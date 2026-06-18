@@ -1,0 +1,39 @@
+import { createContext, useContext } from 'react'
+
+export type Overlay =
+  | 'notifications'
+  | 'settings'
+  | 'profile'
+  | 'activeWorkout'
+  | 'addFood'
+  | 'logWeight'
+  | 'logHabit'
+  | 'createPost'
+  | 'recap'
+  | 'leaderboard'
+  | 'photos'
+  | 'quick'
+  | 'badges'
+  | 'examMode'
+  | 'coach'
+  | 'coachChat'
+  | 'beginner'
+  | 'budgetEats'
+  | 'exerciseDetail'
+  | 'partnerMatch'
+  | 'prCelebration'
+
+export type NavCtx = {
+  open: (o: Overlay, params?: Record<string, unknown>) => void
+  close: () => void
+  goTab: (t: 'dashboard' | 'workout' | 'nutrition' | 'progress' | 'community') => void
+}
+
+const Ctx = createContext<NavCtx | null>(null)
+export const NavProvider = Ctx.Provider
+
+export function useNav() {
+  const c = useContext(Ctx)
+  if (!c) throw new Error('useNav must be used within NavProvider')
+  return c
+}

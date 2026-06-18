@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  /* Surface card used across every screen. Shadow is applied per-platform
+     in the JS <Card> wrapper because RN handles elevation differently. */
+  .card {
+    @apply rounded-2xl bg-ink-800 border border-white/5;
+  }
+
+  .chip {
+    @apply flex-row items-center rounded-full px-2.5 py-1 text-xs font-medium;
+  }
+
+  .btn-primary {
+    @apply flex-row items-center justify-center rounded-full bg-brand-400 px-5 py-3 font-semibold text-black;
+  }
+
+  .section-title {
+    @apply text-[17px] font-bold tracking-tight text-white;
+  }
+
+  .see-all {
+    @apply text-sm font-semibold text-brand-400;
+  }
+}

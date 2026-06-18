@@ -1,0 +1,508 @@
+import { useState, useEffect } from 'react'
+import { View, Text, Pressable, Image, TextInput } from 'react-native'
+import {
+  Sparkles, Check, ChevronRight, ChevronDown, Wallet, Trophy, Flame,
+  GraduationCap, Dumbbell, Lightbulb, ShieldQuestion, Share2, Plus, MapPin,
+  Send, Video, Lock, Crown, X, Clock,
+} from 'lucide-react-native'
+import { Sheet } from '../components/Sheet'
+import { Avatar } from '../components/Avatar'
+import { Icon } from '../components/Icon'
+import { Chip, ProgressBar } from '../components/ui'
+import { TechniqueClip } from '../components/TechniqueClip'
+import { useStore } from '../store/store'
+import { useToast } from '../components/Toast'
+import { useNav } from '../nav'
+import {
+  BUDGET_MEALS, BEGINNER_LESSONS, exerciseDetail, exById, REP_TARGETS, BASE_WEIGHTS,
+} from '../data/catalog'
+import { nextSetRecommendation } from '../store/training'
+import { coachThreadView } from '../store/coach'
+import { CHAT_SUGGESTIONS } from '../lib/coachChat'
+import { todaySession } from '../store/selectors'
+import { relativeLabel } from '../lib/date'
+import { brand, useColors } from '../theme'
+import type { ReactNode } from 'react'
+import type { CoachKind, MealName } from '../store/types'
+
+type Props = { open: boolean; onClose: () => void; params?: Record<string, unknown> }
+
+/* ============================ Your Coach ============================ */
+const coachIcon: Record<CoachKind, ReactNode> = {
+  checkin: <Sparkles size={16} color={brand[400]} />,
+  nudge: <Flame size={16} color={brand[400]} />,
+  celebration: <Trophy size={16} color={brand[400]} />,
+  exam: <GraduationCap size={16} color={brand[400]} />,
+  qa: <ShieldQuestion size={16} color={brand[400]} />,
+}
+
+export function CoachSheet({ open, onClose }: Props) {
+  const { state } = useStore()
+  const nav = useNav()
+  const thread = coachThreadView(state)
+
+  return (
+    <Sheet open={open} onClose={onClose} title="Your coach">
+      <View className="mb-4 flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-3.5">
+        <View className="h-11 w-11 items-center justify-center rounded-full bg-brand-400"><Sparkles size={20} color="#000" /></View>
+        <View>
+          <Text className="font-bold leading-tight text-white">Coach</Text>
+          <Text className="text-[12px] text-white/50">Reads your logs. Checks in, not chats.</Text>
+        </View>
+      </View>
+
+      <View className="gap-3">
+        {thread.map((m, i) => (
+          <View key={m.id} className={`rounded-2xl border p-4 ${i === 0 ? 'border-brand-400/30 bg-brand-400/5' : 'border-white/5 bg-ink-800'}`}>
+            <View className="mb-1 flex-row items-center gap-2">
+              <View className="h-6 w-6 items-center justify-center rounded-full bg-white/5">{coachIcon[m.kind]}</View>
+              <Text className="font-bold leading-tight text-white">{m.title}</Text>
+              <Text className="ml-auto text-[11px] text-white/35">{i === 0 ? 'Today' : relativeLabel(m.dateKey)}</Text>
+            </View>
+            <Text className="text-[14px] leading-snug text-white/70">{m.body}</Text>
+            {m.cta && (
+              <Pressable
+                onPress={() => nav.open(m.cta!.overlay as Parameters<typeof nav.open>[0])}
+                className="mt-3 flex-row items-center gap-1 self-start rounded-full bg-brand-400 px-3.5 py-1.5 active:opacity-90"
+              >
+                <Text className="text-sm font-bold text-black">{m.cta.label}</Text>
+                <ChevronRight size={15} color="#000" />
+              </Pressable>
+            )}
+          </View>
+        ))}
+      </View>
+    </Sheet>
+  )
+}
+
+/* ====================== New to the Gym track ====================== */
+export function BeginnerSheet({ open, onClose }: Props) {
+  const { state, dispatch } = useStore()
+  const toast = useToast()
+  const [openId, setOpenId] = useState<string | null>(BEGINNER_LESSONS[0]?.id ?? null)
+  const done = state.beginnerProgress
+  const total = BEGINNER_LESSONS.length
+
+  return (
+    <Sheet open={open} onClose={onClose} title="New to the gym">
+      <View className="rounded-3xl border border-white/8 bg-ink-800 p-5">
+        <Text className="text-[13px] font-semibold text-brand-400">Your first 90 days</Text>
+        <Text className="mt-1 text-xl font-extrabold tracking-tight text-white">No experience needed</Text>
+        <Text className="mt-1 text-[14px] leading-snug text-white/60">A calm, step by step path into the gym. Read one when you have a spare minute. Nothing here assumes you know anything yet.</Text>
+        <View className="mt-4 flex-row items-center gap-3">
+          <View className="flex-1"><ProgressBar value={(done.length / total) * 100} /></View>
+          <Text className="shrink-0 text-[12px] font-semibold text-white/50">{done.length}/{total}</Text>
+        </View>
+      </View>
+
+      <View className="mt-4 gap-2.5">
+        {BEGINNER_LESSONS.map((l) => {
+          const isOpen = openId === l.id
+          const isDone = done.includes(l.id)
+          return (
+            <View key={l.id} className="overflow-hidden rounded-2xl border border-white/5 bg-ink-800">
+              <Pressable onPress={() => setOpenId(isOpen ? null : l.id)} className="w-full flex-row items-center gap-3 p-4 active:opacity-80">
+                <View className={`h-10 w-10 shrink-0 items-center justify-center rounded-xl ${isDone ? 'bg-brand-400' : 'bg-brand-400/15'}`}>
+                  {isDone ? <Check size={18} strokeWidth={3} color="#000" /> : <Icon name={l.icon} size={20} color={brand[400]} />}
+                </View>
+                <View className="min-w-0 flex-1">
+                  <Text className="font-bold leading-tight text-white">{l.title}</Text>
+                  <Text numberOfLines={1} className="text-[12px] text-white/50">{l.summary} · {l.minutes} min</Text>
+                </View>
+                <ChevronDown size={18} color="rgba(255,255,255,0.3)" style={{ transform: [{ rotate: isOpen ? '180deg' : '0deg' }] }} />
+              </Pressable>
+              {isOpen && (
+                <View className="px-4 pb-4">
+                  <View className="gap-2 border-t border-white/5 pt-3">
+                    {l.body.map((para, i) => <Text key={i} className="text-[14px] leading-relaxed text-white/70">{para}</Text>)}
+                  </View>
+                  {!isDone && (
+                    <Pressable onPress={() => { dispatch({ type: 'COMPLETE_LESSON', id: l.id }); toast('Lesson done. Nice.') }} className="btn-primary mt-3 w-full py-2.5 active:opacity-90">
+                      <Text className="text-sm font-semibold text-black">Mark as read</Text>
+                    </Pressable>
+                  )}
+                </View>
+              )}
+            </View>
+          )
+        })}
+      </View>
+    </Sheet>
+  )
+}
+
+/* ======================== Budget eats ============================= */
+export function BudgetEatsSheet({ open, onClose }: Props) {
+  const { dispatch } = useStore()
+  const toast = useToast()
+  const [openId, setOpenId] = useState<string | null>(null)
+  const [showList, setShowList] = useState(false)
+
+  const grocery = (() => {
+    const map = new Map<string, number>()
+    for (const m of BUDGET_MEALS) for (const ing of m.ingredients) map.set(ing.item, (map.get(ing.item) ?? 0) + ing.cost)
+    return [...map.entries()]
+  })()
+  const weekTotal = grocery.reduce((a, [, c]) => a + c, 0)
+
+  function logMeal(id: string) {
+    const m = BUDGET_MEALS.find((x) => x.id === id)!
+    dispatch({ type: 'ADD_MEAL', meal: { meal: 'Lunch' as MealName, name: m.name, qty: 1, kcal: m.kcal, p: m.p, c: m.c, f: m.f } })
+    toast('Logged to lunch')
+  }
+
+  return (
+    <Sheet open={open} onClose={onClose} title="Eat well for less">
+      <View className="rounded-3xl border border-white/8 bg-ink-800 p-5">
+        <Wallet size={26} color={brand[400]} />
+        <Text className="mt-2 text-xl font-extrabold tracking-tight text-white">Cheap, high protein, fast</Text>
+        <Text className="mt-1 text-[14px] leading-snug text-white/60">Real meals for a student budget, with rough costs. Cook once, eat across a couple of days.</Text>
+      </View>
+
+      <Pressable onPress={() => setShowList((v) => !v)} className="mt-4 w-full flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-4 active:opacity-80">
+        <View className="h-10 w-10 items-center justify-center rounded-xl bg-brand-400/15"><Text className="text-sm font-bold text-brand-400">${weekTotal.toFixed(0)}</Text></View>
+        <View className="flex-1">
+          <Text className="font-bold leading-tight text-white">This week's grocery list</Text>
+          <Text className="text-[12px] text-white/50">Everything for all meals below</Text>
+        </View>
+        <ChevronDown size={18} color="rgba(255,255,255,0.3)" style={{ transform: [{ rotate: showList ? '180deg' : '0deg' }] }} />
+      </Pressable>
+      {showList && (
+        <View className="mt-2 rounded-2xl border border-white/5 bg-ink-800 p-4">
+          {grocery.map(([item, cost], idx) => (
+            <View key={item} className={`flex-row items-center justify-between py-2 ${idx === grocery.length - 1 ? '' : 'border-b border-white/5'}`}>
+              <Text className="text-[13px] text-white/70">{item}</Text>
+              <Text className="text-[13px] font-semibold text-white/50">${cost.toFixed(2)}</Text>
+            </View>
+          ))}
+          <View className="mt-2 flex-row items-center justify-between">
+            <Text className="text-[14px] font-bold text-white">Estimated total</Text>
+            <Text className="text-[14px] font-bold text-brand-400">${weekTotal.toFixed(2)}</Text>
+          </View>
+        </View>
+      )}
+
+      <View className="mt-4 gap-2.5">
+        {BUDGET_MEALS.map((m) => {
+          const isOpen = openId === m.id
+          return (
+            <View key={m.id} className="overflow-hidden rounded-2xl border border-white/5 bg-ink-800">
+              <Pressable onPress={() => setOpenId(isOpen ? null : m.id)} className="w-full flex-row items-center gap-3 p-3 active:opacity-80">
+                <Image source={{ uri: m.image }} resizeMode="cover" className="h-14 w-14 rounded-xl" />
+                <View className="min-w-0 flex-1">
+                  <Text className="font-bold leading-tight text-white">{m.name}</Text>
+                  <Text className="text-[12px] text-white/50">{m.kcal} kcal · {m.p}g protein</Text>
+                  <View className="mt-1 flex-row flex-wrap gap-1">{m.tags.slice(0, 2).map((t) => <Chip key={t} color="green">{t}</Chip>)}</View>
+                </View>
+                <View className="items-end">
+                  <Text className="font-extrabold text-brand-400">${m.cost.toFixed(2)}</Text>
+                  <Text className="text-[10px] text-white/40">per serve</Text>
+                </View>
+              </Pressable>
+              {isOpen && (
+                <View className="gap-3 border-t border-white/5 px-4 py-3">
+                  <View>
+                    <Text className="mb-1 text-[12px] font-bold uppercase tracking-wide text-white/40">Ingredients</Text>
+                    {m.ingredients.map((ing) => (
+                      <View key={ing.item} className="flex-row justify-between py-0.5"><Text className="text-[14px] text-white/70">{ing.item}</Text><Text className="text-[14px] text-white/45">${ing.cost.toFixed(2)}</Text></View>
+                    ))}
+                  </View>
+                  <View>
+                    <Text className="mb-1 text-[12px] font-bold uppercase tracking-wide text-white/40">Method</Text>
+                    <View className="gap-1 pl-1">{m.steps.map((s, i) => <Text key={i} className="text-[14px] text-white/70">{i + 1}. {s}</Text>)}</View>
+                  </View>
+                  {m.cookOnce && (
+                    <View className="flex-row gap-2 rounded-xl bg-brand-400/10 p-3">
+                      <Lightbulb size={16} color={brand[400]} style={{ flexShrink: 0 }} />
+                      <Text className="flex-1 text-[13px] text-white/70">{m.cookOnce}</Text>
+                    </View>
+                  )}
+                  <Pressable onPress={() => logMeal(m.id)} className="btn-primary w-full flex-row items-center justify-center gap-1.5 py-2.5 active:opacity-90"><Plus size={15} color="#000" /><Text className="text-sm font-semibold text-black">Log to today</Text></Pressable>
+                </View>
+              )}
+            </View>
+          )
+        })}
+      </View>
+    </Sheet>
+  )
+}
+
+/* ===================== Exercise technique ========================= */
+export function ExerciseDetailSheet({ open, onClose, params }: Props) {
+  const { state } = useStore()
+  const defId = (params?.defId as string) ?? 'bench'
+  const def = exById(defId)
+  const detail = exerciseDetail(defId)
+  const target = REP_TARGETS[defId] ?? '8–12'
+  const sessionEx = todaySession(state)?.exercises.find((e) => e.defId === defId)
+  const fallback = sessionEx ? Math.max(...sessionEx.sets.map((s) => s.weightKg)) : BASE_WEIGHTS[defId] ?? 20
+  const rec = nextSetRecommendation(state, defId, sessionEx?.targetReps ?? target, fallback)
+
+  if (!def) return null
+  return (
+    <Sheet open={open} onClose={onClose} title={def.name}>
+      <TechniqueClip poster={def.image} videoUrl={detail.video} label="Form clip coming soon" />
+
+      <View className="mt-3 flex-row items-center gap-2">
+        <Chip color="gray">{def.muscle}</Chip>
+        {detail.beginnerFriendly && <Chip color="green">Beginner friendly</Chip>}
+      </View>
+
+      <Text className="mt-4 text-[14px] leading-snug text-white/70">{detail.desc}</Text>
+
+      <Text className="mb-2 mt-5 text-[12px] font-bold uppercase tracking-wide text-white/40">How to do it</Text>
+      <View className="gap-2">
+        {detail.cues.map((c, i) => (
+          <View key={i} className="flex-row items-start gap-3 rounded-xl border border-white/5 bg-ink-800 p-3">
+            <View className="h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-400/15"><Text className="text-[12px] font-bold text-brand-400">{i + 1}</Text></View>
+            <Text className="flex-1 text-[14px] text-white/75">{c}</Text>
+          </View>
+        ))}
+      </View>
+
+      <View className="mt-4 flex-row gap-2.5 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+        <Lightbulb size={18} color="rgba(255,255,255,0.6)" style={{ flexShrink: 0 }} />
+        <View className="flex-1">
+          <Text className="text-[13px] font-bold text-white/80">Most common mistake</Text>
+          <Text className="text-[13px] leading-snug text-white/70">{detail.commonMistake}</Text>
+        </View>
+      </View>
+
+      <View className="mt-3 flex-row gap-2.5 rounded-2xl border border-white/5 bg-ink-800 p-4">
+        <Dumbbell size={18} color={brand[400]} style={{ flexShrink: 0 }} />
+        <View className="flex-1">
+          <Text className="text-[13px] font-bold text-white">If it's taken</Text>
+          <Text className="text-[13px] leading-snug text-white/70">{detail.ifTaken}</Text>
+        </View>
+      </View>
+
+      {rec.hasHistory && (
+        <View className="mt-3 flex-row gap-2.5 rounded-2xl border border-brand-400/20 bg-brand-400/5 p-4">
+          <Sparkles size={18} color={brand[400]} style={{ flexShrink: 0 }} />
+          <View className="flex-1">
+            <Text className="text-[13px] font-bold text-brand-400">Coach's call next time</Text>
+            <Text className="text-[13px] leading-snug text-white/70">{rec.reason}</Text>
+          </View>
+        </View>
+      )}
+    </Sheet>
+  )
+}
+
+/* ===================== Training partner matcher =================== */
+const levelLabel: Record<string, string> = { beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced' }
+
+export function PartnerMatchSheet({ open, onClose }: Props) {
+  const { state, dispatch } = useStore()
+  const toast = useToast()
+  const candidates = [...state.partners].sort((a, b) => b.matchPct - a.matchPct)
+
+  return (
+    <Sheet open={open} onClose={onClose} title="Find a training partner">
+      <View className="rounded-3xl border border-white/8 bg-ink-800 p-5">
+        <MapPin size={24} color={brand[400]} />
+        <Text className="mt-2 text-xl font-extrabold tracking-tight text-white">People on your campus</Text>
+        <Text className="mt-1 text-[14px] leading-snug text-white/60">Matched by your hall, level and goal. Training with someone at your stage is the easiest way to keep showing up.</Text>
+      </View>
+
+      <View className="mt-4 gap-2.5">
+        {candidates.map((c) => {
+          const sameDorm = c.dorm === state.profile.dorm
+          return (
+            <View key={c.id} className="rounded-2xl border border-white/5 bg-ink-800 p-3.5">
+              <View className="flex-row items-center gap-3">
+                <Avatar name={c.name} size={44} />
+                <View className="min-w-0 flex-1">
+                  <View className="flex-row items-center gap-2">
+                    <Text className="font-bold leading-tight text-white">{c.name}</Text>
+                    {sameDorm && <Chip color="green">Your hall</Chip>}
+                  </View>
+                  <Text className="text-[12px] text-white/50">{levelLabel[c.level]} · {c.dorm}</Text>
+                </View>
+                <View className="items-end">
+                  <Text className="font-extrabold text-brand-400">{c.matchPct}%</Text>
+                  <Text className="text-[10px] text-white/40">match</Text>
+                </View>
+              </View>
+              <Text className="mt-2 text-[13px] leading-snug text-white/65">{c.blurb}</Text>
+              <Text className="mt-1 text-[12px] text-white/40">Free: {c.availability}</Text>
+              <Pressable
+                onPress={() => { dispatch({ type: 'CONNECT_PARTNER', id: c.id }); toast(c.connected ? 'Request cancelled' : `Request sent to ${c.name.split(' ')[0]}`) }}
+                className={`mt-3 w-full items-center rounded-full py-2.5 active:opacity-90 ${c.connected ? 'bg-ink-700' : 'bg-brand-400'}`}
+              >
+                <Text className={`text-sm font-bold ${c.connected ? 'text-white/70' : 'text-black'}`}>{c.connected ? 'Request sent' : 'Connect'}</Text>
+              </Pressable>
+            </View>
+          )
+        })}
+      </View>
+    </Sheet>
+  )
+}
+
+/* ====================== PR celebration =========================== */
+export function PRCelebrationSheet({ open, onClose, params }: Props) {
+  const { dispatch } = useStore()
+  const toast = useToast()
+  const lift = (params?.lift as string) ?? 'a lift'
+  const weight = (params?.weight as string) ?? ''
+  const reps = (params?.reps as number) ?? 0
+
+  function share() {
+    dispatch({ type: 'ADD_POST', text: `New ${lift} best, ${weight} for ${reps}. Proof that turning up works.` })
+    toast('Shared to your campus feed')
+    onClose()
+  }
+
+  return (
+    <Sheet open={open} onClose={onClose} title="Personal best">
+      <View className="items-center py-4">
+        <View className="h-20 w-20 items-center justify-center rounded-3xl bg-brand-400">
+          <Trophy size={38} color="#000" />
+        </View>
+        <Text className="mt-5 text-[13px] font-semibold uppercase tracking-wide text-brand-400">New personal best</Text>
+        <Text className="mt-1 text-3xl font-extrabold tracking-tight text-white">{lift}</Text>
+        <Text className="mt-1 text-lg font-bold text-white/80">{weight} for {reps} reps</Text>
+        <Text className="mt-3 max-w-[260px] text-center text-[14px] leading-snug text-white/55">That is the strongest you have logged on this lift. Quietly huge. Your cohort would love to see it.</Text>
+      </View>
+      <Pressable onPress={share} className="btn-primary w-full flex-row items-center justify-center gap-1.5 active:opacity-90"><Share2 size={16} color="#000" /><Text className="font-semibold text-black">Share with your cohort</Text></Pressable>
+      <Pressable onPress={onClose} className="mt-2 w-full items-center rounded-full bg-ink-700 py-3 active:opacity-90"><Text className="text-sm font-semibold text-white/70">Keep it to myself</Text></Pressable>
+    </Sheet>
+  )
+}
+
+/* ===================== Coach messenger (1:1 chat) ================== */
+const BOOKING_SLOTS = ['Tomorrow · 6:00 PM', 'Thursday · 7:30 PM', 'Saturday · 10:00 AM']
+
+export function CoachChatSheet({ open, onClose }: Props) {
+  const { state, dispatch } = useStore()
+  const toast = useToast()
+  const colors = useColors()
+  const [text, setText] = useState('')
+  const [showBook, setShowBook] = useState(false)
+  const [booked, setBooked] = useState<string | null>(null)
+  const premium = state.profile.premium
+  const messages = state.chat
+  const showSuggestions = messages.filter((m) => m.role === 'user').length === 0
+
+  // Mark coach messages read whenever the thread is open and grows.
+  useEffect(() => {
+    if (open) dispatch({ type: 'MARK_CHAT_READ' })
+  }, [open, messages.length, dispatch])
+
+  function send(t?: string) {
+    const msg = (t ?? text).trim()
+    if (!msg) return
+    dispatch({ type: 'SEND_CHAT', text: msg })
+    setText('')
+  }
+
+  function unlock() {
+    dispatch({ type: 'SET_PROFILE', patch: { premium: true } })
+    toast('Premium unlocked — enjoy your calls')
+  }
+
+  function pickSlot(slot: string) {
+    setBooked(slot)
+    toast('Video call booked')
+  }
+
+  return (
+    <Sheet open={open} onClose={onClose} title="Coach">
+      {/* Header row (in-sheet) */}
+      <View className="mb-3 flex-row items-center gap-3">
+        <View className="relative">
+          <View className="h-10 w-10 items-center justify-center rounded-full bg-brand-400"><Sparkles size={20} color="#000" /></View>
+          <View className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-brand-400" style={{ borderWidth: 2, borderColor: colors.ink900 }} />
+        </View>
+        <View className="min-w-0 flex-1">
+          <Text className="font-bold leading-tight text-white">Coach</Text>
+          <Text className="text-[12px] text-brand-400">Online · usually replies instantly</Text>
+        </View>
+        <Pressable onPress={() => setShowBook((v) => !v)} className="h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-400/15 active:opacity-80">
+          <Video size={18} color={brand[400]} />
+        </Pressable>
+      </View>
+
+      {/* Book-a-call panel */}
+      {showBook && (
+        <View className="mb-3 rounded-2xl border border-white/8 bg-ink-800 px-4 py-3.5">
+          {booked ? (
+            <View className="flex-row items-start gap-2.5">
+              <View className="h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-400"><Check size={18} strokeWidth={3} color="#000" /></View>
+              <View className="flex-1">
+                <Text className="font-bold leading-tight text-white">Call booked</Text>
+                <Text className="text-[13px] text-white/60">{booked}. I'll send a video link to your email beforehand.</Text>
+              </View>
+            </View>
+          ) : premium ? (
+            <>
+              <View className="mb-2.5 flex-row items-center gap-2">
+                <Video size={16} color={brand[400]} />
+                <Text className="text-sm font-bold text-white">Book a 1:1 video call</Text>
+                <View className="ml-auto flex-row items-center gap-1 rounded-full bg-brand-400/15 px-2 py-0.5"><Crown size={11} color={brand[400]} /><Text className="text-[10px] font-bold text-brand-400">Premium</Text></View>
+              </View>
+              <View className="gap-2">
+                {BOOKING_SLOTS.map((slot) => (
+                  <Pressable key={slot} onPress={() => pickSlot(slot)} className="w-full flex-row items-center gap-2.5 rounded-xl border border-white/8 bg-ink-700 p-3 active:opacity-80">
+                    <Clock size={15} color={brand[400]} />
+                    <Text className="text-[14px] font-semibold text-white">{slot}</Text>
+                    <ChevronRight size={16} color="rgba(255,255,255,0.3)" style={{ marginLeft: 'auto' }} />
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          ) : (
+            <View className="rounded-xl border border-brand-400/25 bg-brand-400/[0.06] p-4">
+              <View className="flex-row items-center gap-2">
+                <View className="h-8 w-8 items-center justify-center rounded-full bg-brand-400"><Crown size={16} color="#000" /></View>
+                <Text className="font-bold text-white">Video calls are Premium</Text>
+                <Lock size={15} color="rgba(255,255,255,0.4)" style={{ marginLeft: 'auto' }} />
+              </View>
+              <Text className="mt-2 text-[13px] leading-snug text-white/65">Go Premium to book live 1:1 video calls with your coach for form checks, plan reviews and accountability. Text coaching stays free, always.</Text>
+              <Pressable onPress={unlock} className="btn-primary mt-3 w-full flex-row items-center justify-center gap-1.5 py-2.5 active:opacity-90"><Crown size={15} color="#000" /><Text className="text-sm font-semibold text-black">Unlock Premium</Text></Pressable>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* Messages */}
+      <View className="gap-3">
+        {messages.map((m) => (
+          <View key={m.id} className={`flex-row ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <View className={`max-w-[82%] rounded-2xl px-3.5 py-2.5 ${m.role === 'user' ? 'rounded-br-md bg-brand-400' : 'rounded-bl-md border border-white/8 bg-ink-800'}`}>
+              <Text className={`text-[14px] leading-snug ${m.role === 'user' ? 'text-black' : 'text-white/85'}`}>{m.text}</Text>
+              <Text className={`mt-1 text-[10px] ${m.role === 'user' ? 'text-black/50' : 'text-white/35'}`}>{m.time}</Text>
+            </View>
+          </View>
+        ))}
+      </View>
+
+      {/* Suggestions */}
+      {showSuggestions && (
+        <View className="mt-2 flex-row flex-wrap gap-2">
+          {CHAT_SUGGESTIONS.map((s) => (
+            <Pressable key={s} onPress={() => send(s)} className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 active:opacity-80"><Text className="text-[12px] font-medium text-white/70">{s}</Text></Pressable>
+          ))}
+        </View>
+      )}
+
+      {/* Input */}
+      <View className="mt-3 flex-row items-end gap-2 border-t border-white/8 pt-3">
+        <TextInput
+          value={text}
+          onChangeText={setText}
+          multiline
+          placeholder="Message your coach…"
+          placeholderTextColor="rgba(255,255,255,0.3)"
+          className="max-h-28 min-h-[44px] flex-1 rounded-2xl border border-white/8 bg-ink-800 px-4 py-3 text-[15px] text-white"
+        />
+        <Pressable onPress={() => send()} disabled={!text.trim()} className={`h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-400 active:opacity-90 ${!text.trim() ? 'opacity-40' : ''}`}>
+          <Send size={18} color="#000" />
+        </Pressable>
+      </View>
+    </Sheet>
+  )
+}
