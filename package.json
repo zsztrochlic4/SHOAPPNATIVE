@@ -4,6 +4,7 @@
   "description": "StrengthHub Online — React Native (Expo) port of the SHO-app fitness PWA.",
   "main": "index.ts",
   "dependencies": {
+    "@expo/metro-runtime": "^56.0.15",
     "@react-native-async-storage/async-storage": "^3.1.1",
     "expo": "~56.0.12",
     "expo-image-picker": "^56.0.18",
@@ -12,9 +13,11 @@
     "lucide-react-native": "^1.20.0",
     "nativewind": "^4.2.5",
     "react": "19.2.3",
+    "react-dom": "^19.2.3",
     "react-native": "0.85.3",
     "react-native-safe-area-context": "^5.8.0",
-    "react-native-svg": "^15.15.5"
+    "react-native-svg": "^15.15.5",
+    "react-native-web": "^0.21.2"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
