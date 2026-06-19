@@ -1,0 +1,52 @@
+name: Deploy web preview
+
+# Builds the Expo web export and publishes it to GitHub Pages so the app can be
+# previewed in any browser at https://<owner>.github.io/sho-app-native/.
+# One-time setup: repo Settings → Pages → Build and deployment → Source:
+# "GitHub Actions". After that this runs automatically on every push.
+
+on:
+  push:
+    branches:
+      - claude/zen-wozniak-ggne93
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Export web build
+        env:
+          # GitHub Pages serves this project under the /sho-app-native/ sub-path.
+          EXPO_WEB_BASE_URL: /sho-app-native
+        run: npx expo export --platform web
+      - run: touch dist/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
