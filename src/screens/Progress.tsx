@@ -1,16 +1,17 @@
 import { useState } from 'react'
 import { View, Text, Pressable, Image, useWindowDimensions } from 'react-native'
 import { SlidersHorizontal, ChevronDown, ArrowRight, Trophy, Flame, Plus, Camera } from 'lucide-react-native'
-import { default as Svg, Path, Line, Circle, G, Text as SvgText } from 'react-native-svg'
+import { default as Svg, Path, Line, Circle, Rect, G, Text as SvgText } from 'react-native-svg'
 import { Icon } from '../components/Icon'
 import { ProgressRing, ScreenHeader, SectionHeader } from '../components/ui'
 import { useStore } from '../store/store'
 import { useNav } from '../nav'
 import { dayKey, shortDate } from '../lib/date'
 import { fmtWeight, fmtWeightNum, weightUnit, weightVal } from '../lib/format'
+import { exById } from '../data/catalog'
 import {
   weightStats, strengthProgress, habitConsistencyWeek, streakStats,
-  workoutsInRange, nutritionForDay,
+  workoutsInRange, nutritionForDay, volumeByWeek, bestLiftId, oneRMSeries,
 } from '../store/selectors'
 import { brand, useColors } from '../theme'
 
@@ -38,6 +39,11 @@ export default function Progress() {
   const vals = chart.map((c) => c.weight)
   const yMin = Math.floor(Math.min(...vals) - 1)
   const yMax = Math.ceil(Math.max(...vals) + 1)
+
+  const volWeeks = volumeByWeek(state, 8).map((v) => ({ label: v.label, volume: Math.round(weightVal(v.volume, units)) }))
+  const liftId = bestLiftId(state)
+  const strengthSeries = liftId ? oneRMSeries(state, liftId).map((p) => ({ date: shortDate(p.dateKey), kg: Math.round(weightVal(p.kg, units)) })) : []
+  const liftName = liftId ? exById(liftId)?.name ?? 'Strength' : ''
 
   const cards = [
     { icon: 'scale', label: 'Weight', value: fmtWeightNum(w.current, units), unit: weightUnit(units), delta: `${w.delta <= 0 ? '↓' : '↑'} ${fmtWeight(Math.abs(w.delta), units, 1)}`, color: '#7ED957', onClick: () => nav.open('logWeight') },
@@ -115,6 +121,22 @@ export default function Progress() {
         </View>
         <WeightChart chart={chart} yMin={yMin} yMax={yMax} grid={colors.grid} tick={colors.tick} />
       </View>
+
+      {/* Training volume */}
+      <View className="mt-4 rounded-2xl border border-white/5 bg-ink-800 p-4">
+        <Text className="section-title mb-2">Training volume</Text>
+        <Text className="mb-2 text-[12px] text-white/45">Total weight lifted per week ({weightUnit(units)})</Text>
+        <VolumeChart data={volWeeks} unit={weightUnit(units)} grid={colors.grid} tick={colors.tick} />
+      </View>
+
+      {/* Strength over time */}
+      {strengthSeries.length >= 2 && (
+        <View className="mt-4 rounded-2xl border border-white/5 bg-ink-800 p-4">
+          <Text className="section-title mb-2">Strength over time</Text>
+          <Text className="mb-2 text-[12px] text-white/45">{liftName} · estimated 1RM ({weightUnit(units)})</Text>
+          <StrengthChart data={strengthSeries} grid={colors.grid} tick={colors.tick} />
+        </View>
+      )}
 
       {/* Strength Progress */}
       <SectionHeader title="Strength Progress" />
@@ -279,6 +301,157 @@ function WeightChart({
             textAnchor={i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'}
           >
             {chart[i].date}
+          </SvgText>
+        ))}
+      </Svg>
+    </View>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  VolumeChart — bar chart rebuilt with react-native-svg              */
+/*  (replaces the Recharts <BarChart>)                                 */
+/* ------------------------------------------------------------------ */
+function VolumeChart({
+  data, unit, grid, tick,
+}: {
+  data: { label: string; volume: number }[]
+  unit: string
+  grid: string
+  tick: string
+}) {
+  const { width: screenW } = useWindowDimensions()
+  const W = Math.max(1, screenW - 40 - 32)
+  const H = 160 // h-40
+
+  const ML = 38
+  const MR = 6
+  const MT = 6
+  const MB = 22
+  const plotW = Math.max(1, W - ML - MR)
+  const plotH = Math.max(1, H - MT - MB)
+
+  const n = data.length
+  const yMax = Math.max(1, ...data.map((d) => d.volume))
+
+  // Y ticks (4 segments), formatted like the web tickFormatter (1k etc.)
+  const fmtTick = (v: number) => (v >= 1000 ? `${Math.round(v / 1000)}k` : `${v}`)
+  const yTicks = Array.from({ length: 5 }, (_, i) => Math.round((yMax * i) / 4))
+
+  const yFor = (v: number) => MT + plotH - (v / yMax) * plotH
+  const slot = plotW / Math.max(1, n)
+  const barW = Math.min(slot * 0.6, 28)
+
+  if (n === 0) {
+    return (
+      <View className="h-40 w-full items-center justify-center">
+        <Text className="text-[12px] text-white/40">No volume data yet</Text>
+      </View>
+    )
+  }
+
+  return (
+    <View className="h-40 w-full">
+      <Svg width={W} height={H}>
+        {/* horizontal gridlines + Y tick labels */}
+        {yTicks.map((t, i) => {
+          const y = yFor(t)
+          return (
+            <G key={`y${i}`}>
+              <Line x1={ML} y1={y} x2={ML + plotW} y2={y} stroke={grid} strokeWidth={1} strokeDasharray="3 3" />
+              <SvgText x={ML - 6} y={y + 3} fill={tick} fontSize={11} textAnchor="end">{fmtTick(t)}</SvgText>
+            </G>
+          )
+        })}
+
+        {/* bars + X tick labels */}
+        {data.map((d, i) => {
+          const cx = ML + slot * i + slot / 2
+          const y = yFor(d.volume)
+          const h = MT + plotH - y
+          return (
+            <G key={`b${i}`}>
+              <Rect x={cx - barW / 2} y={y} width={barW} height={Math.max(0, h)} rx={4} fill={brand[400]} />
+              <SvgText x={cx} y={H - 6} fill={tick} fontSize={11} textAnchor="middle">{d.label}</SvgText>
+            </G>
+          )
+        })}
+      </Svg>
+    </View>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  StrengthChart — line chart rebuilt with react-native-svg           */
+/*  (replaces the Recharts <LineChart>)                                */
+/* ------------------------------------------------------------------ */
+function StrengthChart({
+  data, grid, tick,
+}: {
+  data: { date: string; kg: number }[]
+  grid: string
+  tick: string
+}) {
+  const { width: screenW } = useWindowDimensions()
+  const W = Math.max(1, screenW - 40 - 32)
+  const H = 160 // h-40
+
+  const ML = 34
+  const MR = 8
+  const MT = 6
+  const MB = 22
+  const plotW = Math.max(1, W - ML - MR)
+  const plotH = Math.max(1, H - MT - MB)
+
+  const n = data.length
+  const vals = data.map((d) => d.kg)
+  // Matches the web domain ['dataMin - 5', 'dataMax + 5'].
+  const yMin = Math.min(...vals) - 5
+  const yMax = Math.max(...vals) + 5
+  const span = yMax - yMin || 1
+
+  const yTicks = Array.from({ length: 5 }, (_, i) => Math.round(yMin + (span * i) / 4))
+
+  const xFor = (i: number) => (n <= 1 ? ML + plotW / 2 : ML + (i / (n - 1)) * plotW)
+  const yFor = (v: number) => MT + plotH - ((v - yMin) / span) * plotH
+
+  const linePts = data.map((d, i) => `${xFor(i)},${yFor(d.kg)}`)
+  const linePath = linePts.length ? `M ${linePts.join(' L ')}` : ''
+
+  const xLabelIdx = n <= 1 ? [0] : n === 2 ? [0, 1] : [0, Math.floor((n - 1) / 2), n - 1]
+
+  return (
+    <View className="h-40 w-full">
+      <Svg width={W} height={H}>
+        {/* horizontal gridlines + Y tick labels */}
+        {yTicks.map((t, i) => {
+          const y = yFor(t)
+          return (
+            <G key={`y${i}`}>
+              <Line x1={ML} y1={y} x2={ML + plotW} y2={y} stroke={grid} strokeWidth={1} strokeDasharray="3 3" />
+              <SvgText x={ML - 6} y={y + 3} fill={tick} fontSize={11} textAnchor="end">{String(t)}</SvgText>
+            </G>
+          )
+        })}
+
+        {/* line */}
+        {linePath ? <Path d={linePath} fill="none" stroke={brand[400]} strokeWidth={3} strokeLinejoin="round" strokeLinecap="round" /> : null}
+        {/* dots */}
+        {data.map((d, i) => (
+          <Circle key={`d${i}`} cx={xFor(i)} cy={yFor(d.kg)} r={2} fill={brand[400]} />
+        ))}
+
+        {/* X tick labels */}
+        {xLabelIdx.map((i) => (
+          <SvgText
+            key={`x${i}`}
+            x={xFor(i)}
+            y={H - 6}
+            fill={tick}
+            fontSize={11}
+            textAnchor={i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'}
+          >
+            {data[i].date}
           </SvgText>
         ))}
       </Svg>

@@ -1,16 +1,18 @@
-import type { ReactNode } from 'react'
-import { View, Text, Pressable } from 'react-native'
+import { useState, type ReactNode } from 'react'
+import { View, Text, Pressable, Image } from 'react-native'
 import { Menu, MessageCircle, Clock, Play, GraduationCap, ChevronRight, Sparkles, Leaf, Check, Flame } from 'lucide-react-native'
 import { Icon } from '../components/Icon'
+import { ActivityIcon } from '../components/ActivityIcon'
 import { Card, ProgressRing } from '../components/ui'
 import { Hero } from '../components/Hero'
+import { IndexGauge } from '../components/IndexGauge'
 import { useStore } from '../store/store'
 import { useNav } from '../nav'
-import { currentWeekKeys, todayKey, longDate, TODAY } from '../lib/date'
-import { fmtFluid, fmtWeightNum, weightUnit, pct } from '../lib/format'
+import { currentWeekKeys, todayKey, longDate, shortDate, fromKey, TODAY } from '../lib/date'
+import { fmtFluid, fmtWeightNum, weightUnit, fmtVolume, pct } from '../lib/format'
 import {
-  todayHabit, todaySession, weightStats, workoutsThisWeek, workoutsInRange,
-  strengthProgress, unreadChat, streakStats, foodReviewForDay,
+  todayHabit, habitForDay, todaySession, sessionForDay, activitiesForDay, weightStats, regularWorkoutsInWeek,
+  strengthProgress, unreadChat, streakStats, foodReviewForDay, weeklyIndex,
 } from '../store/selectors'
 import { coachDaily } from '../store/coach'
 import { dailyTargets, examState } from '../store/training'
@@ -18,6 +20,7 @@ import { Wordmark } from '../components/Logo'
 import { brand, accent, useColors } from '../theme'
 
 const WD = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const FULL_WD = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 function greetingFor(hour: number): string {
   if (hour < 12) return 'Good morning'
@@ -42,8 +45,8 @@ export default function Dashboard() {
   const habit = todayHabit(state)
   const session = todaySession(state)
   const w = weightStats(state)
-  const thisWeek = workoutsThisWeek(state)
-  const lastWeek = workoutsInRange(state, 14) - thisWeek
+  const thisWeek = regularWorkoutsInWeek(state, 0)
+  const lastWeek = regularWorkoutsInWeek(state, 1)
   const sp = strengthProgress(state)
   const strengthAvg = sp.length ? Math.round(sp.reduce((a, s) => a + s.pct, 0) / sp.length) : 0
   const unread = unreadChat(state)
@@ -52,17 +55,27 @@ export default function Dashboard() {
   const exam = examState(state)
   const streak = streakStats(state)
   const foodReview = foodReviewForDay(state)
+  const idx = weeklyIndex(state)
   const weightLoggedToday = state.weights.some((x) => x.dateKey === todayKey)
 
   const greeting = greetingFor(TODAY.getHours())
   const weekKeys = currentWeekKeys()
 
+  // The week strip selects which day's data fills the progress section below.
+  const [selDate, setSelDate] = useState(todayKey)
+  const isToday = selDate === todayKey
+  const selHabit = habitForDay(state, selDate)
+  const selSession = sessionForDay(state, selDate)
+  const selActivities = activitiesForDay(state, selDate)
+  const selWeekday = FULL_WD[fromKey(selDate).getDay()]
+  const selTitle = isToday ? "Today's progress" : `${selWeekday}'s progress`
+
   const habitRings = [
-    { icon: 'footprints', label: 'Steps', value: habit.steps.toLocaleString(), pct: pct(habit.steps, t.steps), color: brand[400] },
-    { icon: 'bed', label: 'Sleep', value: `${habit.sleepH} hrs`, pct: pct(habit.sleepH, t.sleepH), color: brand[400] },
-    { icon: 'droplet', label: 'Water', value: fmtFluid(habit.waterL, units), pct: pct(habit.waterL, t.waterL), color: brand[400] },
-    { icon: 'utensils', label: 'Nutrition', value: `${habit.nutritionScore}/10`, pct: habit.nutritionScore * 10, color: brand[400] },
-    { icon: 'leaf', label: 'Mindset', value: `${habit.mindsetMin} min`, pct: pct(habit.mindsetMin, 10), color: brand[400] },
+    { icon: 'footprints', label: 'Steps', value: selHabit.steps.toLocaleString(), pct: pct(selHabit.steps, t.steps), color: brand[400] },
+    { icon: 'bed', label: 'Sleep', value: `${selHabit.sleepH} hrs`, pct: pct(selHabit.sleepH, t.sleepH), color: brand[400] },
+    { icon: 'droplet', label: 'Water', value: fmtFluid(selHabit.waterL, units), pct: pct(selHabit.waterL, t.waterL), color: brand[400] },
+    { icon: 'utensils', label: 'Nutrition', value: `${selHabit.nutritionScore}/10`, pct: selHabit.nutritionScore * 10, color: brand[400] },
+    { icon: 'leaf', label: 'Mindset', value: `${selHabit.mindsetMin} min`, pct: pct(selHabit.mindsetMin, 10), color: brand[400] },
   ]
   const ringsOnTrack = habitRings.filter((h) => h.pct >= 100).length
 
@@ -119,11 +132,11 @@ export default function Dashboard() {
         </Pressable>
       </View>
 
-      {/* Greeting + date + streak */}
-      <View className="flex-row items-end justify-between gap-3">
+      {/* Weekly performance index, the first thing you see, flush with the page */}
+      <View className="flex-row items-start justify-between gap-3">
         <View className="min-w-0 flex-1">
-          <Text className="text-[26px] font-extrabold tracking-tight text-white">{greeting}, {state.profile.name}</Text>
-          <Text className="mt-1 text-[14px] text-white/45">{longDate(todayKey)}</Text>
+          <Text className="text-[20px] font-extrabold tracking-tight text-white">{greeting}, {state.profile.name}</Text>
+          <Text className="mt-0.5 text-[13px] text-white/45">{longDate(todayKey)}</Text>
         </View>
         {streak.current > 0 && (
           <View className="flex-row shrink-0 items-center gap-1.5 rounded-full bg-accent-orange/15 px-3 py-1.5">
@@ -133,66 +146,136 @@ export default function Dashboard() {
         )}
       </View>
 
-      {/* Week selector */}
-      <View className="mt-5 flex-row justify-between">
-        {weekKeys.map((k, i) => {
-          const active = k === todayKey
-          const trained = state.sessions.some((s) => s.dateKey === k && s.completed)
-          const logged = state.habits.some((h) => h.dateKey === k)
-          const date = parseInt(k.slice(-2))
+      <View className="mt-2">
+        <IndexGauge index={idx} />
+      </View>
+
+      <Text className="mt-2 text-center text-[13px] leading-snug text-white/55">{idx.blurb}</Text>
+
+      {/* What's driving the needle, colour-coded by area */}
+      <View className="mt-4 flex-row justify-between gap-2">
+        {idx.parts.map((p) => {
+          const good = p.pct >= 85, mid = p.pct >= 55
+          const bar = good ? brand[400] : mid ? accent.orange : colors.danger
+          const text = good ? '#469628' : mid ? accent.orange : colors.danger
           return (
-            <View key={k} className={`w-11 items-center gap-2 rounded-2xl py-2.5 ${active ? 'bg-brand-400' : ''}`}>
-              <Text className={`text-[11px] font-semibold uppercase tracking-wide ${active ? 'text-black/55' : 'text-white/35'}`}>{WD[i]}</Text>
-              <Text className={`text-[17px] font-bold ${active ? 'text-black' : 'text-white/70'}`}>{date}</Text>
-              <View className={`h-1.5 w-1.5 rounded-full ${active ? 'bg-black/60' : trained || logged ? 'bg-brand-400' : 'bg-transparent'}`} />
+            <View key={p.label} className="flex-1 items-center gap-1.5">
+              <View className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                <View className="h-full rounded-full" style={{ width: `${Math.min(100, p.pct)}%`, backgroundColor: bar }} />
+              </View>
+              <Text className="text-[10px] font-semibold" style={{ color: text }}>{p.label}</Text>
             </View>
           )
         })}
       </View>
 
-      {/* Today's plan */}
-      <Section title="Your plan" action="Workouts" onAction={() => nav.goTab('workout')} />
-      <Hero image={session?.image} rounded={16}>
+      {/* Week strip: tap a day to load its progress below */}
+      <View className="mt-5 flex-row justify-between">
+        {weekKeys.map((k, i) => {
+          const today = k === todayKey
+          const selected = k === selDate
+          const future = k > todayKey
+          const trained = state.sessions.some((s) => s.dateKey === k && s.completed) || (state.activities ?? []).some((a) => a.dateKey === k)
+          const logged = state.habits.some((h) => h.dateKey === k)
+          const date = parseInt(k.slice(-2))
+          return (
+            <Pressable
+              key={k}
+              disabled={future}
+              onPress={() => setSelDate(k)}
+              className={`w-10 items-center gap-1.5 rounded-xl py-1.5 ${future ? 'opacity-30' : 'active:opacity-70'}`}
+            >
+              <Text className={`text-[10px] font-semibold uppercase tracking-wide ${today ? 'text-brand-400' : 'text-white/35'}`}>{WD[i]}</Text>
+              <View className={`h-7 w-7 items-center justify-center rounded-full ${selected ? 'bg-brand-400' : today ? 'border border-brand-400/50' : ''}`}>
+                <Text className={`text-[15px] font-bold ${selected ? 'text-black' : today ? 'text-brand-400' : 'text-white/75'}`}>{date}</Text>
+              </View>
+              <View className={`h-1.5 w-1.5 rounded-full ${trained ? 'bg-brand-400' : logged ? 'bg-white/30' : future ? 'bg-transparent' : 'bg-white/10'}`} />
+            </Pressable>
+          )
+        })}
+      </View>
+
+      {/* Plan / workout: follows the selected day */}
+      <Section title={isToday ? 'Your plan' : `${selWeekday}'s workout`} action="Workouts" onAction={() => nav.goTab('workout')} />
+      <Hero image={selSession?.image ?? session?.image} rounded={16}>
         <View className="flex-row items-center gap-2">
-          <Text className="text-sm font-semibold text-brand-400">Today's plan</Text>
-          {exam.active && (
+          <Text className="text-sm font-semibold text-brand-400">{isToday ? "Today's plan" : selSession ? (selSession.completed ? 'Completed' : 'Logged') : 'Rest day'}</Text>
+          {exam.active && isToday && (
             <View className="rounded-full bg-accent-purple/20 px-2 py-0.5">
               <Text className="text-[10px] font-bold text-accent-purple">Exam mode</Text>
             </View>
           )}
         </View>
-        <Text className="mt-1 text-2xl font-extrabold tracking-tight text-white">{session?.name ?? 'Rest day'}</Text>
+        <Text className="mt-1 text-2xl font-extrabold tracking-tight text-white">{selSession?.name ?? 'Rest day'}</Text>
         <View className="mt-2 flex-row items-center gap-1.5">
           <Clock size={15} color="rgba(255,255,255,0.6)" />
-          <Text className="text-sm text-white/60">{session ? `${session.exercises.length} exercises, about ${exam.active ? 30 : 50} min` : 'Recovery and mobility'}</Text>
+          <Text className="text-sm text-white/60">
+            {selSession
+              ? isToday
+                ? `${selSession.exercises.length} exercises, about ${exam.active ? 30 : 50} min`
+                : `${selSession.exercises.length} exercises · ${selSession.durationMin} min · ${fmtVolume(selSession.volumeKg, units)}`
+              : 'Recovery and mobility'}
+          </Text>
         </View>
-        {session && (
+        {isToday && selSession && (
           <Pressable onPress={() => nav.open('activeWorkout')} className="btn-primary mt-4 self-start active:opacity-90">
             <Play size={16} color="#000" fill="#000" />
-            <Text className="ml-2 font-semibold text-black">{session.completed ? 'View workout' : 'Start workout'}</Text>
+            <Text className="ml-2 font-semibold text-black">{selSession.completed ? 'View workout' : 'Start workout'}</Text>
           </Pressable>
         )}
       </Hero>
 
-      {/* Quick workouts */}
-      <Pressable onPress={() => nav.open('quick')} className="mt-3 flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-3.5 active:opacity-90">
-        <View className="h-10 w-10 items-center justify-center rounded-xl bg-brand-400/15"><Clock size={20} color={brand[400]} /></View>
-        <View className="flex-1">
-          <Text className="font-bold text-white">Got 15 minutes?</Text>
-          <Text className="text-[12px] text-white/50">Express workouts between lectures</Text>
+      {/* Past day: read-only list of what was done */}
+      {!isToday && selSession && (
+        <View className="mt-3 gap-2">
+          {selSession.exercises.map((ex) => {
+            const doneSets = ex.sets.filter((s) => s.done)
+            const top = doneSets.length ? Math.max(...doneSets.map((s) => s.weightKg)) : 0
+            return (
+              <View key={ex.defId} className="flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-3">
+                <Image source={{ uri: ex.image }} resizeMode="cover" className="h-10 w-10 rounded-xl" />
+                <Text numberOfLines={1} className="flex-1 font-semibold text-white">{ex.name}</Text>
+                <Text className="text-[12px] text-white/55">{doneSets.length || ex.sets.length} × {fmtWeightNum(top, units, units === 'imperial' ? 0 : 1)} {weightUnit(units)}</Text>
+              </View>
+            )
+          })}
         </View>
-        <ChevronRight size={18} color="rgba(148,148,148,0.6)" />
-      </Pressable>
+      )}
 
-      {/* Today's habits */}
-      <Section title="Today's progress" action="Log" onAction={() => nav.open('logHabit')} tight />
-      {t.adjusted && <Text className="-mt-1 mb-3 text-[12px] text-accent-purple">Targets eased for exam season</Text>}
+      {/* Activities logged that day */}
+      {selActivities.length > 0 && (
+        <View className="mt-3 gap-2">
+          {selActivities.map((a) => (
+            <View key={a.id} className="flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-3">
+              <View className="h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-400/15"><ActivityIcon name={a.icon} size={18} color={brand[400]} /></View>
+              <View className="min-w-0 flex-1">
+                <Text numberOfLines={1} className="font-semibold text-white">{a.name}</Text>
+                <Text className="text-[12px] capitalize text-white/50">{a.minutes} min · {a.intensity}</Text>
+              </View>
+              <Text className="text-[12px] text-white/55">{a.calories} kcal</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {!isToday && !selSession && selActivities.length === 0 && (
+        <Text className="mt-3 rounded-2xl border border-dashed border-white/10 py-4 text-center text-[13px] text-white/40" style={{ borderStyle: 'dashed' }}>No workout or activity logged on {shortDate(selDate)}.</Text>
+      )}
+
+      {/* Per-day progress, driven by the day selected in the week strip */}
+      <Section
+        title={selTitle}
+        action={isToday ? 'Log' : 'Today'}
+        onAction={() => (isToday ? nav.open('logHabit') : setSelDate(todayKey))}
+        tight
+      />
+      {isToday && t.adjusted && <Text className="-mt-1 mb-3 text-[12px] text-accent-purple">Targets eased for exam season</Text>}
       <Card className="p-4">
         <View className="mb-4 flex-row items-center gap-2">
           <Text className="text-[13px] font-semibold text-white/55">{ringsOnTrack} of {habitRings.length} goals on track</Text>
-          <Text className="ml-auto text-[13px] text-white/30">Tap to update</Text>
+          <Text className="ml-auto text-[13px] text-white/30">{isToday ? 'Tap to update' : shortDate(selDate)}</Text>
         </View>
-        <Pressable onPress={() => nav.open('logHabit')} className="flex-row justify-between active:opacity-80">
+        <Pressable onPress={isToday ? () => nav.open('logHabit') : undefined} className={`flex-row justify-between ${isToday ? 'active:opacity-80' : ''}`}>
           {habitRings.map((h) => (
             <View key={h.label} className="items-center gap-1.5">
               <ProgressRing value={h.pct} size={54} stroke={4} color={h.color}><Icon name={h.icon} size={19} color={h.color} /></ProgressRing>
@@ -213,7 +296,7 @@ export default function Dashboard() {
       </Card>
 
       {/* Coach presence */}
-      <Pressable onPress={() => nav.open('coach')} className="mt-7 overflow-hidden rounded-2xl border border-brand-400/20 bg-brand-400/5 p-4 active:opacity-90">
+      <Pressable onPress={() => nav.open('coach')} className="mt-5 overflow-hidden rounded-2xl border border-brand-400/20 bg-brand-400/5 p-4 active:opacity-90">
         <View className="flex-row items-center gap-2.5">
           <View className="h-7 w-7 items-center justify-center rounded-full bg-brand-400"><Sparkles size={15} color="#000" /></View>
           <Text className="text-[13px] font-bold text-brand-400">Coach</Text>
@@ -284,7 +367,7 @@ function TaskRow({ task, first }: { task: Task; first: boolean }) {
 
 function Section({ title, action, onAction, right, tight }: { title: string; action?: string; onAction?: () => void; right?: ReactNode; tight?: boolean }) {
   return (
-    <View className={`mb-3 flex-row items-center justify-between ${tight ? 'mt-7' : 'mt-9'}`}>
+    <View className={`mb-2.5 flex-row items-center justify-between ${tight ? 'mt-5' : 'mt-7'}`}>
       <Text className="section-title">{title}</Text>
       {right ? right : action ? <Pressable onPress={onAction} hitSlop={8}><Text className="see-all">{action}</Text></Pressable> : null}
     </View>

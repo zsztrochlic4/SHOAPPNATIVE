@@ -91,7 +91,7 @@ function FeedTab() {
 
       <SectionHeader title="What's happening" />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-5" contentContainerStyle={{ flexDirection: 'row', gap: 12, paddingHorizontal: 20, paddingBottom: 4 }}>
-        {state.posts.map((p) => <FeedCard key={p.id} post={p} onLike={() => dispatch({ type: 'TOGGLE_LIKE', postId: p.id })} onKudos={() => dispatch({ type: 'GIVE_KUDOS', postId: p.id })} onBookmark={() => dispatch({ type: 'TOGGLE_BOOKMARK', postId: p.id })} />)}
+        {state.posts.map((p) => <FeedCard key={p.id} post={p} onLike={() => dispatch({ type: 'TOGGLE_LIKE', postId: p.id })} onKudos={() => dispatch({ type: 'GIVE_KUDOS', postId: p.id })} onBookmark={() => dispatch({ type: 'TOGGLE_BOOKMARK', postId: p.id })} onComment={() => nav.open('postDetail', { postId: p.id })} />)}
       </ScrollView>
 
       {featured && (
@@ -117,7 +117,7 @@ function FeedTab() {
   )
 }
 
-function FeedCard({ post: p, onLike, onKudos, onBookmark }: { post: Post; onLike: () => void; onKudos: () => void; onBookmark: () => void }) {
+function FeedCard({ post: p, onLike, onKudos, onBookmark, onComment }: { post: Post; onLike: () => void; onKudos: () => void; onBookmark: () => void; onComment: () => void }) {
   return (
     <View className="w-[268px] shrink-0 overflow-hidden rounded-2xl border border-white/5 bg-ink-800">
       <View className="flex-row items-center gap-2.5 p-3">
@@ -151,10 +151,10 @@ function FeedCard({ post: p, onLike, onKudos, onBookmark }: { post: Post; onLike
           <HeartHandshake size={17} color={p.gaveKudos ? brand[400] : 'rgba(255,255,255,0.55)'} />
           <Text className={`text-sm ${p.gaveKudos ? 'text-brand-400' : 'text-white/55'}`}>{p.kudos ?? 0}</Text>
         </Pressable>
-        <View className="flex-row items-center gap-1.5">
+        <Pressable onPress={onComment} className="flex-row items-center gap-1.5 active:opacity-70">
           <MessageCircle size={17} color="rgba(255,255,255,0.55)" />
           <Text className="text-sm text-white/55">{p.comments}</Text>
-        </View>
+        </Pressable>
         <Pressable onPress={onBookmark} className="ml-auto active:opacity-70">
           <Bookmark size={17} color={p.bookmarked ? brand[400] : 'rgba(255,255,255,0.45)'} fill={p.bookmarked ? brand[400] : 'none'} />
         </Pressable>
@@ -164,6 +164,7 @@ function FeedCard({ post: p, onLike, onKudos, onBookmark }: { post: Post; onLike
 }
 
 function ChallengeCard({ c, onJoin }: { c: Challenge; onJoin: () => void }) {
+  const nav = useNav()
   return (
     <View className="rounded-2xl border border-white/5 bg-ink-800 p-4">
       <View className="flex-row items-center gap-4">
@@ -213,11 +214,16 @@ function ChallengeCard({ c, onJoin }: { c: Challenge; onJoin: () => void }) {
         </>
       )}
 
-      {!c.joined && (
-        <Pressable onPress={onJoin} className="btn-primary mt-4 w-full py-2.5 active:opacity-90">
-          <Text className="text-sm font-semibold text-black">Join challenge</Text>
+      <View className="mt-4 flex-row gap-2">
+        <Pressable onPress={() => nav.open('challengeDetail', { id: c.id })} className="flex-1 items-center rounded-full border border-white/10 bg-white/5 py-2.5 active:opacity-80">
+          <Text className="text-sm font-semibold text-white/80">View standings</Text>
         </Pressable>
-      )}
+        {!c.joined && (
+          <Pressable onPress={onJoin} className="btn-primary flex-1 py-2.5 active:opacity-90">
+            <Text className="text-sm font-semibold text-black">Join</Text>
+          </Pressable>
+        )}
+      </View>
     </View>
   )
 }

@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { View, Text, Pressable, TextInput, Image, ScrollView, Alert } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -6,6 +6,7 @@ import {
   Bell, Moon, Sun, GraduationCap, Wallet, RotateCcw, Trash2, Camera, Trophy,
   Flame, Search, ScanLine, Plus, Check, Share2, ChevronRight, User, Sparkles, Dumbbell,
   Droplet, Footprints, BedDouble, Leaf, Clock, Play, Award, BellRing, Crown,
+  HeartPulse, Activity, Zap, Minus,
 } from 'lucide-react-native'
 import { Sheet, EmptyState } from '../components/Sheet'
 import { Avatar } from '../components/Avatar'
@@ -19,16 +20,24 @@ import { FOODS, QUICK_WORKOUTS } from '../data/catalog'
 import { pick, makeRng } from '../lib/rng'
 import { todayKey, relativeLabel, shortDate } from '../lib/date'
 import {
-  fmtWeight, fmtWeightNum, toKg, weightUnit, fmtFluid, fluidUnit,
+  fmtWeight, fmtWeightNum, toKg, weightUnit, fmtFluid,
   weightVal,
 } from '../lib/format'
 import {
   weightStats, workoutsThisWeek, totalVolumeRange, streakStats, todayHabit,
-  habitConsistencyWeek, leaderboardSorted, strengthProgress,
+  habitConsistencyWeek, leaderboardSorted, strengthProgress, activitiesInRange,
 } from '../store/selectors'
+import { ActivityIcon } from '../components/ActivityIcon'
 import { examState, dailyTargets, defaultExamWindow } from '../store/training'
+import { translator, LANGUAGES, type Language } from '../lib/i18n'
 import type { MealName, Units, Theme } from '../store/types'
 import { brand, accent } from '../theme'
+
+const INTEGRATIONS: { id: string; name: string; sub: string; icon: ReactNode }[] = [
+  { id: 'appleHealth', name: 'Apple Health', sub: 'Steps, workouts, sleep & heart rate', icon: <HeartPulse size={18} color="#f87171" /> },
+  { id: 'healthConnect', name: 'Health Connect', sub: 'Sync Android health data', icon: <Activity size={18} color={brand[400]} /> },
+  { id: 'strava', name: 'Strava', sub: 'Import runs and rides', icon: <Zap size={18} color={accent.orange} /> },
+]
 
 type Props = { open: boolean; onClose: () => void; params?: Record<string, unknown> }
 
@@ -82,52 +91,105 @@ export function SettingsSheet({ open, onClose }: Props) {
   const { state, dispatch } = useStore()
   const toast = useToast()
   const { units, theme, notificationsEnabled } = state.settings
+  const lang = state.settings.language ?? 'en'
+  const t = translator(lang)
+  const connections = state.settings.connections ?? {}
 
   function toggleNotifs() {
     const next = !notificationsEnabled
     dispatch({ type: 'SET_SETTINGS', patch: { notificationsEnabled: next } })
-    toast(next ? 'Notifications on' : 'Notifications off')
+    toast(next ? t('toast.notifsOn') : t('toast.notifsOff'))
+  }
+
+  function setLang(code: Language) {
+    dispatch({ type: 'SET_SETTINGS', patch: { language: code } })
+    toast(translator(code)('toast.langSet'))
+  }
+
+  function toggleConnection(id: string, name: string) {
+    const on = !connections[id]
+    dispatch({ type: 'SET_SETTINGS', patch: { connections: { ...connections, [id]: on } } })
+    toast(`${name} ${on ? t('toast.connected') : t('toast.disconnected')}`)
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title="Settings">
-      <Group label="Units">
+    <Sheet open={open} onClose={onClose} title={t('settings.title')}>
+      <Group label={t('settings.language')}>
+        <View className="flex-row flex-wrap gap-2">
+          {LANGUAGES.map((l) => {
+            const active = l.code === lang
+            return (
+              <Pressable
+                key={l.code}
+                onPress={() => setLang(l.code)}
+                className={`flex-row items-center justify-between rounded-2xl border p-3 active:opacity-90 ${active ? 'border-brand-400 bg-brand-400/10' : 'border-white/8 bg-ink-800'}`}
+                style={{ width: '48%' }}
+              >
+                <View className="min-w-0 flex-1">
+                  <Text numberOfLines={1} className="font-bold leading-tight text-white" style={l.rtl ? { writingDirection: 'rtl' } : undefined}>{l.native}</Text>
+                  <Text className="text-[11px] text-white/45">{l.english}</Text>
+                </View>
+                {active && <Check size={16} strokeWidth={3} color={brand[400]} />}
+              </Pressable>
+            )
+          })}
+        </View>
+      </Group>
+
+      <Group label={t('settings.units')}>
         <Segmented<Units>
           value={units}
-          options={[{ v: 'metric', l: 'Metric (kg)' }, { v: 'imperial', l: 'Imperial (lb)' }]}
+          options={[{ v: 'metric', l: t('settings.metric') }, { v: 'imperial', l: t('settings.imperial') }]}
           onChange={(v) => dispatch({ type: 'SET_SETTINGS', patch: { units: v } })}
         />
       </Group>
 
-      <Group label="Appearance">
+      <Group label={t('settings.appearance')}>
         <Segmented<Theme>
           value={theme}
-          options={[{ v: 'dark', l: 'Dark', icon: <Moon size={15} color={theme === 'dark' ? '#000' : 'rgba(255,255,255,0.6)'} /> }, { v: 'light', l: 'Light', icon: <Sun size={15} color={theme === 'light' ? '#000' : 'rgba(255,255,255,0.6)'} /> }]}
+          options={[{ v: 'dark', l: t('settings.dark'), icon: <Moon size={15} color={theme === 'dark' ? '#000' : 'rgba(255,255,255,0.6)'} /> }, { v: 'light', l: t('settings.light'), icon: <Sun size={15} color={theme === 'light' ? '#000' : 'rgba(255,255,255,0.6)'} /> }]}
           onChange={(v) => dispatch({ type: 'SET_SETTINGS', patch: { theme: v } })}
         />
       </Group>
 
-      <Group label="Preferences">
-        <Row icon={<BellRing size={18} color={brand[400]} />} title="Push notifications" sub="Reminders, streaks & social">
+      {/* Connected apps / integrations */}
+      <Group label={t('settings.connected')}>
+        {INTEGRATIONS.map((it) => {
+          const on = !!connections[it.id]
+          return (
+            <Row key={it.id} icon={it.icon} title={it.name} sub={it.sub}>
+              <Pressable
+                onPress={() => toggleConnection(it.id, it.name)}
+                className={`rounded-full px-3.5 py-1.5 active:opacity-90 ${on ? 'bg-ink-700' : 'bg-brand-400'}`}
+              >
+                <Text className={`text-sm font-bold ${on ? 'text-brand-400' : 'text-black'}`}>{on ? t('settings.connectedLabel') : t('settings.connect')}</Text>
+              </Pressable>
+            </Row>
+          )
+        })}
+      </Group>
+
+      <Group label={t('settings.preferences')}>
+        <Row icon={<BellRing size={18} color={brand[400]} />} title={t('settings.pushNotifs')} sub={t('settings.pushNotifsSub')}>
           <Toggle on={notificationsEnabled} onPress={toggleNotifs} />
         </Row>
-        <Row icon={<GraduationCap size={18} color={accent.purple} />} title="Exam mode" sub="Shorter sessions during exams">
+        <Row icon={<GraduationCap size={18} color={accent.purple} />} title={t('settings.examMode')} sub={t('settings.examModeSub')}>
           <Toggle on={state.profile.examMode} onPress={() => dispatch({ type: 'SET_PROFILE', patch: { examMode: !state.profile.examMode } })} />
         </Row>
-        <Row icon={<Wallet size={18} color={brand[400]} />} title="Budget nutrition" sub="Prioritise cheap, high-protein meals">
+        <Row icon={<Wallet size={18} color={brand[400]} />} title={t('settings.budget')} sub={t('settings.budgetSub')}>
           <Toggle on={state.profile.budgetMode} onPress={() => dispatch({ type: 'SET_PROFILE', patch: { budgetMode: !state.profile.budgetMode } })} />
         </Row>
-        <Row icon={<Crown size={18} color={brand[400]} />} title="Premium" sub="1:1 video calls with your coach">
+        <Row icon={<Crown size={18} color={brand[400]} />} title={t('settings.premium')} sub={t('settings.premiumSub')}>
           <Toggle on={state.profile.premium} onPress={() => dispatch({ type: 'SET_PROFILE', patch: { premium: !state.profile.premium } })} />
         </Row>
       </Group>
 
-      <Group label="Data">
+      <Group label={t('settings.data')}>
         <Pressable onPress={() => { dispatch({ type: 'RESET_DEMO' }); toast('Demo data restored'); onClose() }} className="w-full flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-4 active:opacity-90">
           <RotateCcw size={18} color={brand[400]} />
           <View className="flex-1">
-            <Text className="font-bold text-white">Reset demo data</Text>
-            <Text className="text-[12px] text-white/50">Restore the 40-day sample history</Text>
+            <Text className="font-bold text-white">{t('settings.resetDemo')}</Text>
+            <Text className="text-[12px] text-white/50">{t('settings.resetDemoSub')}</Text>
           </View>
         </Pressable>
         <Pressable
@@ -139,8 +201,8 @@ export function SettingsSheet({ open, onClose }: Props) {
         >
           <Trash2 size={18} color="#f87171" />
           <View className="flex-1">
-            <Text className="font-bold text-red-300">Clear & start fresh</Text>
-            <Text className="text-[12px] text-white/50">Wipe data and run onboarding</Text>
+            <Text className="font-bold text-red-300">{t('settings.clear')}</Text>
+            <Text className="text-[12px] text-white/50">{t('settings.clearSub')}</Text>
           </View>
         </Pressable>
       </Group>
@@ -340,40 +402,78 @@ export function LogHabitSheet({ open, onClose }: Props) {
   const toast = useToast()
   const units = state.settings.units
   const h = todayHabit(state)
-  const [steps, setSteps] = useState(String(h.steps))
-  const [sleep, setSleep] = useState(String(h.sleepH))
-  const [mindset, setMindset] = useState(String(h.mindsetMin))
+  const [steps, setSteps] = useState(h.steps)
+  const [sleepH, setSleepH] = useState(h.sleepH)
+  const [mindset, setMindset] = useState(h.mindsetMin)
+
+  // Resync to today's values whenever the sheet opens.
+  useEffect(() => {
+    if (open) { setSteps(h.steps); setSleepH(h.sleepH); setMindset(h.mindsetMin) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
 
   function save() {
-    dispatch({ type: 'PATCH_TODAY_HABIT', patch: { steps: parseInt(steps) || 0, sleepH: parseFloat(sleep) || 0, mindsetMin: parseInt(mindset) || 0 } })
-    toast('Habits updated')
+    dispatch({ type: 'PATCH_TODAY_HABIT', patch: { steps, sleepH, mindsetMin: mindset } })
+    toast('Nice work, habits logged 🙌')
     onClose()
   }
 
   const waterStep = units === 'imperial' ? 8 / 33.814 : 0.25
   return (
     <Sheet open={open} onClose={onClose} title="Log habits">
-      {/* Water quick logger */}
-      <View className="mb-4 rounded-2xl border border-white/5 bg-ink-800 p-4">
-        <View className="flex-row items-center gap-2">
-          <Droplet size={18} color={brand[400]} />
-          <Text className="flex-1 font-bold text-white">Water</Text>
-          <Text className="font-extrabold text-white">{fmtFluid(h.waterL, units)}</Text>
-        </View>
-        <View className="mt-3 flex-row gap-2">
-          <Pressable onPress={() => dispatch({ type: 'ADJUST_WATER', deltaL: -waterStep })} className="flex-1 items-center rounded-xl bg-ink-700 py-2.5 active:opacity-80">
-            <Text className="font-bold text-white">−</Text>
-          </Pressable>
-          <Pressable onPress={() => { dispatch({ type: 'ADJUST_WATER', deltaL: waterStep }) }} className="flex-[2] items-center rounded-xl bg-brand-400/20 py-2.5 active:opacity-80">
-            <Text className="font-bold text-brand-400">+ {units === 'imperial' ? '8 oz' : '250 ml'}</Text>
-          </Pressable>
-        </View>
-        <Text className="mt-2 text-center text-[12px] text-white/40">Goal: {fmtFluid(state.profile.waterTargetL, units)} / {fluidUnit(units)}</Text>
-      </View>
+      <Text className="mb-3 text-[13px] text-white/50">Adjust and log. Done in seconds.</Text>
 
-      <Field icon={<Footprints size={18} color={brand[400]} />} label="Steps" value={steps} onChange={setSteps} placeholder="8000" />
-      <Field icon={<BedDouble size={18} color={brand[400]} />} label="Sleep (hours)" value={sleep} onChange={setSleep} placeholder="8" />
-      <Field icon={<Leaf size={18} color={brand[400]} />} label="Mindset / meditation (min)" value={mindset} onChange={setMindset} placeholder="5" />
+      <View className="gap-3.5">
+        {/* Water: fast tap logger */}
+        <View className="rounded-2xl border border-white/5 bg-ink-800 p-4">
+          <View className="flex-row items-center gap-2">
+            <Droplet size={18} color={brand[400]} />
+            <Text className="flex-1 font-bold text-white">Water</Text>
+            <Text className="text-2xl font-extrabold text-brand-400">{fmtFluid(h.waterL, units)}</Text>
+          </View>
+          <View className="mt-3 flex-row gap-2">
+            <Pressable onPress={() => dispatch({ type: 'ADJUST_WATER', deltaL: -waterStep })} className="flex-1 items-center rounded-xl bg-ink-700 py-2.5 active:opacity-80">
+              <Text className="text-lg font-bold text-white">−</Text>
+            </Pressable>
+            <Pressable onPress={() => dispatch({ type: 'ADJUST_WATER', deltaL: waterStep })} className="flex-[2] items-center rounded-xl bg-brand-400/20 py-2.5 active:opacity-80">
+              <Text className="font-bold text-brand-400">+ {units === 'imperial' ? '8 oz' : '250 ml'}</Text>
+            </Pressable>
+          </View>
+          <Text className="mt-2 text-center text-[12px] text-white/40">Goal {fmtFluid(state.profile.waterTargetL, units)}</Text>
+        </View>
+
+        {/* Steps: stepper */}
+        <HabitStepper
+          icon={<Footprints size={18} color={brand[400]} />} label="Steps"
+          value={steps} min={0} max={20000} step={250} onChange={setSteps}
+          display={steps.toLocaleString()} minLabel="0" maxLabel="20k"
+          goalLabel={`${(state.profile.stepTarget / 1000).toFixed(0)}k`}
+        />
+
+        {/* Sleep: stepper */}
+        <HabitStepper
+          icon={<BedDouble size={18} color={brand[400]} />} label="Sleep"
+          value={sleepH} min={0} max={12} step={0.5} onChange={setSleepH}
+          display={`${sleepH}`} unit="h" minLabel="0h" maxLabel="12h"
+          goalLabel={`${state.profile.sleepTargetH}h`}
+        />
+
+        {/* Mindset: quick chips */}
+        <View className="rounded-2xl border border-white/5 bg-ink-800 p-4">
+          <View className="flex-row items-center gap-2">
+            <Leaf size={18} color={brand[400]} />
+            <Text className="flex-1 font-bold text-white">Mindset</Text>
+            <Text className="text-2xl font-extrabold text-brand-400">{mindset}<Text className="text-[13px] font-semibold text-white/40"> min</Text></Text>
+          </View>
+          <View className="mt-3 flex-row flex-wrap gap-2">
+            {[0, 5, 10, 15, 20, 30, 45].map((m) => (
+              <Pressable key={m} onPress={() => setMindset(m)} className={`items-center rounded-xl px-3 py-2 active:opacity-90 ${mindset === m ? 'bg-brand-400' : 'bg-ink-700'}`} style={{ minWidth: 44 }}>
+                <Text className={`text-sm font-bold ${mindset === m ? 'text-black' : 'text-white/60'}`}>{m === 0 ? 'None' : m}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      </View>
 
       <Pressable onPress={save} className="btn-primary mt-6 w-full active:opacity-90">
         <Text className="font-semibold text-black">Save habits</Text>
@@ -382,21 +482,41 @@ export function LogHabitSheet({ open, onClose }: Props) {
   )
 }
 
-function Field({ icon, label, value, onChange, placeholder }: { icon: ReactNode; label: string; value: string; onChange: (v: string) => void; placeholder: string }) {
+/* RN has no range input — emulate the web ruler slider with a labelled
+ * +/- stepper that keeps the same value/min/max/step contract. */
+function HabitStepper({ icon, label, value, min, max, step, onChange, display, unit, minLabel, maxLabel, goalLabel }: {
+  icon: ReactNode; label: string; value: number; min: number; max: number; step: number; onChange: (v: number) => void
+  display: string; unit?: string; minLabel: string; maxLabel: string; goalLabel?: string
+}) {
+  const round = (n: number) => Math.round(n / step) * step
+  const dec = (s: number) => onChange(Math.max(min, round(value - s)))
+  const inc = (s: number) => onChange(Math.min(max, round(value + s)))
   return (
-    <View className="mb-3">
-      <View className="mb-1.5 flex-row items-center gap-2">
+    <View className="rounded-2xl border border-white/5 bg-ink-800 p-4">
+      <View className="flex-row items-center gap-2">
         {icon}
-        <Text className="text-sm font-semibold text-white/70">{label}</Text>
+        <Text className="flex-1 font-bold text-white">{label}</Text>
+        <Text className="text-2xl font-extrabold text-brand-400">{display}{unit && <Text className="text-[13px] font-semibold text-white/40"> {unit}</Text>}</Text>
       </View>
-      <TextInput
-        keyboardType="decimal-pad"
-        value={value}
-        onChangeText={(v) => onChange(v.replace(/[^\d.]/g, ''))}
-        placeholder={placeholder}
-        placeholderTextColor="rgba(148,148,148,0.6)"
-        className="w-full rounded-xl border border-white/8 bg-ink-800 px-4 py-3 text-white"
-      />
+      <View className="mt-3 flex-row items-center gap-2">
+        <Pressable onPress={() => dec(step)} className="h-11 w-11 items-center justify-center rounded-xl bg-ink-700 active:opacity-80">
+          <Minus size={18} color="#fff" />
+        </Pressable>
+        <Pressable onPress={() => dec(step * 4)} className="flex-1 items-center rounded-xl bg-ink-700 py-3 active:opacity-80">
+          <Text className="text-sm font-bold text-white/60">− {step * 4 >= 1000 ? `${step * 4 / 1000}k` : step * 4}</Text>
+        </Pressable>
+        <Pressable onPress={() => inc(step * 4)} className="flex-1 items-center rounded-xl bg-brand-400/20 py-3 active:opacity-80">
+          <Text className="text-sm font-bold text-brand-400">+ {step * 4 >= 1000 ? `${step * 4 / 1000}k` : step * 4}</Text>
+        </Pressable>
+        <Pressable onPress={() => inc(step)} className="h-11 w-11 items-center justify-center rounded-xl bg-brand-400/20 active:opacity-80">
+          <Plus size={18} color={brand[400]} />
+        </Pressable>
+      </View>
+      <View className="mt-1.5 flex-row items-center justify-between">
+        <Text className="text-[11px] text-white/35">{minLabel}</Text>
+        {goalLabel && <Text className="text-[11px] font-semibold text-brand-400/80">Goal {goalLabel}</Text>}
+        <Text className="text-[11px] text-white/35">{maxLabel}</Text>
+      </View>
     </View>
   )
 }
@@ -458,6 +578,7 @@ export function WeeklyRecapSheet({ open, onClose }: Props) {
   const hc = habitConsistencyWeek(state)
   const w = weightStats(state)
   const top = strengthProgress(state)[0]
+  const acts = activitiesInRange(state, 7)
 
   function share() {
     toast('Recap copied to share!')
@@ -484,6 +605,22 @@ export function WeeklyRecapSheet({ open, onClose }: Props) {
             Biggest gain: <Text className="font-bold">{top.name}</Text> up{' '}
             <Text className="font-bold text-brand-400">{top.pct}%</Text> in 4 weeks.
           </Text>
+        </View>
+      )}
+
+      {acts.length > 0 && (
+        <View className="mt-3 rounded-2xl border border-white/5 bg-ink-800 p-4">
+          <Text className="mb-2.5 text-[12px] font-bold uppercase tracking-wide text-white/40">Other activities · {acts.length}</Text>
+          <View className="gap-2">
+            {acts.slice(0, 6).map((a) => (
+              <View key={a.id} className="flex-row items-center gap-2.5">
+                <ActivityIcon name={a.icon} size={16} color={brand[400]} />
+                <Text className="flex-1 text-[13px] text-white/75">{a.name}</Text>
+                {a.weekly && <View className="rounded-full bg-brand-400/15 px-1.5 py-0.5"><Text className="text-[10px] font-bold text-brand-300">Weekly</Text></View>}
+                <Text className="text-[12px] text-white/45">{a.minutes} min</Text>
+              </View>
+            ))}
+          </View>
         </View>
       )}
 
@@ -553,19 +690,64 @@ export function PhotosSheet({ open, onClose }: Props) {
       {photos.length === 0 ? (
         <EmptyState icon={<Camera size={32} color="#fff" />} title="No photos yet" body="Snap a photo to track your visual progress over time." />
       ) : (
-        <View className="flex-row flex-wrap gap-3">
-          {photos.map((p) => (
-            <View key={p.id} className="overflow-hidden rounded-2xl border border-white/5 bg-ink-800" style={{ width: '47%' }}>
-              <Image source={{ uri: p.dataUrl }} resizeMode="cover" style={{ width: '100%', aspectRatio: 3 / 4 }} />
-              <View className="p-2.5">
-                <Text className="text-[12px] font-bold text-white">{shortDate(p.dateKey)}</Text>
-                {p.note && <Text className="text-[11px] text-white/45">{p.note}</Text>}
-              </View>
+        <>
+          {photos.length >= 2 && (
+            <View className="mb-5">
+              <Text className="mb-2 text-[12px] font-bold uppercase tracking-wide text-white/40">Before &amp; after</Text>
+              <CompareSlider before={photos[photos.length - 1]} after={photos[0]} />
             </View>
-          ))}
-        </View>
+          )}
+          <Text className="mb-2 text-[12px] font-bold uppercase tracking-wide text-white/40">All photos</Text>
+          <View className="flex-row flex-wrap gap-3">
+            {photos.map((p) => (
+              <View key={p.id} className="overflow-hidden rounded-2xl border border-white/5 bg-ink-800" style={{ width: '47%' }}>
+                <Image source={{ uri: p.dataUrl }} resizeMode="cover" style={{ width: '100%', aspectRatio: 3 / 4 }} />
+                <View className="p-2.5">
+                  <Text className="text-[12px] font-bold text-white">{shortDate(p.dateKey)}</Text>
+                  {p.note && <Text className="text-[11px] text-white/45">{p.note}</Text>}
+                </View>
+              </View>
+            ))}
+          </View>
+        </>
       )}
     </Sheet>
+  )
+}
+
+/* Web uses an <input type=range> with clipPath to wipe between two photos.
+ * RN has no range input, so we drive the reveal with a +/- stepper that
+ * clips the "after" image by width over the same 0–100% range. */
+function CompareSlider({ before, after }: { before: { dataUrl: string; dateKey: string }; after: { dataUrl: string; dateKey: string } }) {
+  const [pct, setPct] = useState(50)
+  const [w, setW] = useState(0)
+  return (
+    <View>
+      <View
+        onLayout={(e) => setW(e.nativeEvent.layout.width)}
+        className="relative overflow-hidden rounded-2xl border border-white/5"
+        style={{ width: '100%', aspectRatio: 3 / 4 }}
+      >
+        <Image source={{ uri: before.dataUrl }} resizeMode="cover" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
+        <View style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: `${pct}%`, overflow: 'hidden' }}>
+          <Image source={{ uri: after.dataUrl }} resizeMode="cover" style={{ width: w, height: '100%' }} />
+        </View>
+        {w > 0 && <View style={{ position: 'absolute', top: 0, bottom: 0, width: 2, left: (pct / 100) * w, backgroundColor: 'rgba(255,255,255,0.8)' }} />}
+        <View className="absolute bottom-2 left-2 rounded-full bg-black/60 px-2 py-0.5"><Text className="text-[10px] font-bold text-white">After · {shortDate(after.dateKey)}</Text></View>
+        <View className="absolute bottom-2 right-2 rounded-full bg-black/60 px-2 py-0.5"><Text className="text-[10px] font-bold text-white">Before · {shortDate(before.dateKey)}</Text></View>
+      </View>
+      <View className="mt-3 flex-row items-center gap-2">
+        <Pressable onPress={() => setPct((p) => Math.max(0, p - 10))} className="h-10 w-10 items-center justify-center rounded-xl bg-ink-700 active:opacity-80">
+          <Minus size={18} color="#fff" />
+        </Pressable>
+        <View className="h-2 flex-1 overflow-hidden rounded-full bg-white/10">
+          <View className="h-full rounded-full bg-brand-400" style={{ width: `${pct}%` }} />
+        </View>
+        <Pressable onPress={() => setPct((p) => Math.min(100, p + 10))} className="h-10 w-10 items-center justify-center rounded-xl bg-ink-700 active:opacity-80">
+          <Plus size={18} color="#fff" />
+        </Pressable>
+      </View>
+    </View>
   )
 }
 
@@ -574,7 +756,7 @@ export function QuickWorkoutsSheet({ open, onClose }: Props) {
   const toast = useToast()
   return (
     <Sheet open={open} onClose={onClose} title="Got 15 minutes?">
-      <Text className="mb-3 text-[13px] text-white/50">Express sessions for between lectures — no gym needed.</Text>
+      <Text className="mb-3 text-[13px] text-white/50">Express sessions for between lectures. No gym needed.</Text>
       <View className="gap-3">
         {QUICK_WORKOUTS.map((q) => (
           <View key={q.id} className="rounded-2xl border border-white/5 bg-ink-800 p-4">

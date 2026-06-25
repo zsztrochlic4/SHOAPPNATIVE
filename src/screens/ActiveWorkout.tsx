@@ -110,10 +110,11 @@ function mmss(total: number): string {
   return `${m}:${s}`
 }
 
-/** Rest ring colour: green at full → amber → red as it nears zero (hue 96 → 0). */
+/** Rest ring colour: brand green at full → muted amber → soft red near zero.
+ *  Kept at the site's calmer saturation/lightness so it never looks neon. */
 function restColor(frac: number): string {
   const f = Math.max(0, Math.min(1, frac))
-  return `hsl(${Math.round(96 * f)}, 82%, 52%)`
+  return `hsl(${Math.round(96 * f)}, 64%, 60%)`
 }
 
 export default function ActiveWorkout({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -180,7 +181,7 @@ export default function ActiveWorkout({ open, onClose }: { open: boolean; onClos
       if (!prefersReducedMotion()) (typeof navigator !== 'undefined' ? (navigator as any) : undefined)?.vibrate?.([200, 100, 200])
       beep()
       if (typeof document !== 'undefined' && (document as any).hidden && typeof window !== 'undefined' && 'Notification' in window && (window as any).Notification.permission === 'granted') {
-        try { new (window as any).Notification('Rest done — start your next set') } catch { /* ignore */ }
+        try { new (window as any).Notification('Rest done. Start your next set') } catch { /* ignore */ }
       }
       setMode('go')
     }
@@ -376,7 +377,7 @@ export default function ActiveWorkout({ open, onClose }: { open: boolean; onClos
           <View className="absolute -right-6 -top-8 h-32 w-32 rounded-full bg-black/10" />
           <View className="absolute -bottom-10 right-10 h-24 w-24 rounded-full bg-white/10" />
           <Text className="relative text-[11px] font-black uppercase tracking-[2px] text-black/55">
-            {rest !== null ? 'Resume — resting' : prog.done > 0 ? 'Pick up where you left off' : "Let's move"}
+            {rest !== null ? 'Resume, resting' : prog.done > 0 ? 'Pick up where you left off' : "Let's move"}
           </Text>
           <View className="relative mt-1 flex-row items-center justify-between">
             <Text className="text-[26px] font-black leading-none tracking-tight text-black">
@@ -611,13 +612,12 @@ function WorkScreen({
           </View>
         </View>
 
-        {/* Where am I — exercise position, name, what it is */}
+        {/* Where am I: exercise position, name, what it is */}
         <View className="items-center px-6">
           <Text className="text-center text-[11px] font-black uppercase tracking-[2.4px] text-brand-400">
             Exercise {exIndex + 1} of {exTotal} · Set {cursor.setIdx + 1} of {ex.sets.length}
           </Text>
           <Text className="mt-1.5 text-center text-[26px] font-black leading-tight tracking-tight text-white">{ex.name}</Text>
-          <Text className="mt-1.5 max-w-[19rem] text-center text-[13px] leading-snug text-white/55">{detail.desc}</Text>
           <SetDots sets={ex.sets} current={cursor.setIdx} />
           <Pressable
             onPress={() => setShowHow(true)}
@@ -663,11 +663,11 @@ function WorkScreen({
       <View className="relative px-6 pb-12 pt-5">
         <Pressable onPress={onStartRest} className="w-full flex-row items-center justify-center gap-2.5 rounded-2xl bg-brand-400 py-5 active:opacity-90">
           <Check size={20} strokeWidth={3} color="#000" />
-          <Text className="text-[18px] font-black uppercase tracking-wide text-black">{lastSet ? 'Done — finish exercise' : 'Done — start rest'}</Text>
+          <Text className="text-[18px] font-black uppercase tracking-wide text-black">{lastSet ? 'Done, finish exercise' : 'Done, start rest'}</Text>
         </Pressable>
         <Text className="mt-3 text-center text-[12px] font-semibold text-white/40">
           {lastSet
-            ? (nextExName ? <>Up next: <Text className="text-white/70">{nextExName}</Text></> : <Text className="text-brand-400">Last exercise — finish strong</Text>)
+            ? (nextExName ? <>Up next: <Text className="text-white/70">{nextExName}</Text></> : <Text className="text-brand-400">Last exercise. Finish strong</Text>)
             : <>Then: <Text className="text-white/70">Set {cursor.setIdx + 2} of {ex.sets.length}</Text></>}
         </Text>
       </View>

@@ -15,8 +15,8 @@ const goals: { id: Goal; label: string; desc: string }[] = [
 ]
 
 const experiences: { id: Experience; label: string; desc: string }[] = [
-  { id: 'beginner', label: 'Beginner', desc: 'New to training (0–1 yr)' },
-  { id: 'intermediate', label: 'Intermediate', desc: 'Consistent (1–3 yrs)' },
+  { id: 'beginner', label: 'Beginner', desc: 'New to training (0-1 yr)' },
+  { id: 'intermediate', label: 'Intermediate', desc: 'Consistent (1-3 yrs)' },
   { id: 'advanced', label: 'Advanced', desc: 'Experienced (3+ yrs)' },
 ]
 

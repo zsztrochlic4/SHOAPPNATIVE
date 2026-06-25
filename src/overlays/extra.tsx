@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react'
-import { View, Text, Pressable, Image, TextInput } from 'react-native'
+import { useState, useEffect, useRef } from 'react'
+import { View, Text, Pressable, Image, TextInput, Animated, Easing } from 'react-native'
 import {
   Sparkles, Check, ChevronRight, ChevronDown, Wallet, Trophy, Flame,
   GraduationCap, Dumbbell, Lightbulb, ShieldQuestion, Share2, Plus, MapPin,
-  Send, Video, Lock, Crown, X, Clock,
+  Send, Video, Lock, Crown, X, Clock, Repeat, Heart, MessageCircle, Award, Swords, Users,
 } from 'lucide-react-native'
 import { Sheet } from '../components/Sheet'
 import { Avatar } from '../components/Avatar'
@@ -15,11 +15,14 @@ import { useToast } from '../components/Toast'
 import { useNav } from '../nav'
 import {
   BUDGET_MEALS, BEGINNER_LESSONS, exerciseDetail, exById, REP_TARGETS, BASE_WEIGHTS,
+  ACTIVITY_PRESETS, activityPreset, INTENSITY_MULT,
 } from '../data/catalog'
+import { ActivityIcon } from '../components/ActivityIcon'
 import { nextSetRecommendation } from '../store/training'
 import { coachThreadView } from '../store/coach'
-import { CHAT_SUGGESTIONS } from '../lib/coachChat'
-import { todaySession } from '../store/selectors'
+import { CHAT_SUGGESTIONS, coachReply } from '../lib/coachChat'
+import { askCoach } from '../lib/coachApi'
+import { todaySession, leaderboardSorted, youRank } from '../store/selectors'
 import { relativeLabel } from '../lib/date'
 import { brand, useColors } from '../theme'
 import type { ReactNode } from 'react'
@@ -235,7 +238,7 @@ export function ExerciseDetailSheet({ open, onClose, params }: Props) {
   const defId = (params?.defId as string) ?? 'bench'
   const def = exById(defId)
   const detail = exerciseDetail(defId)
-  const target = REP_TARGETS[defId] ?? '8–12'
+  const target = REP_TARGETS[defId] ?? '8-12'
   const sessionEx = todaySession(state)?.exercises.find((e) => e.defId === defId)
   const fallback = sessionEx ? Math.max(...sessionEx.sets.map((s) => s.weightKg)) : BASE_WEIGHTS[defId] ?? 20
   const rec = nextSetRecommendation(state, defId, sessionEx?.targetReps ?? target, fallback)
@@ -376,6 +379,34 @@ export function PRCelebrationSheet({ open, onClose, params }: Props) {
 /* ===================== Coach messenger (1:1 chat) ================== */
 const BOOKING_SLOTS = ['Tomorrow · 6:00 PM', 'Thursday · 7:30 PM', 'Saturday · 10:00 AM']
 
+/* Three bouncing dots while the coach "types" (Animated loop, no CSS). */
+function TypingDots() {
+  const dots = useRef([new Animated.Value(0), new Animated.Value(0), new Animated.Value(0)]).current
+  useEffect(() => {
+    const loops = dots.map((d, i) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(i * 150),
+          Animated.timing(d, { toValue: -4, duration: 300, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+          Animated.timing(d, { toValue: 0, duration: 300, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+          Animated.delay((dots.length - 1 - i) * 150),
+        ]),
+      ),
+    )
+    loops.forEach((l) => l.start())
+    return () => loops.forEach((l) => l.stop())
+  }, [dots])
+  return (
+    <View className="flex-row justify-start">
+      <View className="flex-row items-center gap-1 rounded-2xl rounded-bl-md border border-white/8 bg-ink-800 px-4 py-3.5">
+        {dots.map((d, i) => (
+          <Animated.View key={i} style={{ transform: [{ translateY: d }] }} className="h-1.5 w-1.5 rounded-full bg-white/45" />
+        ))}
+      </View>
+    </View>
+  )
+}
+
 export function CoachChatSheet({ open, onClose }: Props) {
   const { state, dispatch } = useStore()
   const toast = useToast()
@@ -383,6 +414,7 @@ export function CoachChatSheet({ open, onClose }: Props) {
   const [text, setText] = useState('')
   const [showBook, setShowBook] = useState(false)
   const [booked, setBooked] = useState<string | null>(null)
+  const [typing, setTyping] = useState(false)
   const premium = state.profile.premium
   const messages = state.chat
   const showSuggestions = messages.filter((m) => m.role === 'user').length === 0
@@ -390,18 +422,31 @@ export function CoachChatSheet({ open, onClose }: Props) {
   // Mark coach messages read whenever the thread is open and grows.
   useEffect(() => {
     if (open) dispatch({ type: 'MARK_CHAT_READ' })
-  }, [open, messages.length, dispatch])
+  }, [open, messages.length, showBook, booked, typing, dispatch])
 
-  function send(t?: string) {
+  async function send(t?: string) {
     const msg = (t ?? text).trim()
-    if (!msg) return
-    dispatch({ type: 'SEND_CHAT', text: msg })
+    if (!msg || typing) return
     setText('')
+    // Show the user's message immediately, then a typing indicator.
+    dispatch({ type: 'PUSH_CHAT', role: 'user', text: msg })
+    setTyping(true)
+    try {
+      // Real Claude coach (via the serverless endpoint).
+      const reply = await askCoach(state, msg)
+      dispatch({ type: 'PUSH_CHAT', role: 'coach', text: reply })
+    } catch {
+      // Graceful fallback to the on-device rules engine so the demo always
+      // responds, used when no API key/endpoint is configured.
+      dispatch({ type: 'PUSH_CHAT', role: 'coach', text: coachReply(state, msg) })
+    } finally {
+      setTyping(false)
+    }
   }
 
   function unlock() {
     dispatch({ type: 'SET_PROFILE', patch: { premium: true } })
-    toast('Premium unlocked — enjoy your calls')
+    toast('Premium unlocked. Enjoy your calls')
   }
 
   function pickSlot(slot: string) {
@@ -478,10 +523,11 @@ export function CoachChatSheet({ open, onClose }: Props) {
             </View>
           </View>
         ))}
+        {typing && <TypingDots />}
       </View>
 
       {/* Suggestions */}
-      {showSuggestions && (
+      {showSuggestions && !typing && (
         <View className="mt-2 flex-row flex-wrap gap-2">
           {CHAT_SUGGESTIONS.map((s) => (
             <Pressable key={s} onPress={() => send(s)} className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 active:opacity-80"><Text className="text-[12px] font-medium text-white/70">{s}</Text></Pressable>
@@ -499,10 +545,237 @@ export function CoachChatSheet({ open, onClose }: Props) {
           placeholderTextColor="rgba(255,255,255,0.3)"
           className="max-h-28 min-h-[44px] flex-1 rounded-2xl border border-white/8 bg-ink-800 px-4 py-3 text-[15px] text-white"
         />
-        <Pressable onPress={() => send()} disabled={!text.trim()} className={`h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-400 active:opacity-90 ${!text.trim() ? 'opacity-40' : ''}`}>
+        <Pressable onPress={() => send()} disabled={!text.trim() || typing} className={`h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-400 active:opacity-90 ${!text.trim() || typing ? 'opacity-40' : ''}`}>
           <Send size={18} color="#000" />
         </Pressable>
       </View>
+    </Sheet>
+  )
+}
+
+/* ===================== Log a self-chosen activity ================= */
+export function LogActivitySheet({ open, onClose }: Props) {
+  const { dispatch } = useStore()
+  const toast = useToast()
+  const [key, setKey] = useState('run')
+  const [customName, setCustomName] = useState('')
+  const [minutes, setMinutes] = useState('30')
+  const [intensity, setIntensity] = useState<'easy' | 'moderate' | 'hard'>('moderate')
+  const [note, setNote] = useState('')
+  const [weekly, setWeekly] = useState(false)
+
+  const preset = activityPreset(key) ?? ACTIVITY_PRESETS[0]
+  const isCustom = key === 'other'
+  const name = isCustom ? customName.trim() || 'Activity' : preset.name
+  const mins = parseInt(minutes) || 0
+  const kcal = Math.round(mins * preset.kcalPerMin * INTENSITY_MULT[intensity])
+
+  function save() {
+    if (mins <= 0) { toast('Add a duration first'); return }
+    dispatch({ type: 'ADD_ACTIVITY', activity: { type: key, name, icon: isCustom ? 'other' : key, minutes: mins, intensity, calories: kcal, note: note.trim() || undefined, weekly } })
+    toast(`${name} logged`)
+    setKey('run'); setCustomName(''); setMinutes('30'); setIntensity('moderate'); setNote(''); setWeekly(false)
+    onClose()
+  }
+
+  return (
+    <Sheet open={open} onClose={onClose} title="Log an activity">
+      <Text className="mb-3 text-[13px] text-white/55">Anything counts: a sport, a run, a class. Pick one or add your own.</Text>
+
+      <View className="flex-row flex-wrap gap-2">
+        {ACTIVITY_PRESETS.map((a) => {
+          const active = key === a.key
+          return (
+            <Pressable
+              key={a.key}
+              onPress={() => setKey(a.key)}
+              style={{ width: '22.5%' }}
+              className={`items-center gap-1.5 rounded-2xl border py-3 active:opacity-90 ${active ? 'border-brand-400 bg-brand-400/10' : 'border-white/8 bg-ink-800'}`}
+            >
+              <ActivityIcon name={a.key} size={20} color={active ? brand[400] : 'rgba(255,255,255,0.7)'} />
+              <Text className={`text-[11px] font-semibold leading-none ${active ? 'text-brand-400' : 'text-white/70'}`}>{a.name}</Text>
+            </Pressable>
+          )
+        })}
+      </View>
+
+      {isCustom && (
+        <TextInput
+          autoFocus
+          value={customName}
+          onChangeText={setCustomName}
+          placeholder="Name your activity (e.g. Padel, Surfing, Netball)"
+          placeholderTextColor="rgba(255,255,255,0.35)"
+          className="mt-3 w-full rounded-xl border border-white/8 bg-ink-800 px-4 py-3 text-white"
+        />
+      )}
+
+      <Text className="mb-1.5 mt-5 text-sm font-semibold text-white/70">Duration</Text>
+      <View className="flex-row items-center gap-2">
+        {['15', '30', '45', '60'].map((m) => (
+          <Pressable key={m} onPress={() => setMinutes(m)} className={`rounded-full px-3 py-1.5 active:opacity-90 ${minutes === m ? 'bg-brand-400' : 'bg-ink-700'}`}><Text className={`text-sm font-semibold ${minutes === m ? 'text-black' : 'text-white/60'}`}>{m}m</Text></Pressable>
+        ))}
+        <View className="ml-auto flex-row items-center gap-1.5">
+          <TextInput
+            keyboardType="numeric"
+            value={minutes}
+            onChangeText={(t) => setMinutes(t.replace(/\D/g, '').slice(0, 3))}
+            className="w-16 rounded-xl border border-white/8 bg-ink-800 px-3 py-2 text-center text-white"
+          />
+          <Text className="text-sm text-white/45">min</Text>
+        </View>
+      </View>
+
+      <Text className="mb-1.5 mt-5 text-sm font-semibold text-white/70">Intensity</Text>
+      <View className="flex-row gap-1 rounded-xl bg-ink-700 p-1">
+        {(['easy', 'moderate', 'hard'] as const).map((i) => (
+          <Pressable key={i} onPress={() => setIntensity(i)} className={`flex-1 items-center rounded-lg py-2.5 active:opacity-90 ${intensity === i ? 'bg-brand-400' : ''}`}><Text className={`text-sm font-semibold capitalize ${intensity === i ? 'text-black' : 'text-white/60'}`}>{i}</Text></Pressable>
+        ))}
+      </View>
+
+      <TextInput
+        value={note}
+        onChangeText={setNote}
+        placeholder="Note (optional): how did it feel?"
+        placeholderTextColor="rgba(255,255,255,0.35)"
+        className="mt-4 w-full rounded-xl border border-white/8 bg-ink-800 px-4 py-3 text-[14px] text-white"
+      />
+
+      {/* Weekly activity: only these count toward "workouts this week" */}
+      <Pressable onPress={() => setWeekly((v) => !v)} className="mt-3 w-full flex-row items-center gap-3 rounded-2xl border border-white/8 bg-ink-800 p-3.5 active:opacity-90">
+        <View className="h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-400/15"><Repeat size={18} color={brand[400]} /></View>
+        <View className="flex-1">
+          <Text className="font-bold leading-tight text-white">Regular weekly activity</Text>
+          <Text className="text-[12px] text-white/50">Counts toward your weekly workouts</Text>
+        </View>
+        <View className={`h-7 w-12 shrink-0 justify-center rounded-full ${weekly ? 'bg-brand-400' : 'bg-white/15'}`}>
+          <View className="h-6 w-6 rounded-full bg-white" style={{ transform: [{ translateX: weekly ? 22 : 2 }] }} />
+        </View>
+      </Pressable>
+
+      <View className="mt-4 flex-row items-center justify-between rounded-2xl border border-white/5 bg-ink-800 p-4">
+        <Text className="text-[13px] text-white/55">Estimated burn</Text>
+        <Text className="text-lg font-extrabold text-brand-400">≈ {kcal} kcal</Text>
+      </View>
+
+      <Pressable onPress={save} className="btn-primary mt-5 w-full flex-row items-center justify-center gap-1.5 active:opacity-90"><Plus size={16} color="#000" /><Text className="font-semibold text-black">Log activity</Text></Pressable>
+    </Sheet>
+  )
+}
+
+/* ===================== Post detail + comment thread =============== */
+export function PostDetailSheet({ open, onClose, params }: Props) {
+  const { state, dispatch } = useStore()
+  const postId = params?.postId as string | undefined
+  const post = state.posts.find((p) => p.id === postId)
+  const comments = (state.postComments ?? []).filter((c) => c.postId === postId)
+  const [text, setText] = useState('')
+
+  function send() {
+    if (!text.trim() || !postId) return
+    dispatch({ type: 'ADD_COMMENT', postId, text: text.trim() })
+    setText('')
+  }
+
+  return (
+    <Sheet open={open} onClose={onClose} title="Post">
+      {post && (
+        <>
+          <View className="flex-row items-center gap-2.5">
+            <Avatar name={post.author} size={40} />
+            <View className="flex-1"><Text className="font-bold leading-tight text-white">{post.author}</Text><Text className="text-[12px] text-white/45">{post.time}</Text></View>
+          </View>
+          {post.pr && (
+            <View className="mt-2 flex-row items-center gap-1.5 self-start rounded-full bg-brand-400/15 px-2.5 py-1">
+              <Award size={13} color={brand[400]} />
+              <Text className="text-[11px] font-bold text-brand-300">Personal best · {post.pr.lift} {post.pr.weight}</Text>
+            </View>
+          )}
+          <Text className="mt-2 text-[15px] leading-snug text-white">{post.text}</Text>
+          {post.image && <Image source={{ uri: post.image }} resizeMode="cover" className="mt-3 h-56 w-full rounded-2xl" />}
+          <View className="mt-3 flex-row items-center gap-4 border-b border-white/8 pb-4">
+            <View className="flex-row items-center gap-1.5"><Heart size={16} color="rgba(255,255,255,0.55)" /><Text className="text-[13px] text-white/55">{post.likes}</Text></View>
+            <View className="flex-row items-center gap-1.5"><MessageCircle size={16} color="rgba(255,255,255,0.55)" /><Text className="text-[13px] text-white/55">{post.comments}</Text></View>
+          </View>
+
+          <Text className="mb-3 mt-4 text-[12px] font-bold uppercase tracking-wide text-white/40">{comments.length} comment{comments.length === 1 ? '' : 's'}</Text>
+          <View className="gap-3">
+            {comments.map((c) => (
+              <View key={c.id} className="flex-row items-start gap-2.5">
+                <Avatar name={c.author} size={32} />
+                <View className="flex-1 rounded-2xl rounded-tl-md bg-ink-800 px-3 py-2">
+                  <View className="flex-row items-center gap-2"><Text className="text-[13px] font-bold leading-tight text-white">{c.author}</Text><Text className="text-[11px] text-white/35">{c.time}</Text></View>
+                  <Text className="mt-0.5 text-[14px] leading-snug text-white/80">{c.text}</Text>
+                </View>
+              </View>
+            ))}
+            {comments.length === 0 && <Text className="py-2 text-center text-[13px] text-white/40">Be the first to comment.</Text>}
+          </View>
+
+          <View className="mt-4 flex-row items-center gap-2 rounded-2xl border border-white/8 bg-ink-800 p-1.5">
+            <TextInput
+              value={text}
+              onChangeText={setText}
+              onSubmitEditing={send}
+              placeholder="Add a comment…"
+              placeholderTextColor="rgba(255,255,255,0.3)"
+              className="min-w-0 flex-1 px-3 py-2 text-[15px] text-white"
+            />
+            <Pressable onPress={send} disabled={!text.trim()} className={`h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-400 active:opacity-90 ${!text.trim() ? 'opacity-40' : ''}`}><Send size={17} color="#000" /></Pressable>
+          </View>
+        </>
+      )}
+    </Sheet>
+  )
+}
+
+/* ===================== Challenge detail + standings =============== */
+export function ChallengeDetailSheet({ open, onClose, params }: Props) {
+  const { state } = useStore()
+  const id = params?.id as string | undefined
+  const c = state.challenges.find((x) => x.id === id)
+  const rows = leaderboardSorted(state)
+  const yr = youRank(state)
+
+  return (
+    <Sheet open={open} onClose={onClose} title="Challenge">
+      {c && (
+        <>
+          <View className="rounded-3xl border border-brand-400/20 bg-brand-400/[0.06] p-5">
+            <Trophy size={26} color={brand[400]} />
+            <Text className="mt-2 text-xl font-extrabold tracking-tight text-white">{c.title}</Text>
+            <View className="mt-2 flex-row items-center gap-4">
+              <View className="flex-row items-center gap-1.5"><Users size={14} color="rgba(255,255,255,0.6)" /><Text className="text-[13px] text-white/60">{c.participants} in</Text></View>
+              <Text className="text-[13px] text-white/60">Week {c.currentWeek} of {c.totalWeeks}</Text>
+              {c.rank != null && <Text className="ml-auto text-[13px] font-bold text-brand-400">You're #{c.rank}</Text>}
+            </View>
+          </View>
+
+          {c.vsLabel && c.yourSide && (
+            <View className="mt-4 rounded-2xl border border-white/5 bg-ink-800 p-4">
+              <View className="mb-1.5 flex-row items-center justify-between">
+                <View className="flex-row items-center gap-1"><Swords size={14} color={brand[400]} /><Text className="text-[13px] font-semibold text-brand-400">{c.yourSide}</Text></View>
+                <Text className="text-[13px] font-semibold text-white/45">{c.rivalSide}</Text>
+              </View>
+              <View className="h-3 flex-row overflow-hidden rounded-full bg-ink-700"><View className="h-full rounded-l-full bg-brand-400" style={{ width: `${c.yourSidePct ?? 50}%` }} /></View>
+              <View className="mt-1 flex-row items-center justify-between"><Text className="text-[12px] text-white/50">{c.yourSidePct}%</Text><Text className="text-[12px] text-white/50">{c.rivalSidePct}%</Text></View>
+            </View>
+          )}
+
+          <Text className="mb-2 mt-5 text-[12px] font-bold uppercase tracking-wide text-white/40">Standings</Text>
+          <View className="gap-2">
+            {rows.map((u, i) => (
+              <View key={u.id} className={`flex-row items-center gap-3 rounded-2xl border p-3 ${u.isYou ? 'border-brand-400/40 bg-brand-400/10' : 'border-white/5 bg-ink-800'}`}>
+                <Text className={`w-6 text-center text-sm font-extrabold ${i < 3 ? 'text-brand-400' : 'text-white/40'}`}>{i + 1}</Text>
+                <Avatar name={u.name} size={36} />
+                <View className="flex-1"><Text className="font-bold leading-tight text-white">{u.name}</Text><Text className="text-[12px] text-white/45">{u.workouts} workouts · {u.streak}d streak</Text></View>
+                <Text className="font-extrabold text-brand-400">{u.points.toLocaleString()}</Text>
+              </View>
+            ))}
+          </View>
+          <Text className="mt-3 text-center text-[12px] text-white/40">You're ranked #{yr} of {rows.length}.</Text>
+        </>
+      )}
     </Sheet>
   )
 }

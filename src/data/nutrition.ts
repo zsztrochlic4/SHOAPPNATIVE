@@ -1,7 +1,7 @@
 import type { Goal } from '../store/types'
 
 /* ------------------------------------------------------------------ */
-/*  Food knowledge base — powers the on-device food-log review.        */
+/*  Food knowledge base: powers the on-device food-log review.         */
 /*  Plain-language, education-first. Not a calorie tracker.            */
 /* ------------------------------------------------------------------ */
 
@@ -81,7 +81,7 @@ export const FOOD_KB: FoodKB[] = [
 ]
 
 /* ------------------------------------------------------------------ */
-/*  "What to aim for" — the plate guide                                */
+/*  "What to aim for": the plate guide                                 */
 /* ------------------------------------------------------------------ */
 export interface PlateSection {
   portion: string
@@ -91,14 +91,14 @@ export interface PlateSection {
 }
 
 export const PLATE_GUIDE: PlateSection[] = [
-  { portion: 'Half', title: 'Vegetables & fruit', examples: 'Broccoli, peppers, salad, berries — colour and fibre that fill you up', color: '#7ED957' },
-  { portion: 'A quarter', title: 'Lean protein', examples: 'Chicken, fish, eggs, tofu, beans, Greek yogurt — every meal', color: '#3B82F6' },
-  { portion: 'A quarter', title: 'Smart carbs', examples: 'Oats, rice, potato, wholegrain bread — fuel for training & study', color: '#F5A524' },
-  { portion: 'A thumb', title: 'Healthy fats', examples: 'Olive oil, nuts, avocado, oily fish — a little goes a long way', color: '#8B5CF6' },
+  { portion: 'Half', title: 'Vegetables & fruit', examples: 'Broccoli, peppers, salad, berries: colour and fibre that fill you up', color: 'rgb(var(--brand-400))' },
+  { portion: 'A quarter', title: 'Lean protein', examples: 'Chicken, fish, eggs, tofu, beans, Greek yogurt at every meal', color: 'rgb(var(--accent-blue))' },
+  { portion: 'A quarter', title: 'Smart carbs', examples: 'Oats, rice, potato, wholegrain bread: fuel for training & study', color: 'rgb(var(--accent-orange))' },
+  { portion: 'A thumb', title: 'Healthy fats', examples: 'Olive oil, nuts, avocado, oily fish. A little goes a long way', color: 'rgb(var(--accent-purple))' },
 ]
 
 /* ------------------------------------------------------------------ */
-/*  Good / moderation / limit — the simple food tiers                  */
+/*  Good / moderation / limit: the simple food tiers                   */
 /* ------------------------------------------------------------------ */
 export interface FoodTierGuide {
   tier: FoodTier
@@ -110,17 +110,17 @@ export interface FoodTierGuide {
 
 export const FOOD_TIERS: FoodTierGuide[] = [
   {
-    tier: 'great', title: 'Eat freely', color: '#7ED957',
+    tier: 'great', title: 'Eat freely', color: 'rgb(var(--brand-400))',
     desc: 'Build most meals from these. Filling, nutritious and hard to overeat.',
     items: ['Vegetables & salad', 'Fruit', 'Chicken, fish, eggs', 'Beans, lentils, tofu', 'Greek yogurt', 'Oats, potatoes, wholegrains'],
   },
   {
-    tier: 'moderate', title: 'In moderation', color: '#F5A524',
-    desc: 'Useful fuel and totally fine — just keep portions sensible.',
+    tier: 'moderate', title: 'In moderation', color: 'rgb(var(--accent-orange))',
+    desc: 'Useful fuel and totally fine. Just keep portions sensible.',
     items: ['White rice, pasta, bread', 'Cheese & full-fat dairy', 'Nuts & nut butters', 'Lean red meat', 'Dried fruit & honey'],
   },
   {
-    tier: 'limit', title: 'Keep occasional', color: '#F87171',
+    tier: 'limit', title: 'Keep occasional', color: 'rgb(var(--danger))',
     desc: 'No food is banned. Enjoy these sometimes, not as the base of your day.',
     items: ['Fried & fast food', 'Sweets, cake, chocolate', 'Sugary & energy drinks', 'Processed meats', 'Alcohol'],
   },
@@ -133,7 +133,7 @@ export const GOAL_GUIDES: Record<Goal, { headline: string; points: string[] }> =
   'build-muscle': {
     headline: 'Eat to grow',
     points: [
-      'Protein at every meal — aim for a palm-sized portion (chicken, eggs, yogurt, tofu).',
+      'Protein at every meal. Aim for a palm-sized portion (chicken, eggs, yogurt, tofu).',
       'Eat slightly more than you burn. A little extra rice, oats or fruit fuels new muscle.',
       'Carbs around training give you better sessions and recovery.',
       'Spread protein across the day rather than one huge hit.',
@@ -142,10 +142,10 @@ export const GOAL_GUIDES: Record<Goal, { headline: string; points: string[] }> =
   'lose-fat': {
     headline: 'Eat to lean out',
     points: [
-      'Fill half your plate with veg and salad — high volume, low calories, very filling.',
+      'Fill half your plate with veg and salad: high volume, low calories, very filling.',
       'Keep protein high to protect muscle and stay full between meals.',
       'Watch the liquid calories: sugary drinks, juice and alcohol add up fast.',
-      'Swap fried & sugary extras for fruit, yogurt or a smaller portion — not zero.',
+      'Swap fried & sugary extras for fruit, yogurt or a smaller portion, not zero.',
     ],
   },
   'gain-strength': {
@@ -153,7 +153,7 @@ export const GOAL_GUIDES: Record<Goal, { headline: string; points: string[] }> =
     points: [
       'Fuel hard sessions with smart carbs: oats, rice, potatoes.',
       'Protein at each meal supports recovery between heavy days.',
-      'Do not under-eat — strength suffers when you are running on empty.',
+      'Do not under-eat. Strength suffers when you are running on empty.',
       'Sleep and water matter as much as food for strength.',
     ],
   },
@@ -161,9 +161,9 @@ export const GOAL_GUIDES: Record<Goal, { headline: string; points: string[] }> =
     headline: 'Eat to feel good',
     points: [
       'Aim for balance: protein, plenty of veg, smart carbs, a little healthy fat.',
-      'Variety beats perfection — mix up your veg and protein sources.',
+      'Variety beats perfection. Mix up your veg and protein sources.',
       'Hydrate well and limit sugary drinks.',
-      'Cook more than you order in — you control what goes in.',
+      'Cook more than you order in. You control what goes in.',
     ],
   },
 }
@@ -200,7 +200,7 @@ export const NUTRITION_LESSONS: NutritionLesson[] = [
   {
     id: 'nl-moderation', icon: 'leaf', title: 'Nothing is banned', summary: 'Why "good" and "bad" food is a trap', minutes: 2,
     body: [
-      'There are no forbidden foods — only how often and how much. Chocolate, pizza and a night out all fit a healthy diet.',
+      'There are no forbidden foods, only how often and how much. Chocolate, pizza and a night out all fit a healthy diet.',
       'Aim for the 80/20 idea: build around 80% nutritious whole foods, and leave 20% for the things you simply enjoy.',
       'Guilt does not burn calories. Enjoy the treat, then get back to your normal meals.',
     ],
@@ -226,13 +226,13 @@ export const NUTRITION_LESSONS: NutritionLesson[] = [
     body: [
       'Mild thirst can feel like hunger. A glass of water before deciding on a snack often settles it.',
       'Aim to sip through the day. A reusable bottle on your desk is the easiest reminder.',
-      'Drinks with calories — juice, fizzy drinks, fancy coffees, alcohol — count too. Water is the free, zero-calorie default.',
+      'Drinks with calories (juice, fizzy drinks, fancy coffees, alcohol) count too. Water is the free, zero-calorie default.',
     ],
   },
 ]
 
 /* ------------------------------------------------------------------ */
-/*  Q&A — answers the "ask anything about food" box                    */
+/*  Q&A: answers the "ask anything about food" box                     */
 /* ------------------------------------------------------------------ */
 export interface QAItem {
   keywords: string[]
@@ -242,17 +242,17 @@ export interface QAItem {
 
 export const NUTRITION_QA: QAItem[] = [
   { keywords: ['how much protein', 'protein need', 'enough protein', 'protein a day'], q: 'How much protein do I need?', a: 'A practical guide is a palm-sized portion of a protein food at each main meal, which puts most students in a good range. If you train hard and want muscle, lean toward the higher end and spread it across the day.' },
-  { keywords: ['carbs at night', 'carbs bad', 'eat carbs', 'late carbs', 'rice bad'], q: 'Are carbs bad, or bad at night?', a: 'No. Carbs are fuel and the time of day barely matters for body composition — your total intake over the day does. Lean on oats, rice, potatoes and fruit, and keep sugary stuff occasional.' },
-  { keywords: ['lose fat', 'lose weight', 'fat loss', 'cut', 'leaner'], q: 'How do I lose fat?', a: 'Eat a bit less than you burn, keep protein high and fill half your plate with veg so you stay full. Watch liquid calories. You do not need to cut out any food group — small, steady changes win.' },
+  { keywords: ['carbs at night', 'carbs bad', 'eat carbs', 'late carbs', 'rice bad'], q: 'Are carbs bad, or bad at night?', a: 'No. Carbs are fuel and the time of day barely matters for body composition. Your total intake over the day does. Lean on oats, rice, potatoes and fruit, and keep sugary stuff occasional.' },
+  { keywords: ['lose fat', 'lose weight', 'fat loss', 'cut', 'leaner'], q: 'How do I lose fat?', a: 'Eat a bit less than you burn, keep protein high and fill half your plate with veg so you stay full. Watch liquid calories. You do not need to cut out any food group. Small, steady changes win.' },
   { keywords: ['build muscle', 'gain muscle', 'bulk', 'grow', 'get bigger'], q: 'How do I build muscle?', a: 'Train hard, eat slightly more than you burn, and get protein at every meal. Smart carbs around training help. Muscle is built slowly, so consistency over weeks beats any single perfect day.' },
   { keywords: ['snack', 'healthy snack', 'snacking'], q: 'What are good snacks?', a: 'Reach for protein-and-fibre snacks that keep you full: Greek yogurt and fruit, a handful of nuts, hummus and veg, cottage cheese, or a boiled egg. They beat crisps and sweets between lectures.' },
   { keywords: ['cheap', 'budget', 'student', 'save money'], q: 'How do I eat well cheaply?', a: 'Build meals around eggs, tinned tuna, beans, lentils, frozen chicken and frozen veg. Batch cook and reuse. Check the Budget Eats tab for full recipes with rough costs.' },
   { keywords: ['breakfast', 'morning'], q: 'What should I eat for breakfast?', a: 'Aim for protein plus a smart carb: overnight oats with yogurt and fruit, eggs on wholegrain toast, or Greek yogurt with berries and nuts. It keeps you full through morning lectures.' },
-  { keywords: ['sugar', 'sweet', 'chocolate', 'craving'], q: 'Is sugar really that bad?', a: 'A little is fine — it is the amount that matters. Sugary drinks and snacks add up fast without filling you up. Enjoy a treat, just keep it as the 20%, not the base of your day.' },
-  { keywords: ['alcohol', 'drinking', 'beer', 'night out'], q: 'How does alcohol affect my goals?', a: 'Alcohol is calorie-dense, often comes with late-night food, and blunts recovery and muscle growth the next day. It can still fit — just keep nights occasional and have water alongside.' },
+  { keywords: ['sugar', 'sweet', 'chocolate', 'craving'], q: 'Is sugar really that bad?', a: 'A little is fine. It is the amount that matters. Sugary drinks and snacks add up fast without filling you up. Enjoy a treat, just keep it as the 20%, not the base of your day.' },
+  { keywords: ['alcohol', 'drinking', 'beer', 'night out'], q: 'How does alcohol affect my goals?', a: 'Alcohol is calorie-dense, often comes with late-night food, and blunts recovery and muscle growth the next day. It can still fit, just keep nights occasional and have water alongside.' },
   { keywords: ['supplement', 'whey', 'creatine', 'protein powder', 'vitamin'], q: 'Do I need supplements?', a: 'Most people do not. Real food covers it. Protein powder is just a convenient protein source, and creatine is the one with strong evidence for training. Food first, supplements only to fill gaps.' },
   { keywords: ['vegetarian', 'vegan', 'plant', 'meat free', 'no meat'], q: 'How do I get protein without meat?', a: 'Plenty of options: eggs, dairy and Greek yogurt, plus beans, lentils, chickpeas, tofu, tempeh, edamame and soy milk. Mixing different plant sources across the day covers everything you need.' },
-  { keywords: ['eat out', 'restaurant', 'takeaway', 'fast food'], q: 'How do I eat out without ruining things?', a: 'Pick a meal with a clear protein and some veg, watch the sides and sauces, and go easy on sugary drinks. One meal out never undoes your progress — your overall week is what counts.' },
-  { keywords: ['water', 'hydration', 'drink'], q: 'How much water should I drink?', a: 'Sip through the day and aim for pale-yellow urine as a simple check. Keep a bottle nearby. Remember juice, fizzy drinks and alcohol carry calories — water is the free default.' },
-  { keywords: ['meal prep', 'prep', 'batch'], q: 'How do I start meal prepping?', a: 'Cook one big base — rice or pasta and a protein — then portion it into containers for two or three days. Add frozen veg and a sauce to keep it interesting. Start with just lunches.' },
+  { keywords: ['eat out', 'restaurant', 'takeaway', 'fast food'], q: 'How do I eat out without ruining things?', a: 'Pick a meal with a clear protein and some veg, watch the sides and sauces, and go easy on sugary drinks. One meal out never undoes your progress. Your overall week is what counts.' },
+  { keywords: ['water', 'hydration', 'drink'], q: 'How much water should I drink?', a: 'Sip through the day and aim for pale-yellow urine as a simple check. Keep a bottle nearby. Remember juice, fizzy drinks and alcohol carry calories. Water is the free default.' },
+  { keywords: ['meal prep', 'prep', 'batch'], q: 'How do I start meal prepping?', a: 'Cook one big base, rice or pasta and a protein, then portion it into containers for two or three days. Add frozen veg and a sauce to keep it interesting. Start with just lunches.' },
 ]

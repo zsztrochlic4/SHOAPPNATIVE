@@ -1,4 +1,4 @@
-/** Date helpers — all dates handled as local 'YYYY-MM-DD' keys. */
+/** Date helpers. All dates handled as local 'YYYY-MM-DD' keys. */
 
 /** The app's "today". Fixed so the seeded 40-day history lines up with the demo. */
 export const TODAY = new Date('2026-06-07T09:41:00')

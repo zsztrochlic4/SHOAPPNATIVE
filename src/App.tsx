@@ -36,6 +36,9 @@ import {
   ExerciseDetailSheet,
   PartnerMatchSheet,
   PRCelebrationSheet,
+  LogActivitySheet,
+  PostDetailSheet,
+  ChallengeDetailSheet,
 } from './overlays'
 
 export type TabKey = 'dashboard' | 'workout' | 'nutrition' | 'progress' | 'community'
@@ -123,6 +126,9 @@ function Shell() {
       <ExerciseDetailSheet open={overlay === 'exerciseDetail'} onClose={nav.close} params={params} />
       <PartnerMatchSheet open={overlay === 'partnerMatch'} onClose={nav.close} />
       <PRCelebrationSheet open={overlay === 'prCelebration'} onClose={nav.close} params={params} />
+      <LogActivitySheet open={overlay === 'logActivity'} onClose={nav.close} />
+      <PostDetailSheet open={overlay === 'postDetail'} onClose={nav.close} params={params} />
+      <ChallengeDetailSheet open={overlay === 'challengeDetail'} onClose={nav.close} params={params} />
     </NavProvider>
   )
 }

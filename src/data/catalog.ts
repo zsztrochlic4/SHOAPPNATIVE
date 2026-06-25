@@ -3,6 +3,7 @@ import type {
   BudgetMeal,
   ExerciseDef,
   FoodItem,
+  Goal,
   PartnerCandidate,
   ProgramDay,
   QuickWorkout,
@@ -179,6 +180,85 @@ export const exerciseDetail = (id: string): ExerciseDetail =>
     beginnerFriendly: true,
   }
 
+/* -------- "Why this helps your goal": keeps every exercise purposeful -------- */
+/* A noun-phrase describing what each lift develops, slotted into a goal-aware
+ * sentence so the user always sees how a movement serves their bigger goal. */
+const EXERCISE_ROLE: Record<string, string> = {
+  bench: 'your chest, front shoulders and pressing strength',
+  incline: 'your upper chest',
+  shoulder: 'your shoulders and overhead pressing strength',
+  cablefly: 'chest size with a deep stretch and squeeze',
+  tricep: 'your triceps, so your presses lock out stronger',
+  squat: 'your quads, glutes and total-body strength',
+  deadlift: 'your back, glutes and hamstrings',
+  pulldown: 'a wider back and stronger pulling strength',
+  row: 'back thickness and upright posture',
+  curl: 'your biceps',
+  ohp: 'your shoulders and bracing core',
+  legpress: 'your legs with heavy, low-skill loading',
+  rdl: 'your hamstrings and glutes',
+  lateral: 'your side delts and shoulder width',
+}
+
+const COMPOUND_IDS = ['bench', 'incline', 'shoulder', 'squat', 'deadlift', 'pulldown', 'row', 'ohp', 'legpress', 'rdl']
+
+/** One sentence: how this exercise moves the user toward their overall goal. */
+export function exerciseWhy(defId: string, goal: Goal): string {
+  const role = EXERCISE_ROLE[defId] ?? 'strength across this movement'
+  const compound = COMPOUND_IDS.includes(defId)
+  switch (goal) {
+    case 'build-muscle':
+      return `Builds ${role}: direct, visible muscle for your goal.`
+    case 'lose-fat':
+      return compound
+        ? `Works ${role} and burns serious energy, protecting muscle while you lose fat.`
+        : `Keeps ${role} firm and defined as you lean down.`
+    case 'gain-strength':
+      return compound
+        ? `A core strength lift. Driving up ${role} pushes your whole strength goal forward.`
+        : `Strengthens ${role} to support your heavier compound lifts.`
+    case 'stay-healthy':
+    default:
+      return `Strengthens ${role}, keeping you capable and resilient day to day.`
+  }
+}
+
+/** A few words on what today's whole session is for, tied to the user's goal. */
+export function workoutGoalLine(name: string, focus: string, goal: Goal): string {
+  const muscles = focus.replace(/\s*·\s*/g, ', ').toLowerCase()
+  const aim: Record<Goal, string> = {
+    'build-muscle': 'building visible muscle',
+    'lose-fat': 'losing fat while holding on to muscle',
+    'gain-strength': 'getting noticeably stronger',
+    'stay-healthy': 'staying strong and healthy',
+  }
+  return `${name} trains ${muscles}. Done well, every set here moves you closer to ${aim[goal]}.`
+}
+
+/* --------------- Self-logged activity presets ------------------- */
+/* Common activities with a rough kcal/min (at moderate effort). The user can
+ * also log any custom activity, so this list is a convenience, not a limit. */
+export const ACTIVITY_PRESETS: { key: string; name: string; kcalPerMin: number }[] = [
+  { key: 'run', name: 'Run', kcalPerMin: 11 },
+  { key: 'walk', name: 'Walk', kcalPerMin: 4 },
+  { key: 'cycle', name: 'Cycling', kcalPerMin: 8 },
+  { key: 'swim', name: 'Swim', kcalPerMin: 9 },
+  { key: 'football', name: 'Football', kcalPerMin: 9 },
+  { key: 'basketball', name: 'Basketball', kcalPerMin: 8 },
+  { key: 'tennis', name: 'Tennis', kcalPerMin: 7 },
+  { key: 'pickleball', name: 'Pickleball', kcalPerMin: 6 },
+  { key: 'climb', name: 'Climbing', kcalPerMin: 9 },
+  { key: 'hike', name: 'Hike', kcalPerMin: 6 },
+  { key: 'row', name: 'Rowing', kcalPerMin: 10 },
+  { key: 'hiit', name: 'HIIT', kcalPerMin: 12 },
+  { key: 'yoga', name: 'Yoga', kcalPerMin: 3 },
+  { key: 'dance', name: 'Dance', kcalPerMin: 7 },
+  { key: 'boxing', name: 'Boxing', kcalPerMin: 10 },
+  { key: 'other', name: 'Other', kcalPerMin: 7 },
+]
+export const activityPreset = (key: string) => ACTIVITY_PRESETS.find((a) => a.key === key)
+export const INTENSITY_MULT: Record<'easy' | 'moderate' | 'hard', number> = { easy: 0.8, moderate: 1, hard: 1.25 }
+
 /* Plate increments for adaptive progression (kg) */
 export const INCREMENT: Record<string, number> = {
   bench: 2.5, squat: 5, deadlift: 5, ohp: 2.5, row: 2.5, pulldown: 2.5, legpress: 5, rdl: 2.5,
@@ -207,9 +287,9 @@ export const BASE_WEIGHTS: Record<string, number> = {
 }
 
 export const REP_TARGETS: Record<string, string> = {
-  bench: '6–8', incline: '8–10', shoulder: '8–10', cablefly: '10–12', tricep: '12–15',
-  squat: '5–8', deadlift: '5', pulldown: '8–12', row: '8–12', curl: '10–12',
-  ohp: '6–8', legpress: '10–12', rdl: '8–10', lateral: '12–15',
+  bench: '6-8', incline: '8-10', shoulder: '8-10', cablefly: '10-12', tricep: '12-15',
+  squat: '5-8', deadlift: '5', pulldown: '8-12', row: '8-12', curl: '10-12',
+  ohp: '6-8', legpress: '10-12', rdl: '8-10', lateral: '12-15',
 }
 
 export const SET_TARGETS: Record<string, number> = {
@@ -267,7 +347,7 @@ export const BUDGET_MEALS: BudgetMeal[] = [
     id: 'bm-chickenrice', name: 'Chicken, Rice & Frozen Veg', image: img.chicken,
     cost: 2.4, serves: 1, kcal: 620, p: 48, c: 72, f: 14,
     goals: ['build-muscle', 'gain-strength'],
-    flavour: 'Smoky paprika chicken over fluffy rice — the reliable gains plate.',
+    flavour: 'Smoky paprika chicken over fluffy rice, the reliable gains plate.',
     ingredients: [
       { item: 'Chicken thigh (150g)', cost: 1.1 },
       { item: 'Rice (uncooked 80g)', cost: 0.3 },
@@ -282,7 +362,7 @@ export const BUDGET_MEALS: BudgetMeal[] = [
     id: 'bm-eggsbeans', name: 'Eggs & Beans on Toast', image: img.eggs,
     cost: 1.1, serves: 1, kcal: 480, p: 28, c: 52, f: 16,
     goals: ['stay-healthy', 'build-muscle'],
-    flavour: 'Classic comfort — runny eggs, saucy beans, crunchy toast.',
+    flavour: 'Classic comfort: runny eggs, saucy beans, crunchy toast.',
     ingredients: [
       { item: '3 eggs', cost: 0.6 },
       { item: 'Half a tin of beans', cost: 0.3 },
@@ -296,7 +376,7 @@ export const BUDGET_MEALS: BudgetMeal[] = [
     id: 'bm-tunapasta', name: 'Tuna Pasta', image: img.mealPrep,
     cost: 1.6, serves: 1, kcal: 540, p: 40, c: 66, f: 10,
     goals: ['build-muscle', 'gain-strength'],
-    flavour: 'Creamy, lemony tuna & sweetcorn — great hot or cold.',
+    flavour: 'Creamy, lemony tuna & sweetcorn, great hot or cold.',
     ingredients: [
       { item: 'Pasta (uncooked 90g)', cost: 0.4 },
       { item: 'Tin of tuna', cost: 0.9 },
@@ -339,7 +419,7 @@ export const BUDGET_MEALS: BudgetMeal[] = [
     id: 'bm-wrap', name: 'Chicken & Hummus Wrap', image: img.mealPrep,
     cost: 1.8, serves: 1, kcal: 500, p: 36, c: 48, f: 16,
     goals: ['lose-fat', 'build-muscle'],
-    flavour: 'Cool hummus, peppery salad and seasoned chicken — handheld and fast.',
+    flavour: 'Cool hummus, peppery salad and seasoned chicken, handheld and fast.',
     ingredients: [
       { item: 'Wrap', cost: 0.3 },
       { item: 'Leftover chicken (120g)', cost: 0.9 },
@@ -359,7 +439,7 @@ export const BUDGET_MEALS: BudgetMeal[] = [
       { item: 'Tin of tuna', cost: 0.9 },
       { item: 'Sweetcorn, light mayo, pepper', cost: 0.3 },
     ],
-    steps: ['Microwave the potato 6–8 min, then crisp in the oven if you can', 'Mix tuna, corn & a little mayo', 'Split the potato and pile it on', 'Black pepper and go'],
+    steps: ['Microwave the potato 6-8 min, then crisp in the oven if you can', 'Mix tuna, corn & a little mayo', 'Split the potato and pile it on', 'Black pepper and go'],
     cookOnce: 'Bake a few potatoes together and reheat through the week.',
     tags: ['High protein', 'High fibre', 'Under $2'],
   },
@@ -367,7 +447,7 @@ export const BUDGET_MEALS: BudgetMeal[] = [
     id: 'bm-chilli', name: 'Beef & Bean Chilli', image: img.chicken,
     cost: 2.1, serves: 2, kcal: 540, p: 38, c: 55, f: 16,
     goals: ['build-muscle', 'gain-strength', 'stay-healthy'],
-    flavour: 'Deep, smoky and a little spicy — even better the next day.',
+    flavour: 'Deep, smoky and a little spicy, even better the next day.',
     ingredients: [
       { item: 'Lean beef mince (200g)', cost: 1.4 },
       { item: 'Tin of kidney beans', cost: 0.4 },
@@ -375,14 +455,14 @@ export const BUDGET_MEALS: BudgetMeal[] = [
       { item: 'Onion, spices, rice', cost: 0.5 },
     ],
     steps: ['Brown the mince with onion', 'Add tomatoes, beans, chilli & cumin', 'Simmer 20 min', 'Serve over rice'],
-    cookOnce: 'Double it and freeze portions — a free ready-meal for busy nights.',
+    cookOnce: 'Double it and freeze portions for a free ready-meal on busy nights.',
     tags: ['High protein', 'Batch cook', 'Freezer friendly'],
   },
   {
     id: 'bm-lentilcurry', name: 'Red Lentil Curry & Rice', image: img.rice,
     cost: 1.3, serves: 2, kcal: 500, p: 24, c: 78, f: 9,
     goals: ['stay-healthy', 'lose-fat'],
-    flavour: 'Creamy, golden dahl with warming spice — comfort in a bowl.',
+    flavour: 'Creamy, golden dahl with warming spice, comfort in a bowl.',
     ingredients: [
       { item: 'Red lentils (150g)', cost: 0.4 },
       { item: 'Tin chopped tomatoes', cost: 0.3 },
@@ -390,7 +470,7 @@ export const BUDGET_MEALS: BudgetMeal[] = [
       { item: 'Rice', cost: 0.2 },
     ],
     steps: ['Soften onion & garlic with spices', 'Add lentils, tomatoes & water', 'Simmer 20 min until creamy', 'Serve with rice'],
-    cookOnce: 'Lentils are one of the cheapest proteins going — batch a big pot.',
+    cookOnce: 'Lentils are one of the cheapest proteins going, so batch a big pot.',
     tags: ['Plant protein', 'High fibre', 'Under $1.50'],
   },
   {
@@ -410,7 +490,7 @@ export const BUDGET_MEALS: BudgetMeal[] = [
     id: 'bm-omelette', name: 'Veggie Cheese Omelette', image: img.eggs,
     cost: 1.0, serves: 1, kcal: 380, p: 26, c: 8, f: 27,
     goals: ['lose-fat', 'stay-healthy'],
-    flavour: 'Fluffy eggs folded over melty cheese and peppers — low-carb and filling.',
+    flavour: 'Fluffy eggs folded over melty cheese and peppers, low-carb and filling.',
     ingredients: [
       { item: '3 eggs', cost: 0.6 },
       { item: 'Handful frozen peppers/onion', cost: 0.2 },
@@ -431,14 +511,14 @@ export const BUDGET_MEALS: BudgetMeal[] = [
       { item: 'Pasta', cost: 0.3 },
     ],
     steps: ['Brown the mince with onion & garlic', 'Add tomatoes & dried herbs, simmer 15 min', 'Boil the pasta', 'Combine and top with pepper'],
-    cookOnce: 'The sauce freezes brilliantly — make double.',
+    cookOnce: 'The sauce freezes brilliantly, so make double.',
     tags: ['High protein', 'Batch cook', 'Crowd pleaser'],
   },
   {
     id: 'bm-burrito', name: 'Chicken Burrito Bowl', image: img.chicken,
     cost: 2.5, serves: 1, kcal: 640, p: 46, c: 70, f: 16,
     goals: ['build-muscle', 'gain-strength'],
-    flavour: 'Spiced chicken, rice, beans, corn and a squeeze of lime — fakeaway feel.',
+    flavour: 'Spiced chicken, rice, beans, corn and a squeeze of lime, fakeaway feel.',
     ingredients: [
       { item: 'Chicken (150g)', cost: 1.1 },
       { item: 'Rice', cost: 0.3 },
@@ -466,7 +546,7 @@ export const BUDGET_MEALS: BudgetMeal[] = [
     id: 'bm-salmonrice', name: 'Salmon, Rice & Greens', image: img.salmon,
     cost: 2.8, serves: 1, kcal: 580, p: 40, c: 55, f: 20,
     goals: ['build-muscle', 'stay-healthy'],
-    flavour: 'Buttery salmon and garlicky greens — omega-3s on a budget (tinned works too).',
+    flavour: 'Buttery salmon and garlicky greens, omega-3s on a budget (tinned works too).',
     ingredients: [
       { item: 'Salmon fillet or tin (130g)', cost: 1.8 },
       { item: 'Rice', cost: 0.3 },
@@ -479,7 +559,7 @@ export const BUDGET_MEALS: BudgetMeal[] = [
     id: 'bm-bakedoats', name: 'Protein Baked Oats', image: img.oats,
     cost: 1.0, serves: 1, kcal: 440, p: 28, c: 60, f: 10,
     goals: ['build-muscle', 'stay-healthy'],
-    flavour: 'Warm, cakey and chocolatey — breakfast that feels like dessert.',
+    flavour: 'Warm, cakey and chocolatey, breakfast that feels like dessert.',
     ingredients: [
       { item: 'Oats (60g)', cost: 0.2 },
       { item: 'Scoop of whey + 1 egg', cost: 0.6 },
@@ -506,7 +586,7 @@ export const BUDGET_MEALS: BudgetMeal[] = [
     id: 'bm-tacos', name: 'Turkey Mince Tacos', image: img.chicken,
     cost: 2.3, serves: 1, kcal: 520, p: 42, c: 48, f: 16,
     goals: ['lose-fat', 'build-muscle'],
-    flavour: 'Crunchy, zesty and fun to eat — lean turkey with fresh salsa.',
+    flavour: 'Crunchy, zesty and fun to eat: lean turkey with fresh salsa.',
     ingredients: [
       { item: 'Turkey mince (150g)', cost: 1.3 },
       { item: 'Tortillas or wraps', cost: 0.4 },
@@ -519,21 +599,21 @@ export const BUDGET_MEALS: BudgetMeal[] = [
     id: 'bm-ricebeans', name: 'Rice & Beans Bowl', image: img.rice,
     cost: 0.8, serves: 1, kcal: 480, p: 18, c: 84, f: 6,
     goals: ['stay-healthy', 'gain-strength'],
-    flavour: 'The ultimate budget hero — smoky, garlicky and seriously filling.',
+    flavour: 'The ultimate budget hero: smoky, garlicky and seriously filling.',
     ingredients: [
       { item: 'Rice', cost: 0.3 },
       { item: 'Tin of black or kidney beans', cost: 0.4 },
       { item: 'Garlic, paprika, hot sauce', cost: 0.1 },
     ],
     steps: ['Boil the rice', 'Warm beans with garlic & paprika', 'Combine in a bowl', 'Finish with hot sauce'],
-    cookOnce: 'Pennies per portion — add an egg or cheese on top for extra protein.',
+    cookOnce: 'Pennies per portion. Add an egg or cheese on top for extra protein.',
     tags: ['Plant protein', 'Cheapest', 'Under $1'],
   },
   {
     id: 'bm-cottage', name: 'Cottage Cheese & Fruit', image: img.yogurt,
     cost: 1.0, serves: 1, kcal: 280, p: 28, c: 24, f: 6,
     goals: ['lose-fat'],
-    flavour: 'Cool and creamy with sweet fruit — a high-protein snack that fills you up.',
+    flavour: 'Cool and creamy with sweet fruit, a high-protein snack that fills you up.',
     ingredients: [
       { item: 'Cottage cheese (200g)', cost: 0.7 },
       { item: 'Fruit or berries', cost: 0.3 },

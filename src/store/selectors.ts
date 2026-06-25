@@ -1,10 +1,15 @@
-import { currentWeekKeys, dayKey, todayKey } from '../lib/date'
+import { currentWeekKeys, dayKey, todayKey, fromKey, toKey, addDays } from '../lib/date'
 import type { AppState, HabitDay, WorkoutSession } from './types'
 
 export function todayHabit(s: AppState): HabitDay {
+  return habitForDay(s, todayKey)
+}
+
+/** The logged habit for any day, or a zeroed day if nothing was logged. */
+export function habitForDay(s: AppState, key: string = todayKey): HabitDay {
   return (
-    s.habits.find((h) => h.dateKey === todayKey) ?? {
-      dateKey: todayKey,
+    s.habits.find((h) => h.dateKey === key) ?? {
+      dateKey: key,
       steps: 0,
       sleepH: 0,
       waterL: 0,
@@ -16,7 +21,11 @@ export function todayHabit(s: AppState): HabitDay {
 }
 
 export function todaySession(s: AppState): WorkoutSession | undefined {
-  return s.sessions.find((x) => x.dateKey === todayKey)
+  return sessionForDay(s, todayKey)
+}
+
+export function sessionForDay(s: AppState, key: string = todayKey): WorkoutSession | undefined {
+  return s.sessions.find((x) => x.dateKey === key)
 }
 
 export function sessionProgress(session?: WorkoutSession) {
@@ -72,7 +81,7 @@ function dayMeetsGoals(h: HabitDay, s: AppState): boolean {
 
 export function streakStats(s: AppState) {
   const byKey = new Map(s.habits.map((h) => [h.dateKey, h]))
-  // current: count back from yesterday (today is in-progress) — include today if it already qualifies
+  // current: count back from yesterday (today is in-progress), including today if it already qualifies
   let current = 0
   const todayQualifies = (() => {
     const t = byKey.get(todayKey)
@@ -121,6 +130,30 @@ export function foodReviewForDay(s: AppState, key: string = todayKey) {
   return s.foodReviews.find((r) => r.dateKey === key) ?? null
 }
 
+/* -------------------------- Self-logged activities -------------------------- */
+export function activitiesForDay(s: AppState, key: string = todayKey) {
+  return (s.activities ?? []).filter((a) => a.dateKey === key)
+}
+
+export function activitiesInRange(s: AppState, days: number) {
+  const cutoff = dayKey(days)
+  return (s.activities ?? []).filter((a) => a.dateKey >= cutoff)
+}
+
+/** Activities the user flagged as a regular weekly activity, in a given calendar
+ *  week (offset 0 = this week, 1 = last week). These count as "workouts". */
+export function weeklyActivitiesInWeek(s: AppState, offset = 0) {
+  const wk = new Set(currentWeekKeys().map((k) => toKey(addDays(fromKey(k), -7 * offset))))
+  return (s.activities ?? []).filter((a) => a.weekly && wk.has(a.dateKey))
+}
+
+/** Prescribed sessions + regular weekly activities for a calendar week. */
+export function regularWorkoutsInWeek(s: AppState, offset = 0) {
+  const wk = new Set(currentWeekKeys().map((k) => toKey(addDays(fromKey(k), -7 * offset))))
+  const sessions = completedSessions(s).filter((x) => wk.has(x.dateKey)).length
+  return sessions + weeklyActivitiesInWeek(s, offset).length
+}
+
 /* -------------------------- Strength progress -------------------------- */
 /** Epley 1RM estimate from a session's best set of an exercise. */
 function best1RM(session: WorkoutSession, defId: string): number | null {
@@ -163,6 +196,49 @@ export function strengthProgress(s: AppState) {
     .filter(Boolean) as { id: string; name: string; from: number; to: number; pct: number; image: string }[]
 }
 
+/* -------------------------- Strength & volume series -------------------------- */
+function epley(weightKg: number, reps: number) {
+  return weightKg * (1 + reps / 30)
+}
+
+/** Estimated 1RM per completed session for a lift, chronological. */
+export function oneRMSeries(s: AppState, defId: string) {
+  return completedSessions(s)
+    .filter((x) => x.exercises.some((e) => e.defId === defId))
+    .sort((a, b) => a.dateKey.localeCompare(b.dateKey))
+    .map((x) => {
+      const ex = x.exercises.find((e) => e.defId === defId)!
+      const kg = Math.max(0, ...ex.sets.map((set) => epley(set.weightKg, set.reps)))
+      return { dateKey: x.dateKey, kg: Math.round(kg / 2.5) * 2.5 }
+    })
+    .filter((p) => p.kg > 0)
+}
+
+/** The lift with the most logged history (for the default strength chart). */
+export function bestLiftId(s: AppState): string | null {
+  const lifts = ['bench', 'squat', 'deadlift', 'ohp', 'row', 'pulldown']
+  let best: string | null = null
+  let n = 0
+  for (const id of lifts) {
+    const c = completedSessions(s).filter((x) => x.exercises.some((e) => e.defId === id)).length
+    if (c > n) { n = c; best = id }
+  }
+  return best
+}
+
+/** Total training volume bucketed into the last `weeks` weeks (oldest → newest). */
+export function volumeByWeek(s: AppState, weeks = 8) {
+  const done = completedSessions(s)
+  const out: { label: string; volume: number }[] = []
+  for (let wk = weeks - 1; wk >= 0; wk--) {
+    const start = dayKey(wk * 7 + 6)
+    const end = dayKey(wk * 7)
+    const volume = done.filter((x) => x.dateKey >= start && x.dateKey <= end).reduce((a, x) => a + x.volumeKg, 0)
+    out.push({ label: wk === 0 ? 'Now' : `${wk}w`, volume: Math.round(volume) })
+  }
+  return out
+}
+
 /* -------------------------- Habit consistency (this week) -------------------------- */
 export function habitConsistencyWeek(s: AppState) {
   const wk = currentWeekKeys().filter((k) => k <= todayKey)
@@ -185,6 +261,76 @@ export function unreadNotifs(s: AppState) {
 
 export function unreadChat(s: AppState) {
   return s.chat.filter((m) => m.role === 'coach' && !m.read).length
+}
+
+/* -------------------------- Weekly performance index -------------------------- */
+export type WeeklyIndex = {
+  /** 0..100, where ~50 means "on track" to hit your goals. */
+  score: number
+  band: 'off' | 'behind' | 'ontrack' | 'ahead' | 'crushing'
+  label: string
+  blurb: string
+  parts: { label: string; pct: number }[]
+}
+
+/** Reviews the last 7 days of activity vs the user's targets into a single
+ *  needle position. 1.0x of targets = the middle ("on track"). */
+export function weeklyIndex(s: AppState): WeeklyIndex {
+  const p = s.profile
+  const byKey = new Map(s.habits.map((h) => [h.dateKey, h]))
+  const last7 = Array.from({ length: 7 }, (_, d) => dayKey(d))
+  const days = last7.map((k) => byKey.get(k)).filter(Boolean) as HabitDay[]
+  const n = Math.max(1, days.length)
+
+  const avg = (sel: (h: HabitDay) => number) => days.reduce((a, h) => a + sel(h), 0) / n
+  // Count prescribed sessions and self-logged activities. All fitness counts.
+  const workouts = workoutsInRange(s, 7) + activitiesInRange(s, 7).length
+
+  // Each ratio: 1.0 means the target was met across the week.
+  const r = {
+    workouts: workouts / Math.max(1, p.daysPerWeek),
+    steps: p.stepTarget ? avg((h) => h.steps) / p.stepTarget : 0,
+    sleep: p.sleepTargetH ? avg((h) => h.sleepH) / p.sleepTargetH : 0,
+    water: p.waterTargetL ? avg((h) => h.waterL) / p.waterTargetL : 0,
+    nutrition: avg((h) => h.nutritionScore) / 8, // 8/10 counts as on-track
+  }
+  const clamp = (x: number) => Math.max(0, Math.min(1.7, x))
+  const weighted =
+    clamp(r.workouts) * 0.30 +
+    clamp(r.steps) * 0.20 +
+    clamp(r.sleep) * 0.20 +
+    clamp(r.water) * 0.15 +
+    clamp(r.nutrition) * 0.15
+
+  // weighted ≈ 1 → middle (50). 1.7x → ~85+, 0 → 0.
+  const score = Math.round(Math.max(0, Math.min(100, weighted * 50)))
+
+  const band: WeeklyIndex['band'] =
+    score >= 80 ? 'crushing' : score >= 62 ? 'ahead' : score >= 44 ? 'ontrack' : score >= 28 ? 'behind' : 'off'
+  const label = {
+    crushing: 'Crushing your goals',
+    ahead: 'Ahead of pace',
+    ontrack: 'On track',
+    behind: 'Slightly behind',
+    off: 'Off track',
+  }[band]
+  const blurb = {
+    crushing: 'Outstanding week. You are well past your targets, so keep this rhythm.',
+    ahead: 'Strong week. You are pushing beyond your goals nicely.',
+    ontrack: 'Right where you want to be. Hold this and the results come.',
+    behind: 'A little under pace this week. One or two better days turns it around.',
+    off: 'This week slipped. No guilt. Pick one habit and start again today.',
+  }[band]
+
+  const pct = (x: number) => Math.round(Math.max(0, Math.min(1.2, x)) * 100)
+  const parts = [
+    { label: 'Workouts', pct: pct(r.workouts) },
+    { label: 'Steps', pct: pct(r.steps) },
+    { label: 'Sleep', pct: pct(r.sleep) },
+    { label: 'Water', pct: pct(r.water) },
+    { label: 'Nutrition', pct: pct(r.nutrition) },
+  ]
+  return { score, band, label, blurb, parts }
 }
 
 export function leaderboardSorted(s: AppState) {

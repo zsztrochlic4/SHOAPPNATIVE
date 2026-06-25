@@ -7,9 +7,12 @@ import type {
   AppNotification,
   AppState,
   ChatMessage,
+  LoggedActivity,
   LoggedExercise,
   LoggedMeal,
+  PlannedMeal,
   Post,
+  PostComment,
   Profile,
   Settings,
   WorkoutSession,
@@ -28,8 +31,15 @@ export type Action =
   | { type: 'PATCH_TODAY_HABIT'; patch: Partial<{ steps: number; sleepH: number; mindsetMin: number; waterL: number }> }
   | { type: 'ADD_MEAL'; meal: Omit<LoggedMeal, 'id' | 'dateKey'> }
   | { type: 'REMOVE_MEAL'; id: string }
+  | { type: 'ADD_ACTIVITY'; activity: Omit<LoggedActivity, 'id' | 'dateKey' | 'time'> }
+  | { type: 'REMOVE_ACTIVITY'; id: string }
+  | { type: 'TOGGLE_ACTIVITY_WEEKLY'; id: string }
+  | { type: 'ADD_PLANNED_MEAL'; plan: Omit<PlannedMeal, 'id'> }
+  | { type: 'REMOVE_PLANNED_MEAL'; id: string }
+  | { type: 'ADD_COMMENT'; postId: string; text: string }
   | { type: 'SAVE_FOOD_REVIEW'; text: string; score: number }
   | { type: 'SEND_CHAT'; text: string }
+  | { type: 'PUSH_CHAT'; role: 'user' | 'coach'; text: string }
   | { type: 'MARK_CHAT_READ' }
   | { type: 'SAVE_SESSION'; session: WorkoutSession }
   | { type: 'TOGGLE_EXERCISE_DONE'; defId: string }
@@ -103,6 +113,37 @@ function reducer(state: AppState, action: Action): AppState {
     case 'REMOVE_MEAL':
       return { ...state, meals: state.meals.filter((m) => m.id !== action.id) }
 
+    case 'ADD_ACTIVITY': {
+      const activity: LoggedActivity = { ...action.activity, id: `act-${Date.now()}`, dateKey: todayKey, time: nowTime() }
+      const activities = [activity, ...(state.activities ?? [])]
+      // Recognise any logged activity as training for the day.
+      const has = state.habits.some((h) => h.dateKey === todayKey)
+      const habits = has
+        ? state.habits.map((h) => (h.dateKey === todayKey ? { ...h, workout: true } : h))
+        : [...state.habits, { dateKey: todayKey, steps: 0, sleepH: 0, waterL: 0, mindsetMin: 0, nutritionScore: 0, workout: true }]
+      return { ...state, activities, habits }
+    }
+
+    case 'REMOVE_ACTIVITY':
+      return { ...state, activities: (state.activities ?? []).filter((a) => a.id !== action.id) }
+
+    case 'TOGGLE_ACTIVITY_WEEKLY':
+      return { ...state, activities: (state.activities ?? []).map((a) => (a.id === action.id ? { ...a, weekly: !a.weekly } : a)) }
+
+    case 'ADD_PLANNED_MEAL':
+      return { ...state, mealPlan: [...(state.mealPlan ?? []), { ...action.plan, id: `pm-${Date.now()}` }] }
+
+    case 'REMOVE_PLANNED_MEAL':
+      return { ...state, mealPlan: (state.mealPlan ?? []).filter((p) => p.id !== action.id) }
+
+    case 'ADD_COMMENT': {
+      const text = action.text.trim()
+      if (!text) return state
+      const comment: PostComment = { id: `cm-${Date.now()}`, postId: action.postId, author: `${state.profile.name} (You)`, text, time: 'now' }
+      const posts = state.posts.map((p) => (p.id === action.postId ? { ...p, comments: p.comments + 1 } : p))
+      return { ...state, postComments: [...(state.postComments ?? []), comment], posts }
+    }
+
     case 'SAVE_FOOD_REVIEW': {
       const others = state.foodReviews.filter((r) => r.dateKey !== todayKey)
       const review = action.text.trim() ? [{ dateKey: todayKey, text: action.text, score: action.score }] : []
@@ -118,6 +159,21 @@ function reducer(state: AppState, action: Action): AppState {
       const userMsg: ChatMessage = { id: `c-${id}`, role: 'user', text, dateKey: todayKey, time: nowTime(), read: true }
       const coachMsg: ChatMessage = { id: `c-${id + 1}`, role: 'coach', text: coachReply(state, text), dateKey: todayKey, time: nowTime(), read: false }
       return { ...state, chat: [...state.chat, userMsg, coachMsg] }
+    }
+
+    case 'PUSH_CHAT': {
+      const text = action.text.trim()
+      if (!text) return state
+      const msg: ChatMessage = {
+        id: `c-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        role: action.role,
+        text,
+        dateKey: todayKey,
+        time: nowTime(),
+        // user messages are read by definition; coach replies are read while the thread is open
+        read: action.role === 'user',
+      }
+      return { ...state, chat: [...state.chat, msg] }
     }
 
     case 'MARK_CHAT_READ':

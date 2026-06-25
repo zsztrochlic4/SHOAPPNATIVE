@@ -23,15 +23,18 @@ import type {
   Group,
   HabitDay,
   LeaderUser,
+  LoggedActivity,
   LoggedExercise,
   LoggedMeal,
+  PlannedMeal,
   Post,
+  PostComment,
   ProgressPhoto,
   WeightEntry,
   WorkoutSession,
 } from './types'
 
-export const SCHEMA_VERSION = 4
+export const SCHEMA_VERSION = 8
 const DAYS = 40 // 0..38 completed history, 39 = today (in progress)
 
 /* round to nearest 2.5 (plate increments) */
@@ -134,7 +137,7 @@ function buildMeals(rng: () => number, i: number): LoggedMeal[] {
   })
 }
 
-/* Today's exact meals — matches the Nutrition mockup numbers */
+/* Today's exact meals: matches the Nutrition mockup numbers */
 function todaysMeals(): LoggedMeal[] {
   const ids: [LoggedMeal['meal'], string][] = [
     ['Breakfast', 'f-oats'],
@@ -214,7 +217,7 @@ export function buildSeed(): AppState {
       workout: isTraining && good,
     })
   }
-  // today (in progress) — mirrors the dashboard mockup feel
+  // today (in progress), mirrors the dashboard mockup feel
   habits.push({
     dateKey: todayKey,
     steps: 7632,
@@ -225,6 +228,45 @@ export function buildSeed(): AppState {
     workout: false,
   })
 
+  /* Curate the current week (Mon..Sat) into a believable, varied "week in the
+   * life" so each day tells its own story and the dashboard gauge + colour-coded
+   * breakdown show a real mix: steps strong (green), sleep & nutrition mixed
+   * (amber), water the weak spot (red). */
+  const weekHabit: Record<string, Partial<HabitDay>> = {
+    [dayKey(6)]: { steps: 13200, sleepH: 7.4, waterL: 2.2, mindsetMin: 12, nutritionScore: 8, workout: true }, // Mon, strong start
+    [dayKey(5)]: { steps: 10800, sleepH: 7.6, waterL: 1.8, mindsetMin: 8, nutritionScore: 7, workout: true }, // Tue, solid
+    [dayKey(4)]: { steps: 4800, sleepH: 5.5, waterL: 0.8, mindsetMin: 0, nutritionScore: 4, workout: false }, // Wed, rough day off
+    [dayKey(3)]: { steps: 7200, sleepH: 5.2, waterL: 1.0, mindsetMin: 5, nutritionScore: 5, workout: true }, // Thu, trained on poor sleep
+    [dayKey(2)]: { steps: 11500, sleepH: 6.2, waterL: 1.3, mindsetMin: 6, nutritionScore: 6, workout: true }, // Fri, busy but active
+    [dayKey(1)]: { steps: 9000, sleepH: 7.2, waterL: 1.6, mindsetMin: 10, nutritionScore: 8, workout: true }, // Sat, football day
+  }
+  for (let j = 0; j < habits.length; j++) {
+    const ov = weekHabit[habits[j].dateKey]
+    if (ov) habits[j] = { ...habits[j], ...ov }
+  }
+
+  /* A couple of self-logged activities this week (cross-training the app didn't
+   * prescribe). The Saturday football is flagged as a regular weekly activity. */
+  const activities: LoggedActivity[] = [
+    { id: 'act-seed-foot', dateKey: dayKey(1), type: 'football', name: 'Football', icon: 'football', minutes: 60, intensity: 'hard', calories: 540, weekly: true, time: '4:30 PM' },
+    { id: 'act-seed-swim', dateKey: dayKey(3), type: 'swim', name: 'Swim', icon: 'swim', minutes: 30, intensity: 'moderate', calories: 270, weekly: false, time: '8:10 AM' },
+  ]
+
+  /* -------- a starter weekly meal plan -------- */
+  const mealPlan: PlannedMeal[] = [
+    { id: 'pm-1', day: 'Mon', slot: 'Breakfast', name: 'Protein Overnight Oats' },
+    { id: 'pm-2', day: 'Mon', slot: 'Lunch', name: 'Chicken, Rice & Frozen Veg' },
+    { id: 'pm-3', day: 'Tue', slot: 'Dinner', name: 'Tuna Pasta' },
+    { id: 'pm-4', day: 'Thu', slot: 'Lunch', name: 'Chicken & Hummus Wrap' },
+  ]
+
+  /* -------- seeded comments on the feed -------- */
+  const postComments: PostComment[] = [
+    { id: 'cm-s1', postId: 'post-1', author: 'Jayden K.', text: 'Huge, congrats! That bench is flying up.', time: '1h ago' },
+    { id: 'cm-s2', postId: 'post-1', author: 'Sophie L.', text: 'Beast mode 💪 see you Friday?', time: '45m ago' },
+    { id: 'cm-s3', postId: 'post-3', author: 'Mia R.', text: 'Recipe please 🙏', time: '20h ago' },
+  ]
+
   /* -------- sessions -------- */
   const sessions: WorkoutSession[] = []
   for (let i = 0; i < DAYS - 1; i++) {
@@ -232,7 +274,7 @@ export function buildSeed(): AppState {
     const s = buildSession(rng, i, true)
     if (s) sessions.push(s)
   }
-  // today's session — partial (first 3 exercises done) so "Today's Progress" is live
+  // today's session, partial (first 3 exercises done) so "Today's Progress" is live
   const todaySession = buildSession(rng, DAYS - 1, false)
   if (todaySession) {
     todaySession.id = 's-today'
@@ -324,23 +366,26 @@ export function buildSeed(): AppState {
 
   /* -------- progress photos (seeded placeholders) -------- */
   const photos: ProgressPhoto[] = [
-    { id: 'ph-1', dateKey: dayKey(39), dataUrl: photoDataUrl('Day 1', 150), note: 'Starting out — 74.6 kg' },
-    { id: 'ph-2', dateKey: dayKey(19), dataUrl: photoDataUrl('Day 20', 150), note: 'Halfway — 73.0 kg' },
-    { id: 'ph-3', dateKey: dayKey(0), dataUrl: photoDataUrl('Day 40', 150), note: 'Today — 72.4 kg, leaner & stronger' },
+    { id: 'ph-1', dateKey: dayKey(39), dataUrl: photoDataUrl('Day 1', 150), note: 'Starting out, 74.6 kg' },
+    { id: 'ph-2', dateKey: dayKey(19), dataUrl: photoDataUrl('Day 20', 150), note: 'Halfway, 73.0 kg' },
+    { id: 'ph-3', dateKey: dayKey(0), dataUrl: photoDataUrl('Day 40', 150), note: 'Today, 72.4 kg, leaner & stronger' },
   ]
 
   return {
     profile,
-    settings: { units: 'metric', theme: 'dark', notificationsEnabled: true },
+    settings: { units: 'metric', theme: 'dark', notificationsEnabled: true, language: 'en', connections: {} },
     weights,
     habits,
     meals,
     foodReviews: [],
+    activities,
+    mealPlan,
+    postComments,
     chat: [
       {
         id: 'chat-welcome',
         role: 'coach',
-        text: `Hi ${profile.name}, I'm your coach 👋 Message me anytime — about how a session felt, an exercise you'd like to change, a niggle, or staying on track. What's on your mind?`,
+        text: `Hi ${profile.name}, I'm your coach 👋 Message me anytime about how a session felt, an exercise you'd like to change, a niggle, or staying on track. What's on your mind?`,
         dateKey: todayKey,
         time: '9:00 AM',
         read: true,
@@ -374,6 +419,9 @@ export function emptyState(): AppState {
     habits: [],
     meals: [],
     foodReviews: [],
+    activities: [],
+    mealPlan: [],
+    postComments: [],
     sessions: [],
     photos: [],
     posts: s.posts.filter((p) => p.authorId !== 'you'),

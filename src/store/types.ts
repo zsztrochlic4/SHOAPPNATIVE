@@ -1,3 +1,5 @@
+import type { Language } from '../lib/i18n'
+
 export type Units = 'metric' | 'imperial'
 export type Theme = 'dark' | 'light'
 export type Goal = 'build-muscle' | 'lose-fat' | 'gain-strength' | 'stay-healthy'
@@ -40,6 +42,23 @@ export interface Profile {
   createdAtKey: string
 }
 
+/** A planned meal slot in the weekly meal planner. */
+export interface PlannedMeal {
+  id: string
+  day: string // 'Mon'..'Sun'
+  slot: MealName
+  name: string
+}
+
+/** A comment on a community post. */
+export interface PostComment {
+  id: string
+  postId: string
+  author: string
+  text: string
+  time: string
+}
+
 /** A single message in the 1:1 coach messenger. */
 export interface ChatMessage {
   id: string
@@ -54,6 +73,10 @@ export interface Settings {
   units: Units
   theme: Theme
   notificationsEnabled: boolean
+  /** UI language. Defaults to English when absent (older saves). */
+  language?: Language
+  /** Connected third-party integrations, e.g. { strava: true }. */
+  connections?: Record<string, boolean>
 }
 
 export interface WeightEntry {
@@ -105,6 +128,25 @@ export interface FoodReview {
   text: string
   /** 0..10 quality score from the on-device nutrition coach. */
   score: number
+}
+
+/** A self-logged fitness activity not prescribed by the app (run, swim, sport…). */
+export interface LoggedActivity {
+  id: string
+  dateKey: string
+  /** preset key (e.g. 'run') or 'custom' */
+  type: string
+  name: string
+  /** icon key resolved by ActivityIcon */
+  icon: string
+  minutes: number
+  intensity: 'easy' | 'moderate' | 'hard'
+  /** rough estimated calories */
+  calories: number
+  note?: string
+  time: string
+  /** marked as a regular weekly activity; only these count as "workouts this week" */
+  weekly?: boolean
 }
 
 export interface ExerciseDef {
@@ -331,6 +373,12 @@ export interface AppState {
   meals: LoggedMeal[]
   foodReviews: FoodReview[]
   chat: ChatMessage[]
+  /** self-logged activities (optional for older saves) */
+  activities?: LoggedActivity[]
+  /** weekly meal plan */
+  mealPlan?: PlannedMeal[]
+  /** comments per community post */
+  postComments?: PostComment[]
   foods: FoodItem[]
   sessions: WorkoutSession[]
   program: ProgramDay[]
