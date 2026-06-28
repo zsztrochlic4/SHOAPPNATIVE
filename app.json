@@ -8,9 +8,13 @@
     "userInterfaceStyle": "automatic",
     "scheme": "strengthhub",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.zaggy887.strengthhub",
+      "buildNumber": "1"
     },
     "android": {
+      "package": "com.zaggy887.strengthhub",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#0A0A0B",
         "foregroundImage": "./assets/android-icon-foreground.png",
