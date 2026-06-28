@@ -77,4 +77,3 @@ Then in **App Store Connect** (https://appstoreconnect.apple.com):
 - The **AI coach** stays in graceful-fallback (on-device rules) unless you set
   `EXPO_PUBLIC_COACH_API` to a deployed `/api/coach` endpoint — that backend is a
   good candidate for a Firebase Cloud Function if you want it live.
-</content>
