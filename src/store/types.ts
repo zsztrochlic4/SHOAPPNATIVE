@@ -77,6 +77,10 @@ export interface Settings {
   language?: Language
   /** Connected third-party integrations, e.g. { strava: true }. */
   connections?: Record<string, boolean>
+  /** Which metric the main Progress chart shows (default 'weight'). */
+  progressMetric?: string
+  /** The three stat ids shown in the dashboard Progress overview. */
+  dashboardStats?: string[]
 }
 
 export interface WeightEntry {
@@ -307,25 +311,41 @@ export interface QuickWorkout {
   exercises: string[]
 }
 
-/** Cheap, high-protein meals built for a student budget. */
+/** Recipe categories used to filter the Eats browser. */
+export type MealCategory = 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack' | 'Sweet'
+
+/** Easy, tasty, budget-friendly recipes with full step-by-step method. */
 export interface BudgetMeal {
   id: string
   name: string
   image: string
-  cost: number
+  category: MealCategory
+  /** Total hands-on + cook time, in minutes. */
+  minutes: number
   serves: number
   kcal: number
   p: number
   c: number
   f: number
-  ingredients: { item: string; cost: number }[]
+  ingredients: string[]
   steps: string[]
   cookOnce?: string
   tags: string[]
-  /** Which goals this meal suits best, for filtering. */
-  goals?: Goal[]
-  /** One-line "why it tastes good / why it fits" note. */
+  /** One-line "why it tastes good" note. */
   flavour?: string
+}
+
+/** A user-created recipe meal saved in "My Meals". */
+export interface UserMeal {
+  id: string
+  name: string
+  notes?: string
+  kcal: number
+  p: number
+  c: number
+  f: number
+  ingredients: string[]
+  createdAtKey: string
 }
 
 /** A lesson in the New to the Gym first-90-days track. */
@@ -379,6 +399,8 @@ export interface AppState {
   mealPlan?: PlannedMeal[]
   /** comments per community post */
   postComments?: PostComment[]
+  /** quick "how did eating go" tag ids chosen per day, keyed by dateKey */
+  nutritionTags?: Record<string, string[]>
   foods: FoodItem[]
   sessions: WorkoutSession[]
   program: ProgramDay[]
@@ -392,6 +414,12 @@ export interface AppState {
   photos: ProgressPhoto[]
   partners: PartnerCandidate[]
   coachThread: CoachMessage[]
+  /** user-created recipe meals */
+  myMeals?: UserMeal[]
+  /** day keys on which the user started a workout */
+  workoutStartedKeys?: string[]
+  /** day keys on which the user asked the nutrition coach a question */
+  nutritionAskedKeys?: string[]
   /** completed beginner-track lesson ids */
   beginnerProgress: string[]
   /** schema version for migrations */

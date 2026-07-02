@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { View, Text, Pressable, Image, TextInput, Animated, Easing } from 'react-native'
 import {
-  Sparkles, Check, ChevronRight, ChevronDown, Wallet, Trophy, Flame,
-  GraduationCap, Dumbbell, Lightbulb, ShieldQuestion, Share2, Plus, MapPin,
-  Send, Video, Lock, Crown, X, Clock, Repeat, Heart, MessageCircle, Award, Swords, Users,
+  Sparkles, Check, CheckCheck, ChevronRight, ChevronDown, Salad, Trophy, Flame,
+  GraduationCap, Dumbbell, Lightbulb, ShieldQuestion, Share2, Plus, MapPin, Phone,
+  Send, Video, Lock, Crown, Clock, Repeat, Heart, MessageCircle, Award, Swords, Users, X,
 } from 'lucide-react-native'
 import { Sheet } from '../components/Sheet'
 import { Avatar } from '../components/Avatar'
@@ -24,9 +24,11 @@ import { CHAT_SUGGESTIONS, coachReply } from '../lib/coachChat'
 import { askCoach } from '../lib/coachApi'
 import { todaySession, leaderboardSorted, youRank } from '../store/selectors'
 import { relativeLabel } from '../lib/date'
+import { CHART_METRICS, STAT_METRICS, progressMetricId, dashboardStatIds } from '../lib/metrics'
+import { weightVal, toKg, weightUnit } from '../lib/format'
 import { brand, useColors } from '../theme'
 import type { ReactNode } from 'react'
-import type { CoachKind, MealName } from '../store/types'
+import type { CoachKind } from '../store/types'
 
 type Props = { open: boolean; onClose: () => void; params?: Record<string, unknown> }
 
@@ -137,54 +139,15 @@ export function BeginnerSheet({ open, onClose }: Props) {
 
 /* ======================== Budget eats ============================= */
 export function BudgetEatsSheet({ open, onClose }: Props) {
-  const { dispatch } = useStore()
-  const toast = useToast()
   const [openId, setOpenId] = useState<string | null>(null)
-  const [showList, setShowList] = useState(false)
-
-  const grocery = (() => {
-    const map = new Map<string, number>()
-    for (const m of BUDGET_MEALS) for (const ing of m.ingredients) map.set(ing.item, (map.get(ing.item) ?? 0) + ing.cost)
-    return [...map.entries()]
-  })()
-  const weekTotal = grocery.reduce((a, [, c]) => a + c, 0)
-
-  function logMeal(id: string) {
-    const m = BUDGET_MEALS.find((x) => x.id === id)!
-    dispatch({ type: 'ADD_MEAL', meal: { meal: 'Lunch' as MealName, name: m.name, qty: 1, kcal: m.kcal, p: m.p, c: m.c, f: m.f } })
-    toast('Logged to lunch')
-  }
 
   return (
-    <Sheet open={open} onClose={onClose} title="Eat well for less">
+    <Sheet open={open} onClose={onClose} title="Easy recipes">
       <View className="rounded-3xl border border-white/8 bg-ink-800 p-5">
-        <Wallet size={26} color={brand[400]} />
-        <Text className="mt-2 text-xl font-extrabold tracking-tight text-white">Cheap, high protein, fast</Text>
-        <Text className="mt-1 text-[14px] leading-snug text-white/60">Real meals for a student budget, with rough costs. Cook once, eat across a couple of days.</Text>
+        <Salad size={26} color={brand[400]} />
+        <Text className="mt-2 text-xl font-extrabold tracking-tight text-white">Tasty, simple, cheap</Text>
+        <Text className="mt-1 text-[14px] leading-snug text-white/60">Easy meals with every step laid out. Pick one and cook along.</Text>
       </View>
-
-      <Pressable onPress={() => setShowList((v) => !v)} className="mt-4 w-full flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-4 active:opacity-80">
-        <View className="h-10 w-10 items-center justify-center rounded-xl bg-brand-400/15"><Text className="text-sm font-bold text-brand-400">${weekTotal.toFixed(0)}</Text></View>
-        <View className="flex-1">
-          <Text className="font-bold leading-tight text-white">This week's grocery list</Text>
-          <Text className="text-[12px] text-white/50">Everything for all meals below</Text>
-        </View>
-        <ChevronDown size={18} color="rgba(255,255,255,0.3)" style={{ transform: [{ rotate: showList ? '180deg' : '0deg' }] }} />
-      </Pressable>
-      {showList && (
-        <View className="mt-2 rounded-2xl border border-white/5 bg-ink-800 p-4">
-          {grocery.map(([item, cost], idx) => (
-            <View key={item} className={`flex-row items-center justify-between py-2 ${idx === grocery.length - 1 ? '' : 'border-b border-white/5'}`}>
-              <Text className="text-[13px] text-white/70">{item}</Text>
-              <Text className="text-[13px] font-semibold text-white/50">${cost.toFixed(2)}</Text>
-            </View>
-          ))}
-          <View className="mt-2 flex-row items-center justify-between">
-            <Text className="text-[14px] font-bold text-white">Estimated total</Text>
-            <Text className="text-[14px] font-bold text-brand-400">${weekTotal.toFixed(2)}</Text>
-          </View>
-        </View>
-      )}
 
       <View className="mt-4 gap-2.5">
         {BUDGET_MEALS.map((m) => {
@@ -195,21 +158,23 @@ export function BudgetEatsSheet({ open, onClose }: Props) {
                 <Image source={{ uri: m.image }} resizeMode="cover" className="h-14 w-14 rounded-xl" />
                 <View className="min-w-0 flex-1">
                   <Text className="font-bold leading-tight text-white">{m.name}</Text>
-                  <Text className="text-[12px] text-white/50">{m.kcal} kcal · {m.p}g protein</Text>
+                  <Text className="text-[12px] text-white/50">{m.minutes} min · serves {m.serves}</Text>
                   <View className="mt-1 flex-row flex-wrap gap-1">{m.tags.slice(0, 2).map((t) => <Chip key={t} color="green">{t}</Chip>)}</View>
                 </View>
-                <View className="items-end">
-                  <Text className="font-extrabold text-brand-400">${m.cost.toFixed(2)}</Text>
-                  <Text className="text-[10px] text-white/40">per serve</Text>
-                </View>
+                <ChevronDown size={18} color="rgba(255,255,255,0.3)" style={{ flexShrink: 0, transform: [{ rotate: isOpen ? '180deg' : '0deg' }] }} />
               </Pressable>
               {isOpen && (
                 <View className="gap-3 border-t border-white/5 px-4 py-3">
                   <View>
                     <Text className="mb-1 text-[12px] font-bold uppercase tracking-wide text-white/40">Ingredients</Text>
-                    {m.ingredients.map((ing) => (
-                      <View key={ing.item} className="flex-row justify-between py-0.5"><Text className="text-[14px] text-white/70">{ing.item}</Text><Text className="text-[14px] text-white/45">${ing.cost.toFixed(2)}</Text></View>
-                    ))}
+                    <View className="gap-1">
+                      {m.ingredients.map((ing) => (
+                        <View key={ing} className="flex-row items-start gap-2">
+                          <View className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-brand-400" />
+                          <Text className="flex-1 text-[14px] text-white/70">{ing}</Text>
+                        </View>
+                      ))}
+                    </View>
                   </View>
                   <View>
                     <Text className="mb-1 text-[12px] font-bold uppercase tracking-wide text-white/40">Method</Text>
@@ -221,7 +186,6 @@ export function BudgetEatsSheet({ open, onClose }: Props) {
                       <Text className="flex-1 text-[13px] text-white/70">{m.cookOnce}</Text>
                     </View>
                   )}
-                  <Pressable onPress={() => logMeal(m.id)} className="btn-primary w-full flex-row items-center justify-center gap-1.5 py-2.5 active:opacity-90"><Plus size={15} color="#000" /><Text className="text-sm font-semibold text-black">Log to today</Text></Pressable>
                 </View>
               )}
             </View>
@@ -454,20 +418,28 @@ export function CoachChatSheet({ open, onClose }: Props) {
     toast('Video call booked')
   }
 
+  // Find the last message the user sent, to show a Seen / Delivered receipt.
+  let lastUserIdx = -1
+  for (let i = messages.length - 1; i >= 0; i--) { if (messages[i].role === 'user') { lastUserIdx = i; break } }
+  const seen = lastUserIdx >= 0 && messages.slice(lastUserIdx + 1).some((m) => m.role === 'coach')
+
   return (
     <Sheet open={open} onClose={onClose} title="Coach">
       {/* Header row (in-sheet) */}
-      <View className="mb-3 flex-row items-center gap-3">
-        <View className="relative">
-          <View className="h-10 w-10 items-center justify-center rounded-full bg-brand-400"><Sparkles size={20} color="#000" /></View>
+      <View className="mb-3 flex-row items-center gap-2.5">
+        <View className="relative shrink-0">
+          <View className="h-9 w-9 items-center justify-center rounded-full bg-brand-400"><Sparkles size={18} color="#000" /></View>
           <View className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-brand-400" style={{ borderWidth: 2, borderColor: colors.ink900 }} />
         </View>
         <View className="min-w-0 flex-1">
-          <Text className="font-bold leading-tight text-white">Coach</Text>
-          <Text className="text-[12px] text-brand-400">Online · usually replies instantly</Text>
+          <Text numberOfLines={1} className="text-[15px] font-bold leading-tight text-white">Coach</Text>
+          <Text className="text-[12px] leading-tight text-white/45">Active now</Text>
         </View>
-        <Pressable onPress={() => setShowBook((v) => !v)} className="h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-400/15 active:opacity-80">
-          <Video size={18} color={brand[400]} />
+        <Pressable className="h-9 w-9 shrink-0 items-center justify-center rounded-full active:opacity-80">
+          <Phone size={20} color={brand[400]} />
+        </Pressable>
+        <Pressable onPress={() => setShowBook((v) => !v)} className="h-9 w-9 shrink-0 items-center justify-center rounded-full active:opacity-80">
+          <Video size={21} color={brand[400]} />
         </Pressable>
       </View>
 
@@ -777,5 +749,128 @@ export function ChallengeDetailSheet({ open, onClose, params }: Props) {
         </>
       )}
     </Sheet>
+  )
+}
+
+/* ===================== Customise dashboard / goals ================ */
+export function CustomizeSheet({ open, onClose }: Props) {
+  const { state, dispatch } = useStore()
+  const toast = useToast()
+  const units = state.settings.units
+  const p = state.profile
+
+  const metric = progressMetricId(state)
+  const stats = dashboardStatIds(state)
+
+  const [goalW, setGoalW] = useState(() => String(Math.round(weightVal(p.goalWeightKg, units) * 10) / 10))
+  const [steps, setSteps] = useState(() => String(p.stepTarget))
+  const [sleep, setSleep] = useState(() => String(p.sleepTargetH))
+  const [water, setWater] = useState(() => String(p.waterTargetL))
+  const [days, setDays] = useState(() => String(p.daysPerWeek))
+
+  function saveGoals() {
+    dispatch({
+      type: 'SET_PROFILE',
+      patch: {
+        goalWeightKg: Math.round(toKg(parseFloat(goalW) || weightVal(p.goalWeightKg, units), units) * 10) / 10,
+        stepTarget: Math.max(0, Math.round(Number(steps) || 0)),
+        sleepTargetH: Math.max(0, Math.min(14, Number(sleep) || 0)),
+        waterTargetL: Math.max(0, Number(water) || 0),
+        daysPerWeek: Math.max(1, Math.min(7, Math.round(Number(days) || 1))),
+      },
+    })
+    toast('Goals updated')
+  }
+
+  function pickMetric(id: string) {
+    dispatch({ type: 'SET_SETTINGS', patch: { progressMetric: id } })
+  }
+
+  function toggleStat(id: string) {
+    const has = stats.includes(id)
+    let next: string[]
+    if (has) {
+      if (stats.length <= 1) return // keep at least one
+      next = stats.filter((x) => x !== id)
+    } else {
+      // Always keep exactly three: adding a fourth swaps out the oldest pick.
+      next = stats.length >= 3 ? [...stats.slice(1), id] : [...stats, id]
+    }
+    dispatch({ type: 'SET_SETTINGS', patch: { dashboardStats: next } })
+  }
+
+  const inputCls = 'w-24 rounded-xl border border-white/8 bg-ink-900 px-3 py-2 text-right text-[15px] font-bold text-white'
+
+  return (
+    <Sheet open={open} onClose={onClose} title="Customise">
+      {/* Goals */}
+      <Text className="mb-2 text-[12px] font-bold uppercase tracking-wide text-white/40">Your goals</Text>
+      <View className="gap-2 rounded-2xl border border-white/8 bg-ink-800 p-3">
+        <GoalRow label="Goal weight" unit={weightUnit(units)}>
+          <TextInput value={goalW} onChangeText={(v) => setGoalW(v.replace(/[^\d.]/g, ''))} keyboardType="decimal-pad" placeholderTextColor="rgba(148,148,148,0.6)" className={inputCls} />
+        </GoalRow>
+        <GoalRow label="Daily steps" unit="steps">
+          <TextInput value={steps} onChangeText={(v) => setSteps(v.replace(/\D/g, ''))} keyboardType="number-pad" placeholderTextColor="rgba(148,148,148,0.6)" className={inputCls} />
+        </GoalRow>
+        <GoalRow label="Sleep" unit="hours">
+          <TextInput value={sleep} onChangeText={(v) => setSleep(v.replace(/[^\d.]/g, ''))} keyboardType="decimal-pad" placeholderTextColor="rgba(148,148,148,0.6)" className={inputCls} />
+        </GoalRow>
+        <GoalRow label="Water" unit="litres">
+          <TextInput value={water} onChangeText={(v) => setWater(v.replace(/[^\d.]/g, ''))} keyboardType="decimal-pad" placeholderTextColor="rgba(148,148,148,0.6)" className={inputCls} />
+        </GoalRow>
+        <GoalRow label="Workouts / week" unit="days">
+          <TextInput value={days} onChangeText={(v) => setDays(v.replace(/\D/g, '').slice(0, 1))} keyboardType="number-pad" placeholderTextColor="rgba(148,148,148,0.6)" className={inputCls} />
+        </GoalRow>
+        <Pressable onPress={saveGoals} className="btn-primary mt-1 w-full py-2.5 active:opacity-90">
+          <Text className="text-sm font-semibold text-black">Save goals</Text>
+        </Pressable>
+      </View>
+
+      {/* Main chart metric */}
+      <Text className="mb-2 mt-6 text-[12px] font-bold uppercase tracking-wide text-white/40">Top progress chart</Text>
+      <View className="flex-row flex-wrap gap-2.5">
+        {CHART_METRICS.map((m) => {
+          const on = metric === m.id
+          return (
+            <Pressable key={m.id} onPress={() => pickMetric(m.id)} style={{ width: '47.5%' }} className={`items-center gap-2 rounded-2xl border p-3 active:opacity-90 ${on ? 'border-brand-400 bg-brand-400/10' : 'border-white/8 bg-ink-800'}`}>
+              {on && <View className="absolute right-2 top-2"><Check size={15} strokeWidth={3} color={brand[400]} /></View>}
+              <View className="h-9 w-9 items-center justify-center rounded-xl bg-brand-400/15"><Icon name={m.icon} size={18} color={brand[400]} /></View>
+              <Text className="text-[12.5px] font-semibold text-white">{m.label}</Text>
+            </Pressable>
+          )
+        })}
+      </View>
+
+      {/* Dashboard stats */}
+      <View className="mb-2 mt-6 flex-row items-center justify-between">
+        <Text className="text-[12px] font-bold uppercase tracking-wide text-white/40">Dashboard stats</Text>
+        <Text className="text-[11px] text-white/35">Pick 3</Text>
+      </View>
+      <View className="flex-row flex-wrap gap-2.5">
+        {STAT_METRICS.map((m) => {
+          const on = stats.includes(m.id)
+          return (
+            <Pressable key={m.id} onPress={() => toggleStat(m.id)} style={{ width: '47.5%' }} className={`items-center gap-2 rounded-2xl border p-3 active:opacity-90 ${on ? 'border-brand-400 bg-brand-400/10' : 'border-white/8 bg-ink-800'}`}>
+              <View className={`absolute right-2 top-2 h-[18px] w-[18px] items-center justify-center rounded-md border ${on ? 'border-brand-400 bg-brand-400' : 'border-white/20'}`}>{on && <Check size={11} strokeWidth={3.5} color="#000" />}</View>
+              <View className="h-9 w-9 items-center justify-center rounded-xl bg-brand-400/15"><Icon name={m.icon} size={18} color={brand[400]} /></View>
+              <Text className="text-[12.5px] font-semibold text-white">{m.label}</Text>
+            </Pressable>
+          )
+        })}
+      </View>
+      <View className="h-2" />
+    </Sheet>
+  )
+}
+
+function GoalRow({ label, unit, children }: { label: string; unit: string; children: ReactNode }) {
+  return (
+    <View className="flex-row items-center justify-between">
+      <View className="flex-1">
+        <Text className="text-[14px] font-semibold text-white">{label}</Text>
+        <Text className="text-[11px] text-white/40">{unit}</Text>
+      </View>
+      {children}
+    </View>
   )
 }

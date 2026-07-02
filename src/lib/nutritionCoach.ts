@@ -211,3 +211,37 @@ export function answerForQuestion(q: string): QAResult {
   const item = NUTRITION_QA.find((x) => x.q === q)
   return item ? { matched: true, question: item.q, answer: item.a } : answerQuestion(q)
 }
+
+/* ------------------------------------------------------------------ */
+/*  Unified coach: one message in, the right kind of reply out.        */
+/*  A free-text message is either "here's what I ate" (a day review)   */
+/*  or "a question about food" (Q&A). We route on the shape of it.     */
+/* ------------------------------------------------------------------ */
+export type CoachReply =
+  | { kind: 'review'; review: DayReview }
+  | { kind: 'answer'; answer: QAResult }
+
+const QUESTION_OPENERS = /^(how|what|whats|what's|why|should|shall|can|could|is|are|am|do|does|did|which|when|where|who|will|would|may|might|any|tell me)\b/i
+
+export function coachRespond(text: string, goal: Goal): CoachReply {
+  const clean = text.trim()
+  const looksLikeQuestion = clean.endsWith('?') || QUESTION_OPENERS.test(clean)
+
+  if (looksLikeQuestion) {
+    const answer = answerQuestion(clean)
+    // A clear food match inside a question still reads better as a review,
+    // but only when no set answer was found.
+    if (answer.matched) return { kind: 'answer', answer }
+    const review = reviewDay(clean, goal)
+    if (review.found.length >= 2) return { kind: 'review', review }
+    return { kind: 'answer', answer }
+  }
+
+  const review = reviewDay(clean, goal)
+  // Nothing food-like in there, so treat it as a question instead.
+  if (review.found.length === 0) {
+    const answer = answerQuestion(clean)
+    return { kind: 'answer', answer }
+  }
+  return { kind: 'review', review }
+}

@@ -51,11 +51,15 @@ function TodayTab() {
       {session ? (
         <>
           <Hero image={session.image} rounded={16}>
+            <View className="absolute right-3 top-3 z-10 flex-row items-center gap-1.5 rounded-full bg-black/45 px-3 py-1.5">
+              <Clock size={14} color="#fff" />
+              <Text className="text-[13px] font-semibold text-white">~{session.durationMin} min</Text>
+            </View>
             <Text className="text-sm font-semibold text-brand-400">{session.focus}</Text>
             <Text className="mt-1 text-3xl font-extrabold text-white">{session.name}</Text>
             <View className="mt-2 flex-row items-center gap-1.5">
               <Clock size={15} color="rgba(255,255,255,0.65)" />
-              <Text className="text-sm text-white/65">{session.exercises.length} exercises • ~{session.durationMin} min</Text>
+              <Text className="text-sm text-white/65">{session.exercises.length} exercises</Text>
             </View>
             <Pressable onPress={() => nav.open('activeWorkout')} className="btn-primary mt-4 self-start active:opacity-90">
               <Text className="font-semibold text-black">{session.completed ? 'Review Workout' : prog.done > 0 ? 'Resume Workout' : 'Start Workout'}</Text>
@@ -70,11 +74,6 @@ function TodayTab() {
               <Text className="text-[13px] font-semibold text-white">{prog.pct}%</Text>
             </View>
             <ProgressBar value={prog.pct} />
-            <View className="mt-4 flex-row gap-3 rounded-2xl border border-white/5 bg-ink-800 p-4">
-              <Stat icon="dumbbell" color={brand[400]} label="Volume" value={fmtVolume(session.volumeKg, units)} />
-              <Stat icon="clock" color="#9AA0A6" label="Duration" value={`${session.durationMin} min`} />
-              <Stat icon="flame" color="#9AA0A6" label="Calories" value={`${session.calories} kcal`} />
-            </View>
           </View>
 
           <View className="mt-6">
@@ -170,7 +169,7 @@ function OtherActivities() {
                     </View>
                   )}
                 </View>
-                <Text className="text-[12px] capitalize text-white/50">{a.minutes} min · {a.intensity} · {a.calories} kcal</Text>
+                <Text className="text-[12px] capitalize text-white/50">{a.minutes} min · {a.intensity}</Text>
                 {a.note && <Text numberOfLines={1} className="text-[12px] text-white/40">{a.note}</Text>}
               </View>
               <Pressable onPress={() => dispatch({ type: 'TOGGLE_ACTIVITY_WEEKLY', id: a.id })} className={`h-8 w-8 shrink-0 items-center justify-center rounded-full active:opacity-80 ${a.weekly ? 'bg-brand-400/20' : 'bg-white/5'}`}><Repeat size={15} color={a.weekly ? brand[400] : 'rgba(255,255,255,0.4)'} /></Pressable>
@@ -282,23 +281,13 @@ function HistoryTab() {
               </>
             ) : (
               <>
-                <Text className="text-sm font-semibold text-white">{h.calories} kcal</Text>
-                <Text className="text-[12px] text-white/45">{h.minutes} min</Text>
+                <Text className="text-sm font-semibold text-white">{h.minutes} min</Text>
+                <Text className="text-[12px] capitalize text-white/45">activity</Text>
               </>
             )}
           </View>
         </View>
       ))}
-    </View>
-  )
-}
-
-function Stat({ icon, color, label, value }: { icon: string; color: string; label: string; value: string }) {
-  return (
-    <View className="flex-1">
-      <Icon name={icon} size={18} color={color} />
-      <Text className="mt-1.5 text-[12px] text-white/55">{label}</Text>
-      <Text className="text-lg font-extrabold leading-tight text-white">{value}</Text>
     </View>
   )
 }

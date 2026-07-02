@@ -34,7 +34,7 @@ import type {
   WorkoutSession,
 } from './types'
 
-export const SCHEMA_VERSION = 8
+export const SCHEMA_VERSION = 9
 const DAYS = 40 // 0..38 completed history, 39 = today (in progress)
 
 /* round to nearest 2.5 (plate increments) */
@@ -381,6 +381,12 @@ export function buildSeed(): AppState {
     activities,
     mealPlan,
     postComments,
+    nutritionTags: {
+      [dayKey(6)]: ['champ', 'protein', 'hydrated'], // Mon, strong start
+      [dayKey(4)]: ['meh', 'skipped', 'coffee'], // Wed, rough day
+      [dayKey(2)]: ['takeout', 'treat'], // Fri, busy
+      [todayKey]: ['solid', 'protein', 'hydrated'],
+    },
     chat: [
       {
         id: 'chat-welcome',

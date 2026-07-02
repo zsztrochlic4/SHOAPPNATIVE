@@ -3,9 +3,8 @@ import { createContext, useContext } from 'react'
 export type Overlay =
   | 'notifications'
   | 'settings'
-  | 'profile'
   | 'activeWorkout'
-  | 'addFood'
+  | 'customize'
   | 'logWeight'
   | 'logHabit'
   | 'logActivity'
@@ -30,6 +29,10 @@ export type NavCtx = {
   open: (o: Overlay, params?: Record<string, unknown>) => void
   close: () => void
   goTab: (t: 'dashboard' | 'workout' | 'nutrition' | 'progress' | 'community') => void
+  /** Full-screen side menu, layered under sheets so items return to it. */
+  menuOpen: boolean
+  openMenu: () => void
+  closeMenu: () => void
 }
 
 const Ctx = createContext<NavCtx | null>(null)

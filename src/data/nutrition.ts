@@ -1,6 +1,43 @@
 import type { Goal } from '../store/types'
 
 /* ------------------------------------------------------------------ */
+/*  Quick day tags: a fast, tap-only way to log how eating went.       */
+/*  Positive but honest, chilled student-friendly language.            */
+/*  tone drives the chip colour: good (green), neutral, soft (amber).  */
+/* ------------------------------------------------------------------ */
+export type TagTone = 'good' | 'neutral' | 'soft'
+export interface DayTag {
+  id: string
+  label: string
+  emoji: string
+  tone: TagTone
+}
+
+export const NUTRITION_TAGS: DayTag[] = [
+  { id: 'champ', label: 'Ate like a champ', emoji: '🥇', tone: 'good' },
+  { id: 'solid', label: 'Solid day', emoji: '✅', tone: 'good' },
+  { id: 'protein', label: 'Smashed my protein', emoji: '💪', tone: 'good' },
+  { id: 'hydrated', label: 'Stayed hydrated', emoji: '💧', tone: 'good' },
+  { id: 'veg', label: 'Veg loaded', emoji: '🥗', tone: 'good' },
+  { id: 'treat', label: 'Treated myself', emoji: '🍫', tone: 'neutral' },
+  { id: 'takeout', label: 'Takeout kinda day', emoji: '🍕', tone: 'neutral' },
+  { id: 'coffee', label: 'Running on coffee', emoji: '☕', tone: 'neutral' },
+  { id: 'meh', label: 'Meh, been better', emoji: '😐', tone: 'neutral' },
+  { id: 'latenight', label: 'Late-night snacks', emoji: '🌙', tone: 'soft' },
+  { id: 'skipped', label: 'Skipped meals', emoji: '🥲', tone: 'soft' },
+  { id: 'drinks', label: 'Few too many drinks', emoji: '🍻', tone: 'soft' },
+]
+
+export const tagById = (id: string): DayTag | undefined => NUTRITION_TAGS.find((t) => t.id === id)
+
+/** Maps a tag tone to a theme CSS colour variable, for chip styling. */
+export const TAG_TONE_VAR: Record<TagTone, string> = {
+  good: '--brand-400',
+  neutral: '--accent-blue',
+  soft: '--accent-orange',
+}
+
+/* ------------------------------------------------------------------ */
 /*  Food knowledge base: powers the on-device food-log review.         */
 /*  Plain-language, education-first. Not a calorie tracker.            */
 /* ------------------------------------------------------------------ */
@@ -91,10 +128,46 @@ export interface PlateSection {
 }
 
 export const PLATE_GUIDE: PlateSection[] = [
-  { portion: 'Half', title: 'Vegetables & fruit', examples: 'Broccoli, peppers, salad, berries: colour and fibre that fill you up', color: 'rgb(var(--brand-400))' },
-  { portion: 'A quarter', title: 'Lean protein', examples: 'Chicken, fish, eggs, tofu, beans, Greek yogurt at every meal', color: 'rgb(var(--accent-blue))' },
-  { portion: 'A quarter', title: 'Smart carbs', examples: 'Oats, rice, potato, wholegrain bread: fuel for training & study', color: 'rgb(var(--accent-orange))' },
-  { portion: 'A thumb', title: 'Healthy fats', examples: 'Olive oil, nuts, avocado, oily fish. A little goes a long way', color: 'rgb(var(--accent-purple))' },
+  { portion: '½', title: 'Vegetables & fruit', examples: 'Broccoli, peppers, salad, berries. Colour and fibre that fill you up', color: 'rgb(var(--brand-400))' },
+  { portion: '¼', title: 'Protein', examples: 'Chicken, fish, eggs, tofu, beans or Greek yogurt at every meal', color: 'rgb(var(--accent-blue))' },
+  { portion: '¼', title: 'Carbs', examples: 'Oats, rice, potato or wholegrain bread for steady, lasting energy', color: 'rgb(var(--accent-orange))' },
+  { portion: '+', title: 'A little healthy fat', examples: 'Olive oil, nuts, avocado, oily fish. A thumb-sized amount goes a long way', color: 'rgb(var(--accent-purple))' },
+]
+
+/* ------------------------------------------------------------------ */
+/*  Portion sizes you can measure with your own hand                   */
+/* ------------------------------------------------------------------ */
+export interface PortionItem {
+  emoji: string
+  hand: string
+  title: string
+  desc: string
+  color: string
+}
+
+export const PORTION_GUIDE: PortionItem[] = [
+  { emoji: '✋', hand: 'Palm', title: 'Protein', desc: 'One palm-sized piece of meat, fish, eggs, tofu or beans per meal.', color: 'rgb(var(--accent-blue))' },
+  { emoji: '✊', hand: 'Fist', title: 'Veg', desc: 'A fist or two of vegetables or salad. Go for colour and pile it high.', color: 'rgb(var(--brand-400))' },
+  { emoji: '🤲', hand: 'Cupped hand', title: 'Carbs', desc: 'A cupped handful of rice, pasta, oats or potato for energy.', color: 'rgb(var(--accent-orange))' },
+  { emoji: '👍', hand: 'Thumb', title: 'Fats', desc: 'A thumb of oil, butter, nut butter or cheese. Easy to overdo.', color: 'rgb(var(--accent-purple))' },
+]
+
+/* ------------------------------------------------------------------ */
+/*  Simple everyday principles: objective, no goal attached            */
+/* ------------------------------------------------------------------ */
+export interface EatingPrinciple {
+  icon: string
+  title: string
+  text: string
+}
+
+export const EATING_PRINCIPLES: EatingPrinciple[] = [
+  { icon: 'utensils', title: 'Protein at every meal', text: 'It keeps you full for longer and helps your body repair and stay strong.' },
+  { icon: 'leaf', title: 'Half your plate plants', text: 'Veg and fruit bring fibre, vitamins and volume that fill you up for very few calories.' },
+  { icon: 'droplet', title: 'Reach for water first', text: 'Mild thirst often feels like hunger. A glass of water settles it more often than you would think.' },
+  { icon: 'flame', title: 'Mostly whole foods', text: 'Foods close to how they grow keep you fuller and your energy steadier than processed versions.' },
+  { icon: 'brain', title: 'Slow down at meals', text: 'Fullness takes a few minutes to land. Eating a little slower helps you stop at just right.' },
+  { icon: 'target', title: 'Nothing is off-limits', text: 'Treats fit a healthy diet. It is your everyday pattern, not any single meal, that counts.' },
 ]
 
 /* ------------------------------------------------------------------ */
@@ -222,6 +295,14 @@ export const NUTRITION_LESSONS: NutritionLesson[] = [
     ],
   },
   {
+    id: 'nl-fibre', icon: 'leaf', title: 'Fibre, the quiet hero', summary: 'The nutrient most people miss', minutes: 2,
+    body: [
+      'Fibre comes from plants: vegetables, fruit, beans, oats and wholegrains. Most people get less than they need.',
+      'It feeds the good bacteria in your gut, keeps digestion regular, and slows how fast energy hits your blood so you stay fuller and steadier.',
+      'Easy wins: keep the skins on fruit and veg, choose wholegrain over white now and then, and add beans or lentils to meals.',
+    ],
+  },
+  {
     id: 'nl-hydration', icon: 'droplet', title: 'Water & hunger', summary: 'Why hydration helps your diet', minutes: 2,
     body: [
       'Mild thirst can feel like hunger. A glass of water before deciding on a snack often settles it.',
@@ -246,7 +327,7 @@ export const NUTRITION_QA: QAItem[] = [
   { keywords: ['lose fat', 'lose weight', 'fat loss', 'cut', 'leaner'], q: 'How do I lose fat?', a: 'Eat a bit less than you burn, keep protein high and fill half your plate with veg so you stay full. Watch liquid calories. You do not need to cut out any food group. Small, steady changes win.' },
   { keywords: ['build muscle', 'gain muscle', 'bulk', 'grow', 'get bigger'], q: 'How do I build muscle?', a: 'Train hard, eat slightly more than you burn, and get protein at every meal. Smart carbs around training help. Muscle is built slowly, so consistency over weeks beats any single perfect day.' },
   { keywords: ['snack', 'healthy snack', 'snacking'], q: 'What are good snacks?', a: 'Reach for protein-and-fibre snacks that keep you full: Greek yogurt and fruit, a handful of nuts, hummus and veg, cottage cheese, or a boiled egg. They beat crisps and sweets between lectures.' },
-  { keywords: ['cheap', 'budget', 'student', 'save money'], q: 'How do I eat well cheaply?', a: 'Build meals around eggs, tinned tuna, beans, lentils, frozen chicken and frozen veg. Batch cook and reuse. Check the Budget Eats tab for full recipes with rough costs.' },
+  { keywords: ['cheap', 'budget', 'student', 'save money'], q: 'How do I eat well cheaply?', a: 'Build meals around eggs, tinned tuna, beans, lentils, frozen chicken and frozen veg. Batch cook and reuse. Check the Eats tab for full recipes you can cook along with.' },
   { keywords: ['breakfast', 'morning'], q: 'What should I eat for breakfast?', a: 'Aim for protein plus a smart carb: overnight oats with yogurt and fruit, eggs on wholegrain toast, or Greek yogurt with berries and nuts. It keeps you full through morning lectures.' },
   { keywords: ['sugar', 'sweet', 'chocolate', 'craving'], q: 'Is sugar really that bad?', a: 'A little is fine. It is the amount that matters. Sugary drinks and snacks add up fast without filling you up. Enjoy a treat, just keep it as the 20%, not the base of your day.' },
   { keywords: ['alcohol', 'drinking', 'beer', 'night out'], q: 'How does alcohol affect my goals?', a: 'Alcohol is calorie-dense, often comes with late-night food, and blunts recovery and muscle growth the next day. It can still fit, just keep nights occasional and have water alongside.' },

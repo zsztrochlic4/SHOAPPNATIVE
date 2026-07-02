@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { View, Text, Pressable, TextInput, Image, ScrollView, Alert } from 'react-native'
+import { View, Text, Pressable, TextInput, Image, ScrollView, Alert, Modal } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
 import { LinearGradient } from 'expo-linear-gradient'
 import {
   Bell, Moon, Sun, GraduationCap, Wallet, RotateCcw, Trash2, Camera, Trophy,
   Flame, Search, ScanLine, Plus, Check, Share2, ChevronRight, User, Sparkles, Dumbbell,
   Droplet, Footprints, BedDouble, Leaf, Clock, Play, Award, BellRing, Crown,
-  HeartPulse, Activity, Zap, Minus,
+  HeartPulse, Activity, Zap, Minus, X,
 } from 'lucide-react-native'
 import { Sheet, EmptyState } from '../components/Sheet'
 import { Avatar } from '../components/Avatar'
@@ -18,7 +19,7 @@ import { useToast } from '../components/Toast'
 import { useNav } from '../nav'
 import { FOODS, QUICK_WORKOUTS } from '../data/catalog'
 import { pick, makeRng } from '../lib/rng'
-import { todayKey, relativeLabel, shortDate } from '../lib/date'
+import { todayKey, relativeLabel, shortDate, fromKey } from '../lib/date'
 import {
   fmtWeight, fmtWeightNum, toKg, weightUnit, fmtFluid,
   weightVal,
@@ -216,6 +217,97 @@ export function SettingsSheet({ open, onClose }: Props) {
 }
 
 /* ============================ Profile ============================ */
+/* ===================== Menu (full-screen drawer) ================= */
+export function MenuDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { state } = useStore()
+  const nav = useNav()
+  const insets = useSafeAreaInsets()
+  const p = state.profile
+  const earned = state.badges.filter((b) => b.earned).length
+  const unread = state.notifications.filter((n) => !n.read).length
+  const goalLabel: Record<string, string> = { 'build-muscle': 'Build Muscle', 'lose-fat': 'Lose Fat', 'gain-strength': 'Get Stronger', 'stay-healthy': 'Stay Healthy' }
+  const joined = fromKey(p.createdAtKey).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  // Close the drawer and open the target sheet.
+  const go = (o: Parameters<typeof nav.open>[0]) => () => { onClose(); nav.open(o) }
+
+  return (
+    <Modal visible={open} animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+      <View className="flex-1 bg-ink-900" style={{ paddingTop: insets.top }}>
+        <View className="flex-row items-center gap-2 px-3 py-2.5">
+          <Pressable onPress={onClose} hitSlop={8} className="h-9 w-9 items-center justify-center rounded-full active:opacity-70">
+            <X size={22} color="rgba(255,255,255,0.7)" />
+          </Pressable>
+          <Text className="text-[17px] font-bold text-white">Menu</Text>
+        </View>
+
+        <ScrollView className="flex-1 px-4" contentContainerStyle={{ paddingBottom: insets.bottom + 32 }} showsVerticalScrollIndicator={false}>
+          <View className="flex-row items-center gap-4 pt-1">
+            <Avatar name={`${p.name} M`} size={64} />
+            <View className="min-w-0 flex-1">
+              <Text numberOfLines={1} className="text-xl font-extrabold text-white">{p.name} Morgan</Text>
+              <Text numberOfLines={1} className="mt-0.5 text-[13px] text-white/50">{p.university} · Age {p.age}</Text>
+              <View className="mt-2 flex-row flex-wrap items-center gap-2">
+                <View className="rounded-full bg-brand-400/15 px-2.5 py-1"><Text className="text-[11px] font-bold text-brand-400">{goalLabel[p.goal]}</Text></View>
+                <Text className="text-[12px] text-white/40">Member since {joined}</Text>
+              </View>
+            </View>
+          </View>
+
+          <MenuSection title="Your progress">
+            <MenuRow icon={<Sparkles size={17} color={brand[400]} />} title="Weekly recap" sub="Your week in numbers" onPress={go('recap')} first />
+            <MenuRow icon={<Award size={17} color={brand[400]} />} title="Badges" sub={`${earned} earned`} onPress={go('badges')} />
+            <MenuRow icon={<Camera size={17} color={brand[400]} />} title="Progress photos" sub={`${state.photos.length} photos`} onPress={go('photos')} />
+          </MenuSection>
+
+          <MenuSection title="Coaching">
+            <MenuRow icon={<Sparkles size={17} color={brand[400]} />} title="Your coach" sub="Daily check-ins and milestones" onPress={go('coach')} first />
+            <MenuRow icon={<GraduationCap size={17} color={brand[400]} />} title="Exam Survival Protocol" sub={p.examMode ? 'On' : 'Off'} onPress={go('examMode')} />
+            {p.newToGym && <MenuRow icon={<Leaf size={17} color={brand[400]} />} title="New to the gym" sub="Your first 90 days" onPress={go('beginner')} />}
+          </MenuSection>
+
+          <MenuSection title="Community">
+            <MenuRow icon={<Trophy size={17} color={brand[400]} />} title="Campus leaderboard" sub={p.university} onPress={go('leaderboard')} first />
+            <MenuRow
+              icon={<Bell size={17} color={brand[400]} />}
+              title="Notifications"
+              sub="Reminders, streaks & social"
+              onPress={go('notifications')}
+              badge={unread > 0 ? <View className="h-5 min-w-[20px] items-center justify-center rounded-full bg-brand-400 px-1.5"><Text className="text-[11px] font-bold text-black">{unread}</Text></View> : undefined}
+            />
+          </MenuSection>
+
+          <MenuSection title="App">
+            <MenuRow icon={<User size={17} color="rgba(255,255,255,0.7)" />} title="Settings" sub="Units, theme and data" onPress={go('settings')} first />
+          </MenuSection>
+        </ScrollView>
+      </View>
+    </Modal>
+  )
+}
+
+function MenuSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <View className="mt-5">
+      <Text className="mb-2 px-1 text-[12px] font-bold uppercase tracking-wide text-white/40">{title}</Text>
+      <View className="overflow-hidden rounded-2xl border border-white/5 bg-ink-800">{children}</View>
+    </View>
+  )
+}
+
+function MenuRow({ icon, title, sub, onPress, badge, first }: { icon: ReactNode; title: string; sub?: string; onPress: () => void; badge?: ReactNode; first?: boolean }) {
+  return (
+    <Pressable onPress={onPress} className={`flex-row items-center gap-3 p-3.5 active:opacity-80 ${first ? '' : 'border-t border-white/5'}`}>
+      <View className="h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-400/10">{icon}</View>
+      <View className="min-w-0 flex-1">
+        <Text className="font-semibold text-white">{title}</Text>
+        {sub && <Text numberOfLines={1} className="mt-0.5 text-[12px] text-white/45">{sub}</Text>}
+      </View>
+      {badge}
+      <ChevronRight size={18} color="rgba(255,255,255,0.25)" />
+    </Pressable>
+  )
+}
+
 export function ProfileSheet({ open, onClose }: Props) {
   const { state } = useStore()
   const nav = useNav()

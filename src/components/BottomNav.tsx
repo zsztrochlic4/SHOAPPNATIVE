@@ -18,7 +18,7 @@ export function BottomNav({ active, onChange }: { active: TabKey; onChange: (t: 
   return (
     <View
       className="absolute inset-x-0 bottom-0 z-20 border-t border-white/10 bg-ink-900"
-      style={{ paddingBottom: Math.max(insets.bottom, 12), paddingTop: 10, paddingHorizontal: 8 }}
+      style={{ paddingBottom: Math.max(insets.bottom, 8), paddingTop: 10, paddingHorizontal: 8 }}
     >
       <View className="flex-row items-center justify-around">
         {items.map(({ key, label, Icon }) => {

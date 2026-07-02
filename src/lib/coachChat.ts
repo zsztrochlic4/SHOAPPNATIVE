@@ -97,10 +97,10 @@ export function coachWelcome(s: AppState): string {
 }
 
 export const CHAT_SUGGESTIONS = [
-  'I want to swap an exercise',
-  'My legs are really sore',
-  "I'm feeling unmotivated",
-  'How many days should I train?',
+  'Why did I train chest today?',
+  'Why do I feel so sore?',
+  'Am I on track for my goal?',
+  'What should I eat tonight?',
 ]
 
 function name(s: AppState) {

@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
 import Svg, { Circle } from 'react-native-svg'
 import {
-  Check, Plus, Minus, Flag, Info, ChevronDown, Bell, BookOpen, Play,
+  Check, Plus, Minus, Flag, Info, ChevronDown, Bell, BookOpen, Play, Target,
   ChevronLeft, Timer, Dumbbell, ListChecks, HelpCircle, X,
 } from 'lucide-react-native'
 import { Sheet } from '../components/Sheet'
@@ -15,7 +15,7 @@ import { useNav } from '../nav'
 import { todaySession, sessionProgress } from '../store/selectors'
 import { nextSetRecommendation, examState, examTrim } from '../store/training'
 import { prForSession, type PR } from '../store/coach'
-import { exerciseDetail, incrementFor } from '../data/catalog'
+import { exerciseDetail, workoutGoalLine, incrementFor } from '../data/catalog'
 import { fmtWeightNum, weightUnit, fmtVolume, fmtWeight, toKg } from '../lib/format'
 import { brand, accent, useColors } from '../theme'
 import type { Units, WorkoutSession } from '../store/types'
@@ -143,6 +143,9 @@ export default function ActiveWorkout({ open, onClose }: { open: boolean; onClos
     if (!open) return
     setMode('overview'); setCursor(null); setRest(null); setWorkElapsed(0); setTotal(0)
     setFinishing(false); setFinishPR(null)
+    // Opening the workout counts as starting it for today's dashboard tick.
+    if (session) dispatch({ type: 'MARK_WORKOUT_STARTED' })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   // After the completion tick, hand off to a PR moment or close.

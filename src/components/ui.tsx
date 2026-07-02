@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
 import { View, Text, Pressable, ScrollView, type ViewProps } from 'react-native'
 import Svg, { Circle, G } from 'react-native-svg'
-import { useColors } from '../theme'
+import { Sun } from 'lucide-react-native'
+import { useColors, brand } from '../theme'
 
 /* ------------------------------------------------------------------ */
 /*  Card — the surface used across every screen                        */
@@ -158,7 +159,11 @@ export function SegmentedTabs({
           const isActive = t === active
           return (
             <Pressable key={t} onPress={() => onChange(t)} className="pb-3">
-              <Text className={`text-[15px] font-semibold ${isActive ? 'text-brand-400' : 'text-white/45'}`}>{t}</Text>
+              {t === 'Coach' ? (
+                <Sun size={18} color={isActive ? brand[400] : 'rgba(148,148,148,0.75)'} />
+              ) : (
+                <Text className={`text-[15px] font-semibold ${isActive ? 'text-brand-400' : 'text-white/45'}`}>{t}</Text>
+              )}
               {isActive && <View className="absolute -bottom-px left-0 right-0 h-0.5 rounded-full bg-brand-400" />}
             </Pressable>
           )

@@ -15,6 +15,7 @@ import type {
   PostComment,
   Profile,
   Settings,
+  UserMeal,
   WorkoutSession,
 } from './types'
 
@@ -38,6 +39,11 @@ export type Action =
   | { type: 'REMOVE_PLANNED_MEAL'; id: string }
   | { type: 'ADD_COMMENT'; postId: string; text: string }
   | { type: 'SAVE_FOOD_REVIEW'; text: string; score: number }
+  | { type: 'TOGGLE_NUTRITION_TAG'; tag: string }
+  | { type: 'MARK_WORKOUT_STARTED' }
+  | { type: 'MARK_NUTRITION_ASKED' }
+  | { type: 'ADD_MY_MEAL'; meal: Omit<UserMeal, 'id' | 'createdAtKey'> }
+  | { type: 'REMOVE_MY_MEAL'; id: string }
   | { type: 'SEND_CHAT'; text: string }
   | { type: 'PUSH_CHAT'; role: 'user' | 'coach'; text: string }
   | { type: 'MARK_CHAT_READ' }
@@ -151,6 +157,37 @@ function reducer(state: AppState, action: Action): AppState {
       const habits = state.habits.map((h) => (h.dateKey === todayKey ? { ...h, nutritionScore: action.score } : h))
       return { ...state, foodReviews: [...others, ...review], habits }
     }
+
+    case 'TOGGLE_NUTRITION_TAG': {
+      const map = { ...(state.nutritionTags ?? {}) }
+      const current = map[todayKey] ?? []
+      const next = current.includes(action.tag)
+        ? current.filter((t) => t !== action.tag)
+        : [...current, action.tag]
+      if (next.length) map[todayKey] = next
+      else delete map[todayKey]
+      return { ...state, nutritionTags: map }
+    }
+
+    case 'MARK_WORKOUT_STARTED': {
+      const keys = state.workoutStartedKeys ?? []
+      if (keys.includes(todayKey)) return state
+      return { ...state, workoutStartedKeys: [...keys, todayKey] }
+    }
+
+    case 'MARK_NUTRITION_ASKED': {
+      const keys = state.nutritionAskedKeys ?? []
+      if (keys.includes(todayKey)) return state
+      return { ...state, nutritionAskedKeys: [...keys, todayKey] }
+    }
+
+    case 'ADD_MY_MEAL': {
+      const meal: UserMeal = { ...action.meal, id: `um-${Date.now()}`, createdAtKey: todayKey }
+      return { ...state, myMeals: [...(state.myMeals ?? []), meal] }
+    }
+
+    case 'REMOVE_MY_MEAL':
+      return { ...state, myMeals: (state.myMeals ?? []).filter((m) => m.id !== action.id) }
 
     case 'SEND_CHAT': {
       const text = action.text.trim()
