@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { View, ActivityIndicator, ScrollView } from 'react-native'
+import { View, Text, ActivityIndicator, ScrollView, Platform, type ViewStyle, type TextStyle } from 'react-native'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar'
+import { Wifi, BatteryFull, SignalHigh } from 'lucide-react-native'
 import '../global.css'
 import { BottomNav } from './components/BottomNav'
 import { StoreProvider, useStore } from './store/store'
@@ -150,12 +151,85 @@ function ThemedRoot() {
   )
 }
 
+/**
+ * On the web preview, present the app inside a centered phone mockup so it reads
+ * as the mobile app it is, instead of stretching across the whole browser. On
+ * native this is a no-op — the app fills the device as usual.
+ */
+function WebPreviewFrame({ children }: { children: React.ReactNode }) {
+  if (Platform.OS !== 'web') return <>{children}</>
+  return (
+    <View style={webFrame.page}>
+      <View style={webFrame.device}>
+        <FauxStatusBar />
+        <View style={{ flex: 1 }}>{children}</View>
+      </View>
+    </View>
+  )
+}
+
+/** The iOS-style status bar the mockup expects: time on the left, radios right. */
+function FauxStatusBar() {
+  return (
+    <View style={webFrame.statusBar}>
+      <Text style={webFrame.statusTime}>9:41</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <SignalHigh size={18} color="#fff" strokeWidth={2.5} />
+        <Wifi size={17} color="#fff" strokeWidth={2.5} />
+        <BatteryFull size={24} color="#fff" strokeWidth={2} />
+      </View>
+    </View>
+  )
+}
+
+const webFrame: { page: ViewStyle; device: ViewStyle; statusBar: ViewStyle; statusTime: TextStyle } = {
+  page: {
+    flex: 1,
+    minHeight: '100%',
+    backgroundColor: '#0a0a0b',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  device: {
+    width: 402,
+    height: 874,
+    maxWidth: '100%',
+    maxHeight: '100%',
+    borderRadius: 48,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+    borderWidth: 12,
+    borderColor: '#0d0d0f',
+    // react-native-web maps these shadow props to a CSS box-shadow.
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 40 },
+    shadowOpacity: 0.55,
+    shadowRadius: 80,
+  },
+  statusBar: {
+    height: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 28,
+    backgroundColor: '#000',
+  },
+  statusTime: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+}
+
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <StoreProvider>
-        <ThemedRoot />
-      </StoreProvider>
-    </SafeAreaProvider>
+    <WebPreviewFrame>
+      <SafeAreaProvider>
+        <StoreProvider>
+          <ThemedRoot />
+        </StoreProvider>
+      </SafeAreaProvider>
+    </WebPreviewFrame>
   )
 }
