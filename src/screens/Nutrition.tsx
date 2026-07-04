@@ -1,6 +1,6 @@
 import { useMemo, useState, useRef, useEffect, type ReactNode } from 'react'
 import {
-  View, Text, Pressable, ScrollView, TextInput, Image, Modal,
+  View, Text, Pressable, ScrollView, TextInput, Image,
   KeyboardAvoidingView, Platform, Share,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -11,6 +11,7 @@ import {
   Droplet, Plus, Trash2, Share2, Search, Lightbulb, Salad, X,
 } from 'lucide-react-native'
 import { Icon } from '../components/Icon'
+import { AppModal } from '../components/WebFrame'
 import { ProgressRing, SegmentedTabs, ScreenHeader } from '../components/ui'
 import { useStore } from '../store/store'
 import { useToast } from '../components/Toast'
@@ -185,7 +186,7 @@ function CoachTab() {
       <View className="h-2" />
 
       {/* Full-screen chat experience */}
-      <Modal visible={open} animationType="slide" onRequestClose={handleClose} statusBarTranslucent>
+      <AppModal visible={open} animationType="slide" onRequestClose={handleClose}>
         <View className="flex-1 bg-ink-900" style={{ paddingTop: insets.top }}>
           <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             {/* Header */}
@@ -327,7 +328,7 @@ function CoachTab() {
             </View>
           </KeyboardAvoidingView>
         </View>
-      </Modal>
+      </AppModal>
     </>
   )
 }
@@ -754,7 +755,7 @@ function RecipeModal({ meal, onClose }: { meal: BudgetMeal | null; onClose: () =
   }
 
   return (
-    <Modal visible={!!meal} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+    <AppModal visible={!!meal} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable onPress={onClose} className="flex-1 items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.62)' }}>
         {meal && (
           <Pressable onPress={() => {}} className="w-full max-w-[400px] overflow-hidden rounded-3xl border border-white/10 bg-ink-800" style={{ maxHeight: '86%' }}>
@@ -829,7 +830,7 @@ function RecipeModal({ meal, onClose }: { meal: BudgetMeal | null; onClose: () =
           </Pressable>
         )}
       </Pressable>
-    </Modal>
+    </AppModal>
   )
 }
 

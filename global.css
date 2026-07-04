@@ -27,41 +27,20 @@
 }
 
 /* ---------------------------------------------------------------------------
-   Web preview only — present the app as a centered phone mockup.
+   Web preview only — the centered phone mockup (the "wall", the rounded phone
+   body, and the per-overlay clipping) is drawn in React so it applies uniformly
+   to the app AND every overlay: see src/components/WebFrame.tsx (WebPreviewFrame
+   + AppModal). RN-Web modals portal to <body>, so re-centering each overlay in
+   React — rather than styling <body> as the phone — is what keeps the menu,
+   sheets and full-screen views aligned inside the phone instead of covering the
+   whole browser window.
 
-   On native there is no <html>/<body>, so none of this exists there. The key
-   trick: a `transform` on <body> makes it the containing block for
-   `position: fixed` elements, so React Native Web Modals (the menu drawer and
-   every bottom sheet — which portal to <body>) stay clipped inside the phone
-   instead of covering the whole browser window. The theme variables are mirrored
-   onto the document root in JS (see src/theme.tsx) so those modals stay themed.
+   Here we only make the document fill the viewport so the React frame can size
+   and center within it; the surrounding "wall" is painted by WebPreviewFrame.
 --------------------------------------------------------------------------- */
-html {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  padding: 24px;
-  box-sizing: border-box;
-  background-color: #0a0a0b; /* the "wall" around the phone */
-}
-
-body {
-  flex: 0 0 auto;
-  width: min(402px, 100%);
-  height: 874px;
-  max-height: calc(100vh - 48px);
-  overflow: hidden;
-  border-radius: 44px;
-  background-color: #000;
-  box-shadow: 0 40px 120px rgba(0, 0, 0, 0.55);
-  transform: translateZ(0); /* establishes the containing block for fixed modals */
-}
-
+html,
+body,
 #root {
   height: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border-radius: 44px;
+  margin: 0;
 }

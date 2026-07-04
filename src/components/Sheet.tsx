@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react'
-import { Modal, View, Text, Pressable, ScrollView, useWindowDimensions } from 'react-native'
+import { View, Text, Pressable, ScrollView, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { X } from 'lucide-react-native'
 import { useColors } from '../theme'
+import { AppModal, IS_WEB, WEB_SCREEN } from './WebFrame'
 
 /** Bottom sheet / modal used for logging flows and the active workout. */
 export function Sheet({
@@ -18,12 +19,15 @@ export function Sheet({
   children: ReactNode
   full?: boolean
 }) {
-  const { height } = useWindowDimensions()
+  const win = useWindowDimensions()
+  // On web the sheet lives inside the phone mockup, so measure against the
+  // device screen — not the full browser window — to keep it in proportion.
+  const height = IS_WEB ? WEB_SCREEN.height : win.height
   const insets = useSafeAreaInsets()
   const colors = useColors()
 
   return (
-    <Modal visible={open} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+    <AppModal visible={open} transparent animationType="slide" onRequestClose={onClose}>
       <View style={{ flex: 1, justifyContent: 'flex-end' }}>
         <Pressable
           accessibilityLabel="Close"
@@ -60,7 +64,7 @@ export function Sheet({
           </ScrollView>
         </View>
       </View>
-    </Modal>
+    </AppModal>
   )
 }
 
