@@ -25,3 +25,43 @@
     @apply text-sm font-semibold text-brand-400;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Web preview only — present the app as a centered phone mockup.
+
+   On native there is no <html>/<body>, so none of this exists there. The key
+   trick: a `transform` on <body> makes it the containing block for
+   `position: fixed` elements, so React Native Web Modals (the menu drawer and
+   every bottom sheet — which portal to <body>) stay clipped inside the phone
+   instead of covering the whole browser window. The theme variables are mirrored
+   onto the document root in JS (see src/theme.tsx) so those modals stay themed.
+--------------------------------------------------------------------------- */
+html {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+  box-sizing: border-box;
+  background-color: #0a0a0b; /* the "wall" around the phone */
+}
+
+body {
+  flex: 0 0 auto;
+  width: min(402px, 100%);
+  height: 874px;
+  max-height: calc(100vh - 48px);
+  overflow: hidden;
+  border-radius: 44px;
+  background-color: #000;
+  box-shadow: 0 40px 120px rgba(0, 0, 0, 0.55);
+  transform: translateZ(0); /* establishes the containing block for fixed modals */
+}
+
+#root {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 44px;
+}
