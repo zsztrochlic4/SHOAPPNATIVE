@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { View, Text, Pressable, ScrollView, Image, TextInput, StyleSheet, Modal } from 'react-native'
+import { View, Text, Pressable, ScrollView, Image, TextInput, StyleSheet } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
 import Svg, { Circle } from 'react-native-svg'
@@ -8,6 +8,7 @@ import {
   ChevronLeft, Timer, Dumbbell, ListChecks, HelpCircle, X,
 } from 'lucide-react-native'
 import { Sheet } from '../components/Sheet'
+import { AppModal } from '../components/WebFrame'
 import { TechniqueClip } from '../components/TechniqueClip'
 import { useStore } from '../store/store'
 import { useToast } from '../components/Toast'
@@ -911,10 +912,10 @@ function Stepper({ label, value, onMinus, onPlus }: { label: string; value: stri
 /* A full-screen overlay container replacing the web `fixed inset-0` panels. */
 function FullScreen({ open, backgroundColor, children }: { open: boolean; backgroundColor: string; children: React.ReactNode }) {
   return (
-    <Modal visible={open} transparent={false} animationType="fade" statusBarTranslucent>
+    <AppModal visible={open} transparent={false} animationType="fade">
       <SafeAreaView style={{ flex: 1, backgroundColor }}>
         <View className="flex-1">{children}</View>
       </SafeAreaView>
-    </Modal>
+    </AppModal>
   )
 }

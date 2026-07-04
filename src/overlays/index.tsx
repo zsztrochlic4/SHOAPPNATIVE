@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { View, Text, Pressable, TextInput, Image, ScrollView, Alert, Modal } from 'react-native'
+import { View, Text, Pressable, TextInput, Image, ScrollView, Alert } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -10,6 +10,7 @@ import {
   HeartPulse, Activity, Zap, Minus, X,
 } from 'lucide-react-native'
 import { Sheet, EmptyState } from '../components/Sheet'
+import { AppModal } from '../components/WebFrame'
 import { Avatar } from '../components/Avatar'
 import { LogoMark } from '../components/Logo'
 import { Icon } from '../components/Icon'
@@ -231,7 +232,7 @@ export function MenuDrawer({ open, onClose }: { open: boolean; onClose: () => vo
   const go = (o: Parameters<typeof nav.open>[0]) => () => { onClose(); nav.open(o) }
 
   return (
-    <Modal visible={open} animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+    <AppModal visible={open} animationType="slide" onRequestClose={onClose}>
       <View className="flex-1 bg-ink-900" style={{ paddingTop: insets.top }}>
         <View className="flex-row items-center gap-2 px-3 py-2.5">
           <Pressable onPress={onClose} hitSlop={8} className="h-9 w-9 items-center justify-center rounded-full active:opacity-70">
@@ -281,7 +282,7 @@ export function MenuDrawer({ open, onClose }: { open: boolean; onClose: () => vo
           </MenuSection>
         </ScrollView>
       </View>
-    </Modal>
+    </AppModal>
   )
 }
 
