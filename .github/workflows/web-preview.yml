@@ -34,7 +34,7 @@ jobs:
       - name: Export web build
         env:
           # GitHub Pages serves this project under the /sho-app-native/ sub-path.
-          EXPO_WEB_BASE_URL: /sho-app-native
+          EXPO_WEB_BASE_URL: /SHOAPPNATIVE
         run: npx expo export --platform web
       - run: touch dist/.nojekyll
       - uses: actions/upload-pages-artifact@v3
