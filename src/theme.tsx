@@ -8,8 +8,14 @@ import { useStore } from './store/store'
  * `text-accent-purple` class flips between the dark and the cream/sage light
  * theme automatically. See tailwind.config.js for the colour mapping.
  */
-export const themeVars = {
-  dark: vars({
+/**
+ * Raw CSS-variable maps per theme. `themeVars` (below) feeds these to `vars()`
+ * for the app subtree; on web the same maps are also applied to the document
+ * root so React Native Web `Modal`s — which portal to <body>, outside the app
+ * subtree — still inherit the theme instead of rendering unstyled/white.
+ */
+export const cssVars: Record<'dark' | 'light', Record<string, string>> = {
+  dark: {
     '--fg': '255 255 255',
     '--ink-900': '10 10 11',
     '--ink-800': '18 18 20',
@@ -32,8 +38,8 @@ export const themeVars = {
     '--accent-orange': '245 165 36',
     '--accent-yellow': '245 197 24',
     '--danger': '248 113 113',
-  }),
-  light: vars({
+  },
+  light: {
     '--fg': '31 38 28',
     '--ink-900': '244 240 229',
     '--ink-800': '252 250 242',
@@ -57,7 +63,12 @@ export const themeVars = {
     '--accent-orange': '181 112 30',
     '--accent-yellow': '184 150 24',
     '--danger': '199 86 74',
-  }),
+  },
+}
+
+export const themeVars = {
+  dark: vars(cssVars.dark),
+  light: vars(cssVars.light),
 }
 
 /**
