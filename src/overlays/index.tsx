@@ -10,7 +10,7 @@ import {
   HeartPulse, Activity, Zap, Minus, X,
 } from 'lucide-react-native'
 import { Sheet, EmptyState } from '../components/Sheet'
-import { AppModal, DEVICE } from '../components/WebFrame'
+import { AppModal, DEVICE, IS_WEB } from '../components/WebFrame'
 import { Avatar } from '../components/Avatar'
 import { LogoMark } from '../components/Logo'
 import { Icon } from '../components/Icon'
@@ -244,14 +244,14 @@ export function MenuDrawer({ open, onClose }: { open: boolean; onClose: () => vo
         toValue: 1,
         duration: 280,
         easing: Easing.bezier(0.22, 1, 0.36, 1),
-        useNativeDriver: true,
+        useNativeDriver: !IS_WEB,
       }).start()
     } else if (render) {
       Animated.timing(progress, {
         toValue: 0,
         duration: 240,
         easing: Easing.bezier(0.4, 0, 1, 1),
-        useNativeDriver: true,
+        useNativeDriver: !IS_WEB,
       }).start(({ finished }) => {
         if (finished) setRender(false)
       })

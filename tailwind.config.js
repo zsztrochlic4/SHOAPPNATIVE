@@ -2,6 +2,13 @@
 module.exports = {
   content: ['./App.tsx', './src/**/*.{js,ts,jsx,tsx}'],
   presets: [require('nativewind/preset')],
+  // The app drives light/dark entirely through CSS variables applied with
+  // `vars()` (see src/theme.tsx) and never uses Tailwind `dark:` variants.
+  // Force NativeWind's darkMode flag to `class` so react-native-css-interop's
+  // color-scheme sync (a MutationObserver that calls `colorScheme.set()`)
+  // doesn't throw "Cannot manually set color scheme … type 'media'" on web /
+  // during prerender. `class` mode is inert here but keeps the flag valid.
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
