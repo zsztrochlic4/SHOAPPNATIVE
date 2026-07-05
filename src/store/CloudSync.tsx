@@ -31,11 +31,18 @@ export function CloudSync() {
       .then((cloud) => {
         if (cancelled) return
         if (cloud && cloud.v === SCHEMA_VERSION) {
-          // Merge cloud over current state so local-only fields (photos) survive.
+          // Returning user: merge cloud over current state so local-only fields
+          // (photos) survive.
           dispatch({ type: 'HYDRATE', state: { ...stateRef.current, ...cloud } })
+        } else if (cloud === null) {
+          // Brand-new account (no saved doc): start on a clean, un-onboarded
+          // state so they go through onboarding; their answers then save to the
+          // cloud. (A network error throws instead, landing in .catch below, so
+          // we never wipe a returning user's screen just because they're offline.)
+          dispatch({ type: 'RESET_EMPTY' })
         }
       })
-      .catch(() => { /* offline / first login — fall back to local, save later */ })
+      .catch(() => { /* offline / transient — keep local state, save later */ })
       .finally(() => { if (!cancelled) setSynced(true) })
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
