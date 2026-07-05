@@ -90,7 +90,7 @@ function TodayTab() {
                     <Image source={{ uri: e.image }} resizeMode="cover" className="h-12 w-12 rounded-xl" />
                     <Pressable onPress={() => nav.open('exerciseDetail', { defId: e.defId })} className="min-w-0 flex-1">
                       <Text numberOfLines={1} className="font-bold leading-tight text-white">{e.name}</Text>
-                      <Text className="text-[12px] text-white/50">{e.targetSets} sets • {e.targetReps} reps · how to</Text>
+                      <Text numberOfLines={1} className="text-[12px] text-white/50">{e.targetSets} sets • {e.targetReps} reps · how to</Text>
                     </Pressable>
                     <Chip color={done ? 'green' : 'gray'}>{fmtWeight(topWeight, units, units === 'imperial' ? 0 : 1)}</Chip>
                     <Pressable onPress={() => nav.open('exerciseDetail', { defId: e.defId })}><ChevronRight size={18} color="rgba(255,255,255,0.3)" /></Pressable>

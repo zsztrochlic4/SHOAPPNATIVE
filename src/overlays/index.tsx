@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { View, Text, Pressable, TextInput, Image, ScrollView, Alert } from 'react-native'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { View, Text, Pressable, TextInput, Image, ScrollView, Alert, Animated, Easing } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -10,7 +10,7 @@ import {
   HeartPulse, Activity, Zap, Minus, X,
 } from 'lucide-react-native'
 import { Sheet, EmptyState } from '../components/Sheet'
-import { AppModal } from '../components/WebFrame'
+import { AppModal, DEVICE } from '../components/WebFrame'
 import { Avatar } from '../components/Avatar'
 import { LogoMark } from '../components/Logo'
 import { Icon } from '../components/Icon'
@@ -231,9 +231,43 @@ export function MenuDrawer({ open, onClose }: { open: boolean; onClose: () => vo
   // Close the drawer and open the target sheet.
   const go = (o: Parameters<typeof nav.open>[0]) => () => { onClose(); nav.open(o) }
 
+  // Left-edge drawer: slide the panel in from the left (translateX -width -> 0),
+  // matching the web app's `drawer-in`/`drawer-out` animation. Keep the modal
+  // mounted through the slide-out so the exit animation can play.
+  const [render, setRender] = useState(open)
+  const [width, setWidth] = useState<number>(DEVICE.width)
+  const progress = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    if (open) {
+      setRender(true)
+      Animated.timing(progress, {
+        toValue: 1,
+        duration: 280,
+        easing: Easing.bezier(0.22, 1, 0.36, 1),
+        useNativeDriver: true,
+      }).start()
+    } else if (render) {
+      Animated.timing(progress, {
+        toValue: 0,
+        duration: 240,
+        easing: Easing.bezier(0.4, 0, 1, 1),
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (finished) setRender(false)
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  const translateX = progress.interpolate({ inputRange: [0, 1], outputRange: [-width, 0] })
+
   return (
-    <AppModal visible={open} animationType="slide" onRequestClose={onClose}>
-      <View className="flex-1 bg-ink-900" style={{ paddingTop: insets.top }}>
+    <AppModal visible={render} animationType="none" onRequestClose={onClose}>
+      <Animated.View
+        onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+        className="flex-1 bg-ink-900"
+        style={{ paddingTop: insets.top, transform: [{ translateX }] }}
+      >
         <View className="flex-row items-center gap-2 px-3 py-2.5">
           <Pressable onPress={onClose} hitSlop={8} className="h-9 w-9 items-center justify-center rounded-full active:opacity-70">
             <X size={22} color="rgba(255,255,255,0.7)" />
@@ -281,7 +315,7 @@ export function MenuDrawer({ open, onClose }: { open: boolean; onClose: () => vo
             <MenuRow icon={<User size={17} color="rgba(255,255,255,0.7)" />} title="Settings" sub="Units, theme and data" onPress={go('settings')} first />
           </MenuSection>
         </ScrollView>
-      </View>
+      </Animated.View>
     </AppModal>
   )
 }

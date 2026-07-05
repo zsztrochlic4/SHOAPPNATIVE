@@ -107,7 +107,7 @@ export default function Dashboard() {
   return (
     <View className="px-5 pt-2">
       <View className="mb-4 flex-row items-center justify-between">
-        <Pressable onPress={() => nav.openMenu()} className="h-10 w-10 items-center justify-center rounded-xl active:opacity-70">
+        <Pressable accessibilityLabel="Open menu" onPress={() => nav.openMenu()} className="h-10 w-10 items-center justify-center rounded-xl active:opacity-70">
           <Menu size={24} color={colors.fg} />
         </Pressable>
         <Wordmark size="sm" />
@@ -124,7 +124,7 @@ export default function Dashboard() {
           <Text className="mt-0.5 text-[13px] text-white/45">{longDate(todayKey)}</Text>
         </View>
         {streak.current > 0 && (
-          <View className="flex-row shrink-0 items-center gap-1.5 rounded-full bg-accent-orange/15 px-3 py-1.5">
+          <View className="flex-row shrink-0 items-center gap-1.5 rounded-full bg-accent-orange/12 px-3 py-1.5">
             <Flame size={15} color={accent.orange} />
             <Text className="text-[13px] font-bold text-accent-orange">{streak.current} day{streak.current === 1 ? '' : 's'}</Text>
           </View>
