@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "permissions": {
+    "allow": [
+      "Bash(npx expo:*)",
+      "Bash(npm install:*)",
+      "Bash(npm ci:*)",
+      "Bash(npm run web:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm run start:*)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "-e",
+              "const{existsSync}=require('fs');const{execSync}=require('child_process');if(!existsSync('node_modules')){console.log('Installing dependencies (first run)...');execSync('npm install',{stdio:'inherit'})}"
+            ],
+            "timeout": 600,
+            "statusMessage": "Ensuring dependencies are installed"
+          }
+        ]
+      }
+    ]
+  }
+}
