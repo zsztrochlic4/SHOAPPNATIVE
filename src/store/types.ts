@@ -40,6 +40,15 @@ export interface Profile {
   /** premium unlocks 1:1 video calls with the coach */
   premium: boolean
   createdAtKey: string
+  /* ---- richer onboarding context for the AI (all optional) ---- */
+  /** preferred time per session in minutes (e.g. 30, 45, 60, 75) */
+  sessionMinutes?: number
+  /** injuries / limitations to train around, free text ('' or absent = none) */
+  injuries?: string
+  /** dietary preferences / restrictions (e.g. 'vegetarian', 'halal', 'dairy-free') */
+  dietaryPrefs?: string[]
+  /** what's driving them — free text, great context for the coach */
+  motivation?: string
 }
 
 /** A planned meal slot in the weekly meal planner. */

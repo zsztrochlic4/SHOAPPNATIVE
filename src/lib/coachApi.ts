@@ -1,7 +1,7 @@
 import { getAI, getGenerativeModel, GoogleAIBackend, type AI } from 'firebase/ai'
 import { app, firebaseEnabled } from './firebase'
 import type { AppState } from '../store/types'
-import { streakStats } from '../store/selectors'
+import { buildUserContext } from './userContext'
 
 /**
  * Live AI coach, powered by Gemini via Firebase AI Logic.
@@ -16,33 +16,20 @@ import { streakStats } from '../store/selectors'
  */
 const MODEL = 'gemini-2.5-flash-lite'
 
-const GOAL_LABEL: Record<string, string> = {
-  'build-muscle': 'building muscle',
-  'lose-fat': 'losing fat',
-  'gain-strength': 'getting stronger',
-  'stay-healthy': 'staying healthy',
-}
-
-/** The coach persona + guardrails (mirrors the previous server prompt). */
+/** The coach persona + guardrails, with the live per-user context injected. */
 function systemPrompt(s: AppState): string {
-  const p = s.profile
-  const name = p.name?.split(' ')[0] || 'the student'
-  const goal = GOAL_LABEL[p.goal] || 'their fitness goals'
-  const streak = streakStats(s).current
   return [
-    `You are the personal strength & nutrition coach inside StrengthHub Online, a fitness app for university students.`,
-    `You are texting 1:1 with ${name}. Their main goal is ${goal}.`,
-    p.experience ? `Training experience: ${p.experience}.` : '',
-    p.daysPerWeek ? `They train about ${p.daysPerWeek} days per week.` : '',
-    streak > 0 ? `Current streak: ${streak} days.` : '',
-    p.examMode ? `They are in exam season, so keep expectations light and protect their study time.` : '',
+    `You are the personal strength & nutrition coach inside StrengthHub Online, a fitness app for university students. You are texting 1:1 with this student.`,
+    '',
+    `Here is who you are coaching (use it to personalise every reply — reference their goal, equipment, injuries and preferences where relevant):`,
+    buildUserContext(s),
     '',
     `Voice: warm, encouraging, and genuinely knowledgeable, like a great coach who texts back.`,
     `Keep replies short and conversational (usually 2 to 4 sentences). Be specific and give one clear next step rather than long lists. Do not use em dashes; write plainly with commas and full stops.`,
     `You can help with: workouts and swapping exercises, soreness, motivation, plateaus, form cues, sleep, recovery, and student-friendly nutrition.`,
-    `Safety: you are not a doctor. For sharp or lingering pain, possible injury, or disordered-eating concerns, gently recommend they see a professional. Never give crash-diet or extreme advice; keep it healthy and sustainable.`,
+    `Always respect their injuries/limitations and dietary preferences. Safety: you are not a doctor. For sharp or lingering pain, possible injury, or disordered-eating concerns, gently recommend they see a professional. Never give crash-diet or extreme advice; keep it healthy and sustainable.`,
     `Use the student's first name occasionally, not every message. No markdown headers; plain friendly text. An occasional emoji is fine, sparingly.`,
-  ].filter(Boolean).join('\n')
+  ].join('\n')
 }
 
 let ai: AI | null = null
