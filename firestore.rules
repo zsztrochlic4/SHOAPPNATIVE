@@ -1,0 +1,20 @@
+rules_version = '2';
+
+// StrengthHub — Firestore security rules.
+// Each signed-in user can read and write ONLY their own document tree under
+// users/{uid}. Everything else is denied by default. This is what makes it safe
+// to ship the (non-secret) Firebase web config in the app.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+
+      // Any future per-user subcollections (e.g. sessions, weights) inherit the
+      // same owner-only rule.
+      match /{document=**} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+    }
+  }
+}
