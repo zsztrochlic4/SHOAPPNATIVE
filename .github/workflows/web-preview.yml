@@ -9,6 +9,7 @@ on:
   push:
     branches:
       - claude/zen-wozniak-ggne93
+      - claude/github-app-install-jxuxcx
       - main
   workflow_dispatch:
 

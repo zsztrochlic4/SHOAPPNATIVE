@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { View, Text, Pressable, Image, ScrollView, useWindowDimensions } from 'react-native'
+import { View, Text, Pressable, Image } from 'react-native'
 import { SlidersHorizontal, ChevronDown, ArrowRight, Trophy, Flame, Plus, Camera } from 'lucide-react-native'
 import { default as Svg, Path, Line, Circle, Rect, G, Text as SvgText } from 'react-native-svg'
 import { Icon } from '../components/Icon'
@@ -12,11 +12,11 @@ import {
   weightStats, strengthProgress, habitConsistency7d, streakStats,
   workoutsInRange, volumeByWeek,
 } from '../store/selectors'
-import { CHART_METRICS, buildChartData, progressMetricId } from '../lib/metrics'
+import { buildChartData, progressMetricId } from '../lib/metrics'
 import { brand, useColors } from '../theme'
 
 export default function Progress() {
-  const { state, dispatch } = useStore()
+  const { state } = useStore()
   const nav = useNav()
   const colors = useColors()
   const units = state.settings.units
@@ -106,28 +106,6 @@ export default function Progress() {
             <ChevronDown size={14} color="rgba(255,255,255,0.7)" />
           </Pressable>
         </View>
-
-        {/* Metric picker */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          className="mb-3 mt-2"
-          contentContainerStyle={{ gap: 8, paddingRight: 4 }}
-        >
-          {CHART_METRICS.map((m) => {
-            const active = m.id === metricId
-            return (
-              <Pressable
-                key={m.id}
-                onPress={() => dispatch({ type: 'SET_SETTINGS', patch: { progressMetric: m.id } })}
-                className={`flex-row items-center gap-1.5 rounded-full border px-3 py-1.5 active:opacity-80 ${active ? 'border-brand-400 bg-brand-400/15' : 'border-white/10 bg-ink-700'}`}
-              >
-                <Icon name={m.icon} size={14} color={active ? brand[400] : 'rgba(255,255,255,0.5)'} />
-                <Text className={`text-xs font-semibold ${active ? 'text-brand-400' : 'text-white/60'}`}>{m.label}</Text>
-              </Pressable>
-            )
-          })}
-        </ScrollView>
 
         {cd.points.length >= 2 ? (
           <MetricChart points={cd.points} domain={cd.domain} grid={colors.grid} tick={colors.tick} />
@@ -322,10 +300,12 @@ function MetricChart({
   grid: string
   tick: string
 }) {
-  const { width: screenW } = useWindowDimensions()
-  // Screen padding px-5 (20) each side, plus card padding p-4 (16) each side.
-  const W = Math.max(1, screenW - 40 - 32)
+  // Measure the real container width so the chart fills the card on every
+  // surface. `useWindowDimensions` returns the browser window in the web
+  // preview (not the phone frame), which overflowed and clipped the chart.
+  const [W, setW] = useState(0)
   const H = 160 // h-40
+  if (W <= 0) return <View className="h-40 w-full" onLayout={(e) => setW(e.nativeEvent.layout.width)} />
 
   // Margins: room for Y tick labels on the left and X labels at the bottom.
   const ML = 40
@@ -411,9 +391,10 @@ function VolumeChart({
   grid: string
   tick: string
 }) {
-  const { width: screenW } = useWindowDimensions()
-  const W = Math.max(1, screenW - 40 - 32)
+  // Measure the real container width (see MetricChart note).
+  const [W, setW] = useState(0)
   const H = 160 // h-40
+  if (W <= 0) return <View className="h-40 w-full" onLayout={(e) => setW(e.nativeEvent.layout.width)} />
 
   const ML = 38
   const MR = 6
