@@ -7,6 +7,13 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // App-wide config the AI coach reads (config/coach). Public read so the app
+    // can load it; edited only from the Firebase console (no client writes).
+    match /config/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     match /users/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
 

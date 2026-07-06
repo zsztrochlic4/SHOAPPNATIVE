@@ -22,8 +22,9 @@ import { nextSetRecommendation } from '../store/training'
 import { coachThreadView } from '../store/coach'
 import { CHAT_SUGGESTIONS, coachReply } from '../lib/coachChat'
 import { askCoach } from '../lib/coachApi'
+import { getCoachConfig } from '../lib/coachConfig'
 import { todaySession, leaderboardSorted, youRank } from '../store/selectors'
-import { relativeLabel } from '../lib/date'
+import { relativeLabel, todayKey } from '../lib/date'
 import { CHART_METRICS, STAT_METRICS, progressMetricId, dashboardStatIds } from '../lib/metrics'
 import { weightVal, toKg, weightUnit } from '../lib/format'
 import { brand, useColors } from '../theme'
@@ -392,16 +393,31 @@ export function CoachChatSheet({ open, onClose }: Props) {
     const msg = (t ?? text).trim()
     if (!msg || typing) return
     setText('')
+
+    // Daily message cap (managed from config/coach in Firestore) to guard token
+    // spend. Only successful AI replies count; the on-device fallback is free.
+    const cfg = await getCoachConfig()
+    const usedToday = state.coachUsage?.dateKey === todayKey ? state.coachUsage.count : 0
+    if (usedToday >= cfg.dailyMessageLimit) {
+      dispatch({ type: 'PUSH_CHAT', role: 'user', text: msg })
+      dispatch({
+        type: 'PUSH_CHAT',
+        role: 'coach',
+        text: `That's your ${cfg.dailyMessageLimit} coaching messages for today. Come back tomorrow and we'll pick it up. Meanwhile, check your plan or log a session.`,
+      })
+      return
+    }
+
     // Show the user's message immediately, then a typing indicator.
     dispatch({ type: 'PUSH_CHAT', role: 'user', text: msg })
     setTyping(true)
     try {
-      // Real Claude coach (via the serverless endpoint).
       const reply = await askCoach(state, msg)
       dispatch({ type: 'PUSH_CHAT', role: 'coach', text: reply })
+      dispatch({ type: 'BUMP_COACH_USAGE' })
     } catch {
-      // Graceful fallback to the on-device rules engine so the demo always
-      // responds, used when no API key/endpoint is configured.
+      // Graceful fallback to the on-device rules engine so the coach always
+      // responds (no tokens used, so it doesn't count toward the limit).
       dispatch({ type: 'PUSH_CHAT', role: 'coach', text: coachReply(state, msg) })
     } finally {
       setTyping(false)

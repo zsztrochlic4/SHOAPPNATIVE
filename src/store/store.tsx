@@ -46,6 +46,7 @@ export type Action =
   | { type: 'REMOVE_MY_MEAL'; id: string }
   | { type: 'SEND_CHAT'; text: string }
   | { type: 'PUSH_CHAT'; role: 'user' | 'coach'; text: string }
+  | { type: 'BUMP_COACH_USAGE' }
   | { type: 'MARK_CHAT_READ' }
   | { type: 'SAVE_SESSION'; session: WorkoutSession }
   | { type: 'TOGGLE_EXERCISE_DONE'; defId: string }
@@ -211,6 +212,12 @@ function reducer(state: AppState, action: Action): AppState {
         read: action.role === 'user',
       }
       return { ...state, chat: [...state.chat, msg] }
+    }
+
+    case 'BUMP_COACH_USAGE': {
+      const u = state.coachUsage
+      const next = u && u.dateKey === todayKey ? { dateKey: todayKey, count: u.count + 1 } : { dateKey: todayKey, count: 1 }
+      return { ...state, coachUsage: next }
     }
 
     case 'MARK_CHAT_READ':
