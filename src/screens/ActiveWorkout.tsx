@@ -468,7 +468,7 @@ export default function ActiveWorkout({ open, onClose }: { open: boolean; onClos
 
               {howToOpen && (
                 <View className="border-t border-white/5 px-3.5 pb-4 pt-3.5">
-                  <TechniqueClip poster={ex.image} videoUrl={detail.video} label="Form clip coming soon" />
+                  <TechniqueClip exerciseId={ex.defId} poster={ex.image} label="Form clip coming soon" />
                   <Text className="mt-3 text-[13px] leading-snug text-white/70">{detail.desc}</Text>
                   <View className="mt-3 gap-2">
                     {detail.cues.map((c, i) => (
@@ -685,7 +685,7 @@ function WorkScreen({
               <Pressable onPress={() => setShowHow(false)} className="h-8 w-8 items-center justify-center rounded-full bg-white/10 active:opacity-80"><X size={18} color="rgba(255,255,255,0.7)" /></Pressable>
             </View>
             <ScrollView className="flex-1 px-5" contentContainerStyle={{ paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
-              <TechniqueClip poster={ex.image} videoUrl={detail.video} label="Form clip coming soon" />
+              <TechniqueClip exerciseId={ex.defId} poster={ex.image} label="Form clip coming soon" />
               <Text className="mt-3 text-[14px] leading-snug text-white/75">{detail.desc}</Text>
               <Text className="mb-2 mt-5 text-[12px] font-bold uppercase tracking-wide text-white/40">Step by step</Text>
               <View className="gap-2.5">

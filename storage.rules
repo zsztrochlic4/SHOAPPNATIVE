@@ -1,0 +1,26 @@
+rules_version = '2';
+
+// StrengthHub — Cloud Storage security rules.
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Public exercise library (posters + form clips). Anyone can VIEW it so the
+    // app loads media without a login, but no one can upload/change it from the
+    // app — you manage these files from the Firebase console.
+    match /exercises/{allPaths=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Each user's own media (e.g. progress photos) — owner-only.
+    match /users/{uid}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid
+                          && request.resource.size < 15 * 1024 * 1024; // 15MB cap per file
+    }
+
+    // Everything else is denied by default.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

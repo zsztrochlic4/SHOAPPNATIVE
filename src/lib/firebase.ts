@@ -48,6 +48,9 @@ const config = {
 
 export const firebaseEnabled = Boolean(config.apiKey && config.projectId && config.appId)
 
+/** Storage bucket id (e.g. `project.firebasestorage.app`), for building public media URLs. */
+export const storageBucket = config.storageBucket
+
 let app: FirebaseApp | null = null
 let auth: Auth | null = null
 let db: Firestore | null = null
