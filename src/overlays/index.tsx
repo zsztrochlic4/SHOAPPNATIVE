@@ -1095,3 +1095,41 @@ function Stat({ label, value }: { label: string; value: string }) {
     </View>
   )
 }
+
+/* ===================== Past workout detail (history) ================= */
+export function SessionDetailSheet({ open, onClose, params }: Props) {
+  const { state } = useStore()
+  const units = state.settings.units
+  const session = state.sessions.find((s) => s.id === (params?.id as string))
+
+  return (
+    <Sheet open={open} onClose={onClose} title={session?.name ?? 'Workout'}>
+      {!session ? (
+        <Text className="py-8 text-center text-sm text-white/40">Workout not found.</Text>
+      ) : (
+        <>
+          <Text className="text-[13px] text-white/50">
+            {shortDate(session.dateKey)} · {session.durationMin} min · {fmtWeight(session.volumeKg, units, 0)} total
+          </Text>
+          <View className="mt-4 gap-3">
+            {session.exercises.map((ex) => (
+              <View key={ex.defId} className="rounded-2xl border border-white/5 bg-ink-800 p-4">
+                <Text className="font-bold text-white">{ex.name}</Text>
+                <View className="mt-2.5 gap-1.5">
+                  {ex.sets.map((set, i) => (
+                    <View key={i} className="flex-row items-center justify-between">
+                      <Text className="text-[13px] text-white/45">Set {i + 1}</Text>
+                      <Text className={`text-[13px] font-semibold ${set.done ? 'text-white' : 'text-white/40'}`}>
+                        {fmtWeight(set.weightKg, units, units === 'imperial' ? 0 : 1)} × {set.reps}{set.done ? '' : ' · skipped'}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ))}
+          </View>
+        </>
+      )}
+    </Sheet>
+  )
+}
