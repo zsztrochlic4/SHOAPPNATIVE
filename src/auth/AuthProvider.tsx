@@ -39,11 +39,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!firebaseEnabled || !auth) return
-    const unsub = onAuthStateChanged(auth, (u) => {
+    let settled = false
+    const done = (u: User | null) => {
+      if (settled) return
+      settled = true
       setUser(u)
       setLoading(false)
-    })
-    return unsub
+    }
+    const unsub = onAuthStateChanged(auth, done)
+    // If the auth backend is unreachable (sandboxed preview, blocked network),
+    // onAuthStateChanged may never fire — fall through to the app after 3s so
+    // the user isn't stuck on a blank loading screen.
+    const timeout = setTimeout(() => done(null), 3000)
+    return () => {
+      clearTimeout(timeout)
+      unsub()
+    }
   }, [])
 
   async function signUp(email: string, password: string, name?: string) {
