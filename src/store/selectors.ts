@@ -315,34 +315,64 @@ export type WeeklyIndex = {
   parts: { label: string; pct: number }[]
 }
 
-/** Reviews the last 7 days of activity vs the user's targets into a single
- *  needle position. 1.0x of targets = the middle ("on track"). */
+/** Reviews the last 14 days of activity AND actual goal progress vs the user's
+ *  targets into a single needle position. 1.0x of targets = the middle ("on
+ *  track"); above that means ahead of / surpassing their goals. */
+const INDEX_WINDOW = 14
+
 export function weeklyIndex(s: AppState): WeeklyIndex {
   const p = s.profile
   const byKey = new Map(s.habits.map((h) => [h.dateKey, h]))
-  const last7 = Array.from({ length: 7 }, (_, d) => dayKey(d))
-  const days = last7.map((k) => byKey.get(k)).filter(Boolean) as HabitDay[]
+  const keys = Array.from({ length: INDEX_WINDOW }, (_, d) => dayKey(d))
+  const days = keys.map((k) => byKey.get(k)).filter(Boolean) as HabitDay[]
   const n = Math.max(1, days.length)
 
   const avg = (sel: (h: HabitDay) => number) => days.reduce((a, h) => a + sel(h), 0) / n
   // Count prescribed sessions and self-logged activities. All fitness counts.
-  const workouts = workoutsInRange(s, 7) + activitiesInRange(s, 7).length
+  const workouts = workoutsInRange(s, INDEX_WINDOW) + activitiesInRange(s, INDEX_WINDOW).length
 
-  // Each ratio: 1.0 means the target was met across the week.
+  // Each ratio: 1.0 means the target was met across the window. Workout target
+  // scales with the window (daysPerWeek across 2 weeks).
   const r = {
-    workouts: workouts / Math.max(1, p.daysPerWeek),
+    workouts: workouts / Math.max(1, p.daysPerWeek * (INDEX_WINDOW / 7)),
     steps: p.stepTarget ? avg((h) => h.steps) / p.stepTarget : 0,
     sleep: p.sleepTargetH ? avg((h) => h.sleepH) / p.sleepTargetH : 0,
     water: p.waterTargetL ? avg((h) => h.waterL) / p.waterTargetL : 0,
     nutrition: avg((h) => h.nutritionScore) / 8, // 8/10 counts as on-track
   }
+
+  // Real goal progress: is their weight trending toward (or past) their goal
+  // over the window? Only counts when we have at least two weigh-ins, so early
+  // users are judged purely on habits.
+  const winKeys = new Set(keys)
+  const ws = s.weights.filter((w) => winKeys.has(w.dateKey)).sort((a, b) => a.dateKey.localeCompare(b.dateKey))
+  let goalProgress: number | null = null
+  if (ws.length >= 2) {
+    const change = ws[ws.length - 1].kg - ws[0].kg
+    const dir = p.goal === 'lose-fat' ? -1 : p.goal === 'build-muscle' || p.goal === 'gain-strength' ? 1 : 0
+    if (dir === 0) {
+      // Maintain / stay healthy: less drift is better (±0 is ideal).
+      goalProgress = Math.max(0, 1.2 - Math.abs(change) / 1.5)
+    } else {
+      // ~0.7 kg toward the goal over 14 days is "on pace" (= 1.0). Moving the
+      // wrong way scores near zero; faster healthy progress reads as ahead.
+      goalProgress = (change * dir) / 0.7
+    }
+  }
+
   const clamp = (x: number) => Math.max(0, Math.min(1.7, x))
+  const W = { workouts: 0.30, steps: 0.15, sleep: 0.15, water: 0.10, nutrition: 0.15, goal: 0.15 }
+  const habitPart =
+    clamp(r.workouts) * W.workouts +
+    clamp(r.steps) * W.steps +
+    clamp(r.sleep) * W.sleep +
+    clamp(r.water) * W.water +
+    clamp(r.nutrition) * W.nutrition
+  // With weigh-ins, blend goal progress in; without, renormalise habits to 1.0.
   const weighted =
-    clamp(r.workouts) * 0.30 +
-    clamp(r.steps) * 0.20 +
-    clamp(r.sleep) * 0.20 +
-    clamp(r.water) * 0.15 +
-    clamp(r.nutrition) * 0.15
+    goalProgress !== null
+      ? habitPart + clamp(goalProgress) * W.goal
+      : habitPart / (1 - W.goal)
 
   // weighted ≈ 1 → middle (50). 1.7x → ~85+, 0 → 0.
   const score = Math.round(Math.max(0, Math.min(100, weighted * 50)))
@@ -371,6 +401,7 @@ export function weeklyIndex(s: AppState): WeeklyIndex {
     { label: 'Sleep', pct: pct(r.sleep) },
     { label: 'Water', pct: pct(r.water) },
     { label: 'Nutrition', pct: pct(r.nutrition) },
+    ...(goalProgress !== null ? [{ label: 'Goal', pct: pct(goalProgress) }] : []),
   ]
   return { score, band, label, blurb, parts }
 }

@@ -4,10 +4,14 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
-    // Public exercise library (posters + form clips). Anyone can VIEW it so the
-    // app loads media without a login, but no one can upload/change it from the
-    // app — you manage these files from the Firebase console.
+    // Public exercise library (form clips + posters/thumbnails). Anyone can VIEW
+    // it so the app loads media without a login, but no one can upload/change it
+    // from the app — you manage these files from the Firebase console.
     match /exercises/{allPaths=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /thumbnails/{allPaths=**} {
       allow read: if true;
       allow write: if false;
     }

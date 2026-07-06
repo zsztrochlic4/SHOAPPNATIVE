@@ -43,6 +43,7 @@ import {
   PostDetailSheet,
   ChallengeDetailSheet,
   CustomizeSheet,
+  SessionDetailSheet,
 } from './overlays'
 
 export type TabKey = 'dashboard' | 'workout' | 'nutrition' | 'progress' | 'community'
@@ -138,6 +139,7 @@ function Shell() {
       <PostDetailSheet open={overlay === 'postDetail'} onClose={nav.close} params={params} />
       <ChallengeDetailSheet open={overlay === 'challengeDetail'} onClose={nav.close} params={params} />
       <CustomizeSheet open={overlay === 'customize'} onClose={nav.close} />
+      <SessionDetailSheet open={overlay === 'sessionDetail'} onClose={nav.close} params={params} />
     </NavProvider>
   )
 }

@@ -8,6 +8,7 @@ import { Hero } from '../components/Hero'
 import { useStore } from '../store/store'
 import { useNav } from '../nav'
 import { EXERCISES } from '../data/catalog'
+import { exerciseImage } from '../lib/media'
 import { fmtVolume, fmtWeight } from '../lib/format'
 import { relativeLabel } from '../lib/date'
 import { todaySession, sessionProgress, completedSessions, activitiesForDay } from '../store/selectors'
@@ -87,7 +88,7 @@ function TodayTab() {
                     <Pressable onPress={() => dispatch({ type: 'TOGGLE_EXERCISE_DONE', defId: e.defId })} className={`h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${done ? 'border-brand-400 bg-brand-400' : 'border-white/25'}`}>
                       {done && <Check size={14} strokeWidth={3} color="#000" />}
                     </Pressable>
-                    <Image source={{ uri: e.image }} resizeMode="cover" className="h-12 w-12 rounded-xl" />
+                    <Image source={{ uri: exerciseImage(e.defId, e.image) }} resizeMode="cover" className="h-12 w-12 rounded-xl" />
                     <Pressable onPress={() => nav.open('exerciseDetail', { defId: e.defId })} className="min-w-0 flex-1">
                       <Text numberOfLines={1} className="font-bold leading-tight text-white">{e.name}</Text>
                       <Text numberOfLines={1} className="text-[12px] text-white/50">{e.targetSets} sets • {e.targetReps} reps · how to</Text>
@@ -227,7 +228,7 @@ function ExercisesTab() {
       <View className="flex-row flex-wrap gap-3">
         {filtered.map((e) => (
           <Pressable key={e.id} onPress={() => nav.open('exerciseDetail', { defId: e.id })} className="flex-1 basis-[47%] overflow-hidden rounded-2xl border border-white/5 bg-ink-800 active:opacity-90">
-            <Image source={{ uri: e.image }} resizeMode="cover" className="h-24 w-full" />
+            <Image source={{ uri: exerciseImage(e.id, e.image) }} resizeMode="cover" className="h-24 w-full" />
             <View className="p-3">
               <Text numberOfLines={1} className="text-sm font-bold text-white">{dorm && e.bodyweightAlt ? e.bodyweightAlt : e.name}</Text>
               <Text className="text-[12px] text-white/45">{e.muscle}</Text>
@@ -247,17 +248,24 @@ type HistoryItem =
 
 function HistoryTab() {
   const { state } = useStore()
+  const nav = useNav()
   const units = state.settings.units
   const sessions: HistoryItem[] = completedSessions(state).map((s) => ({ kind: 'session', id: s.id, dateKey: s.dateKey, name: s.name, volumeKg: s.volumeKg, durationMin: s.durationMin }))
   const acts: HistoryItem[] = (state.activities ?? []).map((a) => ({ kind: 'activity', id: a.id, dateKey: a.dateKey, name: a.name, icon: a.icon, minutes: a.minutes, calories: a.calories, weekly: a.weekly }))
-  const history = [...sessions, ...acts].sort((a, b) => b.dateKey.localeCompare(a.dateKey)).slice(0, 30)
+  // Full history, newest first — a user can scroll back to any past workout.
+  const history = [...sessions, ...acts].sort((a, b) => b.dateKey.localeCompare(a.dateKey))
 
   if (history.length === 0) return <Text className="py-8 text-center text-sm text-white/40">No history yet. Complete a workout or log an activity.</Text>
 
   return (
     <View className="gap-3">
       {history.map((h) => (
-        <View key={h.id} className="flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-4">
+        <Pressable
+          key={h.id}
+          disabled={h.kind !== 'session'}
+          onPress={() => h.kind === 'session' && nav.open('sessionDetail', { id: h.id })}
+          className="flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-4 active:opacity-90"
+        >
           <View className="h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-400/15">
             {h.kind === 'session' ? <Icon name="dumbbell" size={20} color={brand[400]} /> : <ActivityIcon name={h.icon} size={20} color={brand[400]} />}
           </View>
@@ -286,7 +294,8 @@ function HistoryTab() {
               </>
             )}
           </View>
-        </View>
+          {h.kind === 'session' && <ChevronRight size={16} color="rgba(255,255,255,0.25)" />}
+        </Pressable>
       ))}
     </View>
   )

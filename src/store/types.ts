@@ -431,6 +431,8 @@ export interface AppState {
   nutritionAskedKeys?: string[]
   /** completed beginner-track lesson ids */
   beginnerProgress: string[]
+  /** AI coach usage for the current day, for the per-user daily message limit */
+  coachUsage?: { dateKey: string; count: number }
   /** schema version for migrations */
   v: number
 }

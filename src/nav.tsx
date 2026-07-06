@@ -24,6 +24,7 @@ export type Overlay =
   | 'prCelebration'
   | 'postDetail'
   | 'challengeDetail'
+  | 'sessionDetail'
 
 export type NavCtx = {
   open: (o: Overlay, params?: Record<string, unknown>) => void
