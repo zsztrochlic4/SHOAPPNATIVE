@@ -8,6 +8,7 @@ import { BottomNav } from './components/BottomNav'
 import { StoreProvider, useStore } from './store/store'
 import { AuthProvider, useAuth } from './auth/AuthProvider'
 import { AuthScreen } from './auth/AuthScreen'
+import { WelcomeScreen } from './screens/Welcome'
 import { CloudSync } from './store/CloudSync'
 import { ToastProvider } from './components/Toast'
 import { NavProvider, type Overlay } from './nav'
@@ -169,14 +170,16 @@ function ThemedRoot() {
 }
 
 /**
- * Decides between the login screen and the app. When Firebase isn't configured
- * (`enabled` false) this always falls through to the app, so the preview and
- * demo mode are untouched. When it is configured, signed-out users see the
- * login screen; signed-in users get the app plus the cloud-sync bridge.
+ * Decides between the welcome/login flow and the app. When Firebase isn't
+ * configured (`enabled` false) this always falls through to the app, so the
+ * preview and demo mode are untouched. When it is configured, signed-out users
+ * land on the premium Welcome carousel, then sign up / log in; signed-in users
+ * get the app plus the cloud-sync bridge.
  */
 function AuthGate() {
   const { enabled, loading, user } = useAuth()
   const insets = useSafeAreaInsets()
+  const [entry, setEntry] = useState<'welcome' | 'signup' | 'signin'>('welcome')
 
   if (enabled && loading) {
     return (
@@ -185,7 +188,12 @@ function AuthGate() {
       </View>
     )
   }
-  if (enabled && !user) return <AuthScreen />
+  if (enabled && !user) {
+    if (entry === 'welcome') {
+      return <WelcomeScreen onSignUp={() => setEntry('signup')} onLogIn={() => setEntry('signin')} />
+    }
+    return <AuthScreen initialMode={entry} onBack={() => setEntry('welcome')} />
+  }
 
   return (
     <>
