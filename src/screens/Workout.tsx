@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { View, Text, Pressable, Image, TextInput } from 'react-native'
-import { CalendarDays, Clock, Play, ChevronRight, Check, Leaf, Plus, Trash2, Activity, Repeat } from 'lucide-react-native'
+import { CalendarDays, Clock, Play, ChevronRight, Check, Leaf, Plus, Trash2, Activity, Repeat, RefreshCw } from 'lucide-react-native'
 import { Icon } from '../components/Icon'
 import { ActivityIcon } from '../components/ActivityIcon'
 import { ProgressBar, SegmentedTabs, ScreenHeader, Chip } from '../components/ui'
@@ -13,6 +13,8 @@ import { fmtVolume, fmtWeight } from '../lib/format'
 import { relativeLabel } from '../lib/date'
 import { todaySession, sessionProgress, completedSessions, activitiesForDay } from '../store/selectors'
 import { brand, useColors } from '../theme'
+import { useToast } from '../components/Toast'
+import { syncAll } from '../lib/integrations'
 
 const TABS = ['Today', 'Program', 'Exercises', 'History']
 
@@ -247,18 +249,43 @@ type HistoryItem =
   | { kind: 'activity'; id: string; dateKey: string; name: string; icon: string; minutes: number; calories: number; weekly?: boolean }
 
 function HistoryTab() {
-  const { state } = useStore()
+  const { state, dispatch } = useStore()
   const nav = useNav()
+  const toast = useToast()
+  const [syncing, setSyncing] = useState(false)
   const units = state.settings.units
+  const anyConnected = Object.values(state.integrations ?? {}).some((i) => i.connected)
+
+  async function refresh() {
+    if (syncing) return
+    setSyncing(true)
+    try {
+      toast(await syncAll(state, dispatch))
+    } finally {
+      setSyncing(false)
+    }
+  }
   const sessions: HistoryItem[] = completedSessions(state).map((s) => ({ kind: 'session', id: s.id, dateKey: s.dateKey, name: s.name, volumeKg: s.volumeKg, durationMin: s.durationMin }))
   const acts: HistoryItem[] = (state.activities ?? []).map((a) => ({ kind: 'activity', id: a.id, dateKey: a.dateKey, name: a.name, icon: a.icon, minutes: a.minutes, calories: a.calories, weekly: a.weekly }))
   // Full history, newest first — a user can scroll back to any past workout.
   const history = [...sessions, ...acts].sort((a, b) => b.dateKey.localeCompare(a.dateKey))
 
-  if (history.length === 0) return <Text className="py-8 text-center text-sm text-white/40">No history yet. Complete a workout or log an activity.</Text>
+  if (history.length === 0 && !anyConnected) {
+    return <Text className="py-8 text-center text-sm text-white/40">No history yet. Complete a workout or log an activity.</Text>
+  }
 
   return (
     <View className="gap-3">
+      {anyConnected && (
+        <Pressable
+          onPress={refresh}
+          disabled={syncing}
+          className={`flex-row items-center justify-center gap-2 rounded-2xl border border-brand-400/20 bg-brand-400/5 py-2.5 active:opacity-80 ${syncing ? 'opacity-60' : ''}`}
+        >
+          <RefreshCw size={14} color={brand[400]} />
+          <Text className="text-[13px] font-semibold text-brand-400">{syncing ? 'Syncing…' : 'Sync connected apps'}</Text>
+        </Pressable>
+      )}
       {history.map((h) => (
         <Pressable
           key={h.id}
