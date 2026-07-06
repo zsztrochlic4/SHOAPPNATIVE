@@ -11,6 +11,7 @@ import {
 } from 'lucide-react-native'
 import { Sheet, EmptyState } from '../components/Sheet'
 import { AppModal, DEVICE } from '../components/WebFrame'
+import { IntegrationsSection } from '../components/Integrations'
 import { Avatar } from '../components/Avatar'
 import { LogoMark } from '../components/Logo'
 import { Icon } from '../components/Icon'
@@ -34,12 +35,6 @@ import { examState, dailyTargets, defaultExamWindow } from '../store/training'
 import { translator, LANGUAGES, type Language } from '../lib/i18n'
 import type { MealName, Units, Theme } from '../store/types'
 import { brand, accent } from '../theme'
-
-const INTEGRATIONS: { id: string; name: string; sub: string; icon: ReactNode }[] = [
-  { id: 'appleHealth', name: 'Apple Health', sub: 'Steps, workouts, sleep & heart rate', icon: <HeartPulse size={18} color="#f87171" /> },
-  { id: 'healthConnect', name: 'Health Connect', sub: 'Sync Android health data', icon: <Activity size={18} color={brand[400]} /> },
-  { id: 'strava', name: 'Strava', sub: 'Import runs and rides', icon: <Zap size={18} color={accent.orange} /> },
-]
 
 type Props = { open: boolean; onClose: () => void; params?: Record<string, unknown> }
 
@@ -95,7 +90,6 @@ export function SettingsSheet({ open, onClose }: Props) {
   const { units, theme, notificationsEnabled } = state.settings
   const lang = state.settings.language ?? 'en'
   const t = translator(lang)
-  const connections = state.settings.connections ?? {}
 
   function toggleNotifs() {
     const next = !notificationsEnabled
@@ -106,12 +100,6 @@ export function SettingsSheet({ open, onClose }: Props) {
   function setLang(code: Language) {
     dispatch({ type: 'SET_SETTINGS', patch: { language: code } })
     toast(translator(code)('toast.langSet'))
-  }
-
-  function toggleConnection(id: string, name: string) {
-    const on = !connections[id]
-    dispatch({ type: 'SET_SETTINGS', patch: { connections: { ...connections, [id]: on } } })
-    toast(`${name} ${on ? t('toast.connected') : t('toast.disconnected')}`)
   }
 
   return (
@@ -156,19 +144,7 @@ export function SettingsSheet({ open, onClose }: Props) {
 
       {/* Connected apps / integrations */}
       <Group label={t('settings.connected')}>
-        {INTEGRATIONS.map((it) => {
-          const on = !!connections[it.id]
-          return (
-            <Row key={it.id} icon={it.icon} title={it.name} sub={it.sub}>
-              <Pressable
-                onPress={() => toggleConnection(it.id, it.name)}
-                className={`rounded-full px-3.5 py-1.5 active:opacity-90 ${on ? 'bg-ink-700' : 'bg-brand-400'}`}
-              >
-                <Text className={`text-sm font-bold ${on ? 'text-brand-400' : 'text-black'}`}>{on ? t('settings.connectedLabel') : t('settings.connect')}</Text>
-              </Pressable>
-            </Row>
-          )
-        })}
+        <IntegrationsSection />
       </Group>
 
       <Group label={t('settings.preferences')}>

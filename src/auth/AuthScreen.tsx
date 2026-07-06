@@ -21,10 +21,10 @@ function friendlyError(code: string): string {
   }
 }
 
-export function AuthScreen() {
+export function AuthScreen({ initialMode = 'signin', onBack }: { initialMode?: 'signin' | 'signup'; onBack?: () => void }) {
   const insets = useSafeAreaInsets()
   const { signIn, signUp, signInWithGoogle } = useAuth()
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin')
+  const [mode, setMode] = useState<'signin' | 'signup'>(initialMode)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -63,6 +63,11 @@ export function AuthScreen() {
 
   return (
     <View className="flex-1 bg-ink-900" style={{ paddingTop: insets.top }}>
+      {onBack && (
+        <Pressable onPress={onBack} hitSlop={10} className="absolute left-4 z-10 h-10 w-10 items-center justify-center rounded-full bg-white/5 active:opacity-70" style={{ top: insets.top + 10 }}>
+          <Text className="text-lg text-white/70">‹</Text>
+        </Pressable>
+      )}
       <ScrollView
         contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24, paddingBottom: insets.bottom + 24 }}
         keyboardShouldPersistTaps="handled"
