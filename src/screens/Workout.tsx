@@ -8,6 +8,7 @@ import { Hero } from '../components/Hero'
 import { useStore } from '../store/store'
 import { useNav } from '../nav'
 import { EXERCISES } from '../data/catalog'
+import { exerciseImage } from '../lib/media'
 import { fmtVolume, fmtWeight } from '../lib/format'
 import { relativeLabel } from '../lib/date'
 import { todaySession, sessionProgress, completedSessions, activitiesForDay } from '../store/selectors'
@@ -87,7 +88,7 @@ function TodayTab() {
                     <Pressable onPress={() => dispatch({ type: 'TOGGLE_EXERCISE_DONE', defId: e.defId })} className={`h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${done ? 'border-brand-400 bg-brand-400' : 'border-white/25'}`}>
                       {done && <Check size={14} strokeWidth={3} color="#000" />}
                     </Pressable>
-                    <Image source={{ uri: e.image }} resizeMode="cover" className="h-12 w-12 rounded-xl" />
+                    <Image source={{ uri: exerciseImage(e.defId, e.image) }} resizeMode="cover" className="h-12 w-12 rounded-xl" />
                     <Pressable onPress={() => nav.open('exerciseDetail', { defId: e.defId })} className="min-w-0 flex-1">
                       <Text numberOfLines={1} className="font-bold leading-tight text-white">{e.name}</Text>
                       <Text numberOfLines={1} className="text-[12px] text-white/50">{e.targetSets} sets • {e.targetReps} reps · how to</Text>
@@ -227,7 +228,7 @@ function ExercisesTab() {
       <View className="flex-row flex-wrap gap-3">
         {filtered.map((e) => (
           <Pressable key={e.id} onPress={() => nav.open('exerciseDetail', { defId: e.id })} className="flex-1 basis-[47%] overflow-hidden rounded-2xl border border-white/5 bg-ink-800 active:opacity-90">
-            <Image source={{ uri: e.image }} resizeMode="cover" className="h-24 w-full" />
+            <Image source={{ uri: exerciseImage(e.id, e.image) }} resizeMode="cover" className="h-24 w-full" />
             <View className="p-3">
               <Text numberOfLines={1} className="text-sm font-bold text-white">{dorm && e.bodyweightAlt ? e.bodyweightAlt : e.name}</Text>
               <Text className="text-[12px] text-white/45">{e.muscle}</Text>
