@@ -11,7 +11,6 @@ import {
 } from 'lucide-react-native'
 import { Sheet, EmptyState } from '../components/Sheet'
 import { AppModal, DEVICE } from '../components/WebFrame'
-import { IntegrationsSection } from '../components/Integrations'
 import { Avatar } from '../components/Avatar'
 import { LogoMark } from '../components/Logo'
 import { Icon } from '../components/Icon'
@@ -35,6 +34,12 @@ import { examState, dailyTargets, defaultExamWindow } from '../store/training'
 import { translator, LANGUAGES, type Language } from '../lib/i18n'
 import type { MealName, Units, Theme } from '../store/types'
 import { brand, accent } from '../theme'
+
+const INTEGRATIONS: { id: string; name: string; sub: string; icon: ReactNode }[] = [
+  { id: 'appleHealth', name: 'Apple Health', sub: 'Steps, workouts, sleep & heart rate', icon: <HeartPulse size={18} color="#f87171" /> },
+  { id: 'healthConnect', name: 'Health Connect', sub: 'Sync Android health data', icon: <Activity size={18} color={brand[400]} /> },
+  { id: 'strava', name: 'Strava', sub: 'Import runs and rides', icon: <Zap size={18} color={accent.orange} /> },
+]
 
 type Props = { open: boolean; onClose: () => void; params?: Record<string, unknown> }
 
@@ -90,6 +95,7 @@ export function SettingsSheet({ open, onClose }: Props) {
   const { units, theme, notificationsEnabled } = state.settings
   const lang = state.settings.language ?? 'en'
   const t = translator(lang)
+  const connections = state.settings.connections ?? {}
 
   function toggleNotifs() {
     const next = !notificationsEnabled
@@ -100,6 +106,12 @@ export function SettingsSheet({ open, onClose }: Props) {
   function setLang(code: Language) {
     dispatch({ type: 'SET_SETTINGS', patch: { language: code } })
     toast(translator(code)('toast.langSet'))
+  }
+
+  function toggleConnection(id: string, name: string) {
+    const on = !connections[id]
+    dispatch({ type: 'SET_SETTINGS', patch: { connections: { ...connections, [id]: on } } })
+    toast(`${name} ${on ? t('toast.connected') : t('toast.disconnected')}`)
   }
 
   return (
@@ -144,7 +156,19 @@ export function SettingsSheet({ open, onClose }: Props) {
 
       {/* Connected apps / integrations */}
       <Group label={t('settings.connected')}>
-        <IntegrationsSection />
+        {INTEGRATIONS.map((it) => {
+          const on = !!connections[it.id]
+          return (
+            <Row key={it.id} icon={it.icon} title={it.name} sub={it.sub}>
+              <Pressable
+                onPress={() => toggleConnection(it.id, it.name)}
+                className={`rounded-full px-3.5 py-1.5 active:opacity-90 ${on ? 'bg-ink-700' : 'bg-brand-400'}`}
+              >
+                <Text className={`text-sm font-bold ${on ? 'text-brand-400' : 'text-black'}`}>{on ? t('settings.connectedLabel') : t('settings.connect')}</Text>
+              </Pressable>
+            </Row>
+          )
+        })}
       </Group>
 
       <Group label={t('settings.preferences')}>
@@ -1069,43 +1093,5 @@ function Stat({ label, value }: { label: string; value: string }) {
       <Text className="text-lg font-extrabold text-white">{value}</Text>
       <Text className="text-[11px] text-white/45">{label}</Text>
     </View>
-  )
-}
-
-/* ===================== Past workout detail (history) ================= */
-export function SessionDetailSheet({ open, onClose, params }: Props) {
-  const { state } = useStore()
-  const units = state.settings.units
-  const session = state.sessions.find((s) => s.id === (params?.id as string))
-
-  return (
-    <Sheet open={open} onClose={onClose} title={session?.name ?? 'Workout'}>
-      {!session ? (
-        <Text className="py-8 text-center text-sm text-white/40">Workout not found.</Text>
-      ) : (
-        <>
-          <Text className="text-[13px] text-white/50">
-            {shortDate(session.dateKey)} · {session.durationMin} min · {fmtWeight(session.volumeKg, units, 0)} total
-          </Text>
-          <View className="mt-4 gap-3">
-            {session.exercises.map((ex) => (
-              <View key={ex.defId} className="rounded-2xl border border-white/5 bg-ink-800 p-4">
-                <Text className="font-bold text-white">{ex.name}</Text>
-                <View className="mt-2.5 gap-1.5">
-                  {ex.sets.map((set, i) => (
-                    <View key={i} className="flex-row items-center justify-between">
-                      <Text className="text-[13px] text-white/45">Set {i + 1}</Text>
-                      <Text className={`text-[13px] font-semibold ${set.done ? 'text-white' : 'text-white/40'}`}>
-                        {fmtWeight(set.weightKg, units, units === 'imperial' ? 0 : 1)} × {set.reps}{set.done ? '' : ' · skipped'}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            ))}
-          </View>
-        </>
-      )}
-    </Sheet>
   )
 }

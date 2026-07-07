@@ -4,9 +4,6 @@ import { View, Text, Pressable, ScrollView, TextInput } from 'react-native'
 import { ChevronRight, ChevronLeft, Check } from 'lucide-react-native'
 import { useDispatch } from '../store/store'
 import { LogoMark, Wordmark } from '../components/Logo'
-import { WeightDial } from '../components/WeightDial'
-import { HeightRuler } from '../components/HeightRuler'
-import { thud } from '../lib/haptics'
 import type { Equipment, Experience, Goal, Profile } from '../store/types'
 import { todayKey } from '../lib/date'
 
@@ -53,9 +50,9 @@ export default function Onboarding() {
   const [name, setName] = useState('')
   const [age, setAge] = useState('')
   const [sex, setSex] = useState<Sex | ''>('')
-  const [heightCm, setHeightCm] = useState(175)
-  const [weightKg, setWeightKg] = useState(75)
-  const [goalWeightKg, setGoalWeightKg] = useState(78)
+  const [heightCm, setHeightCm] = useState('')
+  const [weightKg, setWeightKg] = useState('')
+  const [goalWeightKg, setGoalWeightKg] = useState('')
   const [goal, setGoal] = useState<Goal>('build-muscle')
   const [exp, setExp] = useState<Experience>('beginner')
   const [days, setDays] = useState(4)
@@ -96,10 +93,9 @@ export default function Onboarding() {
       ...targetsFor(goal),
     }
     if (sex) profile.sex = sex
-    profile.heightCm = heightCm
-    profile.startWeightKg = Math.round(weightKg * 10) / 10
-    profile.goalWeightKg = Math.round(goalWeightKg * 10) / 10
-    thud()
+    const h = parseInt(heightCm); if (h) profile.heightCm = h
+    const cw = parseFloat(weightKg); if (cw) profile.startWeightKg = Math.round(cw * 10) / 10
+    const gw = parseFloat(goalWeightKg); if (gw) profile.goalWeightKg = Math.round(gw * 10) / 10
     dispatch({ type: 'COMPLETE_ONBOARDING', profile })
   }
 
@@ -161,16 +157,10 @@ export default function Onboarding() {
         {step === 2 && (
           <View>
             <Text className="text-2xl font-extrabold text-white">Your body</Text>
-            <Text className="mt-1 text-[14px] text-white/50">Slide to set. This tunes your calories and tracking.</Text>
-
-            <Text className="mb-3 mt-6 text-[12px] font-bold uppercase tracking-wide text-white/40">Height</Text>
-            <HeightRuler value={heightCm} onChange={setHeightCm} />
-
-            <Text className="mb-1 mt-8 text-[12px] font-bold uppercase tracking-wide text-white/40">Current weight</Text>
-            <WeightDial value={weightKg} onChange={setWeightKg} />
-
-            <Text className="mb-1 mt-8 text-[12px] font-bold uppercase tracking-wide text-white/40">Goal weight</Text>
-            <WeightDial value={goalWeightKg} onChange={setGoalWeightKg} />
+            <Text className="mt-1 text-[14px] text-white/50">Helps set calories and track progress. You can skip any of these.</Text>
+            <NumField label="Height (cm)" value={heightCm} onChangeText={setHeightCm} placeholder="178" />
+            <NumField label="Current weight (kg)" value={weightKg} onChangeText={setWeightKg} placeholder="75" decimal />
+            <NumField label="Goal weight (kg)" value={goalWeightKg} onChangeText={setGoalWeightKg} placeholder="80" decimal />
           </View>
         )}
 
@@ -314,6 +304,21 @@ export default function Onboarding() {
         )}
       </View>
     </ScrollView>
+  )
+}
+
+function NumField({ label, value, onChangeText, placeholder, decimal }: { label: string; value: string; onChangeText: (t: string) => void; placeholder: string; decimal?: boolean }) {
+  return (
+    <View className="mt-5">
+      <Text className="text-sm font-semibold text-white/70">{label}</Text>
+      <TextInput
+        value={value}
+        onChangeText={(t) => onChangeText(t.replace(decimal ? /[^\d.]/g : /\D/g, '').slice(0, decimal ? 6 : 3))}
+        keyboardType={decimal ? 'decimal-pad' : 'numeric'}
+        placeholder={placeholder} placeholderTextColor="rgba(255,255,255,0.35)"
+        className="mt-2 w-full rounded-xl border border-white/8 bg-ink-800 px-4 py-3.5 text-white"
+      />
+    </View>
   )
 }
 

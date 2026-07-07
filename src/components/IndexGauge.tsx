@@ -77,7 +77,7 @@ export function IndexGauge({ index }: { index: WeeklyIndex }) {
 
       <Text className="mt-1.5 text-[18px] font-black tracking-tight" style={{ color }}>{index.label}</Text>
       <Text className="text-[12px] text-white/45">
-        <Text className="font-bold" style={{ color }}>{index.score}</Text>/100 · last 14 days
+        <Text className="font-bold" style={{ color }}>{index.score}</Text>/100 · last 7 days
       </Text>
     </View>
   )

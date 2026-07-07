@@ -10,7 +10,6 @@ import {
 import { Sheet } from '../components/Sheet'
 import { AppModal } from '../components/WebFrame'
 import { TechniqueClip } from '../components/TechniqueClip'
-import { exerciseImage } from '../lib/media'
 import { useStore } from '../store/store'
 import { useToast } from '../components/Toast'
 import { useNav } from '../nav'
@@ -417,7 +416,7 @@ export default function ActiveWorkout({ open, onClose }: { open: boolean; onClos
               {/* Header */}
               <View className="flex-row items-center gap-3 p-3.5">
                 <View className="relative">
-                  <Image source={{ uri: exerciseImage(ex.defId, ex.image) }} resizeMode="cover" className="h-14 w-14 rounded-xl" />
+                  <Image source={{ uri: ex.image }} resizeMode="cover" className="h-14 w-14 rounded-xl" />
                   <View className="absolute -left-1.5 -top-1.5 h-6 w-6 items-center justify-center rounded-lg border border-white/10 bg-ink-900">
                     <Text className="text-[11px] font-black text-brand-400">{String(exIdx + 1).padStart(2, '0')}</Text>
                   </View>

@@ -7,7 +7,6 @@ import type {
   AppNotification,
   AppState,
   ChatMessage,
-  IntegrationState,
   LoggedActivity,
   LoggedExercise,
   LoggedMeal,
@@ -47,16 +46,6 @@ export type Action =
   | { type: 'REMOVE_MY_MEAL'; id: string }
   | { type: 'SEND_CHAT'; text: string }
   | { type: 'PUSH_CHAT'; role: 'user' | 'coach'; text: string }
-  | { type: 'BUMP_COACH_USAGE' }
-  | { type: 'SET_INTEGRATION'; id: string; patch: Partial<IntegrationState> }
-  | {
-      type: 'APPLY_SYNC'
-      provider: string
-      at: string
-      activities: (Omit<LoggedActivity, 'id'> & { externalId: string })[]
-      stepsByDay: Record<string, number>
-      sleepByDay: Record<string, number>
-    }
   | { type: 'MARK_CHAT_READ' }
   | { type: 'SAVE_SESSION'; session: WorkoutSession }
   | { type: 'TOGGLE_EXERCISE_DONE'; defId: string }
@@ -222,49 +211,6 @@ function reducer(state: AppState, action: Action): AppState {
         read: action.role === 'user',
       }
       return { ...state, chat: [...state.chat, msg] }
-    }
-
-    case 'BUMP_COACH_USAGE': {
-      const u = state.coachUsage
-      const next = u && u.dateKey === todayKey ? { dateKey: todayKey, count: u.count + 1 } : { dateKey: todayKey, count: 1 }
-      return { ...state, coachUsage: next }
-    }
-
-    case 'SET_INTEGRATION': {
-      const cur = state.integrations ?? {}
-      const prev = cur[action.id] ?? { connected: false }
-      return { ...state, integrations: { ...cur, [action.id]: { ...prev, ...action.patch } } }
-    }
-
-    case 'APPLY_SYNC': {
-      // De-dupe on the platform's own activity id so re-syncing never doubles up.
-      const have = new Set((state.activities ?? []).map((a) => a.externalId).filter(Boolean))
-      const fresh = action.activities
-        .filter((a) => !have.has(a.externalId))
-        .map((a) => ({ ...a, id: `ext-${action.provider}-${a.externalId}` }))
-
-      // Merge steps/sleep into habit days: the platform's number wins when it's
-      // higher than what was hand-logged (never lowers a manual entry).
-      const touched = new Set([...Object.keys(action.stepsByDay), ...Object.keys(action.sleepByDay)])
-      const habitByKey = new Map(state.habits.map((h) => [h.dateKey, h]))
-      for (const k of touched) {
-        const h = habitByKey.get(k) ?? { dateKey: k, steps: 0, sleepH: 0, waterL: 0, mindsetMin: 0, nutritionScore: 0, workout: false }
-        habitByKey.set(k, {
-          ...h,
-          steps: Math.max(h.steps, action.stepsByDay[k] ?? 0),
-          sleepH: Math.max(h.sleepH, action.sleepByDay[k] ?? 0),
-        })
-      }
-      const habits = [...habitByKey.values()].sort((a, b) => a.dateKey.localeCompare(b.dateKey))
-
-      const cur = state.integrations ?? {}
-      const prev = cur[action.provider] ?? { connected: true }
-      return {
-        ...state,
-        activities: [...(state.activities ?? []), ...fresh],
-        habits,
-        integrations: { ...cur, [action.provider]: { ...prev, lastSyncAt: action.at } },
-      }
     }
 
     case 'MARK_CHAT_READ':
