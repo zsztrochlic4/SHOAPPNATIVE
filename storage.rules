@@ -11,14 +11,6 @@ service firebase.storage {
       allow read: if true;
       allow write: if false;
     }
-    match /thumbnails/{allPaths=**} {
-      allow read: if true;
-      allow write: if false;
-    }
-    match /Thumbnails/{allPaths=**} {
-      allow read: if true;
-      allow write: if false;
-    }
 
     // Each user's own media (e.g. progress photos) — owner-only.
     match /users/{uid}/{allPaths=**} {
