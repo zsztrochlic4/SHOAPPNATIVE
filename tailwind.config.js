@@ -2,6 +2,11 @@
 module.exports = {
   content: ['./App.tsx', './src/**/*.{js,ts,jsx,tsx}'],
   presets: [require('nativewind/preset')],
+  // Theme is driven by CSS variables set via `vars()` on the root view (see
+  // src/theme), not Tailwind's `dark:` variant. Pin darkMode to 'class' so
+  // NativeWind on web doesn't attach its OS-`media` color-scheme observer,
+  // which otherwise throws "Cannot manually set color scheme" on DOM changes.
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
