@@ -92,6 +92,10 @@ export function AuthScreen({ initialMode = 'signin', onBack }: { initialMode?: '
           <LogoMark size={52} />
           <Text className="mt-4 text-2xl font-extrabold tracking-tight text-white">StrengthHub Online</Text>
           <Text className="mt-1 text-[14px] text-white/50">{isSignup ? 'Create your account' : 'Welcome back'}</Text>
+          {/* TEMP diagnostic: shows which API key the built app is actually using. */}
+          <Text className="mt-1 text-[11px] text-brand-400">
+            key …{(process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? 'MISSING').slice(-6)}
+          </Text>
         </View>
 
         {isSignup && (
