@@ -23,16 +23,19 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
  */
 
 /**
- * The project's original auto-created "Browser key" is rejected by the
- * Identity Toolkit API (API_KEY_INVALID) even though it works for Firestore,
- * which silently breaks all sign-in. Env vars beat .env files in Expo, so a
- * stale shell/system variable can keep injecting it — refuse it outright.
+ * Only trust an env-provided key if it's a validly-formed Google API key.
+ * This guards against two real failure modes we hit: the project's original
+ * auto-created "Browser key" (rejected by Identity Toolkit with
+ * API_KEY_INVALID, silently breaking all sign-in) and a corrupted paste where
+ * masked bullet characters (AIzaSyCm••••…) ended up inside .env.
  */
 const BROKEN_KEY = 'AIzaSyAWbsun4fLVFHl0V67WiNwiFocI9EFV8_0'
-const envApiKey = process.env.EXPO_PUBLIC_FIREBASE_API_KEY
+const rawEnvKey = process.env.EXPO_PUBLIC_FIREBASE_API_KEY
+const envApiKey =
+  rawEnvKey && rawEnvKey !== BROKEN_KEY && /^AIza[0-9A-Za-z_-]{35}$/.test(rawEnvKey) ? rawEnvKey : ''
 
 const config = {
-  apiKey: (envApiKey && envApiKey !== BROKEN_KEY ? envApiKey : '') || 'AIzaSyCmPtpRiV61NDW9z4us38JLdh3WK1WxPvQ',
+  apiKey: envApiKey || 'AIzaSyCmPtpRiV61NDW9z4us38JLdh3WK1WxPvQ',
   authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || 'strengthhub-2ab33.firebaseapp.com',
   projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || 'strengthhub-2ab33',
   storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET || 'strengthhub-2ab33.firebasestorage.app',
