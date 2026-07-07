@@ -4,6 +4,7 @@ import { View, Text, Pressable, ScrollView, TextInput } from 'react-native'
 import { ChevronRight, ChevronLeft, Check } from 'lucide-react-native'
 import { useDispatch } from '../store/store'
 import { LogoMark, Wordmark } from '../components/Logo'
+import { PressableScale } from '../components/PressableScale'
 import { WeightDial } from '../components/WeightDial'
 import { HeightRuler } from '../components/HeightRuler'
 import { thud } from '../lib/haptics'
@@ -52,6 +53,7 @@ export default function Onboarding() {
 
   const [name, setName] = useState('')
   const [age, setAge] = useState('')
+  const [phone, setPhone] = useState('')
   const [sex, setSex] = useState<Sex | ''>('')
   const [heightCm, setHeightCm] = useState(175)
   const [weightKg, setWeightKg] = useState(75)
@@ -82,6 +84,7 @@ export default function Onboarding() {
     const profile: Partial<Profile> = {
       name: name.trim() || 'Athlete',
       age: parseInt(age) || 20,
+      phone: phone.trim(),
       goal,
       experience: exp,
       daysPerWeek: days,
@@ -142,6 +145,13 @@ export default function Onboarding() {
             <TextInput
               value={age} onChangeText={(t) => setAge(t.replace(/\D/g, '').slice(0, 2))} keyboardType="numeric"
               placeholder="21" placeholderTextColor="rgba(255,255,255,0.35)"
+              className="mt-2 w-full rounded-xl border border-white/8 bg-ink-800 px-4 py-3.5 text-white"
+            />
+            <Text className="mt-5 text-sm font-semibold text-white/70">Phone number <Text className="text-white/35">(optional)</Text></Text>
+            <TextInput
+              value={phone} onChangeText={(t) => setPhone(t.replace(/[^\d+()\s-]/g, '').slice(0, 20))} keyboardType="phone-pad"
+              placeholder="+44 7700 900000" placeholderTextColor="rgba(255,255,255,0.35)"
+              autoComplete="tel" textContentType="telephoneNumber"
               className="mt-2 w-full rounded-xl border border-white/8 bg-ink-800 px-4 py-3.5 text-white"
             />
             <Text className="mt-5 text-sm font-semibold text-white/70">Sex <Text className="text-white/35">(for accurate calorie targets)</Text></Text>
@@ -294,23 +304,23 @@ export default function Onboarding() {
       {/* nav buttons */}
       <View className="mt-6 flex-row items-center gap-3">
         {step > 0 && (
-          <Pressable onPress={() => setStep((s) => s - 1)} className="h-12 w-12 items-center justify-center rounded-full bg-ink-700 active:opacity-80">
+          <PressableScale onPress={() => setStep((s) => s - 1)} className="h-12 w-12 items-center justify-center rounded-full bg-ink-700">
             <ChevronLeft size={22} color="rgba(255,255,255,0.7)" />
-          </Pressable>
+          </PressableScale>
         )}
         {step < total - 1 ? (
-          <Pressable
-            disabled={!canNext} onPress={() => setStep((s) => s + 1)}
-            className={`btn-primary flex-1 flex-row items-center justify-center active:opacity-90 ${canNext ? '' : 'opacity-40'}`}
+          <PressableScale
+            disabled={!canNext} onPress={() => setStep((s) => s + 1)} containerStyle={{ flex: 1 }}
+            className={`btn-primary flex-row items-center justify-center ${canNext ? '' : 'opacity-40'}`}
           >
             <Text className="font-semibold text-black">Continue </Text>
             <ChevronRight size={18} color="#000" />
-          </Pressable>
+          </PressableScale>
         ) : (
-          <Pressable onPress={finish} className="btn-primary flex-1 flex-row items-center justify-center active:opacity-90">
+          <PressableScale onPress={finish} containerStyle={{ flex: 1 }} className="btn-primary flex-row items-center justify-center">
             <Text className="font-semibold text-black">Build my plan </Text>
             <Check size={18} color="#000" />
-          </Pressable>
+          </PressableScale>
         )}
       </View>
     </ScrollView>
@@ -319,12 +329,12 @@ export default function Onboarding() {
 
 function PillButton({ active, onPress, label }: { active: boolean; onPress: () => void; label: string }) {
   return (
-    <Pressable
-      onPress={onPress}
-      className={`h-12 flex-1 items-center justify-center rounded-xl border active:opacity-80 ${active ? 'border-brand-400 bg-brand-400/10' : 'border-white/8 bg-ink-800'}`}
+    <PressableScale
+      onPress={onPress} scaleTo={0.93} containerStyle={{ flex: 1 }}
+      className={`h-12 items-center justify-center rounded-xl border ${active ? 'border-brand-400 bg-brand-400/10' : 'border-white/8 bg-ink-800'}`}
     >
       <Text className={`text-base font-bold ${active ? 'text-brand-400' : 'text-white/40'}`}>{label}</Text>
-    </Pressable>
+    </PressableScale>
   )
 }
 
@@ -340,9 +350,9 @@ function Picker({ title, sub, children }: { title: string; sub: string; children
 
 function OptionCard({ selected, onPress, title, desc }: { selected: boolean; onPress: () => void; title: string; desc: string }) {
   return (
-    <Pressable
-      onPress={onPress}
-      className={`w-full flex-row items-center justify-between rounded-2xl border p-4 active:opacity-90 ${selected ? 'border-brand-400 bg-brand-400/10' : 'border-white/8 bg-ink-800'}`}
+    <PressableScale
+      onPress={onPress} scaleTo={0.98}
+      className={`w-full flex-row items-center justify-between rounded-2xl border p-4 ${selected ? 'border-brand-400 bg-brand-400/10' : 'border-white/8 bg-ink-800'}`}
     >
       <View className="min-w-0 flex-1">
         <Text className="font-bold text-white">{title}</Text>
@@ -351,6 +361,6 @@ function OptionCard({ selected, onPress, title, desc }: { selected: boolean; onP
       <View className={`h-6 w-6 items-center justify-center rounded-full border-2 ${selected ? 'border-brand-400 bg-brand-400' : 'border-white/25'}`}>
         {selected && <Check size={14} strokeWidth={3} color="#000" />}
       </View>
-    </Pressable>
+    </PressableScale>
   )
 }

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { View, Text, Pressable, Image, Animated } from 'react-native'
+import { View, Text, Image, Animated } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
 import { LogoMark, Wordmark } from '../components/Logo'
+import { PressableScale } from '../components/PressableScale'
 import { img } from '../data/catalog'
 import { brand } from '../theme'
 
@@ -93,14 +94,14 @@ export function WelcomeScreen({ onSignUp, onLogIn }: { onSignUp: () => void; onL
 
         {/* entry actions */}
         <View className="px-7">
-          <Pressable onPress={onSignUp} className="btn-primary w-full py-4 active:opacity-90">
+          <PressableScale onPress={onSignUp} className="btn-primary w-full py-4">
             <Text className="text-[16px] font-bold text-black">Get started</Text>
-          </Pressable>
-          <Pressable onPress={onLogIn} className="mt-4 items-center py-2 active:opacity-70">
+          </PressableScale>
+          <PressableScale onPress={onLogIn} haptic={false} scaleTo={0.97} className="mt-4 items-center py-2">
             <Text className="text-[14px] text-white/60">
               Already have an account? <Text className="font-bold text-brand-400">Log in</Text>
             </Text>
-          </Pressable>
+          </PressableScale>
         </View>
       </View>
     </View>

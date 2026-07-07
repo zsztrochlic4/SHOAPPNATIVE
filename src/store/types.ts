@@ -10,6 +10,8 @@ export type MealName = 'Breakfast' | 'Lunch' | 'Snack' | 'Dinner'
 export interface Profile {
   name: string
   age: number
+  /** contact phone number, free-form (optional) */
+  phone?: string
   sex: 'male' | 'female' | 'other'
   university: string
   cohort: string
