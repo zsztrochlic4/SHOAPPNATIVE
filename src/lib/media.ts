@@ -14,14 +14,14 @@ const BASE = `https://firebasestorage.googleapis.com/v0/b/${storageBucket}/o`
 /**
  * Per-exercise media overrides. Handy for demoing/reusing a clip across several
  * exercises, or when a file doesn't follow the `{id}` naming convention.
- * Paths are relative to the bucket root (e.g. `thumbnails/squating.avif`).
+ * Paths are relative to the bucket root (e.g. `Thumbnails/squating.avif`).
  */
 const OVERRIDES: Record<string, { video?: string; poster?: string }> = {
   // Uploaded test assets, shown on a few exercises to verify media end-to-end.
-  squat: { video: 'exercises/squat.mp4', poster: 'thumbnails/squating.avif' },
-  bench: { video: 'exercises/squat.mp4', poster: 'thumbnails/squating.avif' },
-  incline: { video: 'exercises/squat.mp4', poster: 'thumbnails/squating.avif' },
-  shoulder: { video: 'exercises/squat.mp4', poster: 'thumbnails/squating.avif' },
+  squat: { video: 'exercises/squat.mp4', poster: 'Thumbnails/squating.avif' },
+  bench: { video: 'exercises/squat.mp4', poster: 'Thumbnails/squating.avif' },
+  incline: { video: 'exercises/squat.mp4', poster: 'Thumbnails/squating.avif' },
+  shoulder: { video: 'exercises/squat.mp4', poster: 'Thumbnails/squating.avif' },
 }
 
 /** Build a public download URL for a storage path like `exercises/bench.mp4`. */
