@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LogoMark } from '../components/Logo'
 import { PressableScale } from '../components/PressableScale'
 import { useAuth } from './AuthProvider'
+import { apiKeySuffix } from '../lib/firebase'
 import { brand } from '../theme'
 
 /** Turn Firebase's error codes into friendly, human sentences. */
@@ -93,9 +94,7 @@ export function AuthScreen({ initialMode = 'signin', onBack }: { initialMode?: '
           <Text className="mt-4 text-2xl font-extrabold tracking-tight text-white">StrengthHub Online</Text>
           <Text className="mt-1 text-[14px] text-white/50">{isSignup ? 'Create your account' : 'Welcome back'}</Text>
           {/* TEMP diagnostic: shows which API key the built app is actually using. */}
-          <Text className="mt-1 text-[11px] text-brand-400">
-            key …{(process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? 'MISSING').slice(-6)}
-          </Text>
+          <Text className="mt-1 text-[11px] text-brand-400">key …{apiKeySuffix}</Text>
         </View>
 
         {isSignup && (
