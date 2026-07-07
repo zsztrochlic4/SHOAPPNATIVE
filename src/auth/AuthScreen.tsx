@@ -25,6 +25,12 @@ function friendlyError(code: string): string {
       return 'Sign-ups are currently restricted for this project. Enable Email/Password sign-in in the Firebase console.'
     case 'auth/configuration-not-found':
       return 'Authentication isn’t set up for this project yet. Enable a sign-in method in the Firebase console.'
+    // Key is valid for other services but blocked for Auth — Identity Toolkit
+    // API disabled, or the key’s API restrictions exclude it.
+    case 'auth/api-key-not-valid':
+    case 'auth/api-key-not-valid.-please-pass-a-valid-api-key.':
+    case 'auth/invalid-api-key':
+      return 'Sign-in is blocked: enable the “Identity Toolkit API” for this project in Google Cloud, or remove the API-key restriction that’s excluding it.'
     // Surface the raw code so an unexpected failure is diagnosable, not a mystery.
     default: return code ? `Couldn’t complete that (${code}). Please try again.` : 'Something went wrong. Please try again.'
   }
