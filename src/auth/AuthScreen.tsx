@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { View, Text, TextInput, Pressable, ScrollView, ActivityIndicator } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LogoMark } from '../components/Logo'
+import { PressableScale } from '../components/PressableScale'
 import { useAuth } from './AuthProvider'
 import { brand } from '../theme'
 
@@ -17,14 +18,28 @@ function friendlyError(code: string): string {
     case 'auth/user-not-found': return 'Wrong email or password.'
     case 'auth/too-many-requests': return 'Too many attempts. Please wait a moment and try again.'
     case 'auth/network-request-failed': return 'Network error. Check your connection and try again.'
-    default: return 'Something went wrong. Please try again.'
+    // Email/Password sign-in isn't switched on for this Firebase project.
+    case 'auth/operation-not-allowed':
+      return 'Email sign-up isn’t enabled yet. Turn on Email/Password in Firebase → Authentication → Sign-in method.'
+    case 'auth/admin-restricted-operation':
+      return 'Sign-ups are currently restricted for this project. Enable Email/Password sign-in in the Firebase console.'
+    case 'auth/configuration-not-found':
+      return 'Authentication isn’t set up for this project yet. Enable a sign-in method in the Firebase console.'
+    // Key is valid for other services but blocked for Auth — Identity Toolkit
+    // API disabled, or the key’s API restrictions exclude it.
+    case 'auth/api-key-not-valid':
+    case 'auth/api-key-not-valid.-please-pass-a-valid-api-key.':
+    case 'auth/invalid-api-key':
+      return 'Sign-in is blocked: enable the “Identity Toolkit API” for this project in Google Cloud, or remove the API-key restriction that’s excluding it.'
+    // Surface the raw code so an unexpected failure is diagnosable, not a mystery.
+    default: return code ? `Couldn’t complete that (${code}). Please try again.` : 'Something went wrong. Please try again.'
   }
 }
 
-export function AuthScreen() {
+export function AuthScreen({ initialMode = 'signin', onBack }: { initialMode?: 'signin' | 'signup'; onBack?: () => void }) {
   const insets = useSafeAreaInsets()
   const { signIn, signUp, signInWithGoogle } = useAuth()
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin')
+  const [mode, setMode] = useState<'signin' | 'signup'>(initialMode)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -63,6 +78,11 @@ export function AuthScreen() {
 
   return (
     <View className="flex-1 bg-ink-900" style={{ paddingTop: insets.top }}>
+      {onBack && (
+        <Pressable onPress={onBack} hitSlop={10} className="absolute left-4 z-10 h-10 w-10 items-center justify-center rounded-full bg-white/5 active:opacity-70" style={{ top: insets.top + 10 }}>
+          <Text className="text-lg text-white/70">‹</Text>
+        </Pressable>
+      )}
       <ScrollView
         contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24, paddingBottom: insets.bottom + 24 }}
         keyboardShouldPersistTaps="handled"
@@ -92,15 +112,15 @@ export function AuthScreen() {
           </View>
         )}
 
-        <Pressable
+        <PressableScale
           onPress={submit}
           disabled={busy}
-          className={`btn-primary mt-5 w-full active:opacity-90 ${busy ? 'opacity-60' : ''}`}
+          className={`btn-primary mt-5 w-full ${busy ? 'opacity-60' : ''}`}
         >
           {busy ? <ActivityIndicator color="#000" /> : (
             <Text className="font-semibold text-black">{isSignup ? 'Create account' : 'Sign in'}</Text>
           )}
-        </Pressable>
+        </PressableScale>
 
         <View className="my-5 flex-row items-center gap-3">
           <View className="h-px flex-1 bg-white/10" />
@@ -108,13 +128,13 @@ export function AuthScreen() {
           <View className="h-px flex-1 bg-white/10" />
         </View>
 
-        <Pressable
+        <PressableScale
           onPress={google}
           disabled={busy}
-          className={`w-full flex-row items-center justify-center gap-2 rounded-full border border-white/15 bg-ink-800 py-3 active:opacity-90 ${busy ? 'opacity-60' : ''}`}
+          className={`w-full flex-row items-center justify-center gap-2 rounded-full border border-white/15 bg-ink-800 py-3 ${busy ? 'opacity-60' : ''}`}
         >
           <Text className="font-semibold text-white">Continue with Google</Text>
-        </Pressable>
+        </PressableScale>
 
         <Pressable onPress={() => { setMode(isSignup ? 'signin' : 'signup'); setError(null) }} className="mt-6 active:opacity-70">
           <Text className="text-center text-[14px] text-white/55">
