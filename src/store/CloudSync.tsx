@@ -1,16 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../auth/AuthProvider'
 import { useStore } from './store'
-import { loadUserState, saveUserState } from './cloudSync'
+import { loadUserState, saveUserState } from './cloudRepo'
 import { SCHEMA_VERSION } from './seed'
+import type { AppState } from './types'
 
 /**
- * Bridges the local store and the user's cloud copy. Renders nothing.
+ * Bridges the local store and the user's cloud copy (see cloudRepo.ts for the
+ * Firestore data model). Renders nothing.
  *
- * - On sign-in: pulls the user's saved state from Firestore and hydrates the
- *   store (cloud wins, so data follows them across devices). Photos aren't in
- *   the cloud doc, so we keep whatever photos are already local.
- * - While signed in: debounce-saves the state back to the cloud on every change.
+ * - On sign-in: pulls the user's saved state and hydrates the store (cloud wins,
+ *   so data follows them across devices). Photos aren't in the cloud, so we keep
+ *   whatever is already local.
+ * - While signed in: debounce-saves changes back to the cloud, writing only the
+ *   entries that actually changed since the last save.
  *
  * Inert when signed out or when Firebase isn't configured.
  */
@@ -22,23 +25,29 @@ export function CloudSync() {
   const [synced, setSynced] = useState(false)
   const stateRef = useRef(state)
   stateRef.current = state
+  // The last state we know is persisted, used to diff the next save so we only
+  // write what changed. Seeded from the cloud baseline on load.
+  const savedRef = useRef<Partial<AppState> | undefined>(undefined)
 
   useEffect(() => {
-    if (!user) { setSynced(false); return }
+    if (!user) { setSynced(false); savedRef.current = undefined; return }
     let cancelled = false
     setSynced(false)
     loadUserState(user.uid)
-      .then((cloud) => {
+      .then((loaded) => {
         if (cancelled) return
-        if (cloud && cloud.v === SCHEMA_VERSION) {
+        if (loaded && loaded.state.v === SCHEMA_VERSION) {
           // Returning user: merge cloud over current state so local-only fields
-          // (photos) survive.
-          dispatch({ type: 'HYDRATE', state: { ...stateRef.current, ...cloud } })
-        } else if (cloud === null) {
+          // (photos) survive. Diff future saves against what's actually in the
+          // cloud subcollections (empty for a legacy doc → first save migrates).
+          savedRef.current = loaded.baseline
+          dispatch({ type: 'HYDRATE', state: { ...stateRef.current, ...loaded.state } as AppState })
+        } else if (loaded === null) {
           // Brand-new account (no saved doc): start on a clean, un-onboarded
           // state so they go through onboarding; their answers then save to the
           // cloud. (A network error throws instead, landing in .catch below, so
           // we never wipe a returning user's screen just because they're offline.)
+          savedRef.current = undefined
           dispatch({ type: 'RESET_EMPTY' })
         }
       })
@@ -51,7 +60,10 @@ export function CloudSync() {
   useEffect(() => {
     if (!user || !synced) return
     const id = setTimeout(() => {
-      saveUserState(user.uid, state).catch(() => { /* transient write error, retried on next change */ })
+      const snapshot = state
+      saveUserState(user.uid, snapshot, savedRef.current)
+        .then(() => { savedRef.current = snapshot })
+        .catch(() => { /* transient write error, retried on next change */ })
     }, 800)
     return () => clearTimeout(id)
   }, [state, synced, user])
