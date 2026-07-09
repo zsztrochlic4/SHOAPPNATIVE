@@ -37,7 +37,11 @@ export function IndexGauge({ index }: { index: WeeklyIndex }) {
   const targetDeg = ((Math.max(0, Math.min(100, index.score)) - 50) / 50) * 90
   const anim = useRef(new Animated.Value(-90)).current
   useEffect(() => {
-    const a = Animated.timing(anim, { toValue: targetDeg, duration: 950, useNativeDriver: true })
+    // Animating an SVG `<G rotation>` prop (not a view style transform), which
+    // the native animated driver cannot handle — it must run on the JS driver
+    // on every platform. useNativeDriver:true here also warns on web ("native
+    // animated module is missing").
+    const a = Animated.timing(anim, { toValue: targetDeg, duration: 950, useNativeDriver: false })
     a.start()
     return () => a.stop()
   }, [targetDeg, anim])
