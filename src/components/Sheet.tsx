@@ -56,6 +56,11 @@ export function Sheet({
           </View>
           <ScrollView
             className="flex-1 px-5"
+            // On web the modal's flex chain leaves this unbounded, so it grows to
+            // its content and won't scroll. Cap it to the card's inner height
+            // (sheet height minus the ~56px header) so overflow scrolls. Native
+            // keeps flex-1.
+            style={IS_WEB ? { maxHeight: (full ? height * 0.92 : height * 0.88) - 56 } : undefined}
             contentContainerStyle={{ paddingBottom: 32 + insets.bottom }}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"

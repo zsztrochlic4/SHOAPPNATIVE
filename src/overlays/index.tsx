@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { View, Text, Pressable, TextInput, Image, ScrollView, Alert, Animated, Easing } from 'react-native'
+import { View, Text, Pressable, TextInput, Image, ScrollView, Animated, Easing } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -10,7 +10,7 @@ import {
   HeartPulse, Activity, Zap, Minus, X, LogOut,
 } from 'lucide-react-native'
 import { Sheet, EmptyState } from '../components/Sheet'
-import { AppModal, DEVICE, IS_WEB } from '../components/WebFrame'
+import { AppModal, DEVICE, IS_WEB, WEB_SCREEN } from '../components/WebFrame'
 import { IntegrationsSection } from '../components/Integrations'
 import { Avatar } from '../components/Avatar'
 import { LogoMark } from '../components/Logo'
@@ -91,6 +91,10 @@ export function SettingsSheet({ open, onClose }: Props) {
   const { units, theme, notificationsEnabled } = state.settings
   const lang = state.settings.language ?? 'en'
   const t = translator(lang)
+  // Two-step inline confirm for the destructive wipe — works on web and native
+  // (RN's Alert is a no-op on react-native-web, so a dialog would never show).
+  const [confirmingClear, setConfirmingClear] = useState(false)
+  useEffect(() => { if (!open) setConfirmingClear(false) }, [open])
 
   function toggleNotifs() {
     const next = !notificationsEnabled
@@ -172,16 +176,20 @@ export function SettingsSheet({ open, onClose }: Props) {
           </View>
         </Pressable>
         <Pressable
-          onPress={() => Alert.alert('Clear all data and start fresh?', undefined, [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Clear', style: 'destructive', onPress: () => { dispatch({ type: 'RESET_EMPTY' }); onClose() } },
-          ])}
-          className="w-full flex-row items-center gap-3 rounded-2xl border border-red-500/20 bg-red-500/5 p-4 active:opacity-90"
+          onPress={() => {
+            if (!confirmingClear) { setConfirmingClear(true); return }
+            // Wipe to an empty, un-onboarded state → the app drops straight back
+            // into onboarding (Shell renders <Onboarding/> when !profile.onboarded).
+            dispatch({ type: 'RESET_EMPTY' })
+            setConfirmingClear(false)
+            onClose()
+          }}
+          className={`w-full flex-row items-center gap-3 rounded-2xl border p-4 active:opacity-90 ${confirmingClear ? 'border-red-500/60 bg-red-500/15' : 'border-red-500/20 bg-red-500/5'}`}
         >
           <Trash2 size={18} color="#f87171" />
           <View className="flex-1">
-            <Text className="font-bold text-red-300">{t('settings.clear')}</Text>
-            <Text className="text-[12px] text-white/50">{t('settings.clearSub')}</Text>
+            <Text className="font-bold text-red-300">{confirmingClear ? 'Tap again to wipe everything' : t('settings.clear')}</Text>
+            <Text className="text-[12px] text-white/50">{confirmingClear ? 'Erases your data and restarts onboarding' : t('settings.clearSub')}</Text>
           </View>
         </Pressable>
       </Group>
@@ -247,7 +255,11 @@ export function MenuDrawer({ open, onClose }: { open: boolean; onClose: () => vo
       <Animated.View
         onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
         className="flex-1 bg-ink-900"
-        style={{ paddingTop: insets.top, transform: [{ translateX }] }}
+        // On web the modal's flex chain doesn't give this a definite height, so
+        // the inner ScrollView grows to its content and never scrolls. Pin it to
+        // the visible screen area (device height minus the status bar) so the
+        // ScrollView is bounded and scrolls. Native keeps flex-1.
+        style={{ paddingTop: insets.top, transform: [{ translateX }], ...(IS_WEB ? { height: WEB_SCREEN.height - 44 } : null) }}
       >
         <View className="flex-row items-center gap-2 px-3 py-2.5">
           <Pressable onPress={onClose} hitSlop={8} className="h-9 w-9 items-center justify-center rounded-full active:opacity-70">
