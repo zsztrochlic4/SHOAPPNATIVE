@@ -6,6 +6,11 @@ import '../global.css'
 import { WebPreviewFrame, IS_WEB } from './components/WebFrame'
 import { BottomNav } from './components/BottomNav'
 import { StoreProvider, useStore } from './store/store'
+import { AuthProvider, useAuth } from './auth/AuthProvider'
+import { AuthScreen } from './auth/AuthScreen'
+import { WelcomeScreen } from './screens/Welcome'
+import { CloudSync } from './store/CloudSync'
+import { IntegrationsAutoSync } from './components/Integrations'
 import { ToastProvider } from './components/Toast'
 import { NavProvider, type Overlay } from './nav'
 import { themeVars, useThemeName, brand, cssVars } from './theme'
@@ -157,9 +162,44 @@ function ThemedRoot() {
     <View style={[{ flex: 1 }, themeVars[name]]} className="bg-ink-900">
       <ExpoStatusBar style={name === 'light' ? 'dark' : 'light'} />
       <ToastProvider>
-        <Shell />
+        <AuthGate />
       </ToastProvider>
     </View>
+  )
+}
+
+/**
+ * Decides between the welcome/login flow and the app. When Firebase isn't
+ * configured (`enabled` false) this always falls through to the app, so the
+ * preview and demo mode are untouched. When it is configured, signed-out users
+ * land on the premium Welcome carousel, then sign up / log in; signed-in users
+ * get the app plus the cloud-sync bridge.
+ */
+function AuthGate() {
+  const { enabled, loading, user } = useAuth()
+  const insets = useSafeAreaInsets()
+  const [entry, setEntry] = useState<'welcome' | 'signup' | 'signin'>('welcome')
+
+  if (enabled && loading) {
+    return (
+      <View className="flex-1 items-center justify-center bg-ink-900" style={{ paddingTop: insets.top }}>
+        <ActivityIndicator color={brand[400]} size="large" />
+      </View>
+    )
+  }
+  if (enabled && !user) {
+    if (entry === 'welcome') {
+      return <WelcomeScreen onSignUp={() => setEntry('signup')} onLogIn={() => setEntry('signin')} />
+    }
+    return <AuthScreen initialMode={entry} onBack={() => setEntry('welcome')} />
+  }
+
+  return (
+    <>
+      <CloudSync />
+      <IntegrationsAutoSync />
+      <Shell />
+    </>
   )
 }
 
@@ -168,7 +208,9 @@ export default function App() {
     <WebPreviewFrame>
       <SafeAreaProvider>
         <StoreProvider>
-          <ThemedRoot />
+          <AuthProvider>
+            <ThemedRoot />
+          </AuthProvider>
         </StoreProvider>
       </SafeAreaProvider>
     </WebPreviewFrame>

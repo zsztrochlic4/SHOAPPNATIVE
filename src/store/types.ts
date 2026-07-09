@@ -10,6 +10,8 @@ export type MealName = 'Breakfast' | 'Lunch' | 'Snack' | 'Dinner'
 export interface Profile {
   name: string
   age: number
+  /** contact phone number, free-form (optional) */
+  phone?: string
   sex: 'male' | 'female' | 'other'
   university: string
   cohort: string
@@ -40,6 +42,15 @@ export interface Profile {
   /** premium unlocks 1:1 video calls with the coach */
   premium: boolean
   createdAtKey: string
+  /* ---- richer onboarding context for the AI (all optional) ---- */
+  /** preferred time per session in minutes (e.g. 30, 45, 60, 75) */
+  sessionMinutes?: number
+  /** injuries / limitations to train around, free text ('' or absent = none) */
+  injuries?: string
+  /** dietary preferences / restrictions (e.g. 'vegetarian', 'halal', 'dairy-free') */
+  dietaryPrefs?: string[]
+  /** what's driving them — free text, great context for the coach */
+  motivation?: string
 }
 
 /** A planned meal slot in the weekly meal planner. */
@@ -135,6 +146,17 @@ export interface FoodReview {
 }
 
 /** A self-logged fitness activity not prescribed by the app (run, swim, sport…). */
+/** Connection + tokens for one external health platform. */
+export interface IntegrationState {
+  connected: boolean
+  /** ISO timestamp of the last successful sync */
+  lastSyncAt?: string
+  accessToken?: string
+  refreshToken?: string
+  /** unix seconds when the access token expires */
+  expiresAt?: number
+}
+
 export interface LoggedActivity {
   id: string
   dateKey: string
@@ -151,6 +173,10 @@ export interface LoggedActivity {
   time: string
   /** marked as a regular weekly activity; only these count as "workouts this week" */
   weekly?: boolean
+  /** which platform this came from (e.g. 'strava'); absent = logged by hand */
+  source?: string
+  /** the platform's own id, used to de-duplicate on re-sync */
+  externalId?: string
 }
 
 export interface ExerciseDef {
@@ -422,6 +448,10 @@ export interface AppState {
   nutritionAskedKeys?: string[]
   /** completed beginner-track lesson ids */
   beginnerProgress: string[]
+  /** AI coach usage for the current day, for the per-user daily message limit */
+  coachUsage?: { dateKey: string; count: number }
+  /** connected health platforms (Strava, Whoop, ...) and their sync state */
+  integrations?: Record<string, IntegrationState>
   /** schema version for migrations */
   v: number
 }

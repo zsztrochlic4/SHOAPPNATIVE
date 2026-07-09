@@ -210,7 +210,7 @@ export function ExerciseDetailSheet({ open, onClose, params }: Props) {
   if (!def) return null
   return (
     <Sheet open={open} onClose={onClose} title={def.name}>
-      <TechniqueClip poster={def.image} videoUrl={detail.video} label="Form clip coming soon" />
+      <TechniqueClip exerciseId={defId} poster={def.image} label="Form clip coming soon" />
 
       <View className="mt-3 flex-row items-center gap-2">
         <Chip color="gray">{def.muscle}</Chip>
