@@ -4,8 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
 import Svg, { Circle } from 'react-native-svg'
 import {
-  Check, Plus, Minus, Flag, Info, ChevronDown, Bell, BookOpen, Play, Target,
-  ChevronLeft, Timer, Dumbbell, ListChecks, HelpCircle, X,
+  Check, Plus, Flag, Info, ChevronDown, Bell, BookOpen, Play, Target,
+  ChevronLeft, Timer, ListChecks, HelpCircle, X,
 } from 'lucide-react-native'
 import { Sheet } from '../components/Sheet'
 import { AppModal } from '../components/WebFrame'
@@ -14,9 +14,9 @@ import { useStore } from '../store/store'
 import { useToast } from '../components/Toast'
 import { useNav } from '../nav'
 import { todaySession, sessionProgress } from '../store/selectors'
-import { nextSetRecommendation, examState, examTrim } from '../store/training'
+import { examState, examTrim } from '../store/training'
 import { prForSession, type PR } from '../store/coach'
-import { exerciseDetail, workoutGoalLine, incrementFor } from '../data/catalog'
+import { exerciseDetail, workoutGoalLine } from '../data/catalog'
 import { fmtWeightNum, weightUnit, fmtVolume, fmtWeight, toKg } from '../lib/format'
 import { brand, accent, useColors } from '../theme'
 import type { Units, WorkoutSession } from '../store/types'
@@ -133,6 +133,7 @@ export default function ActiveWorkout({ open, onClose }: { open: boolean; onClos
   const [restTotal, setRestTotal] = useState(120)
   const [total, setTotal] = useState(0)
   const [howTo, setHowTo] = useState<Set<string>>(new Set())
+  const [goalOpen, setGoalOpen] = useState(false)
   const [finishing, setFinishing] = useState(false)
   const [finishPR, setFinishPR] = useState<PR | null>(null)
   const finishStatsRef = useRef<{ time: number; volume: number; sets: number } | null>(null)
@@ -208,14 +209,6 @@ export default function ActiveWorkout({ open, onClose }: { open: boolean; onClos
       i !== exIdx ? ex : { ...ex, sets: ex.sets.map((s, j) => (j === setIdx ? { ...s, [field]: Math.max(0, value) } : s)) },
     )
     patch({ ...session, exercises })
-  }
-
-  function adjust(field: 'weightKg' | 'reps', dir: 1 | -1) {
-    if (!session || !cursor) return
-    const ex = session.exercises[cursor.exIdx]
-    const cur = ex.sets[cursor.setIdx][field]
-    const step = field === 'weightKg' ? incrementFor(ex.defId) : 1
-    setSet(cursor.exIdx, cursor.setIdx, field, cur + dir * step)
   }
 
   function toggleSet(exIdx: number, setIdx: number) {
@@ -311,8 +304,9 @@ export default function ActiveWorkout({ open, onClose }: { open: boolean; onClos
 
   const cursorEx = cursor ? session.exercises[cursor.exIdx] : null
   const cursorSet = cursor && cursorEx ? cursorEx.sets[cursor.setIdx] : null
-  const rec = cursorEx ? nextSetRecommendation(state, cursorEx.defId, cursorEx.targetReps, Math.max(...cursorEx.sets.map((s) => s.weightKg))) : null
   const allDone = prog.total > 0 && prog.done === prog.total
+  // The current exercise = first one not yet fully done; only it gets highlighted.
+  const activeIdx = session.exercises.findIndex((ex) => !(ex.sets.length > 0 && ex.sets.every((s) => s.done)))
 
   /* ============================ Guided focus screens ============================ */
   if (finishing) {
@@ -325,18 +319,12 @@ export default function ActiveWorkout({ open, onClose }: { open: boolean; onClos
         open={open}
         ex={cursorEx}
         cursor={cursor}
-        set={cursorSet}
         elapsed={workElapsed}
         sessionTotal={total}
-        units={units}
-        coachHint={rec?.hasHistory ? rec : null}
         exIndex={cursor.exIdx}
         exTotal={session.exercises.length}
-        nextExName={session.exercises[cursor.exIdx + 1]?.name}
         detail={exerciseDetail(cursorEx.defId)}
         onBack={backToList}
-        onAdjust={adjust}
-        onApplyCoach={() => { if (rec) { setSet(cursor.exIdx, cursor.setIdx, 'weightKg', rec.suggestedWeightKg); setSet(cursor.exIdx, cursor.setIdx, 'reps', rec.suggestedReps) } }}
         onStartRest={startRest}
       />
     )
@@ -365,32 +353,17 @@ export default function ActiveWorkout({ open, onClose }: { open: boolean; onClos
   /* ================================ Overview ================================ */
   return (
     <Sheet open={open} onClose={onClose} title={session.name} full>
-      {/* Live session stat strip */}
-      <View className="mb-4 flex-row gap-3 rounded-2xl border border-white/5 bg-ink-800 p-4">
-        <View className="flex-1 items-center"><Text className="text-[11px] uppercase tracking-wide text-white/40">Time</Text><Text className="text-xl font-extrabold text-white">{mmss(total)}</Text></View>
-        <View className="flex-1 items-center"><Text className="text-[11px] uppercase tracking-wide text-white/40">Volume</Text><Text className="text-xl font-extrabold text-white">{fmtVolume(session.volumeKg, units)}</Text></View>
-        <View className="flex-1 items-center"><Text className="text-[11px] uppercase tracking-wide text-white/40">Sets</Text><Text className="text-xl font-extrabold text-brand-400">{prog.done}/{prog.total}</Text></View>
-      </View>
-
-      {/* The bold primary CTA — launches the follow-along flow */}
+      {/* A clean, single-line CTA to launch the follow-along flow (mirrors web). */}
       {!allDone && (
         <Pressable
           onPress={startGuided}
-          className="relative mb-5 w-full overflow-hidden rounded-2xl bg-brand-400 p-5 active:opacity-90"
+          className="mb-4 w-full flex-row items-center justify-center gap-2.5 rounded-xl py-6 active:opacity-90"
+          style={{ backgroundColor: brand[500] }}
         >
-          <View className="absolute -right-6 -top-8 h-32 w-32 rounded-full bg-black/10" />
-          <View className="absolute -bottom-10 right-10 h-24 w-24 rounded-full bg-white/10" />
-          <Text className="relative text-[11px] font-black uppercase tracking-[2px] text-black/55">
-            {rest !== null ? 'Resume, resting' : prog.done > 0 ? 'Pick up where you left off' : "Let's move"}
+          <Play size={17} color="#fff" fill="#fff" />
+          <Text className="text-[15px] font-bold text-white">
+            {rest !== null ? 'Resume rest' : prog.done > 0 ? 'Resume workout' : 'Start workout'}
           </Text>
-          <View className="relative mt-1 flex-row items-center justify-between">
-            <Text className="text-[26px] font-black leading-none tracking-tight text-black">
-              {rest !== null ? 'Resume rest' : prog.done > 0 ? 'Resume workout' : 'Start workout'}
-            </Text>
-            <View className="h-12 w-12 items-center justify-center rounded-full bg-black">
-              <Play size={22} color={brandColor} fill={brandColor} />
-            </View>
-          </View>
         </Pressable>
       )}
 
@@ -403,67 +376,88 @@ export default function ActiveWorkout({ open, onClose }: { open: boolean; onClos
         </View>
       )}
 
+      {/* What today's session is for. Collapsed by default so the list leads. */}
+      <View className="mb-4 overflow-hidden rounded-xl border border-white/[0.07] bg-white/[0.03]">
+        <Pressable onPress={() => setGoalOpen((o) => !o)} className="w-full flex-row items-center gap-1.5 px-3.5 py-2.5 active:opacity-80">
+          <Target size={13} color="rgba(126,217,87,0.8)" />
+          <Text className="text-[11px] font-bold uppercase tracking-[1.6px] text-brand-400/90">Today's goal</Text>
+          <View className="ml-auto">
+            <ChevronDown size={15} color="rgba(255,255,255,0.4)" style={{ transform: [{ rotate: goalOpen ? '180deg' : '0deg' }] }} />
+          </View>
+        </Pressable>
+        {goalOpen && (
+          <Text className="px-3.5 pb-3 text-[13px] leading-snug text-white/70">
+            {workoutGoalLine(session.name, session.focus, state.profile.goal)}
+          </Text>
+        )}
+      </View>
+
       <Text className="mb-3 text-[12px] font-bold uppercase tracking-[1.8px] text-white/35">{session.exercises.length} exercises</Text>
 
       <View className="gap-3">
         {session.exercises.map((ex, exIdx) => {
           const isOptional = trim?.optionalIds.has(ex.defId)
           const exDone = ex.sets.length > 0 && ex.sets.every((s) => s.done)
+          const isActive = exIdx === activeIdx
           const detail = exerciseDetail(ex.defId)
           const howToOpen = howTo.has(ex.defId)
+          // Compact performance line: shared weight once, then each set's reps.
+          const weights = ex.sets.map((s) => s.weightKg)
+          const sameWeight = weights.length > 0 && weights.every((w) => w === weights[0])
+          const lastLine = ex.sets.length === 0 ? null : sameWeight
+            ? `${fmtWeightNum(weights[0], units, units === 'imperial' ? 0 : 1)}${weightUnit(units)} × ${ex.sets.map((s) => s.reps).join(', ')}`
+            : ex.sets.map((s) => `${fmtWeightNum(s.weightKg, units, units === 'imperial' ? 0 : 1)}${weightUnit(units)}×${s.reps}`).join(', ')
           return (
-            <View key={ex.defId} className={`overflow-hidden rounded-2xl border bg-ink-800 ${exDone ? 'border-brand-400/30' : 'border-white/5'} ${isOptional ? 'opacity-70' : ''}`}>
-              {/* Header */}
-              <View className="flex-row items-center gap-3 p-3.5">
-                <View className="relative">
-                  <Image source={{ uri: ex.image }} resizeMode="cover" className="h-14 w-14 rounded-xl" />
-                  <View className="absolute -left-1.5 -top-1.5 h-6 w-6 items-center justify-center rounded-lg border border-white/10 bg-ink-900">
-                    <Text className="text-[11px] font-black text-brand-400">{String(exIdx + 1).padStart(2, '0')}</Text>
-                  </View>
+            <View
+              key={ex.defId}
+              className={`overflow-hidden rounded-2xl border ${isActive ? 'border-brand-400/50 bg-brand-400/[0.05]' : 'border-white/[0.04] bg-ink-800'} ${isOptional ? 'opacity-70' : ''}`}
+              style={isActive ? { boxShadow: '0 0 22px -8px rgba(126,217,87,0.55)' } : undefined}
+            >
+              <View className="flex-row gap-3.5 p-3.5">
+                <View className="relative self-start">
+                  <Image source={{ uri: ex.image }} resizeMode="cover" className="h-[88px] w-[88px] rounded-xl" style={{ borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }} />
                   {exDone && (
-                    <View className="absolute -bottom-1.5 -right-1.5 h-6 w-6 items-center justify-center rounded-full bg-brand-400" style={{ borderWidth: 2, borderColor: colors.ink800 }}>
-                      <Check size={13} strokeWidth={3.5} color="#000" />
+                    <View className="absolute inset-0 items-center justify-center rounded-xl" style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}>
+                      <View className="h-6 w-6 items-center justify-center rounded-full bg-brand-400">
+                        <Check size={14} strokeWidth={3.5} color="#000" />
+                      </View>
                     </View>
                   )}
                 </View>
                 <View className="min-w-0 flex-1">
                   <View className="flex-row items-center gap-2">
-                    <Text numberOfLines={1} className="font-bold leading-tight text-white">{ex.name}</Text>
+                    <Text numberOfLines={1} className="flex-1 text-[17px] font-bold leading-tight text-white">{ex.name}</Text>
+                    {isActive && (
+                      <View className="rounded-full bg-brand-400/15 px-2 py-0.5">
+                        <Text className="text-[10px] font-bold uppercase tracking-wide text-brand-300">Now</Text>
+                      </View>
+                    )}
                     {isOptional && (
                       <View className="rounded-full bg-white/10 px-2 py-0.5">
                         <Text className="text-[10px] font-semibold text-white/55">Optional</Text>
                       </View>
                     )}
                   </View>
-                  <Text className="mt-0.5 text-[12px] font-semibold text-brand-400">{ex.targetSets} sets · {ex.targetReps} reps</Text>
-                  <Text numberOfLines={2} className="mt-1 text-[12px] leading-snug text-white/45">{detail.desc}</Text>
-                </View>
-              </View>
-
-              {/* Set chips */}
-              <View className="flex-row flex-wrap gap-1.5 px-3.5 pb-3">
-                {ex.sets.map((set, i) => (
-                  <View
-                    key={i}
-                    className={`rounded-lg px-2 py-1 ${set.done ? 'bg-brand-400/15' : 'bg-white/[0.06]'}`}
-                  >
-                    <Text className={`text-[11px] font-bold ${set.done ? 'text-brand-300' : 'text-white/60'}`}>
-                      {fmtWeightNum(set.weightKg, units, units === 'imperial' ? 0 : 1)}{weightUnit(units)} × {set.reps}
+                  <Text className="mt-1 text-[12px] font-medium text-white/45">{ex.targetSets} sets · {ex.targetReps} reps</Text>
+                  {lastLine && (
+                    <Text className="mt-2 text-[12px] leading-snug">
+                      <Text className="text-white/35">Last: </Text>
+                      <Text className="font-semibold text-white/70">{lastLine}</Text>
                     </Text>
-                  </View>
-                ))}
-              </View>
+                  )}
 
-              {/* Actions */}
-              <View className="flex-row items-stretch gap-2 border-t border-white/5 p-2.5">
-                <Pressable onPress={() => toggleHowTo(ex.defId)} className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl bg-white/[0.04] py-2.5 active:opacity-80">
-                  <ChevronDown size={14} color="rgba(255,255,255,0.65)" style={{ transform: [{ rotate: howToOpen ? '180deg' : '0deg' }] }} />
-                  <Text className="text-[12px] font-semibold text-white/65">Form & video</Text>
-                </Pressable>
-                <Pressable onPress={() => startAt(exIdx)} className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl bg-brand-400/15 py-2.5 active:opacity-80">
-                  <Play size={13} color={brandColor} fill={brandColor} />
-                  <Text className="text-[12px] font-bold text-brand-400">{exDone ? 'Redo' : 'Start'}</Text>
-                </Pressable>
+                  {/* Actions */}
+                  <View className="mt-3.5 flex-row gap-2">
+                    <Pressable onPress={() => toggleHowTo(ex.defId)} className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl bg-white/[0.09] py-2 active:opacity-80">
+                      <BookOpen size={14} color="rgba(255,255,255,0.85)" />
+                      <Text className="text-[12px] font-semibold text-white/85">Form & video</Text>
+                    </Pressable>
+                    <Pressable onPress={() => startAt(exIdx)} className={`flex-1 flex-row items-center justify-center gap-1.5 rounded-xl py-2 active:opacity-80 ${isActive ? 'bg-brand-400' : 'bg-white/[0.09]'}`}>
+                      <Play size={13} color={isActive ? '#000' : 'rgba(255,255,255,0.85)'} fill={isActive ? '#000' : 'rgba(255,255,255,0.85)'} />
+                      <Text className={`text-[12px] font-bold ${isActive ? 'text-black' : 'text-white/85'}`}>{exDone ? 'Redo' : 'Start'}</Text>
+                    </Pressable>
+                  </View>
+                </View>
               </View>
 
               {howToOpen && (
@@ -570,24 +564,18 @@ function ManualSetRow({
 
 /* ============================ Work screen ============================ */
 function WorkScreen({
-  open, ex, cursor, set, elapsed, sessionTotal, units, coachHint, exIndex, exTotal, nextExName, detail,
-  onBack, onAdjust, onApplyCoach, onStartRest,
+  open, ex, cursor, elapsed, sessionTotal, exIndex, exTotal, detail,
+  onBack, onStartRest,
 }: {
   open: boolean
   ex: WorkoutSession['exercises'][number]
   cursor: Cursor
-  set: { weightKg: number; reps: number; done: boolean }
   elapsed: number
   sessionTotal: number
-  units: Units
-  coachHint: { suggestedWeightKg: number; suggestedReps: number } | null
   exIndex: number
   exTotal: number
-  nextExName?: string
   detail: { desc: string; cues: string[]; commonMistake: string; video?: string }
   onBack: () => void
-  onAdjust: (field: 'weightKg' | 'reps', dir: 1 | -1) => void
-  onApplyCoach: () => void
   onStartRest: () => void
 }) {
   const [showHow, setShowHow] = useState(false)
@@ -648,32 +636,12 @@ function WorkScreen({
         </View>
       </View>
 
-      {/* Editable target: weight × reps */}
-      <View className="relative px-6">
-        <Text className="mb-2 text-center text-[11px] font-bold uppercase tracking-[1.6px] text-white/35">Log this set</Text>
-        <View className="flex-row gap-3">
-          <Stepper label={weightUnit(units)} value={fmtWeightNum(set.weightKg, units, units === 'imperial' ? 0 : 1)} onMinus={() => onAdjust('weightKg', -1)} onPlus={() => onAdjust('weightKg', 1)} />
-          <Stepper label="reps" value={String(set.reps)} onMinus={() => onAdjust('reps', -1)} onPlus={() => onAdjust('reps', 1)} />
-        </View>
-        {coachHint && (
-          <Pressable onPress={onApplyCoach} className="mt-3 flex-row items-center gap-1.5 self-center rounded-full border border-brand-400/25 bg-brand-400/[0.06] py-1.5 pl-3 pr-3.5 active:opacity-80">
-            <Dumbbell size={13} color={brandColor} />
-            <Text className="text-[12px] font-semibold text-brand-400">Coach suggests {fmtWeightNum(coachHint.suggestedWeightKg, units, units === 'imperial' ? 0 : 1)} {weightUnit(units)} × {coachHint.suggestedReps}</Text>
-          </Pressable>
-        )}
-      </View>
-
-      {/* Primary action + what's coming */}
+      {/* Primary action — a single clean CTA, mirroring web. */}
       <View className="relative px-6 pb-12 pt-5">
         <Pressable onPress={onStartRest} className="w-full flex-row items-center justify-center gap-2.5 rounded-2xl bg-brand-400 py-5 active:opacity-90">
           <Check size={20} strokeWidth={3} color="#000" />
           <Text className="text-[18px] font-black uppercase tracking-wide text-black">{lastSet ? 'Done, finish exercise' : 'Done, start rest'}</Text>
         </Pressable>
-        <Text className="mt-3 text-center text-[12px] font-semibold text-white/40">
-          {lastSet
-            ? (nextExName ? <>Up next: <Text className="text-white/70">{nextExName}</Text></> : <Text className="text-brand-400">Last exercise. Finish strong</Text>)
-            : <>Then: <Text className="text-white/70">Set {cursor.setIdx + 2} of {ex.sets.length}</Text></>}
-        </Text>
       </View>
 
       {/* On-demand "how to do this" — keeps the main screen simple */}
@@ -890,21 +858,6 @@ function SetDots({ sets, current }: { sets: { done: boolean }[]; current: number
           }}
         />
       ))}
-    </View>
-  )
-}
-
-function Stepper({ label, value, onMinus, onPlus }: { label: string; value: string; onMinus: () => void; onPlus: () => void }) {
-  return (
-    <View className="flex-1 rounded-2xl border border-white/10 bg-white/[0.04] p-2">
-      <View className="flex-row items-center justify-between gap-1">
-        <Pressable onPress={onMinus} className="h-10 w-10 items-center justify-center rounded-xl bg-white/[0.06] active:opacity-80"><Minus size={18} color="#fff" /></Pressable>
-        <View className="min-w-0 items-center">
-          <Text numberOfLines={1} className="text-[22px] font-black leading-none text-white">{value}</Text>
-          <Text className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-white/40">{label}</Text>
-        </View>
-        <Pressable onPress={onPlus} className="h-10 w-10 items-center justify-center rounded-xl bg-white/[0.06] active:opacity-80"><Plus size={18} color="#fff" /></Pressable>
-      </View>
     </View>
   )
 }

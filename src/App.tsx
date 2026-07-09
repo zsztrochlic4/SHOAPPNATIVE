@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { View, ActivityIndicator, ScrollView } from 'react-native'
+import { useEffect, useRef, useState } from 'react'
+import { View, ActivityIndicator, ScrollView, Animated, Easing } from 'react-native'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar'
 import '../global.css'
@@ -57,6 +57,35 @@ const screens: Record<TabKey, React.ComponentType> = {
   community: Community,
 }
 
+/**
+ * Fades + slides each screen up by 10px when the active tab changes, mirroring
+ * the web build's `animate-screen-in` (0.45s, cubic-bezier(0.22,1,0.36,1)).
+ * Re-runs whenever `tabKey` changes.
+ */
+function ScreenFade({ tabKey, children }: { tabKey: string; children: React.ReactNode }) {
+  const anim = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    anim.setValue(0)
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 450,
+      easing: Easing.bezier(0.22, 1, 0.36, 1),
+      useNativeDriver: !IS_WEB,
+    }).start()
+  }, [tabKey, anim])
+  return (
+    <Animated.View
+      style={{
+        flex: 1,
+        opacity: anim,
+        transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }],
+      }}
+    >
+      {children}
+    </Animated.View>
+  )
+}
+
 function Shell() {
   const { state, hydrated } = useStore()
   const insets = useSafeAreaInsets()
@@ -104,14 +133,16 @@ function Shell() {
   return (
     <NavProvider value={nav}>
       <View className="flex-1 bg-ink-900" style={{ paddingTop: insets.top }}>
-        <ScrollView
-          key={tab}
-          className="flex-1"
-          contentContainerStyle={{ paddingBottom: insets.bottom + 112 }}
-          showsVerticalScrollIndicator={false}
-        >
-          <Screen />
-        </ScrollView>
+        <ScreenFade tabKey={tab}>
+          <ScrollView
+            key={tab}
+            className="flex-1"
+            contentContainerStyle={{ paddingBottom: insets.bottom + 112 }}
+            showsVerticalScrollIndicator={false}
+          >
+            <Screen />
+          </ScrollView>
+        </ScreenFade>
         <BottomNav active={tab} onChange={setTab} />
       </View>
 
