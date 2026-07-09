@@ -7,7 +7,7 @@ import {
   Bell, Moon, Sun, GraduationCap, Wallet, RotateCcw, Trash2, Camera, Trophy,
   Flame, Search, ScanLine, Plus, Check, Share2, ChevronRight, User, Sparkles, Dumbbell,
   Droplet, Footprints, BedDouble, Leaf, Clock, Play, Award, BellRing, Crown,
-  HeartPulse, Activity, Zap, Minus, X,
+  HeartPulse, Activity, Zap, Minus, X, LogOut,
 } from 'lucide-react-native'
 import { Sheet, EmptyState } from '../components/Sheet'
 import { AppModal, DEVICE, IS_WEB } from '../components/WebFrame'
@@ -17,6 +17,7 @@ import { LogoMark } from '../components/Logo'
 import { Icon } from '../components/Icon'
 import { Chip } from '../components/ui'
 import { useStore } from '../store/store'
+import { useAuth } from '../auth/AuthProvider'
 import { useToast } from '../components/Toast'
 import { useNav } from '../nav'
 import { FOODS, QUICK_WORKOUTS } from '../data/catalog'
@@ -197,6 +198,7 @@ export function SettingsSheet({ open, onClose }: Props) {
 /* ===================== Menu (full-screen drawer) ================= */
 export function MenuDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { state } = useStore()
+  const { enabled: authEnabled, signOut } = useAuth()
   const nav = useNav()
   const insets = useSafeAreaInsets()
   const p = state.profile
@@ -206,6 +208,9 @@ export function MenuDrawer({ open, onClose }: { open: boolean; onClose: () => vo
   const joined = fromKey(p.createdAtKey).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
   // Close the drawer and open the target sheet.
   const go = (o: Parameters<typeof nav.open>[0]) => () => { onClose(); nav.open(o) }
+  // Close the drawer, then sign out — the auth listener swaps back to the
+  // welcome/login flow automatically once the session ends.
+  const logout = () => { onClose(); void signOut() }
 
   // Left-edge drawer: slide the panel in from the left (translateX -width -> 0),
   // matching the web app's `drawer-in`/`drawer-out` animation. Keep the modal
@@ -290,6 +295,16 @@ export function MenuDrawer({ open, onClose }: { open: boolean; onClose: () => vo
           <MenuSection title="App">
             <MenuRow icon={<User size={17} color="rgba(255,255,255,0.7)" />} title="Settings" sub="Units, theme and data" onPress={go('settings')} first />
           </MenuSection>
+
+          {authEnabled && (
+            <Pressable
+              onPress={logout}
+              className="mt-5 flex-row items-center justify-center gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 p-3.5 active:opacity-80"
+            >
+              <LogOut size={18} color="#f87171" />
+              <Text className="font-semibold text-red-400">Log out</Text>
+            </Pressable>
+          )}
         </ScrollView>
       </Animated.View>
     </AppModal>

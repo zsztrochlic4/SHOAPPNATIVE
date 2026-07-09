@@ -39,18 +39,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!firebaseEnabled || !auth) return
-    let settled = false
-    const done = (u: User | null) => {
-      if (settled) return
-      settled = true
-      setUser(u)
+    // End the initial loading spinner exactly once — either when Firebase first
+    // reports auth state, or via the fallback timeout below. This must NOT gate
+    // setUser: the listener has to keep firing for every later sign-in, sign-up
+    // and sign-out so the app reacts immediately (e.g. account creation logs the
+    // user straight in instead of bouncing them back to the login screen).
+    let loaded = false
+    const finishLoading = () => {
+      if (loaded) return
+      loaded = true
       setLoading(false)
     }
-    const unsub = onAuthStateChanged(auth, done)
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUser(u)
+      finishLoading()
+    })
     // If the auth backend is unreachable (sandboxed preview, blocked network),
     // onAuthStateChanged may never fire — fall through to the app after 3s so
     // the user isn't stuck on a blank loading screen.
-    const timeout = setTimeout(() => done(null), 3000)
+    const timeout = setTimeout(finishLoading, 3000)
     return () => {
       clearTimeout(timeout)
       unsub()
