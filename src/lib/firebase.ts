@@ -43,7 +43,14 @@ const config = {
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || '1:739154408800:web:f8941b454d550c3eed9a05',
 }
 
-export const firebaseEnabled = Boolean(config.apiKey && config.projectId && config.appId)
+/**
+ * Local demo mode: set `EXPO_PUBLIC_DEMO_MODE=1` (e.g. in `.env.local`) to run
+ * the app entirely on the built-in seed with no sign-in wall and no cloud sync —
+ * handy for previewing screens with demo data. Never set in production.
+ */
+const demoMode = process.env.EXPO_PUBLIC_DEMO_MODE === '1'
+
+export const firebaseEnabled = !demoMode && Boolean(config.apiKey && config.projectId && config.appId)
 
 /** Last 6 chars of the API key actually in use (temp diagnostic aid). */
 export const apiKeySuffix = config.apiKey.slice(-6)
