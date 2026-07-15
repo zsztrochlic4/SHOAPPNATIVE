@@ -1,7 +1,7 @@
 import { useMemo, useState, useRef, useEffect, type ReactNode } from 'react'
 import {
   View, Text, Pressable, ScrollView, TextInput, Image,
-  KeyboardAvoidingView, Platform, Share,
+  KeyboardAvoidingView, Platform, Share, Animated, Easing,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -269,9 +269,7 @@ function CoachTab() {
                 <View className="mt-2.5 flex-row items-end justify-start gap-1.5">
                   <View className="self-end"><CoachAvatar size={24} /></View>
                   <View className="flex-row items-center gap-1 rounded-[20px] rounded-bl-md bg-ink-700 px-4 py-3.5">
-                    <View className="h-1.5 w-1.5 rounded-full bg-white/40" />
-                    <View className="h-1.5 w-1.5 rounded-full bg-white/40" />
-                    <View className="h-1.5 w-1.5 rounded-full bg-white/40" />
+                    <TypingDots />
                   </View>
                 </View>
               )}
@@ -841,17 +839,25 @@ function WaterCard() {
   const h = todayHabit(state)
   const t = dailyTargets(state)
   const step = units === 'imperial' ? 8 / 33.814 : 0.25
+  const filled = pct(h.waterL, t.waterL)
+  const done = h.waterL >= t.waterL
   return (
     <View className="mt-4 rounded-2xl border border-white/5 bg-ink-800 p-4">
-      <View className="flex-row items-center gap-2">
-        <Droplet size={18} color={brand[400]} />
-        <Text className="flex-1 font-bold text-white">Water</Text>
-        <Text className="font-extrabold text-white">
-          {fmtFluid(h.waterL, units)} <Text className="text-[12px] font-medium text-white/40">/ {fmtFluid(t.waterL, units)}</Text>
-        </Text>
-      </View>
-      <View className="mt-3 h-2 w-full overflow-hidden rounded-full bg-white/8">
-        <View className="h-full rounded-full bg-brand-400" style={{ width: `${pct(h.waterL, t.waterL)}%` }} />
+      <View className="flex-row items-center gap-4">
+        {/* Ring visual instead of a flat bar — glanceable progress at a glance. */}
+        <ProgressRing value={filled} size={72} stroke={7} color={brand[400]}>
+          <Droplet size={20} color={brand[400]} fill={done ? brand[400] : 'none'} />
+        </ProgressRing>
+        <View className="min-w-0 flex-1">
+          <Text className="font-bold text-white">Water</Text>
+          <Text className="mt-0.5">
+            <Text className="text-[22px] font-extrabold text-white">{fmtFluid(h.waterL, units)}</Text>
+            <Text className="text-[13px] font-medium text-white/40"> / {fmtFluid(t.waterL, units)}</Text>
+          </Text>
+          <Text className="mt-0.5 text-[12px] font-semibold" style={{ color: done ? brand[400] : 'rgba(255,255,255,0.4)' }}>
+            {done ? 'Goal hit — nice.' : `${Math.round(filled)}% of today's goal`}
+          </Text>
+        </View>
       </View>
       <View className="mt-3 flex-row gap-2">
         <Pressable onPress={() => dispatch({ type: 'ADJUST_WATER', deltaL: -step })} className="flex-1 items-center rounded-xl bg-ink-700 py-2.5 active:opacity-80">
@@ -1083,4 +1089,39 @@ function MyMealsTab() {
 
 function SectionLabel({ children }: { children: ReactNode }) {
   return <Text className="mb-2.5 text-[12px] font-bold uppercase tracking-[0.14em] text-white/40">{children}</Text>
+}
+
+/* Three dots that rise in sequence — the small "someone's replying" cue that
+ * makes the coach feel present rather than canned. */
+function TypingDots() {
+  const dots = [useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current]
+  useEffect(() => {
+    const loops = dots.map((d, i) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(i * 160),
+          Animated.timing(d, { toValue: 1, duration: 320, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+          Animated.timing(d, { toValue: 0, duration: 320, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+          Animated.delay((2 - i) * 160),
+        ]),
+      ),
+    )
+    loops.forEach((l) => l.start())
+    return () => loops.forEach((l) => l.stop())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  return (
+    <>
+      {dots.map((d, i) => (
+        <Animated.View
+          key={i}
+          style={{
+            width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.55)',
+            opacity: d.interpolate({ inputRange: [0, 1], outputRange: [0.35, 1] }),
+            transform: [{ translateY: d.interpolate({ inputRange: [0, 1], outputRange: [0, -3] }) }],
+          }}
+        />
+      ))}
+    </>
+  )
 }

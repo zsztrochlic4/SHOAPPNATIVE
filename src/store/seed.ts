@@ -59,8 +59,8 @@ const PROG_IMAGE: Record<string, string> = {
   'p-lower': img.legDay,
 }
 
-function buildSession(rng: () => number, i: number, completed: boolean): WorkoutSession | null {
-  const progId = rotationFor(i)
+function buildSession(rng: () => number, i: number, completed: boolean, forceProgId?: string): WorkoutSession | null {
+  const progId = forceProgId ?? rotationFor(i)
   const prog = PROGRAM.find((p) => p.id === progId)
   if (!prog || prog.rest) return null
 
@@ -274,8 +274,10 @@ export function buildSeed(): AppState {
     const s = buildSession(rng, i, true)
     if (s) sessions.push(s)
   }
-  // today's session, partial (first 3 exercises done) so "Today's Progress" is live
-  const todaySession = buildSession(rng, DAYS - 1, false)
+  // today's session, partial (first 3 exercises done) so "Today's Progress" is live.
+  // If today's rotation lands on a rest day, force a Push day so the demo always
+  // has a workout to open (used for previewing the active-workout flow).
+  const todaySession = buildSession(rng, DAYS - 1, false) ?? buildSession(rng, DAYS - 1, false, 'p-push')
   if (todaySession) {
     todaySession.id = 's-today'
     todaySession.dateKey = todayKey
@@ -313,7 +315,7 @@ export function buildSeed(): AppState {
 
   /* -------- challenges (belonging scoped) -------- */
   const challenges: Challenge[] = [
-    { id: 'c-strength', title: '10 Week Strength Challenge', weeks: 10, totalWeeks: 10, currentWeek: 3, participants: 342, joined: true, progressPct: 30, rank: 14, scope: 'campus' },
+    { id: 'c-strength', title: '10 Week Strength Challenge', weeks: 10, totalWeeks: 10, currentWeek: 3, participants: 342, joined: true, progressPct: 30, rank: 14, rankDelta: 2, scope: 'campus' },
     { id: 'c-dorm', title: 'Hall Wars: Weekly Sessions', weeks: 2, totalWeeks: 2, currentWeek: 1, participants: 210, joined: true, progressPct: 58, scope: 'dorm', vsLabel: 'West Hall vs East Hall', yourSide: 'West Hall', yourSidePct: 58, rivalSide: 'East Hall', rivalSidePct: 42 },
     { id: 'c-society', title: 'Lifting Society Volume Cup', weeks: 4, totalWeeks: 4, currentWeek: 2, participants: 64, joined: false, progressPct: 0, scope: 'society', vsLabel: 'Lifting Society vs Run Club', yourSide: 'Lifting Society', yourSidePct: 51, rivalSide: 'Run Club', rivalSidePct: 49 },
     { id: 'c-steps', title: '30 Day Step Streak', weeks: 30, totalWeeks: 30, currentWeek: 0, participants: 218, joined: false, progressPct: 0, scope: 'global' },
@@ -373,7 +375,7 @@ export function buildSeed(): AppState {
 
   return {
     profile,
-    settings: { units: 'metric', theme: 'dark', notificationsEnabled: true, language: 'en', connections: {} },
+    settings: { units: 'metric', theme: 'dark', notificationsEnabled: true, soundEnabled: true, language: 'en', connections: {} },
     weights,
     habits,
     meals,

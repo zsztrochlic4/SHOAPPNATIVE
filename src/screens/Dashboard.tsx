@@ -1,6 +1,6 @@
-import { useState, type ReactNode } from 'react'
-import { View, Text, Pressable, Image } from 'react-native'
-import { Menu, MessageCircle, Clock, Play, GraduationCap, ChevronRight, Leaf, Check, Flame } from 'lucide-react-native'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { View, Text, Pressable, Image, Animated, Easing } from 'react-native'
+import { Menu, MessageCircle, Clock, Play, GraduationCap, ChevronRight, Leaf, Check, Flame, ChevronDown, Info } from 'lucide-react-native'
 import { Icon } from '../components/Icon'
 import { ActivityIcon } from '../components/ActivityIcon'
 import { Card, ProgressRing } from '../components/ui'
@@ -60,9 +60,18 @@ export default function Dashboard() {
   const foodReview = foodReviewForDay(state)
   const idx = weeklyIndex(state)
   const weightLoggedToday = state.weights.some((x) => x.dateKey === todayKey)
+  // The streak is "at risk" until the user logs something today — the nudge that
+  // drives the daily loop (Duolingo's whole retention engine).
+  const loggedSomethingToday =
+    workoutStartedForDay(state, todayKey) || habit.steps > 0 || habit.waterL > 0 || habit.sleepH > 0 || weightLoggedToday
+  const streakAtRisk = streak.current > 0 && !loggedSomethingToday
 
   const greeting = greetingFor(TODAY.getHours())
   const weekKeys = currentWeekKeys()
+
+  // Tap the readiness gauge to reveal what's driving the number (Whoop/Oura's
+  // whole value is the "why", not the score).
+  const [showWhy, setShowWhy] = useState(false)
 
   // The week strip selects which day's data fills the progress section below.
   const [selDate, setSelDate] = useState(todayKey)
@@ -123,32 +132,71 @@ export default function Dashboard() {
           <Text className="text-[20px] font-extrabold tracking-tight text-white">{greeting}, {state.profile.name}</Text>
           <Text className="mt-0.5 text-[13px] text-white/45">{longDate(todayKey)}</Text>
         </View>
-        {streak.current > 0 && (
-          <View className="flex-row shrink-0 items-center gap-1.5 rounded-full bg-accent-orange/12 px-3 py-1.5">
-            <Flame size={15} color={accent.orange} />
-            <Text className="text-[13px] font-bold text-accent-orange">{streak.current} day{streak.current === 1 ? '' : 's'}</Text>
-          </View>
-        )}
+        {streak.current > 0 && <StreakChip days={streak.current} atRisk={streakAtRisk} onPress={() => nav.open('logHabit')} />}
       </View>
 
-      <View className="mt-2"><IndexGauge index={idx} /></View>
-      <Text className="mt-2 text-center text-[13px] leading-snug text-white/55">{idx.blurb}</Text>
+      {/* Keep-the-streak nudge — only when today isn't logged yet. */}
+      {streakAtRisk && (
+        <Pressable onPress={() => nav.open('logHabit')} className="mt-3 flex-row items-center gap-2 rounded-2xl border border-accent-orange/25 bg-accent-orange/10 px-3.5 py-2.5 active:opacity-80">
+          <Flame size={16} color={accent.orange} />
+          <Text className="flex-1 text-[13px] font-semibold text-white/80">Log anything today to keep your {streak.current}-day streak alive.</Text>
+          <ChevronRight size={16} color={accent.orange} />
+        </Pressable>
+      )}
 
-      {/* What's driving the needle, colour-coded by area */}
+      <Pressable onPress={() => setShowWhy((v) => !v)} accessibilityRole="button" accessibilityLabel="Explain your readiness score" className="active:opacity-90">
+        <View className="mt-2"><IndexGauge index={idx} /></View>
+        <Text className="mt-2 text-center text-[13px] leading-snug text-white/55">{idx.blurb}</Text>
+        <View className="mt-1.5 flex-row items-center justify-center gap-1">
+          <Info size={12} color="rgba(148,148,148,0.7)" />
+          <Text className="text-[12px] font-semibold text-white/45">{showWhy ? 'Hide the breakdown' : 'What moves this score?'}</Text>
+          <ChevronDown size={13} color="rgba(148,148,148,0.7)" style={{ transform: [{ rotate: showWhy ? '180deg' : '0deg' }] }} />
+        </View>
+      </Pressable>
+
+      {/* What's driving the needle, colour-coded by area. Values show under each
+       *  bar so the row isn't just abstract colour; tap the gauge for the why. */}
       <View className="mt-4 flex-row justify-between gap-2">
         {idx.parts.map((p) => {
           const good = p.pct >= 85, mid = p.pct >= 55
           const bar = good ? colors.brand400 : mid ? colors.accentOrange : colors.danger
           return (
-            <View key={p.label} className="flex-1 items-center gap-1.5">
+            <View key={p.label} className="flex-1 items-center gap-1">
               <View className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
                 <View className="h-full rounded-full" style={{ width: `${Math.min(100, p.pct)}%`, backgroundColor: bar }} />
               </View>
               <Text className="text-[10px] font-semibold" style={{ color: bar }}>{p.label}</Text>
+              <Text className="text-[10px] font-bold text-white/70">{p.pct}%</Text>
             </View>
           )
         })}
       </View>
+
+      {/* Expanded explainer — how the score is built, per habit. */}
+      {showWhy && (
+        <Card className="mt-3 p-4">
+          <Text className="text-[13px] font-bold text-white">How your readiness works</Text>
+          <Text className="mt-1 text-[12px] leading-snug text-white/55">
+            It blends your last 7 days across five habits versus your targets. <Text className="font-semibold text-white/75">50 means on track</Text> — higher means you're beating your goals. Hit your targets and each bar fills toward 100%.
+          </Text>
+          <View className="mt-3 gap-2.5">
+            {idx.parts.map((p) => {
+              const good = p.pct >= 85, mid = p.pct >= 55
+              const bar = good ? colors.brand400 : mid ? colors.accentOrange : colors.danger
+              const note = good ? 'On target' : mid ? 'A little under' : 'Needs attention'
+              return (
+                <View key={p.label} className="flex-row items-center gap-3">
+                  <Text className="w-20 text-[12px] font-semibold text-white/70">{p.label}</Text>
+                  <View className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
+                    <View className="h-full rounded-full" style={{ width: `${Math.min(100, p.pct)}%`, backgroundColor: bar }} />
+                  </View>
+                  <Text className="w-24 text-right text-[11px] font-semibold" style={{ color: bar }}>{p.pct}% · {note}</Text>
+                </View>
+              )
+            })}
+          </View>
+        </Card>
+      )}
 
       {/* Week strip: tap a day to load its progress below */}
       <View className="mt-5 flex-row justify-between">
@@ -162,8 +210,13 @@ export default function Dashboard() {
           return (
             <Pressable key={k} disabled={future} onPress={() => setSelDate(k)} className={`w-10 items-center gap-1.5 rounded-xl py-1.5 ${future ? 'opacity-30' : 'active:opacity-70'}`}>
               <Text className={`text-[10px] font-semibold uppercase tracking-wide ${today ? 'text-brand-400' : 'text-white/35'}`}>{WD[i]}</Text>
-              <View className={`h-7 w-7 items-center justify-center rounded-full ${selected ? 'bg-brand-400' : today ? 'border border-brand-400/50' : ''}`}>
-                <Text className={`text-[15px] font-bold ${selected ? 'text-black' : today ? 'text-brand-400' : 'text-white/75'}`}>{date}</Text>
+              {/* "Today" is always a ring; the *selected* day is always a fill —
+               *  so when today is selected you see a filled disc inside its ring
+               *  and the two states never read as the same thing. */}
+              <View className={`h-8 w-8 items-center justify-center rounded-full ${today ? 'border-2 border-brand-400' : 'border-2 border-transparent'}`}>
+                <View className={`h-6 w-6 items-center justify-center rounded-full ${selected ? 'bg-brand-400' : ''}`}>
+                  <Text className={`text-[14px] font-bold ${selected ? 'text-black' : today ? 'text-brand-400' : 'text-white/75'}`}>{date}</Text>
+                </View>
               </View>
               <View className={`h-1.5 w-1.5 rounded-full ${trained ? 'bg-brand-400' : logged ? 'bg-white/30' : future ? 'bg-transparent' : 'bg-white/10'}`} />
             </Pressable>
@@ -330,6 +383,33 @@ export default function Dashboard() {
       </View>
       <View className="h-2" />
     </View>
+  )
+}
+
+/* Streak chip with a gently flickering flame — the core-loop badge, so it should
+ * feel alive rather than static. Pressable to jump straight to logging. */
+function StreakChip({ days, atRisk, onPress }: { days: number; atRisk: boolean; onPress: () => void }) {
+  const flicker = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(flicker, { toValue: 1, duration: 620, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(flicker, { toValue: 0, duration: 720, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      ]),
+    )
+    loop.start()
+    return () => loop.stop()
+  }, [flicker])
+  const scale = flicker.interpolate({ inputRange: [0, 1], outputRange: [1, 1.16] })
+  const opacity = flicker.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1] })
+  return (
+    <Pressable onPress={onPress} accessibilityLabel={`${days} day streak`} className="shrink-0 flex-row items-center gap-1.5 rounded-full bg-accent-orange/12 px-3 py-1.5 active:opacity-80">
+      <Animated.View style={{ transform: [{ scale }], opacity }}>
+        <Flame size={15} color={accent.orange} />
+      </Animated.View>
+      <Text className="text-[13px] font-bold text-accent-orange">{days} day{days === 1 ? '' : 's'}</Text>
+      {atRisk && <View className="h-1.5 w-1.5 rounded-full bg-accent-orange" />}
+    </Pressable>
   )
 }
 

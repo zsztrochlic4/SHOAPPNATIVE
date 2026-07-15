@@ -3,6 +3,7 @@ import { Animated, View, Text } from 'react-native'
 import Svg, { Path, G, Polygon, Circle, Defs, LinearGradient, Stop } from 'react-native-svg'
 import type { WeeklyIndex } from '../store/selectors'
 import { useColors } from '../theme'
+import { useCountUp } from '../lib/useCountUp'
 
 const AnimatedG = Animated.createAnimatedComponent(G)
 
@@ -14,6 +15,8 @@ const AnimatedG = Animated.createAnimatedComponent(G)
  */
 export function IndexGauge({ index }: { index: WeeklyIndex }) {
   const colors = useColors()
+  // Count the score up as the needle swings, so the number feels earned.
+  const scoreText = useCountUp(index.score, { duration: 950 })
   const W = 220, H = 116
   const cx = W / 2, cy = 104, r = 90, stroke = 13
 
@@ -81,7 +84,7 @@ export function IndexGauge({ index }: { index: WeeklyIndex }) {
 
       <Text className="mt-1.5 text-[18px] font-black tracking-tight" style={{ color }}>{index.label}</Text>
       <Text className="text-[12px] text-white/45">
-        <Text className="font-bold" style={{ color }}>{index.score}</Text>/100 · last 7 days
+        <Text className="font-bold" style={{ color }}>{scoreText}</Text>/100 · last 7 days
       </Text>
     </View>
   )

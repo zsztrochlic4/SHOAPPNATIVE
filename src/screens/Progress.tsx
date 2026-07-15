@@ -108,7 +108,7 @@ export default function Progress() {
         </View>
 
         {cd.points.length >= 2 ? (
-          <MetricChart points={cd.points} domain={cd.domain} grid={colors.grid} tick={colors.tick} />
+          <MetricChart points={cd.points} domain={cd.domain} unit={cd.unit} grid={colors.grid} tick={colors.tick} />
         ) : (
           <View className="h-40 w-full items-center justify-center">
             <Text className="text-sm font-semibold text-white/55">Not enough data yet</Text>
@@ -293,10 +293,11 @@ export default function Progress() {
 /*  (replaces the Recharts <AreaChart>)                                */
 /* ------------------------------------------------------------------ */
 function MetricChart({
-  points, domain, grid, tick,
+  points, domain, unit, grid, tick,
 }: {
   points: { date: string; value: number }[]
   domain?: [number, number]
+  unit: string
   grid: string
   tick: string
 }) {
@@ -304,6 +305,8 @@ function MetricChart({
   // surface. `useWindowDimensions` returns the browser window in the web
   // preview (not the phone frame), which overflowed and clipped the chart.
   const [W, setW] = useState(0)
+  // Tap a point to lock a read-out of its exact value + date.
+  const [sel, setSel] = useState<number | null>(null)
   const H = 160 // h-40
   if (W <= 0) return <View className="h-40 w-full" onLayout={(e) => setW(e.nativeEvent.layout.width)} />
 
@@ -328,6 +331,15 @@ function MetricChart({
   const fmtTick = (v: number) => (v >= 1000 ? `${Math.round(v / 1000)}k` : `${Math.round(v * 10) / 10}`)
   const yTicks = Array.from({ length: 5 }, (_, i) => yMin + (span * i) / 4)
 
+  // Compare to last period: split the window in half and draw the earlier
+  // half's average as a reference line, so "up vs last period" is visible, not
+  // just implied by the trend.
+  const half = Math.floor(n / 2)
+  const mean = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0)
+  const prevAvg = n >= 4 ? mean(vals.slice(0, half)) : null
+  const currAvg = n >= 4 ? mean(vals.slice(half)) : null
+  const periodDelta = prevAvg != null && currAvg != null ? currAvg - prevAvg : 0
+
   // Line + area paths
   const linePts = points.map((c, i) => `${xFor(i)},${yFor(c.value)}`)
   const linePath = linePts.length ? `M ${linePts.join(' L ')}` : ''
@@ -337,6 +349,15 @@ function MetricChart({
 
   // X tick labels — first & last (preserveStartEnd) plus a middle one.
   const xLabelIdx = n <= 1 ? [0] : n === 2 ? [0, 1] : [0, Math.floor((n - 1) / 2), n - 1]
+
+  const fmtVal = (v: number) => (v >= 1000 ? v.toLocaleString() : `${Math.round(v * 10) / 10}`)
+
+  // Tooltip geometry (clamped inside the plot).
+  const tipW = 88
+  const tipH = 30
+  const selX = sel != null ? xFor(sel) : 0
+  const tipX = Math.max(ML, Math.min(ML + plotW - tipW, selX - tipW / 2))
+  const tipY = MT + 2
 
   return (
     <View className="h-40 w-full">
@@ -352,14 +373,32 @@ function MetricChart({
           )
         })}
 
+        {/* previous-period reference line */}
+        {prevAvg != null && (
+          <G>
+            <Line x1={ML} y1={yFor(prevAvg)} x2={ML + plotW} y2={yFor(prevAvg)} stroke={tick} strokeWidth={1} strokeDasharray="2 4" opacity={0.6} />
+            <SvgText x={ML + plotW} y={yFor(prevAvg) - 4} fill={tick} fontSize={10} textAnchor="end">prev period</SvgText>
+          </G>
+        )}
+
         {/* area fill */}
         {areaPath ? <Path d={areaPath} fill={brand[400]} fillOpacity={0.18} /> : null}
         {/* line */}
         {linePath ? <Path d={linePath} fill="none" stroke={brand[400]} strokeWidth={3} strokeLinejoin="round" strokeLinecap="round" /> : null}
         {/* dots */}
         {points.map((c, i) => (
-          <Circle key={`d${i}`} cx={xFor(i)} cy={yFor(c.value)} r={2} fill={brand[400]} />
+          <Circle key={`d${i}`} cx={xFor(i)} cy={yFor(c.value)} r={sel === i ? 4 : 2} fill={brand[400]} />
         ))}
+
+        {/* selected point: guide line + read-out bubble */}
+        {sel != null && (
+          <G>
+            <Line x1={selX} y1={MT} x2={selX} y2={MT + plotH} stroke={brand[400]} strokeWidth={1} strokeDasharray="3 3" opacity={0.5} />
+            <Rect x={tipX} y={tipY} width={tipW} height={tipH} rx={7} fill="#000" opacity={0.82} />
+            <SvgText x={tipX + tipW / 2} y={tipY + 12} fill="#fff" fontSize={12} fontWeight="bold" textAnchor="middle">{fmtVal(points[sel].value)} {unit}</SvgText>
+            <SvgText x={tipX + tipW / 2} y={tipY + 24} fill="rgba(255,255,255,0.6)" fontSize={10} textAnchor="middle">{points[sel].date}</SvgText>
+          </G>
+        )}
 
         {/* X tick labels */}
         {xLabelIdx.map((i) => (
@@ -375,6 +414,22 @@ function MetricChart({
           </SvgText>
         ))}
       </Svg>
+
+      {/* Transparent hit targets over each point — tap to read its value. */}
+      <View style={{ position: 'absolute', left: ML, top: MT, width: plotW, height: plotH, flexDirection: 'row' }}>
+        {points.map((_, i) => (
+          <Pressable key={i} style={{ flex: 1 }} onPress={() => setSel((s) => (s === i ? null : i))} />
+        ))}
+      </View>
+
+      {/* Compare-to-last-period delta chip (hidden while inspecting a point). */}
+      {sel == null && prevAvg != null && Math.abs(periodDelta) >= 0.05 && (
+        <View className="absolute left-10 top-0 flex-row items-center rounded-full bg-ink-700/90 px-2 py-0.5">
+          <Text className="text-[10px] font-bold" style={{ color: periodDelta >= 0 ? brand[400] : 'rgba(255,255,255,0.55)' }}>
+            {periodDelta >= 0 ? '▲' : '▼'} {fmtVal(Math.abs(periodDelta))} {unit} vs last period
+          </Text>
+        </View>
+      )}
     </View>
   )
 }

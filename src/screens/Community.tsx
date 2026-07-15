@@ -1,8 +1,8 @@
-import { useState } from 'react'
-import { View, Text, Pressable, Image, ScrollView } from 'react-native'
+import { useRef, useState, type ReactNode } from 'react'
+import { View, Text, Pressable, Image, ScrollView, Animated, Easing } from 'react-native'
 import {
   Users, Heart, MessageCircle, Bookmark, ChevronRight, MoreHorizontal, CalendarClock,
-  HeartHandshake, Award, UserPlus, Swords,
+  HeartHandshake, Award, UserPlus, Swords, TrendingUp,
 } from 'lucide-react-native'
 import { Icon } from '../components/Icon'
 import { Avatar, AvatarStack } from '../components/Avatar'
@@ -143,14 +143,18 @@ function FeedCard({ post: p, onLike, onKudos, onBookmark, onComment }: { post: P
         </View>
       )}
       <View className="flex-row items-center gap-3 p-3">
-        <Pressable onPress={onLike} className="flex-row items-center gap-1.5 active:opacity-70">
-          <Heart size={17} color={p.liked ? brand[400] : 'rgba(255,255,255,0.55)'} fill={p.liked ? brand[400] : 'none'} />
-          <Text className={`text-sm ${p.liked ? 'text-brand-400' : 'text-white/55'}`}>{p.likes}</Text>
-        </Pressable>
-        <Pressable onPress={onKudos} className="flex-row items-center gap-1.5 active:opacity-70">
-          <HeartHandshake size={17} color={p.gaveKudos ? brand[400] : 'rgba(255,255,255,0.55)'} />
-          <Text className={`text-sm ${p.gaveKudos ? 'text-brand-400' : 'text-white/55'}`}>{p.kudos ?? 0}</Text>
-        </Pressable>
+        <ReactionButton
+          active={p.liked}
+          count={p.likes}
+          onPress={onLike}
+          renderIcon={(active) => <Heart size={17} color={active ? brand[400] : 'rgba(255,255,255,0.55)'} fill={active ? brand[400] : 'none'} />}
+        />
+        <ReactionButton
+          active={!!p.gaveKudos}
+          count={p.kudos ?? 0}
+          onPress={onKudos}
+          renderIcon={(active) => <HeartHandshake size={17} color={active ? brand[400] : 'rgba(255,255,255,0.55)'} fill={active ? brand[400] : 'none'} />}
+        />
         <Pressable onPress={onComment} className="flex-row items-center gap-1.5 active:opacity-70">
           <MessageCircle size={17} color="rgba(255,255,255,0.55)" />
           <Text className="text-sm text-white/55">{p.comments}</Text>
@@ -160,6 +164,59 @@ function FeedCard({ post: p, onLike, onKudos, onBookmark, onComment }: { post: P
         </Pressable>
       </View>
     </View>
+  )
+}
+
+/* A like/kudos button with an optimistic heart-burst. The tap registers
+ * instantly (the reducer already toggled state) and a little pop of particles
+ * confirms it — the Instagram/Strava touch that signals quality. */
+function ReactionButton({ active, count, onPress, renderIcon }: {
+  active: boolean
+  count: number
+  onPress: () => void
+  renderIcon: (active: boolean) => ReactNode
+}) {
+  const pop = useRef(new Animated.Value(1)).current
+  const burst = useRef(new Animated.Value(0)).current
+  const PARTICLES = 6
+
+  function press() {
+    const activating = !active
+    onPress()
+    pop.stopAnimation()
+    pop.setValue(activating ? 0.5 : 0.82)
+    Animated.spring(pop, { toValue: 1, useNativeDriver: true, speed: 14, bounciness: activating ? 18 : 6 }).start()
+    if (activating) {
+      burst.setValue(0)
+      Animated.timing(burst, { toValue: 1, duration: 520, easing: Easing.out(Easing.quad), useNativeDriver: true }).start()
+    }
+  }
+
+  return (
+    <Pressable onPress={press} hitSlop={6} className="flex-row items-center gap-1.5 active:opacity-70">
+      <View style={{ width: 17, height: 17, alignItems: 'center', justifyContent: 'center' }}>
+        {Array.from({ length: PARTICLES }).map((_, i) => {
+          const angle = (i / PARTICLES) * Math.PI * 2
+          return (
+            <Animated.View
+              key={i}
+              pointerEvents="none"
+              style={{
+                position: 'absolute', width: 4, height: 4, borderRadius: 2, backgroundColor: brand[400],
+                opacity: burst.interpolate({ inputRange: [0, 0.7, 1], outputRange: [0.9, 0.9, 0] }),
+                transform: [
+                  { translateX: burst.interpolate({ inputRange: [0, 1], outputRange: [0, Math.cos(angle) * 15] }) },
+                  { translateY: burst.interpolate({ inputRange: [0, 1], outputRange: [0, Math.sin(angle) * 15] }) },
+                  { scale: burst.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 1, 0] }) },
+                ],
+              }}
+            />
+          )
+        })}
+        <Animated.View style={{ transform: [{ scale: pop }] }}>{renderIcon(active)}</Animated.View>
+      </View>
+      <Text className={`text-sm ${active ? 'text-brand-400' : 'text-white/55'}`}>{count}</Text>
+    </Pressable>
   )
 }
 
@@ -183,6 +240,14 @@ function ChallengeCard({ c, onJoin }: { c: Challenge; onJoin: () => void }) {
           <View className="items-end">
             <Text className="text-[11px] text-white/45">Your rank</Text>
             <Text className="text-lg font-extrabold text-brand-400">#{c.rank}</Text>
+            {c.rankDelta != null && c.rankDelta !== 0 && (
+              <View className="mt-0.5 flex-row items-center gap-0.5">
+                <TrendingUp size={11} color={c.rankDelta > 0 ? brand[400] : 'rgba(255,255,255,0.4)'} style={c.rankDelta > 0 ? undefined : { transform: [{ scaleY: -1 }] }} />
+                <Text className="text-[11px] font-bold" style={{ color: c.rankDelta > 0 ? brand[400] : 'rgba(255,255,255,0.4)' }}>
+                  {c.rankDelta > 0 ? `+${c.rankDelta}` : c.rankDelta} this week
+                </Text>
+              </View>
+            )}
           </View>
         )}
       </View>

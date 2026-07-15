@@ -7,7 +7,7 @@ import {
   Bell, Moon, Sun, GraduationCap, Wallet, RotateCcw, Trash2, Camera, Trophy,
   Flame, Search, ScanLine, Plus, Check, Share2, ChevronRight, User, Sparkles, Dumbbell,
   Droplet, Footprints, BedDouble, Leaf, Clock, Play, Award, BellRing, Crown,
-  HeartPulse, Activity, Zap, Minus, X, LogOut,
+  HeartPulse, Activity, Zap, Minus, X, LogOut, Volume2,
 } from 'lucide-react-native'
 import { Sheet, EmptyState } from '../components/Sheet'
 import { AppModal, DEVICE, IS_WEB, WEB_SCREEN } from '../components/WebFrame'
@@ -89,17 +89,26 @@ export function SettingsSheet({ open, onClose }: Props) {
   const { state, dispatch } = useStore()
   const toast = useToast()
   const { units, theme, notificationsEnabled } = state.settings
+  const soundEnabled = state.settings.soundEnabled ?? true
   const lang = state.settings.language ?? 'en'
   const t = translator(lang)
   // Two-step inline confirm for the destructive wipe — works on web and native
   // (RN's Alert is a no-op on react-native-web, so a dialog would never show).
   const [confirmingClear, setConfirmingClear] = useState(false)
-  useEffect(() => { if (!open) setConfirmingClear(false) }, [open])
+  const [langOpen, setLangOpen] = useState(false)
+  useEffect(() => { if (!open) { setConfirmingClear(false); setLangOpen(false) } }, [open])
+  const currentLang = LANGUAGES.find((l) => l.code === lang) ?? LANGUAGES[0]
 
   function toggleNotifs() {
     const next = !notificationsEnabled
     dispatch({ type: 'SET_SETTINGS', patch: { notificationsEnabled: next } })
     toast(next ? t('toast.notifsOn') : t('toast.notifsOff'))
+  }
+
+  function toggleSound() {
+    const next = !soundEnabled
+    dispatch({ type: 'SET_SETTINGS', patch: { soundEnabled: next } })
+    toast(next ? t('toast.soundOn') : t('toast.soundOff'))
   }
 
   function setLang(code: Language) {
@@ -110,25 +119,39 @@ export function SettingsSheet({ open, onClose }: Props) {
   return (
     <Sheet open={open} onClose={onClose} title={t('settings.title')}>
       <Group label={t('settings.language')}>
-        <View className="flex-row flex-wrap gap-2">
-          {LANGUAGES.map((l) => {
-            const active = l.code === lang
-            return (
-              <Pressable
-                key={l.code}
-                onPress={() => setLang(l.code)}
-                className={`flex-row items-center justify-between rounded-2xl border p-3 active:opacity-90 ${active ? 'border-brand-400 bg-brand-400/10' : 'border-white/8 bg-ink-800'}`}
-                style={{ width: '48%' }}
-              >
-                <View className="min-w-0 flex-1">
-                  <Text numberOfLines={1} className="font-bold leading-tight text-white" style={l.rtl ? { writingDirection: 'rtl' } : undefined}>{l.native}</Text>
-                  <Text className="text-[11px] text-white/45">{l.english}</Text>
-                </View>
-                {active && <Check size={16} strokeWidth={3} color={brand[400]} />}
-              </Pressable>
-            )
-          })}
-        </View>
+        {/* Collapsed disclosure row (iOS Settings pattern) — opens the full
+         *  picker on tap instead of a long always-open grid. */}
+        <Pressable
+          onPress={() => setLangOpen((v) => !v)}
+          className="w-full flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-4 active:opacity-90"
+        >
+          <View className="min-w-0 flex-1">
+            <Text numberOfLines={1} className="font-bold leading-tight text-white" style={currentLang.rtl ? { writingDirection: 'rtl' } : undefined}>{currentLang.native}</Text>
+            <Text className="text-[12px] text-white/45">{currentLang.english}</Text>
+          </View>
+          <ChevronRight size={18} color="rgba(255,255,255,0.4)" style={{ transform: [{ rotate: langOpen ? '90deg' : '0deg' }] }} />
+        </Pressable>
+        {langOpen && (
+          <View className="mt-2 flex-row flex-wrap gap-2">
+            {LANGUAGES.map((l) => {
+              const active = l.code === lang
+              return (
+                <Pressable
+                  key={l.code}
+                  onPress={() => { setLang(l.code); setLangOpen(false) }}
+                  className={`flex-row items-center justify-between rounded-2xl border p-3 active:opacity-90 ${active ? 'border-brand-400 bg-brand-400/10' : 'border-white/8 bg-ink-800'}`}
+                  style={{ width: '48%' }}
+                >
+                  <View className="min-w-0 flex-1">
+                    <Text numberOfLines={1} className="font-bold leading-tight text-white" style={l.rtl ? { writingDirection: 'rtl' } : undefined}>{l.native}</Text>
+                    <Text className="text-[11px] text-white/45">{l.english}</Text>
+                  </View>
+                  {active && <Check size={16} strokeWidth={3} color={brand[400]} />}
+                </Pressable>
+              )
+            })}
+          </View>
+        )}
       </Group>
 
       <Group label={t('settings.units')}>
@@ -155,6 +178,9 @@ export function SettingsSheet({ open, onClose }: Props) {
       <Group label={t('settings.preferences')}>
         <Row icon={<BellRing size={18} color={brand[400]} />} title={t('settings.pushNotifs')} sub={t('settings.pushNotifsSub')}>
           <Toggle on={notificationsEnabled} onPress={toggleNotifs} />
+        </Row>
+        <Row icon={<Volume2 size={18} color={brand[400]} />} title={t('settings.sound')} sub={t('settings.soundSub')}>
+          <Toggle on={soundEnabled} onPress={toggleSound} />
         </Row>
         <Row icon={<GraduationCap size={18} color={accent.purple} />} title={t('settings.examMode')} sub={t('settings.examModeSub')}>
           <Toggle on={state.profile.examMode} onPress={() => dispatch({ type: 'SET_PROFILE', patch: { examMode: !state.profile.examMode } })} />

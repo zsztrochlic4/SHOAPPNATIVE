@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
-import { View, Text, Pressable, Image, TextInput } from 'react-native'
-import { CalendarDays, Clock, Play, ChevronRight, Check, Leaf, Plus, Trash2, Activity, Repeat, RefreshCw } from 'lucide-react-native'
+import { View, Text, Pressable, Image, TextInput, StyleSheet } from 'react-native'
+import Svg, { Path, Circle } from 'react-native-svg'
+import { CalendarDays, Clock, Play, ChevronRight, Check, Leaf, Plus, Trash2, Activity, Repeat, RefreshCw, Dumbbell } from 'lucide-react-native'
 import { Icon } from '../components/Icon'
 import { ActivityIcon } from '../components/ActivityIcon'
 import { ProgressBar, SegmentedTabs, ScreenHeader, Chip } from '../components/ui'
@@ -229,7 +230,7 @@ function ExercisesTab() {
       <View className="flex-row flex-wrap gap-3">
         {filtered.map((e) => (
           <Pressable key={e.id} onPress={() => nav.open('exerciseDetail', { defId: e.id })} className="flex-1 basis-[47%] overflow-hidden rounded-2xl border border-white/5 bg-ink-800 active:opacity-90">
-            <Image source={{ uri: e.image }} resizeMode="cover" className="h-24 w-full" />
+            <ExerciseThumb uri={e.image} />
             <View className="p-3">
               <Text numberOfLines={1} className="text-sm font-bold text-white">{dorm && e.bodyweightAlt ? e.bodyweightAlt : e.name}</Text>
               <Text className="text-[12px] text-white/45">{e.muscle}</Text>
@@ -240,6 +241,45 @@ function ExercisesTab() {
         {filtered.length === 0 && <Text className="w-full py-8 text-center text-sm text-white/40">No exercises found.</Text>}
       </View>
     </View>
+  )
+}
+
+/* Exercise thumbnail with a consistent muscle-group fallback behind it, so a
+ * slow or failed image reads as an intentional tile, never an empty grey box. */
+function ExerciseThumb({ uri }: { uri: string }) {
+  const [failed, setFailed] = useState(false)
+  return (
+    <View className="h-24 w-full bg-ink-700">
+      <View style={StyleSheet.absoluteFill} className="items-center justify-center">
+        <Dumbbell size={26} color="rgba(126,217,87,0.35)" />
+      </View>
+      {!failed && (
+        <Image
+          source={{ uri }}
+          resizeMode="cover"
+          className="h-24 w-full"
+          onError={() => setFailed(true)}
+        />
+      )}
+    </View>
+  )
+}
+
+/* Tiny volume-trend sparkline — Strava-style glanceable context on each session
+ * row, showing where that session sits in your recent volume trend. */
+function Sparkline({ values, activeIndex, color }: { values: number[]; activeIndex: number; color: string }) {
+  const W = 56, H = 22
+  if (values.length < 2 || activeIndex < 0) return null
+  const min = Math.min(...values), max = Math.max(...values)
+  const span = max - min || 1
+  const x = (i: number) => (i / (values.length - 1)) * W
+  const y = (v: number) => H - 2 - ((v - min) / span) * (H - 4)
+  const d = values.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ')
+  return (
+    <Svg width={W} height={H}>
+      <Path d={d} fill="none" stroke={color} strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" opacity={0.55} />
+      <Circle cx={x(activeIndex)} cy={y(values[activeIndex])} r={2.6} fill={color} />
+    </Svg>
   )
 }
 
@@ -264,6 +304,11 @@ function HistoryTab() {
       setSyncing(false)
     }
   }
+  // Chronological volume series for the per-row sparkline, plus a lookup so each
+  // session row can highlight its own point in the trend.
+  const chron = completedSessions(state).slice().sort((a, b) => a.dateKey.localeCompare(b.dateKey))
+  const volSeries = chron.map((s) => s.volumeKg)
+  const volIndex = new Map(chron.map((s, i) => [s.id, i]))
   const sessions: HistoryItem[] = completedSessions(state).map((s) => ({ kind: 'session', id: s.id, dateKey: s.dateKey, name: s.name, volumeKg: s.volumeKg, durationMin: s.durationMin }))
   const acts: HistoryItem[] = (state.activities ?? []).map((a) => ({ kind: 'activity', id: a.id, dateKey: a.dateKey, name: a.name, icon: a.icon, minutes: a.minutes, calories: a.calories, weekly: a.weekly }))
   const history = [...sessions, ...acts].sort((a, b) => b.dateKey.localeCompare(a.dateKey)).slice(0, 30)
@@ -301,6 +346,9 @@ function HistoryTab() {
             </View>
             <Text className="text-[12px] text-white/45">{relativeLabel(h.dateKey)}{h.kind === 'activity' ? ' · activity' : ''}</Text>
           </View>
+          {h.kind === 'session' && volSeries.length >= 2 && (
+            <View className="mr-1 shrink-0"><Sparkline values={volSeries} activeIndex={volIndex.get(h.id) ?? -1} color={brand[400]} /></View>
+          )}
           <View className="items-end">
             {h.kind === 'session' ? (
               <>

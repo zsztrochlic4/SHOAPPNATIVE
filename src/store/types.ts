@@ -84,6 +84,8 @@ export interface Settings {
   units: Units
   theme: Theme
   notificationsEnabled: boolean
+  /** Play the rest-timer beeps/tick and the workout-complete chime. Defaults on. */
+  soundEnabled?: boolean
   /** UI language. Defaults to English when absent (older saves). */
   language?: Language
   /** Connected third-party integrations, e.g. { strava: true }. */
@@ -273,6 +275,8 @@ export interface Challenge {
   joined: boolean
   progressPct: number
   rank?: number
+  /** how many places you've moved this week (positive = climbed) */
+  rankDelta?: number
   /** belonging-scoped: who you're really competing alongside */
   scope?: CommunityScope
   /** e.g. "West Hall vs East Hall" */

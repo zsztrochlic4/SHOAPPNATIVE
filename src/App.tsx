@@ -14,6 +14,8 @@ import { IntegrationsAutoSync } from './components/Integrations'
 import { ToastProvider } from './components/Toast'
 import { NavProvider, type Overlay } from './nav'
 import { themeVars, useThemeName, brand, cssVars } from './theme'
+import { setSoundEnabled } from './lib/sound'
+import { Skeleton, SkeletonLines } from './components/Skeleton'
 import Dashboard from './screens/Dashboard'
 import Workout from './screens/Workout'
 import Nutrition from './screens/Nutrition'
@@ -111,9 +113,29 @@ function Shell() {
   }
 
   if (!hydrated) {
+    // A dashboard-shaped skeleton reads as "almost ready" rather than a lonely
+    // spinner on a blank screen.
     return (
-      <View className="flex-1 items-center justify-center bg-ink-900">
-        <ActivityIndicator color={brand[400]} size="large" />
+      <View className="flex-1 bg-ink-900 px-5" style={{ paddingTop: insets.top + 12 }}>
+        <View className="flex-row items-center justify-between">
+          <Skeleton width={40} height={40} radius={12} />
+          <Skeleton width={96} height={20} radius={6} />
+          <Skeleton width={40} height={40} radius={12} />
+        </View>
+        <View className="mt-6 items-center gap-3">
+          <Skeleton width={200} height={20} radius={6} />
+          <Skeleton width={228} height={116} radius={16} />
+          <Skeleton width={240} height={14} radius={6} />
+        </View>
+        <View className="mt-6 flex-row justify-between">
+          {Array.from({ length: 7 }).map((_, i) => (
+            <Skeleton key={i} width={30} height={54} radius={12} />
+          ))}
+        </View>
+        <View className="mt-8 gap-3">
+          <Skeleton width="100%" height={150} radius={16} />
+          <View className="mt-2"><SkeletonLines count={3} /></View>
+        </View>
       </View>
     )
   }
@@ -177,6 +199,13 @@ function Shell() {
 
 function ThemedRoot() {
   const name = useThemeName()
+  const { state } = useStore()
+
+  // Keep the (asset-free) sound engine in sync with Settings → "Sounds & cues".
+  const soundOn = state.settings.soundEnabled ?? true
+  useEffect(() => {
+    setSoundEnabled(soundOn)
+  }, [soundOn])
 
   // On web, RN-Web modals (menu, sheets, full-screen views) portal to <body>,
   // outside this themed subtree, so they wouldn't see the `vars()` applied
