@@ -384,19 +384,26 @@ function Stagger({ start = 120, step = 62, children }: { start?: number; step?: 
   return <>{children.map((c, i) => <Reveal key={i} delay={start + i * step}>{c}</Reveal>)}</>
 }
 
-/** Directional slide+fade between screens (sho-slide-fwd/back). */
+/**
+ * Directional slide+fade between screens (sho-slide-fwd/back: 26px, 380ms).
+ * Remounts per `animKey` — like the prototype's `<div key={viewKey}>` — so the
+ * incoming screen starts hidden at its offset (CSS `both` fill) instead of
+ * flashing at rest and snapping back, and so per-step state (unit toggles,
+ * scroll positions, focus) resets naturally.
+ */
 function Stage({ animKey, dir, children }: { animKey: string; dir: 'fwd' | 'back'; children: ReactNode }) {
-  const x = useRef(new Animated.Value(0)).current
-  const o = useRef(new Animated.Value(1)).current
+  return <StageInner key={animKey} dir={dir}>{children}</StageInner>
+}
+function StageInner({ dir, children }: { dir: 'fwd' | 'back'; children: ReactNode }) {
+  const x = useRef(new Animated.Value(dir === 'back' ? -26 : 26)).current
+  const o = useRef(new Animated.Value(0)).current
   useEffect(() => {
-    x.setValue(dir === 'back' ? -30 : 30)
-    o.setValue(0)
     Animated.parallel([
       Animated.timing(x, { toValue: 0, duration: 380, easing: EASE, useNativeDriver: NATIVE }),
-      Animated.timing(o, { toValue: 1, duration: 300, easing: EASE, useNativeDriver: NATIVE }),
+      Animated.timing(o, { toValue: 1, duration: 380, easing: EASE, useNativeDriver: NATIVE }),
     ]).start()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [animKey])
+  }, [])
   return <Animated.View style={{ flex: 1, opacity: o, transform: [{ translateX: x }] }}>{children}</Animated.View>
 }
 
@@ -442,7 +449,10 @@ function Spinner({ size = 60, thickness = 4 }: { size?: number; thickness?: numb
 /** Premium segmented progress + section label (ProgressHeader). */
 function ProgressHeader({ sectionIdx, sectionProgress, onBack, showBack = true }: { sectionIdx: number; sectionProgress: number; onBack: () => void; showBack?: boolean }) {
   const tok = useTok()
-  const fills = useRef(SECTIONS.map(() => new Animated.Value(0))).current
+  // The header remounts with each step (Stage keys the whole screen), so start
+  // each bar AT its current fill — mirroring CSS, which only transitions
+  // changes after mount — and animate only subsequent in-place updates.
+  const fills = useRef(SECTIONS.map((_s, i) => new Animated.Value(i < sectionIdx ? 1 : i === sectionIdx ? sectionProgress : 0))).current
   useEffect(() => {
     fills.forEach((f, i) => {
       const target = i < sectionIdx ? 1 : i === sectionIdx ? sectionProgress : 0
@@ -450,7 +460,9 @@ function ProgressHeader({ sectionIdx, sectionProgress, onBack, showBack = true }
     })
   }, [fills, sectionIdx, sectionProgress])
   return (
-    <View style={{ paddingTop: 48, paddingHorizontal: 4 }}>
+    // The app renders below a real (or frame-drawn) status bar, so the
+    // prototype's 48px status-clearing padding shrinks to a small gap.
+    <View style={{ paddingTop: 6, paddingHorizontal: 4 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 40 }}>
         <Pressable onPress={() => { if (showBack) { tick(); onBack() } }} hitSlop={8} style={{ width: 40, height: 40, marginLeft: -8, borderRadius: 999, alignItems: 'center', justifyContent: 'center', opacity: showBack ? 1 : 0 }}>
           <Icon name="back" size={22} stroke={2.4} color={tok.rgb('--fg', 0.7)} />
@@ -487,6 +499,8 @@ function ActionBar({ onPress, disabled, label = 'Continue', onSkip, skipLabel = 
   const scale = useRef(new Animated.Value(1)).current
   return (
     <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 26 }}>
+      {/* prototype scrim: linear-gradient(to top, ink-900 62%, transparent) */}
+      <LinearGradient pointerEvents="none" colors={[tok.rgb('--ink-900', 0), tok.rgb('--ink-900'), tok.rgb('--ink-900')]} locations={[0, 0.38, 1]} style={{ position: 'absolute', top: -26, left: 0, right: 0, bottom: 0 }} />
       {hint ? <Text style={{ textAlign: 'center', fontSize: 13, color: tok.rgb('--fg', 0.5), marginBottom: 10 }}>{hint}</Text> : null}
       <Animated.View style={{ transform: [{ scale }] }}>
         <Pressable
@@ -521,7 +535,7 @@ function Radio({ selected }: { selected: boolean }) {
 function OptionRow({ label, glyph, flag, selected, onPress }: { label: string; glyph?: string; flag?: string; selected: boolean; onPress: () => void }) {
   const tok = useTok()
   return (
-    <Pressable onPress={onPress} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 17, paddingHorizontal: 18, borderRadius: 18, backgroundColor: selected ? tok.rgb('--brand-400', 0.12) : tok.rgb('--ink-800'), borderWidth: 1.5, borderColor: selected ? tok.rgb('--brand-400', 0.9) : tok.rgb('--fg', 0.06) }}>
+    <Pressable onPress={onPress} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 17, paddingHorizontal: 18, borderRadius: 18, backgroundColor: selected ? tok.rgb('--brand-400', 0.12) : tok.rgb('--ink-800'), borderWidth: 1.5, borderColor: selected ? tok.rgb('--brand-400', 0.9) : tok.rgb('--fg', 0.06), transform: [{ scale: selected ? 1.005 : 1 }] }}>
       {glyph ? <View style={{ width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: selected ? tok.rgb('--brand-400', 0.18) : tok.rgb('--fg', 0.06) }}><Text style={{ fontSize: 22, color: selected ? tok.rgb('--brand-300') : tok.rgb('--fg', 0.6) }}>{glyph}</Text></View> : null}
       <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 9 }}>
         <Text style={{ fontSize: 16.5, fontWeight: '700', color: tok.rgb('--fg') }}>{label}</Text>
@@ -536,7 +550,7 @@ function OptionRow({ label, glyph, flag, selected, onPress }: { label: string; g
 function OptionCard({ icon, label, desc, selected, onPress }: { icon?: string; label: string; desc?: string; selected: boolean; onPress: () => void }) {
   const tok = useTok()
   return (
-    <Pressable onPress={onPress} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 15, paddingVertical: 17, paddingHorizontal: 17, borderRadius: 20, backgroundColor: selected ? tok.rgb('--brand-400', 0.12) : tok.rgb('--ink-800'), borderWidth: 1.5, borderColor: selected ? tok.rgb('--brand-400', 0.9) : tok.rgb('--fg', 0.06) }}>
+    <Pressable onPress={onPress} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 15, paddingVertical: 17, paddingHorizontal: 17, borderRadius: 20, backgroundColor: selected ? tok.rgb('--brand-400', 0.12) : tok.rgb('--ink-800'), borderWidth: 1.5, borderColor: selected ? tok.rgb('--brand-400', 0.9) : tok.rgb('--fg', 0.06), transform: [{ scale: selected ? 1.005 : 1 }] }}>
       {icon ? <View style={{ width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: selected ? tok.rgb('--brand-400', 0.18) : tok.rgb('--fg', 0.06) }}><Icon name={icon} size={24} color={selected ? tok.rgb('--brand-300') : tok.rgb('--fg', 0.6)} /></View> : null}
       <View style={{ flex: 1, paddingTop: 1 }}>
         <Text style={{ fontSize: 16.5, fontWeight: '700', color: tok.rgb('--fg') }}>{label}</Text>
@@ -551,7 +565,7 @@ function OptionCard({ icon, label, desc, selected, onPress }: { icon?: string; l
 function SelectChip({ label, selected, disabled, onPress }: { label: string; selected: boolean; disabled?: boolean; onPress: () => void }) {
   const tok = useTok()
   return (
-    <Pressable disabled={disabled && !selected} onPress={onPress} style={{ flexDirection: 'row', alignItems: 'center', gap: 7, paddingVertical: 12, paddingHorizontal: 18, borderRadius: 999, backgroundColor: selected ? tok.rgb('--brand-400', 0.16) : tok.rgb('--ink-800'), borderWidth: 1.5, borderColor: selected ? tok.rgb('--brand-400', 0.85) : tok.rgb('--fg', 0.07) }}>
+    <Pressable disabled={disabled && !selected} onPress={onPress} style={{ flexDirection: 'row', alignItems: 'center', gap: 7, paddingVertical: 12, paddingHorizontal: 18, borderRadius: 999, backgroundColor: selected ? tok.rgb('--brand-400', 0.16) : tok.rgb('--ink-800'), borderWidth: 1.5, borderColor: selected ? tok.rgb('--brand-400', 0.85) : tok.rgb('--fg', 0.07), transform: [{ scale: selected ? 1.03 : 1 }] }}>
       {selected ? <Icon name="check" size={14} color={tok.rgb('--brand-300')} stroke={3} /> : null}
       <Text style={{ fontSize: 15, fontWeight: '600', color: selected ? tok.rgb('--brand-300') : disabled ? tok.rgb('--fg', 0.28) : tok.rgb('--fg', 0.82) }}>{label}</Text>
     </Pressable>
@@ -566,7 +580,7 @@ function WeekdayGrid({ selected, onToggle }: { selected: string[]; onToggle: (d:
       {DAYS.map((d) => {
         const on = selected.includes(d)
         return (
-          <Pressable key={d} onPress={() => { tick(); onToggle(d) }} style={{ flex: 1, paddingVertical: 14, borderRadius: 14, alignItems: 'center', backgroundColor: on ? tok.rgb('--brand-400', 0.16) : tok.rgb('--ink-800'), borderWidth: 1.5, borderColor: on ? tok.rgb('--brand-400', 0.85) : tok.rgb('--fg', 0.07) }}>
+          <Pressable key={d} onPress={() => { tick(); onToggle(d) }} style={{ flex: 1, paddingVertical: 14, borderRadius: 14, alignItems: 'center', backgroundColor: on ? tok.rgb('--brand-400', 0.16) : tok.rgb('--ink-800'), borderWidth: 1.5, borderColor: on ? tok.rgb('--brand-400', 0.85) : tok.rgb('--fg', 0.07), transform: [{ scale: on ? 1.04 : 1 }] }}>
             <Text style={{ fontSize: 13.5, fontWeight: '700', color: on ? tok.rgb('--brand-300') : tok.rgb('--fg', 0.55) }}>{DAYS_SHORT[d].slice(0, 1)}</Text>
           </Pressable>
         )
@@ -716,7 +730,7 @@ function Shell({ header, footer, children }: { header?: ReactNode; footer?: Reac
 function TopBack({ onBack, label }: { onBack: () => void; label?: string }) {
   const tok = useTok()
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 48, paddingHorizontal: 16, minHeight: 40 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 6, paddingHorizontal: 16, minHeight: 40 }}>
       <Pressable onPress={() => { tick(); onBack() }} hitSlop={8} style={{ width: 40, height: 40, marginLeft: -8, borderRadius: 999, alignItems: 'center', justifyContent: 'center' }}>
         <Icon name="back" size={22} stroke={2.4} color={tok.rgb('--fg', 0.7)} />
       </Pressable>
@@ -727,7 +741,7 @@ function TopBack({ onBack, label }: { onBack: () => void; label?: string }) {
 
 /* ──────────────────────────── the screen ─────────────────────────────────── */
 
-type Phase = 'welcome' | 'login' | 'flow' | 'gate-under16' | 'gate-guardian' | 'terms' | 'processing' | 'summary' | 'account'
+type Phase = 'splash' | 'welcome' | 'login' | 'flow' | 'gate-under16' | 'gate-guardian' | 'terms' | 'processing' | 'summary' | 'account'
 
 export default function Onboarding() {
   const dispatch = useDispatch()
@@ -735,7 +749,7 @@ export default function Onboarding() {
   const [answers, setAnswers] = useState<Answers>(DEFAULT_ANSWERS)
   const [index, setIndex] = useState(0)
   const [dir, setDir] = useState<'fwd' | 'back'>('fwd')
-  const [phase, setPhase] = useState<Phase>('welcome')
+  const [phase, setPhase] = useState<Phase>('splash')
   const [returnToSummary, setReturnToSummary] = useState(false)
   const set = <K extends keyof Answers>(k: K, v: Answers[K]) => setAnswers((a) => ({ ...a, [k]: v }))
 
@@ -806,7 +820,8 @@ export default function Onboarding() {
 
   let view: ReactNode
   let viewKey = phase as string
-  if (phase === 'welcome') view = <Welcome onStart={() => { setDir('fwd'); setIndex(0); setPhase('flow') }} onLogin={() => { setDir('fwd'); setPhase('login') }} />
+  if (phase === 'splash') view = <Splash onDone={() => { setDir('fwd'); setPhase('welcome') }} />
+  else if (phase === 'welcome') view = <Welcome onStart={() => { setDir('fwd'); setIndex(0); setPhase('flow') }} onLogin={() => { setDir('fwd'); setPhase('login') }} />
   else if (phase === 'login') view = <Login onBack={() => { setDir('back'); setPhase('welcome') }} />
   else if (phase === 'gate-under16') view = <Under16 onBack={() => { setDir('back'); setPhase('flow') }} />
   else if (phase === 'gate-guardian') view = <Guardian answers={answers} set={set} onBack={() => { setDir('back'); setPhase('flow') }} onContinue={() => { set('guardianConsent', true); setPhase('flow'); advance() }} />
@@ -1027,10 +1042,19 @@ function FocusInput({ value, onChangeText, placeholder, multiline, autoFocus, ke
 }) {
   const tok = useTok()
   const [focused, setFocused] = useState(false)
+  const ref = useRef<TextInput>(null)
+  // The prototype focuses 360ms after mount so the screen slide settles first —
+  // focusing immediately yanks the view mid-transition.
+  useEffect(() => {
+    if (!autoFocus) return
+    const t = setTimeout(() => ref.current?.focus(), 360)
+    return () => clearTimeout(t)
+  }, [autoFocus])
   return (
     <TextInput
+      ref={ref}
       value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={tok.rgb('--fg', 0.32)}
-      multiline={multiline} autoFocus={autoFocus} keyboardType={keyboardType} autoCapitalize={autoCapitalize}
+      multiline={multiline} keyboardType={keyboardType} autoCapitalize={autoCapitalize}
       onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} selectionColor={tok.rgb('--brand-400')}
       style={{
         width: '100%', backgroundColor: tok.rgb('--ink-800'), color: tok.rgb('--fg'), borderRadius: multiline ? 14 : 16,
@@ -1390,7 +1414,7 @@ function Under16({ onBack }: { onBack: () => void }) {
   const tok = useTok()
   return (
     <View style={{ flex: 1 }}>
-      <View style={{ paddingTop: 54, paddingHorizontal: 20 }}>
+      <View style={{ paddingTop: 10, paddingHorizontal: 20 }}>
         <Pressable onPress={onBack} hitSlop={8} style={{ width: 40, height: 40, marginLeft: -8, borderRadius: 999, alignItems: 'center', justifyContent: 'center' }}><Icon name="back" size={22} color={tok.rgb('--fg', 0.7)} /></Pressable>
       </View>
       <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 26 }}>
@@ -1411,7 +1435,7 @@ function Guardian({ answers, set, onContinue, onBack }: { answers: Answers; set:
   const ok = answers.guardianConsent
   return (
     <View style={{ flex: 1 }}>
-      <View style={{ paddingTop: 54, paddingHorizontal: 20 }}>
+      <View style={{ paddingTop: 10, paddingHorizontal: 20 }}>
         <Pressable onPress={onBack} hitSlop={8} style={{ width: 40, height: 40, marginLeft: -8, borderRadius: 999, alignItems: 'center', justifyContent: 'center' }}><Icon name="back" size={22} color={tok.rgb('--fg', 0.7)} /></Pressable>
       </View>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 26, paddingTop: 10 }} keyboardShouldPersistTaps="handled">
@@ -1467,7 +1491,7 @@ function Processing({ onDone }: { onDone: () => void }) {
   useEffect(() => { Animated.timing(bar, { toValue: pct, duration: 600, easing: EASE, useNativeDriver: false }).start() }, [bar, pct])
   return (
     <View style={{ flex: 1, paddingHorizontal: 26 }}>
-      <View style={{ paddingTop: 74, alignItems: 'center' }}>
+      <View style={{ paddingTop: 30, alignItems: 'center' }}>
         <Wordmark size={18} />
         <Text style={{ marginTop: 22, fontSize: 24, fontWeight: '800', letterSpacing: -0.5, color: tok.rgb('--fg') }}>Building your experience</Text>
         <View style={{ marginTop: 18, width: 220, height: 6, borderRadius: 999, backgroundColor: tok.rgb('--fg', 0.1), overflow: 'hidden' }}>
@@ -1793,20 +1817,26 @@ function TypingDot({ delay }: { delay: number }) {
   return <Animated.View style={{ width: 7, height: 7, borderRadius: 999, backgroundColor: tok.rgb('--brand-300'), opacity: a }} />
 }
 
-function AppShowcase() {
+function AppShowcase({ scale = 1 }: { scale?: number }) {
   const tok = useTok()
   const [i, setI] = useState(0)
   const fade = useRef(new Animated.Value(0)).current
+  // sho-hero-in: the card floats up and settles once on mount.
+  const hero = useRef(new Animated.Value(0)).current
+  useEffect(() => { Animated.timing(hero, { toValue: 1, duration: 1000, easing: EASE, useNativeDriver: NATIVE }).start() }, [hero])
   useEffect(() => { const t = setInterval(() => setI((v) => (v + 1) % 3), 3800); return () => clearInterval(t) }, [])
   useEffect(() => { fade.setValue(0); Animated.timing(fade, { toValue: 1, duration: 620, easing: EASE, useNativeDriver: NATIVE }).start() }, [i, fade])
+  // Design canvas is 316x396; scale down (never up) to fit shorter screens.
   return (
-    <View style={{ width: 316, height: 396 }}>
-      <View style={{ position: 'absolute', top: 40, left: 40, right: 40, bottom: 40, borderRadius: 200, backgroundColor: tok.rgb('--brand-400', 0.08) }} />
-      <View style={{ flex: 1, borderRadius: 28, overflow: 'hidden', backgroundColor: tok.rgb('--ink-700'), borderWidth: 1, borderColor: tok.rgb('--fg', 0.09) }}>
-        <Animated.View key={i} style={{ flex: 1, padding: 20, opacity: fade, transform: [{ translateY: fade.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }] }}>
-          {i === 0 ? <PushDayCard /> : i === 1 ? <ProgressCard /> : <CoachChat />}
-        </Animated.View>
-      </View>
+    <View style={{ width: 316 * scale, height: 396 * scale }}>
+      <Animated.View style={{ width: 316, height: 396, transformOrigin: 'top left' as any, opacity: hero, transform: [{ scale }, { translateY: hero.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) }] }}>
+        <View style={{ position: 'absolute', top: 40, left: 40, right: 40, bottom: 40, borderRadius: 200, backgroundColor: tok.rgb('--brand-400', 0.08) }} />
+        <View style={{ flex: 1, borderRadius: 28, overflow: 'hidden', backgroundColor: tok.rgb('--ink-700'), borderWidth: 1, borderColor: tok.rgb('--fg', 0.09) }}>
+          <Animated.View key={i} style={{ flex: 1, padding: 20, opacity: fade, transform: [{ translateY: fade.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }] }}>
+            {i === 0 ? <PushDayCard /> : i === 1 ? <ProgressCard /> : <CoachChat />}
+          </Animated.View>
+        </View>
+      </Animated.View>
     </View>
   )
 }
@@ -1863,17 +1893,26 @@ function LanguageSelect() {
 
 function Welcome({ onStart, onLogin }: { onStart: () => void; onLogin: () => void }) {
   const tok = useTok()
+  const { height: winH } = useWindowDimensions()
+  // The prototype laid this out on a fixed 874px canvas. Real screens (and the
+  // web phone frame, whose content area sits below a separate 44px status bar
+  // inside a 12px bezel) can be shorter, so derive the available height and
+  // scale the showcase card to fit instead of letting it overflow the buttons.
+  const contentH = NATIVE ? winH : Math.min(874, winH - 48) - 68
+  const midAvail = contentH - 252 // header block + button block + paddings
+  const HEADLINE_RESERVE = 150 // headline (2 × 36px lines) + 30 top margin + breathing room
+  const scale = Math.max(0.55, Math.min(1, (midAvail - HEADLINE_RESERVE) / 396))
   return (
     <View style={{ flex: 1, paddingHorizontal: 24 }}>
-      <View style={{ paddingTop: 78, paddingHorizontal: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 50 }}>
+      <View style={{ paddingTop: 30, paddingHorizontal: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 50 }}>
         <Reveal delay={80}><AppIcon size={34} /></Reveal>
         <Reveal delay={120}><LanguageSelect /></Reveal>
       </View>
-      <View style={{ flex: 1, alignItems: 'center', paddingTop: 24, paddingBottom: 40 }}>
-        <AppShowcase />
-        <Reveal delay={360}><Text style={{ marginTop: 30, fontSize: 33, lineHeight: 36, fontWeight: '800', letterSpacing: -1, color: tok.rgb('--fg'), textAlign: 'center' }}>Training built{'\n'}around you.</Text></Reveal>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 16, paddingBottom: 16 }}>
+        <AppShowcase scale={scale} />
+        <Reveal delay={360}><Text style={{ marginTop: 30 * scale, fontSize: 33, lineHeight: 36, fontWeight: '800', letterSpacing: -1, color: tok.rgb('--fg'), textAlign: 'center' }}>Training built{'\n'}around you.</Text></Reveal>
       </View>
-      <View style={{ paddingHorizontal: 8, paddingBottom: 40 }}>
+      <View style={{ paddingHorizontal: 8, paddingBottom: 32 }}>
         <Reveal delay={920}>
           <Pressable onPress={() => { thud(); onStart() }} style={{ height: 56, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: tok.rgb('--brand-400') }}><Text style={{ fontSize: 16.5, fontWeight: '700', color: '#08140a' }}>Get Started</Text></Pressable>
         </Reveal>
@@ -1896,7 +1935,7 @@ function Login({ onBack }: { onBack: () => void }) {
   const submit = async () => { setBusy(true); try { await signIn(email, pw) } catch { /* auth listener handles success; errors surface in the real AuthScreen */ } finally { setBusy(false) } }
   return (
     <View style={{ flex: 1 }}>
-      <View style={{ paddingTop: 54, paddingHorizontal: 20 }}>
+      <View style={{ paddingTop: 10, paddingHorizontal: 20 }}>
         <Pressable onPress={onBack} hitSlop={8} style={{ width: 40, height: 40, marginLeft: -8, borderRadius: 999, alignItems: 'center', justifyContent: 'center' }}><Icon name="back" size={22} color={tok.rgb('--fg', 0.7)} /></Pressable>
       </View>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 10 }} keyboardShouldPersistTaps="handled">
@@ -1934,5 +1973,28 @@ function PasswordInput({ value, onChangeText }: { value: string; onChangeText: (
   return (
     <TextInput value={value} onChangeText={onChangeText} secureTextEntry autoCapitalize="none" placeholder="••••••••" placeholderTextColor={tok.rgb('--fg', 0.32)} selectionColor={tok.rgb('--brand-400')} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
       style={{ width: '100%', backgroundColor: tok.rgb('--ink-800'), color: tok.rgb('--fg'), borderRadius: 14, borderWidth: 1.5, borderColor: focused ? tok.rgb('--brand-400', 0.8) : tok.rgb('--fg', 0.08), paddingHorizontal: 15, paddingVertical: 15, fontSize: 16 }} />
+  )
+}
+
+/* ─────────────────────────────── splash ──────────────────────────────────── */
+/** Dark splash: the wordmark fades in still (sho-splash-fade), ~1.75s. */
+function Splash({ onDone }: { onDone: () => void }) {
+  const tok = useTok()
+  const fade = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    Animated.timing(fade, { toValue: 1, duration: 500, easing: Easing.out(Easing.ease), useNativeDriver: NATIVE }).start()
+    const t = setTimeout(onDone, 1750)
+    return () => clearTimeout(t)
+  }, [fade, onDone])
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+      <Animated.View style={{ opacity: fade }}>
+        <View style={{ flexDirection: 'row' }}>
+          <Text style={{ fontSize: 38, fontWeight: '800', letterSpacing: -0.8, lineHeight: 40, color: tok.rgb('--fg') }}>Strength</Text>
+          <Text style={{ fontSize: 38, fontWeight: '800', fontStyle: 'italic', letterSpacing: -0.8, lineHeight: 40, color: tok.rgb('--brand-400') }}>Hub</Text>
+          <Text style={{ position: 'absolute', top: -11, right: 2, fontSize: 11, fontWeight: '800', letterSpacing: 1.5, color: tok.rgb('--brand-400') }}>ONLINE</Text>
+        </View>
+      </Animated.View>
+    </View>
   )
 }
