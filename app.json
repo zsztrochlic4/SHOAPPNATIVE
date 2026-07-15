@@ -27,6 +27,19 @@
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
-    "plugins": ["expo-image-picker", "expo-status-bar", "expo-video", "expo-web-browser"]
+    "plugins": [
+      "expo-image-picker",
+      "expo-status-bar",
+      "expo-video",
+      "expo-web-browser",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 160,
+          "backgroundColor": "#0A0A0B"
+        }
+      ]
+    ]
   }
 }

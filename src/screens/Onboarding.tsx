@@ -21,8 +21,9 @@ import {
   Platform, useWindowDimensions,
   type NativeSyntheticEvent, type NativeScrollEvent, type ViewStyle, type TextStyle,
 } from 'react-native'
-import Svg, { Path, Line, Rect, Circle, Polygon, G, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg'
+import Svg, { Path, Line, Rect, Circle, Polygon, G, Text as SvgText } from 'react-native-svg'
 import { LinearGradient } from 'expo-linear-gradient'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useDispatch } from '../store/store'
 import { useAuth } from '../auth/AuthProvider'
 import { cssVars, useThemeName } from '../theme'
@@ -1060,8 +1061,11 @@ function FocusInput({ value, onChangeText, placeholder, multiline, autoFocus, ke
         width: '100%', backgroundColor: tok.rgb('--ink-800'), color: tok.rgb('--fg'), borderRadius: multiline ? 14 : 16,
         borderWidth: 1.5, borderColor: focused ? tok.rgb('--brand-400', 0.8) : tok.rgb('--fg', 0.08),
         paddingHorizontal: multiline ? 15 : 16, paddingVertical: multiline ? 14 : 16,
-        fontSize: big ? 18 : 15.5, fontWeight: big ? '600' : '400', textAlignVertical: multiline ? 'top' : 'center',
-        minHeight: multiline ? 92 : undefined,
+        // Prototype: 18px, semibold ONLY for single-line answers; multiline
+        // paragraphs (and their placeholders) stay regular weight at 1.5.
+        fontSize: big ? 18 : 15.5, fontWeight: big && !multiline ? '600' : '400',
+        lineHeight: multiline ? (big ? 27 : 22) : undefined, textAlignVertical: multiline ? 'top' : 'center',
+        minHeight: multiline ? (big ? 113 : 92) : undefined,
       }}
     />
   )
@@ -1150,19 +1154,23 @@ function DateStep({ step, answers, set, header, onContinue }: { step: Step; answ
   return (
     <View style={{ flex: 1 }}>
       {header}
-      <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 20 }}>
+      {/* Heading sits at the top like every other question page; only the
+          wheel itself is centred in the remaining space. */}
+      <View style={{ flex: 1, paddingHorizontal: 20, paddingTop: 18 }}>
         <QHeader title={step.title} sub={step.sub} />
-        <Reveal delay={180}>
-          <View style={{ marginTop: 8 }}>
-            <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: '50%', height: 42, marginTop: -21, borderRadius: 14, backgroundColor: tok.rgb('--ink-700'), borderWidth: 1, borderColor: tok.rgb('--brand-400', 0.28) }} />
-            <View style={{ flexDirection: 'row' }}>
-              <Wheel items={DOB_MONTHS} index={mIdx} onIndex={(i) => { setM(i); commit(i, dIdx, yIdx) }} flexBasis={1.5} />
-              <Wheel items={days} index={dIdx} onIndex={(i) => { setD(i); commit(mIdx, i, yIdx) }} flexBasis={0.8} />
-              <Wheel items={years} index={yIdx} onIndex={(i) => { setY(i); commit(mIdx, dIdx, i) }} flexBasis={1} />
+        <View style={{ flex: 1, justifyContent: 'center' }}>
+          <Reveal delay={180}>
+            <View>
+              <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: '50%', height: 42, marginTop: -21, borderRadius: 14, backgroundColor: tok.rgb('--ink-700'), borderWidth: 1, borderColor: tok.rgb('--brand-400', 0.28) }} />
+              <View style={{ flexDirection: 'row' }}>
+                <Wheel items={DOB_MONTHS} index={mIdx} onIndex={(i) => { setM(i); commit(i, dIdx, yIdx) }} flexBasis={1.5} />
+                <Wheel items={days} index={dIdx} onIndex={(i) => { setD(i); commit(mIdx, i, yIdx) }} flexBasis={0.8} />
+                <Wheel items={years} index={yIdx} onIndex={(i) => { setY(i); commit(mIdx, dIdx, i) }} flexBasis={1} />
+              </View>
+              <FadeMask horizontal={false} />
             </View>
-            <FadeMask horizontal={false} />
-          </View>
-        </Reveal>
+          </Reveal>
+        </View>
       </View>
       <ActionBar onPress={onContinue} />
     </View>
@@ -1675,14 +1683,48 @@ function CoachSparkle({ size = 28 }: { size?: number }) {
   )
 }
 
+/** Ring with the % label in the centre; fill sweeps smoothly (900ms). */
 function MiniRing({ pct }: { pct: number }) {
   const tok = useTok()
   const r = 16, c = 2 * Math.PI * r
+  const anim = useRef(new Animated.Value(pct)).current
+  useEffect(() => { Animated.timing(anim, { toValue: pct, duration: 900, easing: EASE, useNativeDriver: false }).start() }, [anim, pct])
   return (
     <Svg width={42} height={42} viewBox="0 0 42 42">
       <Circle cx="21" cy="21" r={r} fill="none" stroke={tok.rgb('--fg', 0.12)} strokeWidth={4} />
-      <Circle cx="21" cy="21" r={r} fill="none" stroke={tok.rgb('--brand-400')} strokeWidth={4} strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - pct / 100)} transform="rotate(-90 21 21)" />
+      <AnimatedCircle cx="21" cy="21" r={r} fill="none" stroke={tok.rgb('--brand-400')} strokeWidth={4} strokeLinecap="round" strokeDasharray={c} strokeDashoffset={anim.interpolate({ inputRange: [0, 100], outputRange: [c, 0] })} transform="rotate(-90 21 21)" />
+      <SvgText x="21" y="25" textAnchor="middle" fontSize="11" fontWeight="800" fill={tok.rgb('--fg')}>{`${pct}%`}</SvgText>
     </Svg>
+  )
+}
+
+/** sho-tick: the check pops in — scale 0.2 → 1.15 (60%) → 1 over 520ms. */
+function TickPop({ children }: { children: ReactNode }) {
+  const a = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    Animated.timing(a, { toValue: 1, duration: 520, easing: Easing.bezier(0.34, 1.56, 0.64, 1), useNativeDriver: NATIVE }).start()
+  }, [a])
+  return (
+    <Animated.View style={{ opacity: a.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0, 1, 1] }), transform: [{ scale: a.interpolate({ inputRange: [0, 0.6, 1], outputRange: [0.2, 1.15, 1] }) }] }}>
+      {children}
+    </Animated.View>
+  )
+}
+
+function PushRow({ name, done, justClicked }: { name: string; done: boolean; justClicked: boolean }) {
+  const tok = useTok()
+  // The just-ticked row swells to 1.015 and settles back (320ms bounce).
+  const s = useRef(new Animated.Value(1)).current
+  useEffect(() => {
+    Animated.timing(s, { toValue: justClicked ? 1.015 : 1, duration: 320, easing: Easing.bezier(0.34, 1.56, 0.64, 1), useNativeDriver: NATIVE }).start()
+  }, [s, justClicked])
+  return (
+    <Animated.View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 15, borderRadius: 13, backgroundColor: tok.rgb('--ink-800'), transform: [{ scale: s }] }}>
+      <View style={{ width: 22, height: 22, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: done ? tok.rgb('--brand-400') : 'transparent', borderWidth: done ? 0 : 2, borderColor: tok.rgb('--fg', 0.2) }}>
+        {done ? <TickPop><Icon name="check" size={13} stroke={3.4} color="#08140a" /></TickPop> : null}
+      </View>
+      <Text style={{ fontSize: 15.5, fontWeight: '600', color: tok.rgb('--fg', done ? 0.85 : 0.6) }}>{name}</Text>
+    </Animated.View>
   )
 }
 
@@ -1704,15 +1746,7 @@ function PushDayCard() {
         <MiniRing pct={pct} />
       </View>
       <View style={{ flex: 1, marginTop: 16, justifyContent: 'center', gap: 9 }}>
-        {names.map((name, k) => {
-          const done = k < n
-          return (
-            <View key={name} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 15, borderRadius: 13, backgroundColor: tok.rgb('--ink-800') }}>
-              <View style={{ width: 22, height: 22, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: done ? tok.rgb('--brand-400') : 'transparent', borderWidth: done ? 0 : 2, borderColor: tok.rgb('--fg', 0.2) }}>{done ? <Icon name="check" size={13} stroke={3.4} color="#08140a" /> : null}</View>
-              <Text style={{ fontSize: 15.5, fontWeight: '600', color: tok.rgb('--fg', done ? 0.85 : 0.6) }}>{name}</Text>
-            </View>
-          )
-        })}
+        {names.map((name, k) => <PushRow key={name} name={name} done={k < n} justClicked={k === n - 1 && k < n} />)}
       </View>
     </View>
   )
@@ -1894,11 +1928,12 @@ function LanguageSelect() {
 function Welcome({ onStart, onLogin }: { onStart: () => void; onLogin: () => void }) {
   const tok = useTok()
   const { height: winH } = useWindowDimensions()
+  const insets = useSafeAreaInsets()
   // The prototype laid this out on a fixed 874px canvas. Real screens (and the
   // web phone frame, whose content area sits below a separate 44px status bar
   // inside a 12px bezel) can be shorter, so derive the available height and
   // scale the showcase card to fit instead of letting it overflow the buttons.
-  const contentH = NATIVE ? winH : Math.min(874, winH - 48) - 68
+  const contentH = NATIVE ? winH - insets.top - insets.bottom : Math.min(874, winH - 48) - 68
   const midAvail = contentH - 252 // header block + button block + paddings
   const HEADLINE_RESERVE = 150 // headline (2 × 36px lines) + 30 top margin + breathing room
   const scale = Math.max(0.55, Math.min(1, (midAvail - HEADLINE_RESERVE) / 396))
