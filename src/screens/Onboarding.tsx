@@ -1158,7 +1158,8 @@ function DateStep({ step, answers, set, header, onContinue }: { step: Step; answ
           wheel itself is centred in the remaining space. */}
       <View style={{ flex: 1, paddingHorizontal: 20, paddingTop: 18 }}>
         <QHeader title={step.title} sub={step.sub} />
-        <View style={{ flex: 1, justifyContent: 'center' }}>
+        {/* biased upward: the wheel reads better sitting above true centre */}
+        <View style={{ flex: 1, justifyContent: 'center', paddingBottom: 72 }}>
           <Reveal delay={180}>
             <View>
               <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: '50%', height: 42, marginTop: -21, borderRadius: 14, backgroundColor: tok.rgb('--ink-700'), borderWidth: 1, borderColor: tok.rgb('--brand-400', 0.28) }} />
@@ -1778,6 +1779,17 @@ function ProgressCard() {
 }
 
 /** Card 3 — coach chat with a typing → send → reply sequence. */
+/** sho-msg-in: chat bubbles rise in with a slight scale settle. */
+function MsgIn({ dur = 420, style, children }: { dur?: number; style?: ViewStyle; children: ReactNode }) {
+  const a = useRef(new Animated.Value(0)).current
+  useEffect(() => { Animated.timing(a, { toValue: 1, duration: dur, easing: EASE, useNativeDriver: NATIVE }).start() }, [a, dur])
+  return (
+    <Animated.View style={[style, { opacity: a, transform: [{ translateY: a.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }, { scale: a.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1] }) }] }]}>
+      {children}
+    </Animated.View>
+  )
+}
+
 function CoachChat() {
   const tok = useTok()
   const full = 'yes, is eggs, avocado and toast a healthy breakfast?'
@@ -1806,26 +1818,26 @@ function CoachChat() {
         </View>
       </View>
       <View style={{ flex: 1, paddingHorizontal: 16, paddingTop: 16, gap: 12 }}>
-        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end', marginRight: 26 }}>
+        <MsgIn dur={460} style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end', marginRight: 26 }}>
           <CoachSparkle size={22} />
           <View style={{ maxWidth: '88%', paddingVertical: 11, paddingHorizontal: 14, borderRadius: 16, borderTopLeftRadius: 4, backgroundColor: tok.rgb('--ink-800') }}>
             <Text style={{ fontSize: 14, lineHeight: 19.6, color: tok.rgb('--fg', 0.9), fontWeight: '500' }}>Hey Alex, I just want to check in with how your eating is going. Do you have any questions for me?</Text>
           </View>
-        </View>
+        </MsgIn>
         {sent ? (
-          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginLeft: 26 }}>
+          <MsgIn dur={420} style={{ flexDirection: 'row', justifyContent: 'flex-end', marginLeft: 26 }}>
             <View style={{ maxWidth: '84%', paddingVertical: 11, paddingHorizontal: 14, borderRadius: 16, borderBottomRightRadius: 4, backgroundColor: tok.rgb('--brand-400') }}>
               <Text style={{ fontSize: 14, lineHeight: 19.6, color: '#08140a', fontWeight: '600' }}>{full}</Text>
             </View>
-          </View>
+          </MsgIn>
         ) : null}
         {reply ? (
-          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end' }}>
+          <MsgIn dur={360} style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end' }}>
             <CoachSparkle size={22} />
             <View style={{ paddingVertical: 13, paddingHorizontal: 15, borderRadius: 16, borderTopLeftRadius: 4, backgroundColor: tok.rgb('--ink-800'), flexDirection: 'row', gap: 5 }}>
               {[0, 1, 2].map((d) => <TypingDot key={d} delay={d * 160} />)}
             </View>
-          </View>
+          </MsgIn>
         ) : null}
       </View>
       <View style={{ paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: 1, borderTopColor: tok.rgb('--fg', 0.07), flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -1851,24 +1863,37 @@ function TypingDot({ delay }: { delay: number }) {
   return <Animated.View style={{ width: 7, height: 7, borderRadius: 999, backgroundColor: tok.rgb('--brand-300'), opacity: a }} />
 }
 
+/**
+ * sho-card-in: each card mounts hidden 14px low and rises in over 620ms. A
+ * fresh Animated.Value per mount (keyed by card index) means the incoming card
+ * never flashes at rest before animating — the shared-value version did.
+ */
+function CardIn({ children }: { children: ReactNode }) {
+  const a = useRef(new Animated.Value(0)).current
+  useEffect(() => { Animated.timing(a, { toValue: 1, duration: 620, easing: EASE, useNativeDriver: NATIVE }).start() }, [a])
+  return (
+    <Animated.View style={{ flex: 1, padding: 20, opacity: a, transform: [{ translateY: a.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }] }}>
+      {children}
+    </Animated.View>
+  )
+}
+
 function AppShowcase({ scale = 1 }: { scale?: number }) {
   const tok = useTok()
   const [i, setI] = useState(0)
-  const fade = useRef(new Animated.Value(0)).current
   // sho-hero-in: the card floats up and settles once on mount.
   const hero = useRef(new Animated.Value(0)).current
   useEffect(() => { Animated.timing(hero, { toValue: 1, duration: 1000, easing: EASE, useNativeDriver: NATIVE }).start() }, [hero])
   useEffect(() => { const t = setInterval(() => setI((v) => (v + 1) % 3), 3800); return () => clearInterval(t) }, [])
-  useEffect(() => { fade.setValue(0); Animated.timing(fade, { toValue: 1, duration: 620, easing: EASE, useNativeDriver: NATIVE }).start() }, [i, fade])
   // Design canvas is 316x396; scale down (never up) to fit shorter screens.
   return (
     <View style={{ width: 316 * scale, height: 396 * scale }}>
       <Animated.View style={{ width: 316, height: 396, transformOrigin: 'top left' as any, opacity: hero, transform: [{ scale }, { translateY: hero.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) }] }}>
         <View style={{ position: 'absolute', top: 40, left: 40, right: 40, bottom: 40, borderRadius: 200, backgroundColor: tok.rgb('--brand-400', 0.08) }} />
         <View style={{ flex: 1, borderRadius: 28, overflow: 'hidden', backgroundColor: tok.rgb('--ink-700'), borderWidth: 1, borderColor: tok.rgb('--fg', 0.09) }}>
-          <Animated.View key={i} style={{ flex: 1, padding: 20, opacity: fade, transform: [{ translateY: fade.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }] }}>
+          <CardIn key={i}>
             {i === 0 ? <PushDayCard /> : i === 1 ? <ProgressCard /> : <CoachChat />}
-          </Animated.View>
+          </CardIn>
         </View>
       </Animated.View>
     </View>
