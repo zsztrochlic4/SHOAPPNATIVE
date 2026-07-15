@@ -900,7 +900,7 @@ function StepView({ step, answers, set, header, onContinue, onAdvance, onRestart
       const showOther = step.otherValue && arr.includes(step.otherValue)
       const disabled = step.weekday ? arr.length === 0 : step.skipLabel ? count === 0 : step.optional ? false : count === 0
       return (
-        <Shell header={header} footer={<ActionBar disabled={disabled} onPress={onContinue} onSkip={(step.optional || step.skipLabel) && count === 0 ? onAdvance : undefined} skipLabel={step.skipLabel || 'Skip'} />}>
+        <Shell header={header} footer={<ActionBar disabled={disabled} onPress={onContinue} onSkip={step.optional || step.skipLabel ? onAdvance : undefined} skipLabel={step.skipLabel || 'Skip'} />}>
           <QHeader title={step.title} sub={step.sub}
             chip={step.max ? (
               <View style={{ paddingVertical: 5, paddingHorizontal: 12, borderRadius: 999, backgroundColor: atMax ? tok.rgb('--brand-400', 0.16) : tok.rgb('--fg', 0.08) }}>
@@ -1215,7 +1215,16 @@ function MeasureStep({ step, answers, set, header, onContinue }: { step: Step; a
       </View>
       <View style={{ marginTop: 12 }}>
         {isHeight && isImperial ? <FtInReadout inches={disp} /> : null}
-        <RulerControl value={disp} onChange={(d) => set(key, toMetric(d))} min={min} max={max} unit={isHeight && isImperial ? 'in' : readoutUnit} orientation={isHeight ? 'vertical' : 'horizontal'} />
+        <RulerControl
+          value={disp}
+          onChange={(d) => {
+            set(key, toMetric(d))
+            // Dragging a goal weight overrides an earlier "no goal weight" skip
+            // (the prototype's {none:true} store is overwritten the same way).
+            if (step.kind === 'goalweight' && answers.noGoalWeight) set('noGoalWeight', false)
+          }}
+          min={min} max={max} unit={isHeight && isImperial ? 'in' : readoutUnit} orientation={isHeight ? 'vertical' : 'horizontal'}
+        />
       </View>
     </Shell>
   )
