@@ -1,0 +1,29 @@
+name: Profile Sweep (safety gate)
+
+# Runs the workout generator's profile sweep on every push and PR. The sweep is the
+# HARD gate for the backend: it generates a program across every 4 goals x 3 experience
+# levels x 2-6 days plus edge cases and fails the build if any prescription breaches a
+# safety floor (reps<4 on Load, RIR below the exercise Min RIR or grid floor, %1RM>88,
+# an advanced lift to a non-advanced user, a solo spotter lift without its cue) or leaves
+# a required slot empty. This is what stops a future change silently reintroducing a breach.
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['**']
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Profile sweep (safety-floor + required-slot gate)
+        run: npm run sweep

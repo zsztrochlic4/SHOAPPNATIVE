@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "outDir": ".sweep-out",
+    "module": "commonjs",
+    "target": "es2019",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "ignoreDeprecations": "6.0",
+    "types": ["node"],
+    "rootDir": "src"
+  },
+  "include": ["src/backend/**/*.ts", "src/store/types.ts", "src/lib/i18n.ts"]
+}

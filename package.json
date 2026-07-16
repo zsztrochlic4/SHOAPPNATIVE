@@ -41,7 +41,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "sweep": "tsc -p tsconfig.sweep.json && node .sweep-out/backend/generator/runSweep.js"
   },
   "private": true
 }

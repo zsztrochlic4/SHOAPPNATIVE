@@ -56,6 +56,13 @@ commitment) with **zero safety-floor breaches and zero empty required slots**. V
 and the volume floor(4)/cap(20). Backlog #15 acceptance met (UL4 Int-Hypertrophy chest 10–16;
 PPL6 back trimmed <16).
 
+**The sweep is enforced automatically:** `npm run sweep` (compiles the backend and runs
+`runSweep.ts`), and CI (`.github/workflows/sweep.yml`) runs typecheck + sweep on every push
+and PR — a regression that reintroduces a breach fails the build. CS04 variety is in: repeated
+day types (Upper×2, Push×2, Legs×2, Full×2) draw different exercises each occurrence. Known
+tradeoff: a 2-day full-body split leaves calves at 0 direct sets (the Full template has no calf
+slot and calves aren't a floored major muscle).
+
 Equipment taxonomy reconciled to the Exercise Database's own 46-tag vocabulary
 (`equipmentTags.ts`); the onboarding mapping now emits those tags (fixes M4).
 

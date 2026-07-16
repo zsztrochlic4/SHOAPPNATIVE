@@ -84,20 +84,25 @@ export function generateProgram(user: UserDoc): GenResult {
   // Step 5 — volume budget.
   const targets = volumeTargets(user.goal, user.experience, user.focal_points, user.commitments)
 
-  // Step 6/7 — build + prescribe each scheduled day.
+  // Step 6/7 — build + prescribe each scheduled day. CS04: repeated day types draw
+  // different exercises, so week-used picks per day type are avoided on later occurrences.
   const budget = maxExercises(user.session_length_min)
+  const weekUsedByDayType = new Map<string, Set<string>>()
   const days: BuiltDay[] = sched.placements.map((pl) => {
     const slots = SESSION_TEMPLATES.filter((s) => s.dayType === pl.dayType).sort((a, b) => a.order - b.order)
+    const avoid = weekUsedByDayType.get(pl.dayType) ?? new Set<string>()
     const used = new Set<string>()
     const exercises: BuiltExercise[] = []
     for (const slot of slots) {
       const isOptional = !slot.required
       if (isOptional && exercises.length >= budget) continue
-      const pick = pickForSlot(slot, ctx, used)
+      const pick = pickForSlot(slot, ctx, used, avoid)
       if (!pick) { if (slot.required) audit.push(`UNFILLED required slot ${slot.slotId} on ${pl.dayType}`); continue }
       used.add(pick.ex.id)
       exercises.push({ slotId: slot.slotId, slotName: slot.slotName, order: slot.order, required: slot.required, ...prescribe(pick.ex, ctx) })
     }
+    for (const id of used) avoid.add(id)
+    weekUsedByDayType.set(pl.dayType, avoid)
     return { dayType: pl.dayType, weekday: pl.weekday, exercises }
   })
 

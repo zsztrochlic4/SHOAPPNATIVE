@@ -158,13 +158,20 @@ export function pickForSlot(
   slot: SessionSlot,
   ctx: BuildContext,
   usedInDay: Set<string>,
+  avoid?: Set<string>,
 ): { ex: Exercise; viaSub: boolean } | null {
   const p = parseSlot(slot, ctx.focalPoints)
   const injuryRegions = injuryStressRegions(ctx.affectedRegions)
   const injExcl = injuryExcludeIds(ctx.affectedRegions)
   const fullExclude = new Set<string>([...ctx.excludedIds, ...injExcl, ...usedInDay])
 
-  const pool = candidates(p, ctx, fullExclude)
+  let pool = candidates(p, ctx, fullExclude)
+  // CS04 variety: on a repeated day type, prefer exercises not already used for that day
+  // type this week — but only if doing so still leaves a candidate (required slots fill).
+  if (avoid && avoid.size) {
+    const fresh = pool.filter((ex) => !avoid.has(ex.id))
+    if (fresh.length) pool = fresh
+  }
   if (pool.length) {
     pool.sort((a, b) => score(b, p, ctx, injuryRegions) - score(a, p, ctx, injuryRegions) || a.id.localeCompare(b.id))
     return { ex: pool[0], viaSub: false }
