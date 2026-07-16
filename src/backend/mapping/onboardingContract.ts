@@ -20,6 +20,7 @@ import {
 import { ageFromDob, routeByAge } from '../safety/ageRouting'
 import { evaluateScreening } from '../safety/screening'
 import { platformCleared } from '../coach/signOff'
+import { BASIC_GYM_TAGS, BODYWEIGHT_TAGS, FULL_GYM_TAGS } from '../data/equipmentTags'
 
 /* ------------------------------------------------------------------ */
 /*  Raw onboarding answer shape (the wizard's vocabulary)              */
@@ -150,24 +151,28 @@ export const COMMITMENT_TYPE_MAP: Record<string, CommitmentType> = {
   Other: 'other',
 }
 
-/** Equipment chip → canonical equipment tag id. */
-export const EQUIPMENT_TAG_MAP: Record<string, string> = {
-  'Squat rack': 'squat_rack',
-  Barbell: 'barbell',
-  'Barbell+plates': 'barbell',
-  Dumbbells: 'dumbbell',
-  'Bench or chair': 'bench',
-  'Pull-up bar': 'pullup_bar',
-  'Resistance bands': 'band',
-  Kettlebell: 'kettlebell',
-  'Sliders or a towel': 'sliders',
+/** Equipment chip → Exercise-Database equipment tag id(s). One chip can grant several. */
+export const EQUIPMENT_TAG_MAP: Record<string, string[]> = {
+  'Squat rack': ['rack'],
+  Barbell: ['barbell', 'plates', 'ez_bar', 'trap_bar'],
+  'Barbell+plates': ['barbell', 'plates'],
+  Dumbbells: ['dumbbell'],
+  'Bench or chair': ['bench', 'chair'],
+  'Pull-up bar': ['pull_up_bar'],
+  'Resistance bands': ['band', 'anchor_point'],
+  Kettlebell: ['kettlebell'],
+  'Sliders or a towel': ['sliders', 'towel'],
 }
 
-/** Tier-implied base tags before the user's ticked extras (Onboarding Contract). */
+/**
+ * Tier-implied base tags, in the Exercise Database's own vocabulary, generated from the
+ * sheet (equipmentTags.ts): a tier provides whatever its exercises need. Full Gym has
+ * everything; ticked chips add specific tags on top of the Basic/Bodyweight base.
+ */
 const TIER_BASE_TAGS: Record<EquipmentTier, string[]> = {
-  'Full Gym': ['barbell', 'squat_rack', 'dumbbell', 'bench', 'pullup_bar', 'band', 'kettlebell', 'cable', 'machine'],
-  'Basic Gym': ['dumbbell', 'band', 'bench'],
-  Bodyweight: [],
+  'Full Gym': FULL_GYM_TAGS,
+  'Basic Gym': BASIC_GYM_TAGS,
+  Bodyweight: BODYWEIGHT_TAGS,
 }
 
 /* ------------------------------------------------------------------ */
@@ -223,8 +228,7 @@ export function mapEquipmentTags(env: OnboardingInput['environment'], equipment:
   const tier = mapEquipmentTier(env)
   const tags = new Set<string>(TIER_BASE_TAGS[tier])
   for (const chip of equipment) {
-    const tag = EQUIPMENT_TAG_MAP[chip]
-    if (tag) tags.add(tag)
+    for (const tag of EQUIPMENT_TAG_MAP[chip] ?? []) tags.add(tag)
   }
   return [...tags]
 }

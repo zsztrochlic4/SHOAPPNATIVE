@@ -65,6 +65,76 @@ export interface Substitution {
   matchType: string
 }
 
+/** Training split (sheet "Splits"). day_structure is the ordered list of day types. */
+export interface Split {
+  splitId: string
+  name: string
+  daysMin: number
+  daysMax: number
+  dayStructure: string[] // e.g. ['Upper','Lower','Upper','Lower']
+  bestForGoals: string[] // 'All' = any
+  experience: string[]   // 'All' = any
+  why: string
+}
+
+/** Split Selector decision-table row (sheet "Split Selector"); first match wins. */
+export interface SplitSelectorRow {
+  daysPerWeek: number
+  experience: string[] // pipe tokens, 'All' = any
+  goal: string[]       // pipe tokens, 'All' = any
+  splitId: string
+  reason: string
+}
+
+/** One slot in a day-type template (sheet "Session Templates"). */
+export interface SessionSlot {
+  slotId: string
+  dayType: string
+  order: number
+  slotName: string
+  muscleGroupFilter: string      // pipe tokens, 'Any', or FOCAL_1/FOCAL_2, or conditioning
+  movementPatternFilter: string  // pipe tokens or 'Any' or free note
+  typeFilter: string             // Compound/Isolation/Any/Compound>Isolation/Isolation>Compound (+notes)
+  required: boolean
+  note: string
+}
+
+/** Weekly volume target (sheet "Weekly Volume"). */
+export interface WeeklyVolumeRow {
+  goal: string
+  experience: string // 'All' = any
+  weeklySetsMin: number
+  weeklySetsMax: number
+  appliesTo: string[] // muscle tokens, or a prose note for Strength/GenFitness
+}
+
+/** External commitment adjustment row (sheet "External Commitments"). */
+export interface CommitmentRow {
+  commitmentType: string
+  examples: string
+  loadProfile: string[]
+  volumeCutMuscles: string[] // may be ['user_reported']
+  volumeCutSetsMin: number
+  volumeCutSetsMax: number
+  adjacencyBlockHours: number
+  intervalSlotsRemoved: number
+  rirPenaltyNextDay: number
+  notes: string
+}
+
+/** Injury Modifications region row (sheet "Injury Modifications"). */
+export interface InjuryModRow {
+  region: string
+  matchesStressRegion: string
+  avoidPatterns: string
+  prefer: string
+  rirBump: number
+  excludeIds: string[]
+  downgradeIds: string[]
+  reviewAfter: string
+  coachNote: string
+}
+
 /**
  * Prescription Grid row (sheet "Prescription Logic"), keyed by `${Goal}|${Class}`. Every
  * numeric field is a plain number or null (empty = not applicable). RIR is reps-in-reserve;

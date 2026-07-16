@@ -1,0 +1,7 @@
+/**
+ * GENERATED from workbook sheet "Exercise Database" (Required Equipment Tags) via SheetJS. Do not hand-edit.
+ * Source of truth is the workbook / CLEAN csv.
+ */
+export const BODYWEIGHT_TAGS: string[] = ["anchor_point","band","bed","bench","box","cable_machine","chair","desk","low_bar","machine_abduction","partner","pull_up_bar","rack","rings","sliders","smooth_floor","stair","step","sturdy_table","towel","wall"]
+export const BASIC_GYM_TAGS: string[] = ["ab_wheel","anchor_point","back_extension_bench","band","barbell","bed","bench","box","cable_machine","chair","desk","dip_bars","dumbbell","ez_bar","incline_bench","kettlebell","low_bar","machine_abduction","machine_cable_row","machine_calf","machine_chest_press","machine_lat_pulldown","partner","pull_up_bar","rack","rings","rowing_erg","sliders","smooth_floor","stair","stationary_bike","step","sturdy_table","towel","wall"]
+export const FULL_GYM_TAGS: string[] = ["ab_wheel","anchor_point","back_extension_bench","band","barbell","bed","bench","box","cable_machine","chair","decline_bench","desk","dip_bars","dumbbell","ez_bar","incline_bench","kettlebell","low_bar","machine_abduction","machine_cable_row","machine_calf","machine_chest_press","machine_lat_pulldown","machine_leg_curl","machine_leg_extension","machine_leg_press","machine_seated_calf","partner","plates","pull_up_bar","rack","rings","rope_attachment","rowing_erg","sliders","smooth_floor","stair","stairmaster","stationary_bike","step","sturdy_table","towel","trap_bar","treadmill","wall"]

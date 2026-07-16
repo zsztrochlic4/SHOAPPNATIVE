@@ -1,0 +1,481 @@
+/**
+ * GENERATED from workbook sheet "Session Templates" via SheetJS. Do not hand-edit.
+ * Source of truth is the workbook / CLEAN csv.
+ */
+import type { SessionSlot } from './types'
+
+export const SESSION_TEMPLATES: SessionSlot[] = [
+  {
+    "slotId": "Full-1",
+    "dayType": "Full",
+    "order": 1,
+    "slotName": "Squat compound",
+    "muscleGroupFilter": "Quads",
+    "movementPatternFilter": "Squat|Lunge",
+    "typeFilter": "Compound",
+    "required": true,
+    "note": "The biggest lift goes first, freshest."
+  },
+  {
+    "slotId": "Full-2",
+    "dayType": "Full",
+    "order": 2,
+    "slotName": "Push",
+    "muscleGroupFilter": "Chest",
+    "movementPatternFilter": "Horizontal Push|Vertical Push",
+    "typeFilter": "Compound",
+    "required": true,
+    "note": "Main press of the day."
+  },
+  {
+    "slotId": "Full-3",
+    "dayType": "Full",
+    "order": 3,
+    "slotName": "Pull",
+    "muscleGroupFilter": "Back",
+    "movementPatternFilter": "Horizontal Pull|Vertical Pull",
+    "typeFilter": "Compound",
+    "required": true,
+    "note": "Every push is matched by a pull."
+  },
+  {
+    "slotId": "Full-4",
+    "dayType": "Full",
+    "order": 4,
+    "slotName": "Hinge",
+    "muscleGroupFilter": "Hamstrings & Glutes|Back",
+    "movementPatternFilter": "Hinge",
+    "typeFilter": "Compound",
+    "required": true,
+    "note": "Hinge pattern every session."
+  },
+  {
+    "slotId": "Full-5",
+    "dayType": "Full",
+    "order": 5,
+    "slotName": "Isolation filler",
+    "muscleGroupFilter": "Shoulders|Biceps|Triceps",
+    "movementPatternFilter": "Any",
+    "typeFilter": "Isolation",
+    "required": false,
+    "note": "Filled when session time allows, rotated across the week."
+  },
+  {
+    "slotId": "Full-6",
+    "dayType": "Full",
+    "order": 6,
+    "slotName": "Core",
+    "muscleGroupFilter": "Core",
+    "movementPatternFilter": "Any",
+    "typeFilter": "Isolation",
+    "required": true,
+    "note": "Core finishes every full body day."
+  },
+  {
+    "slotId": "Upper-1",
+    "dayType": "Upper",
+    "order": 1,
+    "slotName": "Horizontal push",
+    "muscleGroupFilter": "Chest",
+    "movementPatternFilter": "Horizontal Push",
+    "typeFilter": "Compound",
+    "required": true,
+    "note": "Main press first."
+  },
+  {
+    "slotId": "Upper-2",
+    "dayType": "Upper",
+    "order": 2,
+    "slotName": "Horizontal pull",
+    "muscleGroupFilter": "Back",
+    "movementPatternFilter": "Horizontal Pull",
+    "typeFilter": "Compound",
+    "required": true,
+    "note": "Row to match the press."
+  },
+  {
+    "slotId": "Upper-3",
+    "dayType": "Upper",
+    "order": 3,
+    "slotName": "Vertical push",
+    "muscleGroupFilter": "Shoulders",
+    "movementPatternFilter": "Vertical Push",
+    "typeFilter": "Compound",
+    "required": true,
+    "note": "Overhead work."
+  },
+  {
+    "slotId": "Upper-4",
+    "dayType": "Upper",
+    "order": 4,
+    "slotName": "Vertical pull",
+    "muscleGroupFilter": "Back",
+    "movementPatternFilter": "Vertical Pull",
+    "typeFilter": "Compound",
+    "required": true,
+    "note": "Pulldown or chin up pattern."
+  },
+  {
+    "slotId": "Upper-5",
+    "dayType": "Upper",
+    "order": 5,
+    "slotName": "Biceps isolation",
+    "muscleGroupFilter": "Biceps",
+    "movementPatternFilter": "Any",
+    "typeFilter": "Isolation",
+    "required": false,
+    "note": "Arms fill remaining time."
+  },
+  {
+    "slotId": "Upper-6",
+    "dayType": "Upper",
+    "order": 6,
+    "slotName": "Triceps isolation",
+    "muscleGroupFilter": "Triceps",
+    "movementPatternFilter": "Any",
+    "typeFilter": "Isolation",
+    "required": false,
+    "note": "Arms fill remaining time."
+  },
+  {
+    "slotId": "Lower-1",
+    "dayType": "Lower",
+    "order": 1,
+    "slotName": "Squat compound",
+    "muscleGroupFilter": "Quads",
+    "movementPatternFilter": "Squat",
+    "typeFilter": "Compound",
+    "required": true,
+    "note": "Main lift first."
+  },
+  {
+    "slotId": "Lower-2",
+    "dayType": "Lower",
+    "order": 2,
+    "slotName": "Hinge",
+    "muscleGroupFilter": "Hamstrings & Glutes",
+    "movementPatternFilter": "Hinge",
+    "typeFilter": "Compound",
+    "required": true,
+    "note": "Squat and hinge in every lower session."
+  },
+  {
+    "slotId": "Lower-3",
+    "dayType": "Lower",
+    "order": 3,
+    "slotName": "Single leg",
+    "muscleGroupFilter": "Quads",
+    "movementPatternFilter": "Lunge",
+    "typeFilter": "Compound",
+    "required": true,
+    "note": "Unilateral work every lower day."
+  },
+  {
+    "slotId": "Lower-4",
+    "dayType": "Lower",
+    "order": 4,
+    "slotName": "Knee flexion",
+    "muscleGroupFilter": "Hamstrings & Glutes",
+    "movementPatternFilter": "Isolation",
+    "typeFilter": "Isolation",
+    "required": true,
+    "note": "Direct hamstring work."
+  },
+  {
+    "slotId": "Lower-5",
+    "dayType": "Lower",
+    "order": 5,
+    "slotName": "Calves",
+    "muscleGroupFilter": "Calves",
+    "movementPatternFilter": "Any",
+    "typeFilter": "Isolation",
+    "required": false,
+    "note": "Filled when time allows."
+  },
+  {
+    "slotId": "Lower-6",
+    "dayType": "Lower",
+    "order": 6,
+    "slotName": "Core",
+    "muscleGroupFilter": "Core",
+    "movementPatternFilter": "Any",
+    "typeFilter": "Isolation",
+    "required": true,
+    "note": "Core finishes the session."
+  },
+  {
+    "slotId": "Push-1",
+    "dayType": "Push",
+    "order": 1,
+    "slotName": "Horizontal push",
+    "muscleGroupFilter": "Chest",
+    "movementPatternFilter": "Horizontal Push",
+    "typeFilter": "Compound",
+    "required": true,
+    "note": "Main press first."
+  },
+  {
+    "slotId": "Push-2",
+    "dayType": "Push",
+    "order": 2,
+    "slotName": "Vertical push",
+    "muscleGroupFilter": "Shoulders",
+    "movementPatternFilter": "Vertical Push",
+    "typeFilter": "Compound",
+    "required": true,
+    "note": "Overhead second."
+  },
+  {
+    "slotId": "Push-3",
+    "dayType": "Push",
+    "order": 3,
+    "slotName": "Secondary press or fly",
+    "muscleGroupFilter": "Chest",
+    "movementPatternFilter": "Any",
+    "typeFilter": "Any",
+    "required": true,
+    "note": "A second chest angle or a fly."
+  },
+  {
+    "slotId": "Push-4",
+    "dayType": "Push",
+    "order": 4,
+    "slotName": "Lateral delt",
+    "muscleGroupFilter": "Shoulders",
+    "movementPatternFilter": "Isolation",
+    "typeFilter": "Isolation",
+    "required": true,
+    "note": "Direct side delt work."
+  },
+  {
+    "slotId": "Push-5",
+    "dayType": "Push",
+    "order": 5,
+    "slotName": "Triceps",
+    "muscleGroupFilter": "Triceps",
+    "movementPatternFilter": "Any",
+    "typeFilter": "Isolation",
+    "required": true,
+    "note": "Triceps close the day."
+  },
+  {
+    "slotId": "Pull-1",
+    "dayType": "Pull",
+    "order": 1,
+    "slotName": "Hinge or heavy row",
+    "muscleGroupFilter": "Back",
+    "movementPatternFilter": "Hinge|Horizontal Pull",
+    "typeFilter": "Compound",
+    "required": true,
+    "note": "Heaviest pull first."
+  },
+  {
+    "slotId": "Pull-2",
+    "dayType": "Pull",
+    "order": 2,
+    "slotName": "Vertical pull",
+    "muscleGroupFilter": "Back",
+    "movementPatternFilter": "Vertical Pull",
+    "typeFilter": "Compound",
+    "required": true,
+    "note": "Lat width work."
+  },
+  {
+    "slotId": "Pull-3",
+    "dayType": "Pull",
+    "order": 3,
+    "slotName": "Second row",
+    "muscleGroupFilter": "Back",
+    "movementPatternFilter": "Horizontal Pull",
+    "typeFilter": "Compound",
+    "required": true,
+    "note": "A different row angle."
+  },
+  {
+    "slotId": "Pull-4",
+    "dayType": "Pull",
+    "order": 4,
+    "slotName": "Rear delt",
+    "muscleGroupFilter": "Shoulders",
+    "movementPatternFilter": "Isolation|Horizontal Pull",
+    "typeFilter": "Isolation",
+    "required": true,
+    "note": "Rear delts every pull day."
+  },
+  {
+    "slotId": "Pull-5",
+    "dayType": "Pull",
+    "order": 5,
+    "slotName": "Biceps",
+    "muscleGroupFilter": "Biceps",
+    "movementPatternFilter": "Any",
+    "typeFilter": "Isolation",
+    "required": true,
+    "note": "Biceps close the day."
+  },
+  {
+    "slotId": "Legs-1",
+    "dayType": "Legs",
+    "order": 1,
+    "slotName": "Squat compound",
+    "muscleGroupFilter": "Quads",
+    "movementPatternFilter": "Squat",
+    "typeFilter": "Compound",
+    "required": true,
+    "note": "Main lift first."
+  },
+  {
+    "slotId": "Legs-2",
+    "dayType": "Legs",
+    "order": 2,
+    "slotName": "Hinge",
+    "muscleGroupFilter": "Hamstrings & Glutes",
+    "movementPatternFilter": "Hinge",
+    "typeFilter": "Compound",
+    "required": true,
+    "note": "Hip hinge second."
+  },
+  {
+    "slotId": "Legs-3",
+    "dayType": "Legs",
+    "order": 3,
+    "slotName": "Single leg",
+    "muscleGroupFilter": "Quads",
+    "movementPatternFilter": "Lunge",
+    "typeFilter": "Compound",
+    "required": true,
+    "note": "Unilateral work."
+  },
+  {
+    "slotId": "Legs-4",
+    "dayType": "Legs",
+    "order": 4,
+    "slotName": "Knee flexion",
+    "muscleGroupFilter": "Hamstrings & Glutes",
+    "movementPatternFilter": "Isolation",
+    "typeFilter": "Isolation",
+    "required": true,
+    "note": "Direct hamstrings."
+  },
+  {
+    "slotId": "Legs-5",
+    "dayType": "Legs",
+    "order": 5,
+    "slotName": "Calves",
+    "muscleGroupFilter": "Calves",
+    "movementPatternFilter": "Any",
+    "typeFilter": "Isolation",
+    "required": true,
+    "note": "Calves every leg day."
+  },
+  {
+    "slotId": "Legs-6",
+    "dayType": "Legs",
+    "order": 6,
+    "slotName": "Core",
+    "muscleGroupFilter": "Core",
+    "movementPatternFilter": "Any",
+    "typeFilter": "Isolation",
+    "required": false,
+    "note": "When time allows."
+  },
+  {
+    "slotId": "Focus-1",
+    "dayType": "Focus",
+    "order": 1,
+    "slotName": "Focal slot 1",
+    "muscleGroupFilter": "FOCAL_1",
+    "movementPatternFilter": "Any",
+    "typeFilter": "Compound>Isolation",
+    "required": true,
+    "note": "Compound preferred, isolation if the focal muscle has no compound (Core, Calves)."
+  },
+  {
+    "slotId": "Focus-2",
+    "dayType": "Focus",
+    "order": 2,
+    "slotName": "Focal slot 2",
+    "muscleGroupFilter": "FOCAL_1",
+    "movementPatternFilter": "Any, different pattern to slot 1",
+    "typeFilter": "Compound>Isolation",
+    "required": true,
+    "note": "A second angle on the same target."
+  },
+  {
+    "slotId": "Focus-3",
+    "dayType": "Focus",
+    "order": 3,
+    "slotName": "Focal isolation 1",
+    "muscleGroupFilter": "FOCAL_1",
+    "movementPatternFilter": "Any",
+    "typeFilter": "Isolation>Compound",
+    "required": true,
+    "note": "Direct volume."
+  },
+  {
+    "slotId": "Focus-4",
+    "dayType": "Focus",
+    "order": 4,
+    "slotName": "Focal isolation 2",
+    "muscleGroupFilter": "FOCAL_2|FOCAL_1",
+    "movementPatternFilter": "Any",
+    "typeFilter": "Isolation>Compound",
+    "required": true,
+    "note": "Second focal point if declared, otherwise more of the first."
+  },
+  {
+    "slotId": "Focus-5",
+    "dayType": "Focus",
+    "order": 5,
+    "slotName": "Core",
+    "muscleGroupFilter": "Core",
+    "movementPatternFilter": "Any",
+    "typeFilter": "Isolation",
+    "required": false,
+    "note": "When time allows."
+  },
+  {
+    "slotId": "Cond-1",
+    "dayType": "Cond",
+    "order": 1,
+    "slotName": "Interval block",
+    "muscleGroupFilter": "Full Body & Conditioning",
+    "movementPatternFilter": "Conditioning|Full Body|Hinge",
+    "typeFilter": "Any, Prescription Class = Interval or Power",
+    "required": true,
+    "note": "The main conditioning piece: erg, bike, intervals or swings, prescribed off the Interval or Power grid row for the user's goal."
+  },
+  {
+    "slotId": "Cond-2",
+    "dayType": "Cond",
+    "order": 2,
+    "slotName": "Second block",
+    "muscleGroupFilter": "Full Body & Conditioning",
+    "movementPatternFilter": "Any",
+    "typeFilter": "Any, Prescription Class = Interval",
+    "required": false,
+    "note": "A second modality when session length allows, different to block 1."
+  },
+  {
+    "slotId": "Cond-3",
+    "dayType": "Cond",
+    "order": 3,
+    "slotName": "Carry",
+    "muscleGroupFilter": "Full Body & Conditioning",
+    "movementPatternFilter": "Carry",
+    "typeFilter": "Compound",
+    "required": false,
+    "note": "Farmer or suitcase carry as a finisher."
+  },
+  {
+    "slotId": "Cond-4",
+    "dayType": "Cond",
+    "order": 4,
+    "slotName": "Core",
+    "muscleGroupFilter": "Core",
+    "movementPatternFilter": "Any",
+    "typeFilter": "Isolation",
+    "required": false,
+    "note": "Low fatigue core to close."
+  }
+]

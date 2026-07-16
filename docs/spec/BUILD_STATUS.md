@@ -43,9 +43,25 @@ in demo mode. Naming note: the workbook calls the collection `users`; the app al
 at its top level.
 
 ## P1 — engine
-14-step Generator Flow, Split Selector, Session Templates, Weekly Volume, Prescription Logic,
-Schedule Rules, Progression Engine, Exercise Swaps, Goal Change, Custom Splits, Injury
-Modifications application, Exam Survival Protocol. CC01–CC05. Not started.
+**Steps 1–8 (initial generation) DONE and gated.** `src/backend/generator/`:
+`select.ts` (Split Selector), `schedule.ts` (Schedule Rules SCH02–06), `volume.ts` (Weekly
+Volume + reconciliation rules 1/2/3/7), `build.ts` (Session Templates fill + Prescription +
+Safety clamp + Injury-Mod application + S09 cue), `generate.ts` (orchestrator), plus the
+data seeds `splits/splitSelector/sessionTemplates/weeklyVolume/externalCommitments/injuryModifications/equipmentTags`.
+
+**Hard gate — `sweep.ts::runProfileSweep()` PASSES:** 60 core profiles (4 goals × 3
+experience × 2–6 days) + 3 edge cases (consecutive days, injury flag, conditioning-covering
+commitment) with **zero safety-floor breaches and zero empty required slots**. Verifies S04
+(reps≥4, %1RM≤88), Min-RIR + grid-RIR floors, S01 (advanced-gate), S09 (solo spotter cue),
+and the volume floor(4)/cap(20). Backlog #15 acceptance met (UL4 Int-Hypertrophy chest 10–16;
+PPL6 back trimmed <16).
+
+Equipment taxonomy reconciled to the Exercise Database's own 46-tag vocabulary
+(`equipmentTags.ts`); the onboarding mapping now emits those tags (fixes M4).
+
+Still P1: runtime steps 9–14 (Progression Engine, Exercise Swaps, Goal Change, calendar
+adaptation SCH07/08, deload, re-screen), Custom Splits, Exam Survival Protocol, CC01–CC05.
+Not started — on hold per owner (safety review in progress).
 
 ## P2 — enhancements
 Exercise media, structured equipment taxonomy, conversational entry points, notifications,
