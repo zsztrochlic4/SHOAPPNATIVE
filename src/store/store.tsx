@@ -19,6 +19,7 @@ import type {
   UserMeal,
   WorkoutSession,
 } from './types'
+import type { UserDoc } from '../backend/schema'
 
 const STORAGE_KEY = 'sho.state.v1'
 
@@ -27,7 +28,7 @@ export type Action =
   | { type: 'HYDRATE'; state: AppState }
   | { type: 'SET_SETTINGS'; patch: Partial<Settings> }
   | { type: 'SET_PROFILE'; patch: Partial<Profile> }
-  | { type: 'COMPLETE_ONBOARDING'; profile: Partial<Profile> }
+  | { type: 'COMPLETE_ONBOARDING'; profile: Partial<Profile>; backendUser?: UserDoc }
   | { type: 'LOG_WEIGHT'; kg: number }
   | { type: 'ADJUST_WATER'; deltaL: number }
   | { type: 'PATCH_TODAY_HABIT'; patch: Partial<{ steps: number; sleepH: number; mindsetMin: number; waterL: number }> }
@@ -103,7 +104,11 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, profile: { ...state.profile, ...action.patch } }
 
     case 'COMPLETE_ONBOARDING':
-      return { ...state, profile: { ...state.profile, ...action.profile, onboarded: true } }
+      return {
+        ...state,
+        profile: { ...state.profile, ...action.profile, onboarded: true },
+        backendUser: action.backendUser ?? state.backendUser,
+      }
 
     case 'LOG_WEIGHT': {
       const others = state.weights.filter((w) => w.dateKey !== todayKey)

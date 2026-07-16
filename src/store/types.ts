@@ -1,4 +1,5 @@
 import type { Language } from '../lib/i18n'
+import type { UserDoc } from '../backend/schema'
 
 export type Units = 'metric' | 'imperial'
 export type Theme = 'dark' | 'light'
@@ -456,6 +457,9 @@ export interface AppState {
   coachUsage?: { dateKey: string; count: number }
   /** connected health platforms (Strava, Whoop, ...) and their sync state */
   integrations?: Record<string, IntegrationState>
+  /** Canonical backend `users` document (workout backend source of truth). Written
+   *  only by the onboarding mapping module; the local Profile above is derived from it. */
+  backendUser?: UserDoc
   /** schema version for migrations */
   v: number
 }

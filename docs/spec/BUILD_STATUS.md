@@ -24,11 +24,11 @@ work lands. Source of truth = `StrengthHub_Workout_Backend_v16.xlsx` (see `sheet
 | 8 | Safety Rules engine (S01–S09, P01–P03 floors) | Safety Rules | ✅ core done | `src/backend/safety/safetyRules.ts` |
 | 2 | Seed exercises (all columns) | Exercise Database | ✅ done (113) | `src/backend/data/exercises.ts` |
 | 3 | Seed substitutions (ID-based) | Substitutions | ✅ done (542) | `src/backend/data/substitutions.ts` |
-| 5 | Wire new onboarding: B1 flow reorder, B2 dob storage, M1 structured for Advanced, produce UserDoc, persist | Onboarding Questions/Contract | ⏳ next | `src/screens/Onboarding.tsx` |
-| 5b | Firestore persistence (write UserDoc / read on load) | Data Schemas | ⏳ todo | `src/backend/repo/*` |
+| 5 | Wire new onboarding: B1 flow reorder, B2 dob storage, M1 structured for Advanced, produce UserDoc | Onboarding Questions/Contract | ✅ done | `src/screens/Onboarding.tsx` |
+| 5b | Firestore persistence (write UserDoc / read on load) | Data Schemas | ⏳ todo (currently in app state `backendUser`) | `src/backend/repo/*` |
 | 9 | Stop-symptom escalation (S06) | Safety Rules S06 | ⏳ todo | `src/backend/safety/stopSymptom.ts` |
 | 10 | Coach AI Operating Rules as system-prompt contract | Coach AI Operating Rules | ⏳ todo | `src/backend/coach/operatingRules.ts` |
-| CC06 | Free-text red-flag scan on `notes` | Screening Outcomes / S05 | ⏳ todo | `src/backend/safety/redFlagScan.ts` |
+| CC06 | Free-text red-flag scan on `notes` | Screening Outcomes / S05 | ✅ done | `src/backend/safety/redFlagScan.ts` |
 | 11 | **Accredited professional sign-off gate** (coach stays disabled until on file) | Safety sheets | ⏳ todo (config flag) | — |
 
 ## P1 — engine

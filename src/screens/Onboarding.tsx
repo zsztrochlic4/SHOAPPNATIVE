@@ -31,6 +31,13 @@ import { tick, thud } from '../lib/haptics'
 import { todayKey } from '../lib/date'
 import { LANGUAGES, type Language } from '../lib/i18n'
 import type { Equipment, Experience, Goal, Profile } from '../store/types'
+import {
+  buildUserDoc, mapAffectedRegions, mapFollowups, mapScreeningAnswers,
+  type OnboardingInput,
+} from '../backend/mapping/onboardingContract'
+import { deriveLocalProfile } from '../backend/mapping/projection'
+import { evaluateScreening } from '../backend/safety/screening'
+import { hasRedFlag } from '../backend/safety/redFlagScan'
 
 const NATIVE = Platform.OS !== 'web'
 /** Prototype motion curve (cubic-bezier(0.22,0.8,0.28,1)). */
@@ -84,6 +91,8 @@ interface Answers {
   motivation: string
   safety: Record<string, 'yes' | 'no'>
   followup: Record<string, string>
+  /** Region(s) captured when screening Q5 = Yes with no injury chip (B1). */
+  screeningRegions: string[]
   movements: string[]; movementsOther: string
   terms: boolean
 }
@@ -95,7 +104,7 @@ const DEFAULT_ANSWERS: Answers = {
   days: ['Monday', 'Wednesday', 'Friday', 'Saturday'], session: 60, alone: '',
   environment: 'gym', equipment: [], trainAround: [], moreInfo: '',
   activities: [], activityOther: '', activityDetail: {}, loveExercises: [], avoidExercises: [],
-  motivation: '', safety: {}, followup: {}, movements: [], movementsOther: '', terms: false,
+  motivation: '', safety: {}, followup: {}, screeningRegions: [], movements: [], movementsOther: '', terms: false,
 }
 
 /* ─────────────────────────────── option data ─────────────────────────────── */
@@ -199,20 +208,36 @@ function joinAreas(list: string[]) {
   return l.slice(0, -1).join(', ') + ' and ' + l[l.length - 1]
 }
 type Verdict = 'clear' | 'modify' | 'block' | 'donotgenerate'
-function evaluateSafety(a: Answers): Verdict {
-  const s = a.safety || {}
-  if (s.s3 === 'yes') return 'donotgenerate'
-  if (s.s1 === 'yes' || s.s2 === 'yes' || s.s4 === 'yes' || s.s6 === 'yes' || s.s7 === 'yes') return 'block'
-  const areas = trainAroundAreas(a)
-  const f = a.followup || {}
-  if (areas.length > 0) {
-    if (f.f1 === 'yes' || f.f2 === 'yes' || f.f3 === 'yes' || f.f4 === 'active' || f.f4 === 'unsure') return 'block'
-    return 'modify'
-  }
-  if (s.s5 === 'yes') return 'block'
-  return 'clear'
+
+/** All region labels feeding the screening: injury chips + any Q5-only capture (B1). */
+function screeningRegionLabels(a: Answers): string[] {
+  return [...trainAroundAreas(a), ...(a.screeningRegions || [])]
 }
-function needsFollowup(a: Answers) { return trainAroundAreas(a).length > 0 }
+
+/**
+ * Screening verdict — delegates to the single backend router so the on-screen
+ * outcome always matches what the generator stores. B1 (Q5 → joint follow-ups) and
+ * the MODIFY-vs-CLEARANCE routing live there, not here.
+ */
+function evaluateSafety(a: Answers): Verdict {
+  const res = evaluateScreening({
+    answers: mapScreeningAnswers(a.safety || {}),
+    followups: mapFollowups(a.followup || {}, a.movements || []),
+    affectedRegions: mapAffectedRegions(screeningRegionLabels(a)),
+    redFlag: false, // the CC06 free-text scan runs at finish, not on this UI verdict
+  })
+  switch (res.outcome) {
+    case 'DO_NOT_GENERATE': return 'donotgenerate'
+    case 'REQUIRE_PROFESSIONAL_CLEARANCE': return 'block'
+    case 'MODIFY_AND_CONTINUE': return 'modify'
+    default: return 'clear'
+  }
+}
+
+/** B1: the joint follow-ups are needed on an injury chip OR a Yes to screening Q5. */
+function needsFollowup(a: Answers) {
+  return trainAroundAreas(a).length > 0 || a.safety?.s5 === 'yes'
+}
 const targetsFor = (goal: Goal) => {
   switch (goal) {
     case 'build-muscle': return { calorieTarget: 2600, proteinTarget: 170, carbTarget: 300, fatTarget: 75 }
@@ -223,6 +248,45 @@ const targetsFor = (goal: Goal) => {
 }
 const GOAL_MAP: Record<GoalKey, Goal> = { build: 'build-muscle', lose: 'lose-fat', strong: 'gain-strength', healthy: 'stay-healthy' }
 const EQUIP_MAP: Record<EnvKey, Equipment> = { gym: 'full-gym', home: 'home-basic', bodyweight: 'dorm-bodyweight' }
+
+/** Adapt the wizard's Answers to the deterministic mapping module's input shape. The
+ *  Q5-only screening region(s) are merged into `trainAround` so affected_regions covers
+ *  both the injury chips and a Q5 capture. */
+function answersToInput(a: Answers, uid: string): OnboardingInput {
+  return {
+    uid,
+    name: a.name,
+    dob: a.dob,
+    guardianConsent: a.guardianConsent,
+    sex: a.sex,
+    height: a.height,
+    weight: a.weight,
+    goalWeight: a.goalWeight,
+    noGoalWeight: a.noGoalWeight,
+    goal: a.goal,
+    focus: a.focus,
+    experience: a.experience,
+    structured: a.structured,
+    days: a.days,
+    session: a.session,
+    alone: a.alone as OnboardingInput['alone'],
+    environment: a.environment,
+    equipment: a.equipment,
+    trainAround: [...(a.trainAround || []).filter((x) => x !== 'None'), ...(a.screeningRegions || [])],
+    moreInfo: a.moreInfo,
+    activities: a.activities,
+    activityOther: a.activityOther,
+    activityDetail: a.activityDetail,
+    loveExercises: a.loveExercises,
+    avoidExercises: a.avoidExercises,
+    motivation: a.motivation,
+    safety: a.safety,
+    followup: a.followup,
+    movements: a.movements,
+    movementsOther: a.movementsOther,
+    terms: a.terms,
+  }
+}
 
 function goalMessage(a: Answers) {
   const map: Record<GoalKey, { title: string; sub: string }> = {
@@ -283,7 +347,9 @@ function buildFlow(a: Answers): Step[] {
   push({ id: 'p_focus', type: 'interstitial', section: 'goals', compute: focusMessage })
 
   push({ id: 'd1', type: 'single', section: 'training', key: 'experience', title: 'How experienced are you with training?', options: EXPERIENCE_OPTIONS, cards: true })
-  if (a.experience === 'intermediate') {
+  // M1: ask about prior structured programming for Intermediate AND Advanced. Stored so
+  // the generator can apply Safety P01's conservative first block consistently.
+  if (a.experience === 'intermediate' || a.experience === 'advanced') {
     push({ id: 'd2', type: 'single', section: 'training', key: 'structured', title: 'Have you followed a structured training program before?', options: [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }], autoAdvance: true })
     if (a.structured === 'no') push({ id: 'p_structured', type: 'interstitial', section: 'training', compute: () => ({ title: 'No problem at all', sub: 'We’ll give you a clear structure to follow from day one.' }) })
   }
@@ -310,14 +376,21 @@ function buildFlow(a: Answers): Step[] {
   push({ id: 'j1', type: 'text', section: 'lifestyle', key: 'motivation', title: 'What’s driving you?', sub: 'There’s no wrong answer. This helps make your experience feel more relevant to you.', placeholder: 'e.g. I want to feel fitter and build a routine I can keep', optional: true, multiline: true, appendPrompts: true, prompts: ['I want to look better', 'I’m getting ready for summer', 'I want to feel fitter', 'I want to build a better routine', 'I want to feel more confident', 'I want to prove I can stay consistent'] })
   push({ id: 'p_motivation', type: 'interstitial', section: 'lifestyle', compute: () => ({ title: 'That’s worth working toward', sub: 'We’ll keep this front of mind as we build your plan.' }) })
 
+  // B1: the 7-question screening runs FIRST, then the joint follow-ups fire on either an
+  // injury chip OR a Yes to screening Q5 (bone/joint/soft-tissue). A bare Q5 = Yes is no
+  // longer auto-blocked; the follow-ups decide MODIFY vs professional clearance.
+  push({ id: 'safetyall', type: 'safetyall', section: 'safety' })
   if (needsFollowup(a)) {
+    // Q5 = Yes with no chip: capture which area it is so the MODIFY rules have a region.
+    if (a.safety?.s5 === 'yes' && trainAroundAreas(a).length === 0) {
+      push({ id: 'sregion', type: 'multi', section: 'safety', key: 'screeningRegions', title: 'Which area is affected?', sub: 'Pick the area your answer was about so we can train around it safely.', options: TRAIN_AROUND_OPTIONS })
+    }
     push({ id: 'fintro', type: 'followupintro', section: 'safety' })
     SAFETY_FOLLOWUPS.forEach((q) => push({ id: q.id, type: 'followup', section: 'safety', key: q.id, q }))
     push({ id: 'fmoves', type: 'movements', section: 'safety', key: 'movements', title: 'Which movements cause discomfort?', sub: 'Optional. Select any that apply and add your own.' })
   }
-  push({ id: 'safetyall', type: 'safetyall', section: 'safety' })
   const v = evaluateSafety(a)
-  if (v !== 'clear' && v !== 'modify') push({ id: 'outcome', type: 'safetyoutcome', section: 'safety' })
+  if (v === 'block' || v === 'donotgenerate') push({ id: 'outcome', type: 'safetyoutcome', section: 'safety' })
 
   return flow
 }
@@ -746,6 +819,7 @@ type Phase = 'splash' | 'welcome' | 'login' | 'flow' | 'gate-under16' | 'gate-gu
 
 export default function Onboarding() {
   const dispatch = useDispatch()
+  const { user } = useAuth()
   const tok = useTok()
   const [answers, setAnswers] = useState<Answers>(DEFAULT_ANSWERS)
   const [index, setIndex] = useState(0)
@@ -780,8 +854,12 @@ export default function Onboarding() {
       if (age !== null && age < 16) { setDir('fwd'); setPhase('gate-under16'); return }
       if (age !== null && age < 18 && !answers.guardianConsent) { setDir('fwd'); setPhase('gate-guardian'); return }
     }
-    if (step.type === 'safetyoutcome') { setDir('fwd'); setPhase('terms'); return }
-    if (step.type === 'safetyall' && !(flow[index + 1] && flow[index + 1].type === 'safetyoutcome')) { setDir('fwd'); setPhase('terms'); return }
+    // The blocked-outcome screen is a dead-end (its own "come back later" button).
+    if (step.type === 'safetyoutcome') return
+    // Any safety step that is the last in the flow means a CLEAR/MODIFY verdict with no
+    // outcome screen to follow → proceed to terms. Otherwise advance into the next
+    // safety step (follow-ups, or the block-outcome screen).
+    if (step.section === 'safety' && index >= flow.length - 1) { setDir('fwd'); setPhase('terms'); return }
     advance()
   }
   const onEdit = (stepId: string) => {
@@ -791,30 +869,15 @@ export default function Onboarding() {
   const restart = () => { setAnswers(DEFAULT_ANSWERS); setIndex(0); setReturnToSummary(false); setDir('fwd'); setPhase('welcome') }
 
   function finish() {
-    const goal = GOAL_MAP[(answers.goal || 'build') as GoalKey]
-    const injuries = [joinAreas(trainAroundAreas(answers)), answers.moreInfo.trim()].filter(Boolean).join('. ')
-    const profile: Partial<Profile> = {
-      name: normalizeName(answers.name) || 'Athlete',
-      age: ageFromDob(answers.dob) ?? 20,
-      goal,
-      experience: (answers.experience || 'beginner') as Experience,
-      daysPerWeek: answers.days.length || 3,
-      sessionMinutes: answers.session,
-      equipment: EQUIP_MAP[(answers.environment || 'gym') as EnvKey],
-      newToGym: answers.experience === 'beginner',
-      heightCm: answers.height,
-      startWeightKg: Math.round(answers.weight * 10) / 10,
-      goalWeightKg: answers.noGoalWeight ? Math.round(answers.weight * 10) / 10 : Math.round(answers.goalWeight * 10) / 10,
-      injuries,
-      motivation: answers.motivation.trim(),
-      budgetMode: false,
-      dietaryPrefs: [],
-      createdAtKey: todayKey,
-      ...targetsFor(goal),
-    }
-    if (answers.sex) profile.sex = answers.sex
+    // Build the canonical backend `users` document via the single deterministic mapping
+    // module (the ONLY place it's constructed), run the CC06 red-flag scan on the free
+    // text, then derive the local Profile from it — one-directional, no write-back.
+    // B2: date_of_birth is carried through and age is derived, never defaulted to 20.
+    const input = answersToInput(answers, user?.uid ?? 'local')
+    const userDoc = buildUserDoc(input, { redFlag: hasRedFlag(answers.moreInfo) })
+    const profile: Partial<Profile> = { ...deriveLocalProfile(userDoc), createdAtKey: todayKey }
     thud()
-    dispatch({ type: 'COMPLETE_ONBOARDING', profile })
+    dispatch({ type: 'COMPLETE_ONBOARDING', profile, backendUser: userDoc })
   }
 
   const header = <ProgressHeader sectionIdx={sectionIdx} sectionProgress={sectionProgress} onBack={back} />
@@ -944,7 +1007,7 @@ function StepView({ step, answers, set, header, onContinue, onAdvance, onRestart
       return <MidTransition header={header} onContinue={onAdvance} />
 
     case 'followupintro': {
-      const areas = joinAreas(trainAroundAreas(answers))
+      const areas = joinAreas(screeningRegionLabels(answers))
       return (
         <View style={{ flex: 1 }}>
           {header}
@@ -984,7 +1047,7 @@ function StepView({ step, answers, set, header, onContinue, onAdvance, onRestart
       const sel = answers.movements
       const toggle = (m: string) => { tick(); set('movements', sel.includes(m) ? sel.filter((x) => x !== m) : [...sel, m]) }
       return (
-        <Shell header={header} footer={<ActionBar onPress={onContinue} onSkip={onAdvance} skipLabel="Nothing specific" />}>
+        <Shell header={header} footer={<ActionBar onPress={onContinue} onSkip={onContinue} skipLabel="Nothing specific" />}>
           <QHeader title={step.title} sub={step.sub} />
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
             <Stagger start={150} step={40}>
