@@ -13,7 +13,7 @@ follow_up_question	answer_to_modify	answer_to_clearance
 Is the problem painful right now?	No / mild and settling	Yes, currently painful
 Is it being treated by a health professional?	No / discharged	Yes, under active treatment
 Have you been told to limit or avoid exercise?	No	Yes, exercise restricted
-Is the issue resolved, or still active?	Resolved or stable	Still active / flaring
+Is the issue resolved, or still active?	Resolved or stable	Still active / flaring / unsure
 Which movements make it worse? (free text)	Stored as affected_region for SW02 filtering	-
 
 Free-text red-flag scan ('anything else we should know?')
