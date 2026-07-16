@@ -170,8 +170,12 @@ export function runProfileSweep(): SweepResult {
   // the test only, and restore it so the sweep never enables the coach as a side effect.
   const prevSigned = PROFESSIONAL_SIGNOFF.signed
   const prevSheets = PROFESSIONAL_SIGNOFF.sheetsReviewed
+  const prevReviewer = PROFESSIONAL_SIGNOFF.reviewer
+  const prevAccreditation = PROFESSIONAL_SIGNOFF.accreditation
   PROFESSIONAL_SIGNOFF.signed = true
   PROFESSIONAL_SIGNOFF.sheetsReviewed = [...REQUIRED_REVIEW_SHEETS]
+  PROFESSIONAL_SIGNOFF.reviewer = 'SWEEP_TEST_REVIEWER'
+  PROFESSIONAL_SIGNOFF.accreditation = 'SWEEP_TEST_ACCREDITATION'
   try {
     const goals: BackendGoal[] = ['Hypertrophy', 'Fat Loss', 'Strength', 'General Fitness']
     const exps: BackendExperience[] = ['Beginner', 'Intermediate', 'Advanced']
@@ -258,6 +262,8 @@ export function runProfileSweep(): SweepResult {
   } finally {
     PROFESSIONAL_SIGNOFF.signed = prevSigned
     PROFESSIONAL_SIGNOFF.sheetsReviewed = prevSheets
+    PROFESSIONAL_SIGNOFF.reviewer = prevReviewer
+    PROFESSIONAL_SIGNOFF.accreditation = prevAccreditation
   }
   return { passed: failures.length === 0, count, failures }
 }

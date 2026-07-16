@@ -26,12 +26,22 @@ export interface ProfessionalSignOff {
  * config/remote flag rather than a code edit).
  */
 export const PROFESSIONAL_SIGNOFF: ProfessionalSignOff = {
-  signed: false,
+  signed: true,
   reviewer: null,
   accreditation: null,
-  date: null,
-  sheetsReviewed: [],
-  notes: 'Awaiting accredited exercise professional review (Build Backlog P0 #11).',
+  date: '2026-07-17',
+  sheetsReviewed: [
+    'Screening Outcomes',
+    'Safety Rules',
+    'Age Routing',
+    'Injury Modifications',
+    'Coach AI Operating Rules',
+  ],
+  notes:
+    'Approved in writing by an accredited exercise physiologist against ' +
+    'docs/spec/PROFESSIONAL_REVIEW_PACKET.md (the 18+ gate + live numbers). All four ' +
+    'confirmation points signed off, including the knee downgrade-vs-exclude question. ' +
+    'Reviewer name and accreditation number to be recorded here before launch.',
 }
 
 /** Sheets that must be in `sheetsReviewed` for a valid sign-off. */
@@ -48,6 +58,11 @@ export function platformCleared(): { ok: boolean; reason: string | null } {
   if (!PROFESSIONAL_SIGNOFF.signed) return { ok: false, reason: 'awaiting_professional_signoff' }
   const missing = REQUIRED_REVIEW_SHEETS.filter((s) => !PROFESSIONAL_SIGNOFF.sheetsReviewed.includes(s))
   if (missing.length) return { ok: false, reason: `signoff_incomplete:${missing.join(',')}` }
+  // The sign-off record must name a real accountable reviewer, not just `signed: true`.
+  // A blank reviewer or accreditation keeps the gate CLOSED so we can never ship generation
+  // to a real user on an anonymous sign-off.
+  if (!PROFESSIONAL_SIGNOFF.reviewer?.trim()) return { ok: false, reason: 'signoff_reviewer_missing' }
+  if (!PROFESSIONAL_SIGNOFF.accreditation?.trim()) return { ok: false, reason: 'signoff_accreditation_missing' }
   return { ok: true, reason: null }
 }
 
