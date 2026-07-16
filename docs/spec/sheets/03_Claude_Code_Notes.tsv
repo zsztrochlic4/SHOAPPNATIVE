@@ -1,6 +1,5 @@
-Claude Code Notes
-In-app engineering notes captured during design: things the app (SHOAPPNATIVE) must do that are not pure backend rules. Each note points to the spec sheet it depends on. These fold into the Build Backlog.
-
+Claude Code Notes					
+In-app engineering notes captured during design: things the app (SHOAPPNATIVE) must do that are not pure backend rules. Each note points to the spec sheet it depends on. These fold into the Build Backlog.					
 #	Note	Priority	Why it matters	What Claude Code must build	Spec sheet(s)
 CC01	Editable & flexible training days	High	The chosen gym days must be editable after onboarding, and a single week must be reschedulable. A user set to Mon/Tue/Thu should be able to move Monday to Friday from week 2, or shift a session when life gets in the way.	Build an editable training-days setting. On change, re-run Schedule Rules to re-place the week (rest floor, 48h spacing, commitment adjacency) without wiping progression_state. Add a per-session 'move' action that reschedules one session and folds it forward, distinct from a 'miss'.	Schedule Rules, Data Schemas
 CC02	Catch-up on missed days	High	When a user misses a day, they should be able to catch up rather than lose the session. The backend spec (SCH07/08) already shifts or folds; the app needs the UI for it.	Surface a 'catch up' / 'do this next session' option when a planned session was missed. Implement the SCH07 shift-forward and slot-fold logic, and the SCH08 3-week re-plan-and-suggest. A planned_absence (Exam Protocol) suppresses the penalty entirely (SCH10).	Schedule Rules SCH07/08/10, Exam Survival Protocol

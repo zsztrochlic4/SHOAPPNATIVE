@@ -1,6 +1,6 @@
 /**
- * GENERATED from workbook sheet "Substitutions". Do not hand-edit.
- * Regenerate via scripts (see docs/spec). Source of truth is the workbook.
+ * GENERATED from workbook sheet "Substitutions" via SheetJS. Do not hand-edit.
+ * Source of truth is the workbook / CLEAN csv.
  */
 import type { Substitution } from './types'
 

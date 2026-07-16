@@ -1,6 +1,5 @@
-Training Splits
-The splits the generator can serve. day_structure is pipe separated day types, each mapping to a Session Templates row set. best_for_goals and experience are pipe separated tokens, 'All' matches everything. Conditioning is a first class day type (Cond) with its own template, so Interval prescriptions always have a deterministic home. Rest days fill the remaining calendar days per Schedule Rules.
-
+Training Splits							
+The splits the generator can serve. day_structure is pipe separated day types, each mapping to a Session Templates row set. best_for_goals and experience are pipe separated tokens, 'All' matches everything. Conditioning is a first class day type (Cond) with its own template, so Interval prescriptions always have a deterministic home. Rest days fill the remaining calendar days per Schedule Rules.							
 split_id	name	days_min	days_max	day_structure	best_for_goals	experience	why
 FB1	Full Body x1	1	1	Full	All	All	One quality full body session. Not optimal, vastly better than nothing, and honest about it.
 FB2	Full Body x2	2	2	Full|Full	All	All	Every muscle twice a week in two sessions. The most efficient use of two gym days that exists.

@@ -1,6 +1,5 @@
-Progression Engine (runtime)
-How the backend adjusts reps, sets and load from logged performance. Runs at Generator Flow step 9 after every completed workout instance, reading set_logs and writing progression_state. Every adjustment is bounded by the Prescription Grid ranges and the Safety Rules: the engine may move a user within reps_min to reps_max and up to the S07 weekly load cap, and it may never take a user below a floor, above 88 percent 1RM, below 4 reps on a Load exercise, or past the exercise Min RIR. Progression only happens when it is safe: fatigue, missed reps and stop symptoms all pause or reverse it.
-
+Progression Engine (runtime)				
+How the backend adjusts reps, sets and load from logged performance. Runs at Generator Flow step 9 after every completed workout instance, reading set_logs and writing progression_state. Every adjustment is bounded by the Prescription Grid ranges and the Safety Rules: the engine may move a user within reps_min to reps_max and up to the S07 weekly load cap, and it may never take a user below a floor, above 88 percent 1RM, below 4 reps on a Load exercise, or past the exercise Min RIR. Progression only happens when it is safe: fatigue, missed reps and stop symptoms all pause or reverse it.				
 rule_id	adjustment	condition	engine_action	writes_to_progression_state
 PR01	progress load (up)	Loadable exercise. User hit the top of the rep range (reps_max) with the prescribed RIR or easier, for the required number of sessions (default 2 in a row)	Add one increment: 2.5kg upper body, 5kg lower body, or 5 percent, whichever is smaller. Reset reps to reps_min. Capped by Safety Rule S07 (max 5 percent per week).	progression_state.current_load_kg up, current_rep_target reset to reps_min, sessions_at_current=0, stall_count=0
 PR02	progress reps (up)	Non-loadable exercise (bodyweight, band with no more tension), user hit reps_max at target RIR	Add reps beyond reps_max up to a soft ceiling, then slow the lowering phase, then progress to a harder variation via Substitutions (higher skill, same group).	current_rep_target up, or variation swap logged
@@ -10,16 +9,14 @@ PR05	stall	Same exercise fails to progress for 3 consecutive sessions (stall_cou
 PR06	fatigue override	User logs RPE 10 or failure on 3+ sets in a session, or flags poor sleep or a missed prior session	Do not progress this session regardless of PR01/PR02. Apply Safety Rules F02/F03: hold or reduce, raise rir_min by 1. Progression resumes when fatigue clears.	no progression written, fatigue flag noted
 PR07	new exercise starting load	An exercise the user has never done (fresh program, or a swap)	Do not guess heavy. Start at an estimate from a similar logged lift if one exists, otherwise start light at RIR 4 to 5 and let the user find the working weight over 2 sessions (Safety Rule P01).	progression_state row created, first 2 sessions marked as calibration
 PR08	beginner ramp	User is in their first 4 weeks	Progress conservatively: rir_min stays at 2, load increments at the bottom of the range, add reps before load. Block Advanced and Power classes (Safety Rule P01).	standard state writes, capped increments
-
-Load Increments by Equipment
-PR01 says 'add the smallest available increment'. What is available depends on the equipment, not the muscle. The engine rounds the target load to the nearest achievable increment for that equipment before writing it.
-equipment_type	min_increment	rounding_rule
-barbell	2.5 kg total	Round to nearest 2.5 kg (1.25 kg plate per side). 5 kg jumps for lower-body compounds once past the beginner ramp.
-dumbbell	2 to 2.5 kg per hand	Round to the gym's available dumbbell steps; many go up in 2 kg. If the next dumbbell is too big a jump, add reps first.
-fixed_machine	1 plate on the stack	Round to one stack plate. If one plate is too large a jump, add reps or use the half-plate pin if present.
-cable	1 plate on the stack	Same as machine. Cable stacks often start smaller, so increments are gentler.
-bodyweight	add reps, then tempo, then harder variation	No external load. Progress via PR02, not PR01.
-band	next band level	Discrete jumps; add reps within a band before moving up a level, the jump between bands is large.
-assisted	reduce assistance by 2.5 to 5 kg	Less assistance means more of your own bodyweight. Progress by removing assistance, not adding load.
-
-Non-weight progression: duration exercises progress by seconds up to the Time cap (60s), interval exercises by rounds then work-interval length, carries by distance or time, assisted exercises by reducing assistance. The engine reads measurement_type to know which value to move.
+Load Increments by Equipment				
+PR01 says 'add the smallest available increment'. What is available depends on the equipment, not the muscle. The engine rounds the target load to the nearest achievable increment for that equipment before writing it.				
+equipment_type	min_increment	rounding_rule		
+barbell	2.5 kg total	Round to nearest 2.5 kg (1.25 kg plate per side). 5 kg jumps for lower-body compounds once past the beginner ramp.		
+dumbbell	2 to 2.5 kg per hand	Round to the gym's available dumbbell steps; many go up in 2 kg. If the next dumbbell is too big a jump, add reps first.		
+fixed_machine	1 plate on the stack	Round to one stack plate. If one plate is too large a jump, add reps or use the half-plate pin if present.		
+cable	1 plate on the stack	Same as machine. Cable stacks often start smaller, so increments are gentler.		
+bodyweight	add reps, then tempo, then harder variation	No external load. Progress via PR02, not PR01.		
+band	next band level	Discrete jumps; add reps within a band before moving up a level, the jump between bands is large.		
+assisted	reduce assistance by 2.5 to 5 kg	Less assistance means more of your own bodyweight. Progress by removing assistance, not adding load.		
+Non-weight progression: duration exercises progress by seconds up to the Time cap (60s), interval exercises by rounds then work-interval length, carries by distance or time, assisted exercises by reducing assistance. The engine reads measurement_type to know which value to move.				

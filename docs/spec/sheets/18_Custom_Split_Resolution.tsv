@@ -1,6 +1,5 @@
-Custom Split Resolution
-Turns a fuzzy structural request into a specific day_structure, so the same request always resolves the same way. The AI matches the user's day count and what they want to de-emphasise or emphasise, reads the resolved day_structure, then validates it through Custom Split Rules (coverage, 48-hour spacing, shared volume). If the user's phrasing does not match a row, offer the two nearest rows and let them pick. The resolved structure still passes through every safety and volume rule unchanged. This table decides STRUCTURE only, never how hard anything is trained.
-
+Custom Split Resolution			
+Turns a fuzzy structural request into a specific day_structure, so the same request always resolves the same way. The AI matches the user's day count and what they want to de-emphasise or emphasise, reads the resolved day_structure, then validates it through Custom Split Rules (coverage, 48-hour spacing, shared volume). If the user's phrasing does not match a row, offer the two nearest rows and let them pick. The resolved structure still passes through every safety and volume rule unchanged. This table decides STRUCTURE only, never how hard anything is trained.			
 days_per_week	user_request	resolved_day_structure	note
 2	none / balanced	Full|Full	Two days is always full body. Nothing to bias.
 3	none / balanced	Full|Full|Full	Default 3-day. Everything 3x if beginner, or PPL by preference.

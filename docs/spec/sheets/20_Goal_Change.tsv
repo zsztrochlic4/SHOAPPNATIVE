@@ -1,6 +1,5 @@
-Goal Change (runtime)
-What happens when the user changes their goal mid-program. The engine re-runs the parts of the Generator Flow that depend on goal (split selection, volume budget, prescription) while preserving everything that does not (logged loads, progression history, schedule, screening). The user's strength gains and history are never thrown away by a goal change, and intensity never spikes: a single easy transition week absorbs the shift. A goal change always creates a new program version.
-
+Goal Change (runtime)				
+What happens when the user changes their goal mid-program. The engine re-runs the parts of the Generator Flow that depend on goal (split selection, volume budget, prescription) while preserving everything that does not (logged loads, progression history, schedule, screening). The user's strength gains and history are never thrown away by a goal change, and intensity never spikes: a single easy transition week absorbs the shift. A goal change always creates a new program version.				
 rule_id	phase	trigger_or_scope	engine_action	principle
 GC01	detect	User tells the coach they want a different goal, or edits it in settings	Confirm the new canonical goal (Strength, Hypertrophy, Fat Loss, General Fitness) and that they want to change now versus at the next block.	Ask once, do not nag. The user owns their goal.
 GC02	re-select split	New goal may change the best split (e.g. Fat Loss favours a conditioning day, Hypertrophy favours PPL or focus)	Re-run the Split Selector with the new goal and the user's existing days and experience. If the split_id changes, show the user the new structure before applying.	The calendar and commitments carry over, only the day structure may change.

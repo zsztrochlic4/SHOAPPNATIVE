@@ -1,6 +1,5 @@
-Generator Flow
-The end to end order of operations for the workout engine. Steps 1 to 8 build the initial program, steps 9 to 14 run continuously as the user trains and their needs change. The AI layer and the Firestore backend follow these steps in order. No step overrides an earlier HARD_SAFETY outcome, and every runtime change (progression, swap, goal change) is re-clamped by the Safety Rules.
-
+Generator Flow			
+The end to end order of operations for the workout engine. Steps 1 to 8 build the initial program, steps 9 to 14 run continuously as the user trains and their needs change. The AI layer and the Firestore backend follow these steps in order. No step overrides an earlier HARD_SAFETY outcome, and every runtime change (progression, swap, goal change) is re-clamped by the Safety Rules.			
 step	name	what_happens	reads_from
 1	Screen	Run the pre exercise screening. Route on the Screening Outcomes sheet. CLEAR and MODIFY_AND_CONTINUE proceed, everything else stops here.	Screening Outcomes
 2	Collect inputs	Goal, lifting days available (which weekdays, not just how many), session length, experience, exact equipment, focal points (0 to 2), exercises to avoid, and fixed weekly commitments with day, type and intensity.	Onboarding, External Commitments

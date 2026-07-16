@@ -1,6 +1,5 @@
-Onboarding Contract
-One row per onboarding field. This is the contract between the app wizard and the backend: raw_answer is what the user taps, canonical_value is what gets stored and read by the generator. Mappings are deterministic lookups in code, never inferred by the AI at generation time, so two users who tap identical answers always route identically. 'ask' fields must be collected in the wizard. 'infer_ok' fields may be defaulted and refined later in app.
-
+Onboarding Contract						
+One row per onboarding field. This is the contract between the app wizard and the backend: raw_answer is what the user taps, canonical_value is what gets stored and read by the generator. Mappings are deterministic lookups in code, never inferred by the AI at generation time, so two users who tap identical answers always route identically. 'ask' fields must be collected in the wizard. 'infer_ok' fields may be defaulted and refined later in app.						
 step	field	raw_answer_options	maps_to_backend_field	canonical_value	policy	feeds
 1	name	free text	users.display_name	string, fallback 'Athlete'	ask	Tone only
 1	age (derived)	computed from date_of_birth	users.age	int, never defaulted	ask	Age Routing, Nutrition
@@ -32,15 +31,14 @@ step	field	raw_answer_options	maps_to_backend_field	canonical_value	policy	feeds
 9	diet	No restrictions|Vegetarian|Vegan|Halal|Dairy-free|Gluten-free|High-protein (multi)	users.diet[]	array of tokens	ask	Nutrition only
 9	tight_budget	toggle	users.tight_budget	bool	ask	Nutrition only
 10	motivation	free text, optional	users.motivation	string or null	infer_ok	Tone only
-
-Notes for the build
-1
-5
-7
-7
-- Screening is the final onboarding step (step 12), placed after motivation but BEFORE the first program is generated. Generator Flow step 1 reads the stored screening outcome, so the screen must be completed at the end of onboarding and the result saved before generation runs. It gates generation via Safety Rule S05.
-- Screening is a real screen, not a Terms of Use clause: the answers must change what the app does, which a buried waiver cannot. The waiver checkbox sits on the same screen, on top of it, not instead of it.
-- REQUIRE_PROFESSIONAL_CLEARANCE and DO_NOT_GENERATE outcomes stop generation. The app shows a neutral message directing the user to a health professional and unlocks generation only after clearance is confirmed. No diagnosis language.
-- The 'anything else' free text on step 8 is an addition, never a replacement for the seven structured questions. It catches extra detail; it does not route on its own.
-- Every 'ask' row must be present before step 3 of the Generator Flow runs. Every 'infer_ok' row may be defaulted at generation and refined later in conversation with the AI.
-- All canonical mappings live in one code lookup, shared by the wizard and the generator, so onboarding answers and backend behaviour can never drift.
+Notes for the build						
+1						
+5						
+7						
+7						
+- Screening is the final onboarding step (step 12), placed after motivation but BEFORE the first program is generated. Generator Flow step 1 reads the stored screening outcome, so the screen must be completed at the end of onboarding and the result saved before generation runs. It gates generation via Safety Rule S05.						
+- Screening is a real screen, not a Terms of Use clause: the answers must change what the app does, which a buried waiver cannot. The waiver checkbox sits on the same screen, on top of it, not instead of it.						
+- REQUIRE_PROFESSIONAL_CLEARANCE and DO_NOT_GENERATE outcomes stop generation. The app shows a neutral message directing the user to a health professional and unlocks generation only after clearance is confirmed. No diagnosis language.						
+- The 'anything else' free text on step 8 is an addition, never a replacement for the seven structured questions. It catches extra detail; it does not route on its own.						
+- Every 'ask' row must be present before step 3 of the Generator Flow runs. Every 'infer_ok' row may be defaulted at generation and refined later in conversation with the AI.						
+- All canonical mappings live in one code lookup, shared by the wizard and the generator, so onboarding answers and backend behaviour can never drift.						

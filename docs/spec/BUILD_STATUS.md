@@ -65,24 +65,23 @@ profile-sweep safety test harness. Not started.
 5. **`trains_alone`** stored as the 4-value frequency (`always`/`usually`/`sometimes`/`never`);
    Safety S09 fires on `always`/`usually`.
 
-## Workbook data-quality findings (Exercise Database) — confirm
-The core safety/generation columns are clean and complete. Four columns are not usable as-is;
-handled deterministically and flagged here:
-1. **Measurement Type** is blank sheet-wide → derived 1:1 from **Load Unit**
-   (`kg→weight_reps`, `bodyweight→reps`, `rounds→interval`, `seconds→duration`,
-   `assist_kg→assisted`). **APPROVED by owner.**
-2. **Optional Equipment Tags** is **corrupted, not empty-by-design**: 109/113 cells are
-   numeric cells whose value is the shared-string INDEX of an Impact word — the Impact Level
-   data leaked here with its `t="s"` string flag stripped (e.g. cell value `432` where
-   `sharedStrings[432]="Low"`; also `342="High"`, `1598="Moderate"`). Only 4 cells hold real
-   optional tags (`dumbbell`×3, `dumbbell/plate`×1), which the seed keeps; the numeric ones are
-   dropped. So the authored Impact data technically exists but is unreliable/mis-typed.
-3. **video_url** holds numbers (shared-string indices like `weight_reps`), not URLs → absent.
-   Media is P2 (#24).
-4. **Impact Level** — **now DERIVED deterministically** (owner decision), not read from the
-   corrupted column: High = jumping/plyometric/running-based conditioning, Low = everything
-   else, matched on name + movement pattern with word boundaries. Result: 6 High
-   (Jump Squat, Pogo Hop, Burpee, Jumping Jack, High Knees, Treadmill Interval), 107 Low —
-   consistent with the Injury-Mod ankle/knee exclusions.
-- Row counts differ from the Backlog prose: **113** exercises (not 110) and **542** substitutions
-  (not 528). Seeded the actual sheet contents; 0 dangling refs, 0 exercises with empty substitutes.
+## Workbook parsing — RESOLVED (the workbook is NOT corrupted)
+Earlier "corruption" claims (Impact Level, Optional Equipment Tags, Measurement Type, and the
+Prescription grid) were a **bug in a hand-rolled raw-XML parser**, which mis-read inline numeric
+cells and collapsed empty columns — it surfaced sharedStrings indices (`432`, `2666`…) as data
+and shifted values. Fixed by switching all workbook reading to **SheetJS (openpyxl-equivalent)**.
+Everything now reads clean and is seeded from the authored source:
+1. **Measurement Type** — authored, read directly (`weight_reps`×68, `reps`×26, `duration`×8,
+   `interval`×10, `assisted`×1). Matches Load Unit with 0 mismatches.
+2. **Impact Level** — authored, read directly: **Low ×104, High ×5, Moderate ×4**. High =
+   Jump Squat, Pogo Hop, Burpee, Jumping Jack, High Knees; Moderate = Kettlebell Swing,
+   Mountain Climber, Dumbbell Swing, Treadmill Interval. (Replaces the earlier binary
+   derivation, which wrongly marked Treadmill High and the swings/mtn-climber Low.)
+3. **Optional Equipment Tags** — authored: 109 empty + 4 real (QD04/QD08/HG07 `dumbbell`,
+   CO14 `dumbbell/plate`). Seeded verbatim.
+4. **Prescription grid** — seeded verbatim from the owner-supplied `Prescription_Logic_CLEAN.csv`
+   (`src/backend/data/prescriptionGrid.ts`); all 20 rows aligned, every non-interval row carries
+   its `rir_min` floor. `video_url` is genuinely absent (media is P2 #24).
+- Row counts: **113** exercises, **542** substitutions (Backlog prose said 110/528). 0 dangling
+  refs, 0 exercises with empty substitutes.
+- The buggy raw-XML `parse.js` is retired; TSV mirrors in `sheets/` are regenerated via SheetJS.

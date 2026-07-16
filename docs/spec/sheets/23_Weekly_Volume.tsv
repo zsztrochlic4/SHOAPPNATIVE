@@ -1,6 +1,5 @@
-Weekly Volume Targets
-Hard weekly sets per muscle. The generator budgets at the week level first and lets sessions follow. Working sets at the prescribed RIR only, warm ups do not count.
-
+Weekly Volume Targets				
+Hard weekly sets per muscle. The generator budgets at the week level first and lets sessions follow. Working sets at the prescribed RIR only, warm ups do not count.				
 goal	experience	weekly_sets_min	weekly_sets_max	applies_to
 Hypertrophy	Beginner	8	12	Chest|Back|Quads|Hamstrings & Glutes|Shoulders
 Hypertrophy	Intermediate	10	16	Chest|Back|Quads|Hamstrings & Glutes|Shoulders
@@ -8,14 +7,13 @@ Hypertrophy	Advanced	12	20	Chest|Back|Quads|Hamstrings & Glutes|Shoulders
 Strength	All	6	12	Counted per main lift pattern (squat, press, hinge, pull) rather than per muscle
 Fat Loss	All	6	10	Enough to keep muscle in a deficit. Volume is cut before load, never the reverse
 General Fitness	All	6	10	All major muscle groups
-
-Reconciliation: making the week hit the budget
-Session Template slot counts are a base, not the budget. After building all days, the generator reconciles each muscle against its weekly target in this order. This is what closes the gap between, say, one chest slot per Upper day and a 10 set weekly minimum.
-order	rule	detail
-1	Fill sets up	Raise sets on existing slots from sets_min toward sets_max for the under target muscle. Example: Intermediate Hypertrophy on UL4, chest at 3+3 = 6 sets, raise both Upper day chest slots to 4+4 = 8.
-2	Add a slot	Still under target: add one extra slot per session for that muscle, isolation preferred, respecting the session set budget. Example: add a fly on one Upper day and a second press on the other, 8 + 4 = 12 sets, inside the 10 to 16 window.
-3	Trim overshoot	Over target (PPL6 back can hit 18+ sets): reduce that muscle's later slots to sets_min, then drop its optional slots, then convert one direct slot to the week's most under target muscle.
-4	Arms, calves, core	Half the main muscle target, direct sets only. Indirect work from compounds is deliberately not counted in v1, so the generator slightly overcounts arms and delts. That is the safe direction to err.
-5	Focal points	Add 3 to 4 weekly sets to each focal muscle, remove the same number from the lowest priority muscle, hard cap 20 for any muscle.
-6	Commitment cuts	Apply External Commitments volume cuts after focal adjustments. Cuts and focal additions on the same muscle net off.
-7	Floor	Every major muscle keeps at least 4 direct or heavy indirect sets per week on any split. Nothing is trained zero times.
+Reconciliation: making the week hit the budget				
+Session Template slot counts are a base, not the budget. After building all days, the generator reconciles each muscle against its weekly target in this order. This is what closes the gap between, say, one chest slot per Upper day and a 10 set weekly minimum.				
+order	rule	detail		
+1	Fill sets up	Raise sets on existing slots from sets_min toward sets_max for the under target muscle. Example: Intermediate Hypertrophy on UL4, chest at 3+3 = 6 sets, raise both Upper day chest slots to 4+4 = 8.		
+2	Add a slot	Still under target: add one extra slot per session for that muscle, isolation preferred, respecting the session set budget. Example: add a fly on one Upper day and a second press on the other, 8 + 4 = 12 sets, inside the 10 to 16 window.		
+3	Trim overshoot	Over target (PPL6 back can hit 18+ sets): reduce that muscle's later slots to sets_min, then drop its optional slots, then convert one direct slot to the week's most under target muscle.		
+4	Arms, calves, core	Half the main muscle target, direct sets only. Indirect work from compounds is deliberately not counted in v1, so the generator slightly overcounts arms and delts. That is the safe direction to err.		
+5	Focal points	Add 3 to 4 weekly sets to each focal muscle, remove the same number from the lowest priority muscle, hard cap 20 for any muscle.		
+6	Commitment cuts	Apply External Commitments volume cuts after focal adjustments. Cuts and focal additions on the same muscle net off.		
+7	Floor	Every major muscle keeps at least 4 direct or heavy indirect sets per week on any split. Nothing is trained zero times.		

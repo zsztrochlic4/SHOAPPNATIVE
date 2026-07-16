@@ -1,6 +1,5 @@
-Safety and Programming Rules
-Applied after the Prescription Grid lookup, in ascending numeric priority (the rule_id prefix is a label, priority is the sort key). HARD_SAFETY rules can block or rewrite a session and are never overridden by any goal, preference or prompt. PROGRAM_DEFAULT and FATIGUE_ADJUSTMENT rules are coaching defaults with named exemptions.
-
+Safety and Programming Rules						
+Applied after the Prescription Grid lookup, in ascending numeric priority (the rule_id prefix is a label, priority is the sort key). HARD_SAFETY rules can block or rewrite a session and are never overridden by any goal, preference or prompt. PROGRAM_DEFAULT and FATIGUE_ADJUSTMENT rules are coaching defaults with named exemptions.						
 rule_id	priority	rule_type	applies_to	condition	action	plain_english
 S01	10	HARD_SAFETY	skill_level = Advanced	user_experience below Advanced	Do not serve. Walk the Substitutions list in priority order and return the first entry compatible with the user's skill level, equipment, restrictions and exclusion history.	Advanced lifts are never given to a beginner. The app walks the swap list until it finds one the user can actually and safely do.
 S02	20	HARD_SAFETY	prescription_class = Power	any goal	Force rir_min to 2 or higher. End set if movement speed or landing quality drops.	Explosive lifts are never taken to failure. A failed jump squat is a fall.

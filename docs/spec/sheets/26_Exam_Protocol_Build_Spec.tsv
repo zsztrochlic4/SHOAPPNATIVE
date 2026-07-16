@@ -1,6 +1,5 @@
-Exam Protocol: Build Spec
-What Claude Code has to build and what changes on the platform to deliver the Exam Survival Protocol. This is the implementation companion to the rules sheet: the rules sheet says WHAT happens, this says WHERE it is built. The same split of concerns (rules on one sheet, build spec on another) can be used for any future feature.
-
+Exam Protocol: Build Spec			
+What Claude Code has to build and what changes on the platform to deliver the Exam Survival Protocol. This is the implementation companion to the rules sheet: the rules sheet says WHAT happens, this says WHERE it is built. The same split of concerns (rules on one sheet, build spec on another) can be used for any future feature.			
 area	component	what to build	build note
 Data model	users.planned_absences[]	Add a planned_absences array to the users doc (or a subcollection): each entry {absence_id, start_date, end_date, mode_id, note, created_at, status: upcoming|active|completed|cancelled}.	Firestore schema change. Add to Data Schemas sheet users collection.
 Onboarding / settings	Exam Survival Protocol entry point	The 'More' card the user tapped opens a flow: pick date range on a calendar, pick one mode (the 6 modes from this sheet shown as cards with the plain-English 'user says' text), optional note, confirm.	New screen. Reuse the mode names and descriptions verbatim from this sheet so the UI and backend never drift.

@@ -1,6 +1,5 @@
-Schedule Rules
-How day types are placed onto the user's actual calendar, including rest day calculation and fixed commitments. Applied in rule order after the split is chosen. Rest days are whatever remains after lifting days and commitments are placed, subject to the SCH02 floor.
-
+Schedule Rules			
+How day types are placed onto the user's actual calendar, including rest day calculation and fixed commitments. Applied in rule order after the split is chosen. Rest days are whatever remains after lifting days and commitments are placed, subject to the SCH02 floor.			
 rule_id	name	rule	plain_english
 SCH01	inputs	At onboarding collect: which days the user can lift, which days carry fixed commitments, and the commitment type and intensity for each.	The calendar is built around real life, not the other way round.
 SCH02	rest floor	Every week keeps at least one day with no lifting and no declared commitment. If the user's schedule leaves zero empty days, drop the lowest priority lifting day.	One genuine rest day per week is non negotiable.

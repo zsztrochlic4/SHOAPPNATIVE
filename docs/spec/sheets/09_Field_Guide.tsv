@@ -1,5 +1,4 @@
-How The Program Generator Should Read Each Column
-
+How The Program Generator Should Read Each Column	
 Column	What it does
 ID	Stable primary key. Never reuse or renumber. Log sets against this, not the exercise name.
 Muscle Group	Top level filter. Used to hit weekly volume targets per muscle.

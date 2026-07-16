@@ -1,6 +1,5 @@
-Split Selector
-Decision table. Match on days_per_week, then experience, then goal, first matching row wins. experience and goal are pipe separated tokens, 'All' matches everything. Focal points never change the split, they change slot filling and Weekly Volume distribution.
-
+Split Selector				
+Decision table. Match on days_per_week, then experience, then goal, first matching row wins. experience and goal are pipe separated tokens, 'All' matches everything. Focal points never change the split, they change slot filling and Weekly Volume distribution.				
 days_per_week	experience	goal	split_id	reason
 1	All	All	FB1	One day only ever gets full body.
 2	All	All	FB2	Two days, full body both.

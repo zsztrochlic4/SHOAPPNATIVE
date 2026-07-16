@@ -1,6 +1,6 @@
 /**
- * GENERATED from workbook sheet "Exercise Database". Do not hand-edit.
- * Regenerate via scripts (see docs/spec). Source of truth is the workbook.
+ * GENERATED from workbook sheet "Exercise Database" via SheetJS. Do not hand-edit.
+ * Source of truth is the workbook / CLEAN csv.
  */
 import type { Exercise } from './types'
 
@@ -4756,7 +4756,7 @@ export const EXERCISES: Exercise[] = [
       "kettlebell"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": "Low",
+    "impactLevel": "Moderate",
     "supported": false,
     "active": true,
     "measurementType": "reps",
@@ -5020,7 +5020,7 @@ export const EXERCISES: Exercise[] = [
       "none"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": "Low",
+    "impactLevel": "Moderate",
     "supported": false,
     "active": true,
     "measurementType": "interval",
@@ -5874,7 +5874,7 @@ export const EXERCISES: Exercise[] = [
       "dumbbell"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": "Low",
+    "impactLevel": "Moderate",
     "supported": false,
     "active": true,
     "measurementType": "reps",
@@ -5928,7 +5928,7 @@ export const EXERCISES: Exercise[] = [
       "treadmill"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": "High",
+    "impactLevel": "Moderate",
     "supported": false,
     "active": true,
     "measurementType": "interval",

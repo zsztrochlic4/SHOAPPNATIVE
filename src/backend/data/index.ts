@@ -5,11 +5,22 @@
 
 import { EXERCISES } from './exercises'
 import { SUBSTITUTIONS } from './substitutions'
-import type { Exercise, Substitution } from './types'
+import { PRESCRIPTION_GRID } from './prescriptionGrid'
+import type { Exercise, PrescriptionRow, Substitution } from './types'
 import type { ExerciseSafetyMeta } from '../safety/safetyRules'
 
-export { EXERCISES, SUBSTITUTIONS }
-export type { Exercise, Substitution }
+export { EXERCISES, SUBSTITUTIONS, PRESCRIPTION_GRID }
+export type { Exercise, Substitution, PrescriptionRow }
+
+/** Prescription grid keyed by `${goal}|${class}` (Generator Flow step 7). */
+export const PRESCRIPTION_BY_KEY: Readonly<Record<string, PrescriptionRow>> = Object.freeze(
+  Object.fromEntries(PRESCRIPTION_GRID.map((r) => [r.key, r])),
+)
+
+/** Look up the grid row for a goal + prescription class. */
+export function prescriptionFor(goal: string, prescriptionClass: string): PrescriptionRow | undefined {
+  return PRESCRIPTION_BY_KEY[`${goal}|${prescriptionClass}`]
+}
 
 export const EXERCISE_BY_ID: Readonly<Record<string, Exercise>> = Object.freeze(
   Object.fromEntries(EXERCISES.map((e) => [e.id, e])),

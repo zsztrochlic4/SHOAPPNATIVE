@@ -1,7 +1,6 @@
-Coverage Check
-Live counts driven off the Exercise Database sheet. Use this to spot gaps before shipping the program generator.
-
-By Muscle Group
+Coverage Check		
+Live counts driven off the Exercise Database sheet. Use this to spot gaps before shipping the program generator.		
+By Muscle Group		
 Category	Count	% of DB
 Chest	12	0.106194690265487
 Back	15	0.132743362831858
@@ -14,36 +13,31 @@ Core	14	0.123893805309735
 Calves	4	0.0353982300884956
 Full Body & Conditioning	14	0.123893805309735
 Total	113	1
-
-By Equipment Tier
+By Equipment Tier		
 Category	Count	% of DB
 Bodyweight	52	0.460176991150442
 Basic Gym	33	0.292035398230089
 Full Gym	28	0.247787610619469
 Total	113	1
-
-By Skill Level
+By Skill Level		
 Category	Count	% of DB
 Beginner	77	0.68141592920354
 Intermediate	27	0.238938053097345
 Advanced	9	0.079646017699115
 Total	113	1
-
-By Primary Goal Fit
+By Primary Goal Fit		
 Category	Count	% of DB
 Strength	14	0.123893805309735
 Hypertrophy	36	0.31858407079646
 Fat Loss	14	0.123893805309735
 General Fitness	49	0.433628318584071
 Total	113	1
-
-By Type
+By Type		
 Category	Count	% of DB
 Compound	64	0.566371681415929
 Isolation	49	0.433628318584071
 Total	113	1
-
-By Prescription Class
+By Prescription Class		
 Category	Count	% of DB
 Load	65	0.575221238938053
 Rep	26	0.230088495575221
@@ -51,10 +45,9 @@ Time	8	0.0707964601769912
 Interval	10	0.0884955752212389
 Power	4	0.0353982300884956
 Total	113	1
-
-Substitution Coverage
-Exercises in database	113
-Exercises with at least 1 substitution	113
-Exercises with at least 3 substitutions	113
-Average substitutions per exercise	4.8
-Exercises with no substitution	0
+Substitution Coverage		
+Exercises in database	113	
+Exercises with at least 1 substitution	113	
+Exercises with at least 3 substitutions	113	
+Average substitutions per exercise	4.8	
+Exercises with no substitution	0	

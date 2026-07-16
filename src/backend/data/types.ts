@@ -33,9 +33,8 @@ export interface Exercise {
   /** Structured tags; comma-separated in the sheet, a slash = any-one-of (bench/chair). */
   requiredEquipmentTags: string[]
   optionalEquipmentTags: string[]
-  /** Derived: High = jumping/plyometric/running-based conditioning; Low = everything else.
-   *  (The sheet's Impact column is corrupted — see docs/spec/BUILD_STATUS.md.) */
-  impactLevel: 'Low' | 'High'
+  /** Authored in the Exercise Database (Impact Level column). Injury-Mod rules prefer Low. */
+  impactLevel: 'Low' | 'Moderate' | 'High'
   supported: boolean
   active: boolean
   /** Derived from Load Unit (the sheet's Measurement Type column is blank). */
@@ -64,4 +63,31 @@ export interface Substitution {
   /** 1 = best match; the generator walks priority order. */
   priority: number
   matchType: string
+}
+
+/**
+ * Prescription Grid row (sheet "Prescription Logic"), keyed by `${Goal}|${Class}`. Every
+ * numeric field is a plain number or null (empty = not applicable). RIR is reps-in-reserve;
+ * higher = easier/safer. The generator reads the row, then clamps it against Safety Rules.
+ */
+export interface PrescriptionRow {
+  key: string
+  goal: string
+  prescriptionClass: string
+  setsMin: number | null
+  setsMax: number | null
+  repsMin: number | null
+  repsMax: number | null
+  durationSecMin: number | null
+  durationSecMax: number | null
+  rirMin: number | null
+  rirMax: number | null
+  restSecMin: number | null
+  restSecMax: number | null
+  pct1rmMin: number | null
+  pct1rmMax: number | null
+  roundsMin: number | null
+  roundsMax: number | null
+  progressionRule: string
+  coachNote: string
 }

@@ -1,6 +1,5 @@
-Custom Split Rules
-What happens when the user wants a structure the Splits sheet does not list, like Push Pull Legs Push. The design principle: a custom split compiles down to the same day_structure format as a preset, is validated by these rules, and then flows through Session Templates, Weekly Volume, Prescription Logic and Safety Rules identically. No special cases downstream.
-
+Custom Split Rules			
+What happens when the user wants a structure the Splits sheet does not list, like Push Pull Legs Push. The design principle: a custom split compiles down to the same day_structure format as a preset, is validated by these rules, and then flows through Session Templates, Weekly Volume, Prescription Logic and Safety Rules identically. No special cases downstream.			
 rule_id	name	rule	plain_english
 CS01	allowed building blocks	A custom split is any ordered sequence of known day types (Push, Pull, Legs, Upper, Lower, Full, Focus, Cond) with length equal to the user's lifting days. It is stored as a day_structure string, exactly like the preset splits, so every downstream sheet works unchanged.	Push Pull Legs Push is just 'Push|Pull|Legs|Push'. Nothing downstream needs to know it was custom.
 CS02	coverage check	Every major muscle group must be hit directly at least once per week. If the sequence leaves a muscle at zero (Push Push Pull Push has no leg work), warn the user, and offer to convert one repeated day. If they insist, add the missing pattern as required slots on the closest day and note it on the program.	The user can bias hard toward what they love, but nothing gets trained zero times without them being told.

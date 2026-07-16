@@ -1,6 +1,5 @@
-Substitutions
-Normalized substitution collection. One row per pair, ID based so renames never break it. Key = exercise_id-substitute_id, use as the Firestore document ID. Priority 1 is the best swap. The generator walks priority order and returns the FIRST substitute compatible with the user's skill level, equipment, restrictions and exclusion history. It never assumes priority 1 is valid.
-
+Substitutions				
+Normalized substitution collection. One row per pair, ID based so renames never break it. Key = exercise_id-substitute_id, use as the Firestore document ID. Priority 1 is the best swap. The generator walks priority order and returns the FIRST substitute compatible with the user's skill level, equipment, restrictions and exclusion history. It never assumes priority 1 is valid.				
 key	exercise_id	substitute_id	priority	match_type
 CH01-CH02	CH01	CH02	1	like_for_like
 CH01-CH05	CH01	CH05	2	like_for_like

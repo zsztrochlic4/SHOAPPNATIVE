@@ -1,6 +1,5 @@
-Data Schemas (Firestore reference)
-The dynamic side of the backend: what gets written as users train. This workbook is the static rules layer, these collections are where user state lives. Reference for the Firebase build, field names are the contract between the app, the generator and the AI layer.
-
+Data Schemas (Firestore reference)			
+The dynamic side of the backend: what gets written as users train. This workbook is the static rules layer, these collections are where user state lives. Reference for the Firebase build, field names are the contract between the app, the generator and the AI layer.			
 collection	key	fields	purpose
 users	uid (doc id)	uid, display_name, date_of_birth, age_verified, sex, height_cm, weight_kg, goal_weight_kg, experience, goal, focal_points[] (max 2), days_available[], session_length_min, equipment_tier, equipment_tags[], trains_alone, excluded_exercise_ids[], preferred_exercise_ids[], affected_regions[], commitments[{day, commitment_type, intensity}], screening{version, outcome, answers{}, followups{}, guardian_consent, clearance_confirmed, date, conditions[]}, diet[], tight_budget, planned_absences[{absence_id, start_date, end_date, mode_id, note, status}]	One document per user. Everything the generator reads at step 2 lives here.
 programs	program_id	uid, version, split_id or day_structure, custom (bool), schedule{weekday: day_type}, created_at, active, superseded_by, generation_audit[{step, rule_ids_applied, choices}]	Immutable once generated. Changes create a new version so history is never lost. The audit array records which rules fired, which is the debugging and liability trail.

@@ -1,6 +1,5 @@
-StrengthHub Online | Onboarding to Program
-The onboarding wizard the user completes, and exactly how each answer drives the workout generator. Read this first: it is the entry point to the whole workbook. Every 'feeds' reference points to another sheet in this file. Mappings are deterministic lookups in code, never inferred at generation time, so identical answers always produce identical programs.
-
+StrengthHub Online | Onboarding to Program					
+The onboarding wizard the user completes, and exactly how each answer drives the workout generator. Read this first: it is the entry point to the whole workbook. Every 'feeds' reference points to another sheet in this file. Mappings are deterministic lookups in code, never inferred at generation time, so identical answers always produce identical programs.					
 Step	Question (as shown to user)	Answer options	Default	What the coach does with it	Feeds (sheet)
 0	Welcome	(no input) 'A few quick questions and your coach will build training around you.'	-	Nothing. Intro screen.	-
 1	Name	free text	required	Stored for tone and greetings only.	Onboarding Contract
@@ -24,8 +23,8 @@ Step	Question (as shown to user)	Answer options	Default	What the coach does with
 8	(if any) Which days, and how hard?	weekday chips + Easy/Moderate/Hard	-	The day drives scheduling adjacency; the intensity scales how much volume is cut and whether the next day runs easier.	External Commitments, Schedule Rules
 9	Any exercises you love? / Anything you'd rather never do?	free text or search	skip	Favourites are weighted up when a slot allows; no-gos seed the exclusion list so they are never programmed. Optional; can be set later in-app.	Exercise Swaps, Data Schemas
 10	What's driving you?	free text (placeholders: look better, summer body, get fitter, better routine)	empty	Tone and motivational framing only. No effect on the program structure.	Onboarding Contract
-11	QUICK SAFETY CHECK  —  final step, gates whether any program is generated (Safety Rule S05)
-11	1. Doctor ever said you have a heart condition, or to only exercise under supervision?
+11	QUICK SAFETY CHECK  —  final step, gates whether any program is generated (Safety Rule S05)				
+11	1. Doctor ever said you have a heart condition, or to only exercise under supervision?				
 11	2. Do you feel chest pain during physical activity?	Yes / No	-	Yes on 1-4, 6 or 7 -> REQUIRE PROFESSIONAL CLEARANCE: no program generates, user directed to a GP/physio, generation unlocks only after clearance. Chest pain at rest -> DO NOT GENERATE.	Screening Outcomes, Age Routing
 11	3. In the past month, chest pain when NOT active?	Yes / No	-	Yes on 1-4, 6 or 7 -> REQUIRE PROFESSIONAL CLEARANCE: no program generates, user directed to a GP/physio, generation unlocks only after clearance. Chest pain at rest -> DO NOT GENERATE.	Screening Outcomes, Age Routing
 11	4. Do you lose balance from dizziness, or ever lose consciousness?	Yes / No	-	Yes on 1-4, 6 or 7 -> REQUIRE PROFESSIONAL CLEARANCE: no program generates, user directed to a GP/physio, generation unlocks only after clearance. Chest pain at rest -> DO NOT GENERATE.	Screening Outcomes, Age Routing
@@ -34,6 +33,5 @@ Step	Question (as shown to user)	Answer options	Default	What the coach does with
 11	7. Any other reason you shouldn't do physical activity?	Yes / No	-	Yes on 1-4, 6 or 7 -> REQUIRE PROFESSIONAL CLEARANCE: no program generates, user directed to a GP/physio, generation unlocks only after clearance. Chest pain at rest -> DO NOT GENERATE.	Screening Outcomes, Age Routing
 11	Follow-ups (only if Q5 Yes or an injury flagged): painful now? / under treatment? / exercise restricted? / resolved or active? / which movements hurt?	per question	-	Any of: painful now, under treatment, restricted, still active -> professional clearance, no program. All mild -> MODIFY_AND_CONTINUE, and 'which movements hurt' is stored as the affected region for exclusion rules.	Screening Outcomes, Injury Modifications
 11	Terms of Use acknowledgement	checkbox	must tick	Recorded with the screening result. Sits on top of the real screen, never instead of it.	Data Schemas
-
-After onboarding, the generator runs the 14-step Generator Flow:
-Screen -> pick split -> schedule around commitments -> budget weekly volume -> build each session from templates -> prescribe sets/reps/RIR -> set starting loads light -> then continuously: progress from logged performance, swap on request, adapt the calendar, deload, and re-screen. Every runtime change is re-checked against the Safety Rules. See the Generator Flow sheet.
+After onboarding, the generator runs the 14-step Generator Flow:					
+Screen -> pick split -> schedule around commitments -> budget weekly volume -> build each session from templates -> prescribe sets/reps/RIR -> set starting loads light -> then continuously: progress from logged performance, swap on request, adapt the calendar, deload, and re-screen. Every runtime change is re-checked against the Safety Rules. See the Generator Flow sheet.					

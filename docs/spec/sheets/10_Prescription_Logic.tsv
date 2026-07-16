@@ -1,24 +1,23 @@
-Prescription Grid
-One row per Goal and Prescription Class. Key = Goal|Class, unique, use it as the Firestore document ID. Every number is a plain number, no text, no ranges inside a cell. Empty means not applicable. RIR is reps left in reserve. Higher RIR is easier and safer. Sets, reps, seconds and rest are all min and max pairs.
-
+Prescription Grid																		
+One row per Goal and Prescription Class. Key = Goal|Class, unique, use it as the Firestore document ID. Every number is a plain number, no text, no ranges inside a cell. Empty means not applicable. RIR is reps left in reserve. Higher RIR is easier and safer. Sets, reps, seconds and rest are all min and max pairs.																		
 key	goal	prescription_class	sets_min	sets_max	reps_min	reps_max	duration_sec_min	duration_sec_max	rir_min	rir_max	rest_sec_min	rest_sec_max	pct_1rm_min	pct_1rm_max	rounds_min	rounds_max	progression_rule	coach_note
-Strength|Load	Strength	Load	3	5	4	6	1			3	180	300	75	88	2666			Heavy load with long rest. Reps stay at 4 or above so the app never prescribes a near maximal single.
-Strength|Rep	Strength	Rep	4	6	4	8	1			2	150	180	2669					No load to add, so difficulty comes from leverage.
-Strength|Time	Strength	Time	3	4	20			40	2	3	120	180	2672					Short heavy holds. Long holds become endurance work.
-Strength|Power	Strength	Power	3	5	3	5	3			5	120	180	2675					Never taken near failure. A failed power rep is a fall.
-Strength|Interval	Strength	Interval	1	1	480			720	4	6	2678							Conditioning competes with heavy lifting recovery, so keep it small.
-Hypertrophy|Load	Hypertrophy	Load	3	4	6	12	1			2	90	180	65	80	2681			Hard sets close to failure drive growth. Compounds keep at least 1 rep in reserve.
-Hypertrophy|Rep	Hypertrophy	Rep	3	4	8	20	1			2	75	105	2684					Bodyweight sets need to be taken closer to failure than loaded ones.
-Hypertrophy|Time	Hypertrophy	Time	3	3	30			60	1	2	60	90	2687					Past 60 seconds the limit becomes endurance rather than muscle.
-Hypertrophy|Power	Hypertrophy	Power	2	3	3	5	3			5	120	120	2690					Explosive lifts cannot be pushed near failure safely.
-Hypertrophy|Interval	Hypertrophy	Interval	1	1	600			900	4	6	2693							Enough conditioning to stay fit, not enough to eat into recovery.
-Fat Loss|Load	Fat Loss	Load	2	3	8	15	1			3	45	75	60	75	2696			In a calorie deficit, lifting keeps the muscle you already have. Cut volume, never load.
-Fat Loss|Rep	Fat Loss	Rep	2	3	12	20	1			3	45	60	2699					Keeps heart rate up while still loading the muscle.
-Fat Loss|Time	Fat Loss	Time	2	3	30			45	1	3	30	45	2702					Cheap to recover from and keeps total work high.
-Fat Loss|Power	Fat Loss	Power	4	6	15			20	3	5	40	60	2705					Capping the work interval keeps technique intact as fatigue builds.
-Fat Loss|Interval	Fat Loss	Interval	20					40	40			60	6			10	Add rounds, then extend the work interval, then cut rest.	Short hard intervals. Effort around 8 out of 10, never all out.
-General Fitness|Load	General Fitness	Load	2	3	8	15	2			3	60	90	55	70	2711			Leaving reps in reserve keeps soreness low and keeps the user turning up.
-General Fitness|Rep	General Fitness	Rep	2	3	8	15	2			3	60	60	2714					The goal is a habit that survives exam period.
-General Fitness|Time	General Fitness	Time	2	3	20			45	2	3	45	60	2717					Builds trunk endurance and postural tolerance.
-General Fitness|Power	General Fitness	Power	2	3	5	8	4			6	90	90	2720					Teaches force absorption, which protects knees and ankles. Skill first.
-General Fitness|Interval	General Fitness	Interval	30					60	60			90	3			5	Add rounds.	Moderate effort, around 6 out of 10. Builds an aerobic base.
+Strength|Load	Strength	Load	3	5	4	6			1	3	180	300	75	88			Add 2.5kg upper body or 5kg lower body once the top set hits reps_max in two sessions in a row. Never add more than 5 percent load in a week.	Heavy load with long rest. Reps stay at 4 or above so the app never prescribes a near maximal single.
+Strength|Rep	Strength	Rep	4	6	4	8			1	2	150	180					Move to a harder version of the exercise rather than adding reps. Once a set passes 8 reps, progress the variation.	No load to add, so difficulty comes from leverage.
+Strength|Time	Strength	Time	3	4			20	40	2	3	120	180					Add load first, seconds second. Hold time is capped at 40 seconds.	Short heavy holds. Long holds become endurance work.
+Strength|Power	Strength	Power	3	5	3	5			3	5	120	180					Add height, distance or load only while movement speed stays the same. Stop the set the moment speed drops.	Never taken near failure. A failed power rep is a fall.
+Strength|Interval	Strength	Interval	1	1			480	720	4	6							Do not progress. Keep it as an easy warm up only.	Conditioning competes with heavy lifting recovery, so keep it small.
+Hypertrophy|Load	Hypertrophy	Load	3	4	6	12			1	2	90	180	65	80			Double progression. Add reps to reps_max, then add weight and return to reps_min.	Hard sets close to failure drive growth. Compounds keep at least 1 rep in reserve.
+Hypertrophy|Rep	Hypertrophy	Rep	3	4	8	20			1	2	75	105					Add reps, then slow the lowering phase, then move to a harder variation.	Bodyweight sets need to be taken closer to failure than loaded ones.
+Hypertrophy|Time	Hypertrophy	Time	3	3			30	60	1	2	60	90					Add seconds to 60, then add load or move to a harder position.	Past 60 seconds the limit becomes endurance rather than muscle.
+Hypertrophy|Power	Hypertrophy	Power	2	3	3	5			3	5	120	120					Do not chase growth here. Use it as a primer before heavy sets.	Explosive lifts cannot be pushed near failure safely.
+Hypertrophy|Interval	Hypertrophy	Interval	1	1			600	900	4	6							Hold steady. Do not add volume.	Enough conditioning to stay fit, not enough to eat into recovery.
+Fat Loss|Load	Fat Loss	Load	2	3	8	15			1	3	45	75	60	75			Keep the weight the same and cut rest, or hold the reps and add weight. Never let load fall.	In a calorie deficit, lifting keeps the muscle you already have. Cut volume, never load.
+Fat Loss|Rep	Fat Loss	Rep	2	3	12	20			1	3	45	60					Add reps or shorten rest. Can be run as a circuit.	Keeps heart rate up while still loading the muscle.
+Fat Loss|Time	Fat Loss	Time	2	3			30	45	1	3	30	45					Add seconds or reduce rest.	Cheap to recover from and keeps total work high.
+Fat Loss|Power	Fat Loss	Power	4	6			15	20	3	5	40	60					Add rounds, not reps per round.	Capping the work interval keeps technique intact as fatigue builds.
+Fat Loss|Interval	Fat Loss	Interval					20	40			40	60			6	10	Add rounds, then extend the work interval, then cut rest.	Short hard intervals. Effort around 8 out of 10, never all out.
+General Fitness|Load	General Fitness	Load	2	3	8	15			2	3	60	90	55	70			Add reps or a small amount of weight whenever the last set feels easy.	Leaving reps in reserve keeps soreness low and keeps the user turning up.
+General Fitness|Rep	General Fitness	Rep	2	3	8	15			2	3	60	60					Add reps, then progress the variation.	The goal is a habit that survives exam period.
+General Fitness|Time	General Fitness	Time	2	3			20	45	2	3	45	60					Add seconds.	Builds trunk endurance and postural tolerance.
+General Fitness|Power	General Fitness	Power	2	3	5	8			4	6	90	90					Add reps only once the landing is quiet and controlled.	Teaches force absorption, which protects knees and ankles. Skill first.
+General Fitness|Interval	General Fitness	Interval					30	60			60	90			3	5	Add rounds.	Moderate effort, around 6 out of 10. Builds an aerobic base.
