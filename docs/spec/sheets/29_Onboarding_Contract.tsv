@@ -1,0 +1,46 @@
+Onboarding Contract
+One row per onboarding field. This is the contract between the app wizard and the backend: raw_answer is what the user taps, canonical_value is what gets stored and read by the generator. Mappings are deterministic lookups in code, never inferred by the AI at generation time, so two users who tap identical answers always route identically. 'ask' fields must be collected in the wizard. 'infer_ok' fields may be defaulted and refined later in app.
+
+step	field	raw_answer_options	maps_to_backend_field	canonical_value	policy	feeds
+1	name	free text	users.display_name	string, fallback 'Athlete'	ask	Tone only
+1	age (derived)	computed from date_of_birth	users.age	int, never defaulted	ask	Age Routing, Nutrition
+1	sex	Male | Female | Other	users.sex	male | female | other	ask	Nutrition (calorie accuracy)
+2	height_cm	ruler, default 175	users.height_cm	int cm	ask	Nutrition only
+2	weight_kg	dial, default 75	users.weight_kg	float kg	ask	Nutrition, starting load sanity
+2	goal_weight_kg	dial, default 78	users.goal_weight_kg	float kg	ask	Nutrition only
+3	goal	Build muscle | Lose fat | Get stronger | Stay healthy	users.goal	Build muscle=Hypertrophy; Lose fat=Fat Loss; Get stronger=Strength; Stay healthy=General Fitness	ask	Split Selector, Prescription Logic, Weekly Volume
+3	focal_points	Chest|Back|Shoulders|Arms|Legs|Glutes|Core|Abs (max 2, skippable)	users.focal_points[]	Arms=Biceps+Triceps; Legs=Quads; Glutes=Hamstrings & Glutes; Abs=Core; others map by name. Max 2, empty allowed	infer_ok	Session Templates (Focus), Weekly Volume focal adjustment, UL5
+4	experience	Beginner (<6mo) | Intermediate (6mo-3yr) | Advanced (3yr+)	users.experience	Beginner | Intermediate | Advanced	ask	Split Selector, Safety Rules P01, Weekly Volume
+5	training_days	weekday multi-tap, default Mon Wed Fri Sat	users.days_available[]	array of gym weekdays only, sport excluded; editable post-onboarding, scheduler re-plans on change	ask	Split Selector (count), Schedule Rules (placement)
+5	session_length_min	30 | 45 | 60 | 75	users.session_length_min	int minutes	ask	Session Templates budget (exercise and set count)
+6	equipment_preset	Full Gym | Home Basics | Dorm/Bodyweight	users.equipment_tier	Full Gym=Full Gym; Home Basics=Basic Gym; Dorm/Bodyweight=Bodyweight	ask	Exercise Database tier filter
+6	equipment_tags	optional chips: Barbell+plates | Squat rack | Pull-up bar | Bench or chair | Kettlebell | Resistance bands | Sliders or a towel	users.equipment_tags[]	Full Gym=all tags; Home Basics base=dumbbell,band,bench/chair plus any ticked extras (barbell, squat_rack, etc); Bodyweight base=none plus any ticked	ask	Exercise Database required_equipment_tags filter
+12	screening_q1_heart	Yes | No	users.screening.answers.q1	bool	ask	Screening Outcomes routing
+12	screening_q2_chest_active	Yes | No	users.screening.answers.q2	bool	ask	Screening Outcomes routing
+12	screening_q3_chest_rest	Yes | No	users.screening.answers.q3	bool	ask	Screening Outcomes routing
+12	screening_q4_dizzy_faint	Yes | No	users.screening.answers.q4	bool	ask	Screening Outcomes routing
+12	screening_q5_joint	Yes | No	users.screening.answers.q5	bool	ask	Screening Outcomes (Yes triggers joint follow-ups, which decide MODIFY vs CLEARANCE)
+12	screening_q6_pregnancy	Yes | No	users.screening.answers.q6	bool	ask	Screening Outcomes (clearance route)
+12	screening_q7_other	Yes | No	users.screening.answers.q7	bool	ask	Screening Outcomes routing
+12	screening_outcome	derived, not asked	users.screening.outcome	all No=CLEAR; q5 Yes with follow-ups minor=MODIFY_AND_CONTINUE; q5 Yes with follow-ups painful/treated/restricted=REQUIRE_PROFESSIONAL_CLEARANCE; any of q1-q4,q6,q7 Yes=REQUIRE_PROFESSIONAL_CLEARANCE; symptom at rest or advised against=DO_NOT_GENERATE	ask	Safety Rule S05 (gates generation)
+12	waiver_ack	checkbox on same screen	users.screening.waiver_accepted	bool, must be true to proceed	ask	Terms of Use record
+7	limitations	None|Lower back|Neck|Shoulders|Elbows|Wrists|Hips|Knees|Ankles|Achilles or calf|Feet	users.affected_regions[]	array of region tokens; each maps to an Injury Modifications region. Free text removed. Achilles/calf maps to ankle region.	ask	MODIFY_AND_CONTINUE (prefers Supported=Yes, Impact=Low for region)
+7	anything_else	free text, optional	users.notes	AI scans for health red-flags; any found route to screening/clearance (S05), not just stored. Not a screening substitute.	infer_ok	AI review, not a screening substitute
+8	commitment_type	None|Basketball|Football|Running|Tennis|Swimming|Cycling|Dance|Martial arts|Rock climbing|Gym classes|Walking/hiking|Rowing|Yoga/Pilates|Golf|Skating|Surfing|Active job|Other	users.commitments[].commitment_type	maps to External Commitments commitment_type; Other stored as free text and AI-classified	ask	External Commitments, Schedule Rules adjacency
+8	commitment_days	weekday chips (if not None)	users.commitments[].day	array of weekdays	ask	Schedule Rules adjacency
+8	commitment_intensity	Easy | Moderate | Hard	users.commitments[].intensity	easy | moderate | hard	ask	External Commitments (scales cut and rir penalty)
+9	diet	No restrictions|Vegetarian|Vegan|Halal|Dairy-free|Gluten-free|High-protein (multi)	users.diet[]	array of tokens	ask	Nutrition only
+9	tight_budget	toggle	users.tight_budget	bool	ask	Nutrition only
+10	motivation	free text, optional	users.motivation	string or null	infer_ok	Tone only
+
+Notes for the build
+1
+5
+7
+7
+- Screening is the final onboarding step (step 12), placed after motivation but BEFORE the first program is generated. Generator Flow step 1 reads the stored screening outcome, so the screen must be completed at the end of onboarding and the result saved before generation runs. It gates generation via Safety Rule S05.
+- Screening is a real screen, not a Terms of Use clause: the answers must change what the app does, which a buried waiver cannot. The waiver checkbox sits on the same screen, on top of it, not instead of it.
+- REQUIRE_PROFESSIONAL_CLEARANCE and DO_NOT_GENERATE outcomes stop generation. The app shows a neutral message directing the user to a health professional and unlocks generation only after clearance is confirmed. No diagnosis language.
+- The 'anything else' free text on step 8 is an addition, never a replacement for the seven structured questions. It catches extra detail; it does not route on its own.
+- Every 'ask' row must be present before step 3 of the Generator Flow runs. Every 'infer_ok' row may be defaulted at generation and refined later in conversation with the AI.
+- All canonical mappings live in one code lookup, shared by the wizard and the generator, so onboarding answers and backend behaviour can never drift.

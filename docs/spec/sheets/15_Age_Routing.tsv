@@ -1,0 +1,8 @@
+Age Routing
+Age decides which screening pathway runs, and it is collected as date_of_birth, never a defaulted number. Under-18s do not receive the adult screen. 16 to 17 year olds follow a young-person pathway with guardian consent and conservative training defaults. Under-16 is out of scope for launch and blocked. This routing runs before the screening questions.
+
+age_band	ages	pathway	stored_fields	note
+adult	18 and over	Standard adult pre-exercise screening (7 questions). Route per Screening Outcomes.	screening_version = adult_v1	No guardian consent required.
+young_person	16 to 17	Use the young-person screening pathway (ESSA-style youth screen), not the adult flow. Require guardian consent before any program generates. Conservative defaults: block Advanced and Power classes, rir_min +1, load increments at the bottom of the range.	screening_version = youth_v1, guardian_consent_required = true	A minor is never silently defaulted into the adult flow.
+under_16	Under 16	Do not generate a program. The platform is not designed or screened for under-16s. Show a message explaining this.	screening_version = none, blocked = true	Hard stop. Out of scope for launch.
+unverified	Age not provided or not verified	Do not generate. Prompt for date of birth. Age is never defaulted for screening purposes.	age_verified = false	The old 'default to 20' behaviour is removed.

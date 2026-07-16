@@ -1,0 +1,47 @@
+Session Templates
+How a single workout is assembled. Look up the day_type from the split's day_structure, fill slots in order. Filter tokens are pipe separated: 'Squat|Lunge' means the pattern is Squat OR Lunge. 'Compound>Isolation' means compound preferred, isolation allowed. FOCAL_1 and FOCAL_2 resolve to the user's declared focal points (eligible focal points: Chest, Back, Shoulders, Quads, Hamstrings & Glutes, Biceps, Triceps, Core, Calves. Full Body & Conditioning is not a focal point). Selection within a slot: filter by required_equipment_tags against the user's equipment, skill and exclusions, then weight by Primary Goal Fit, then focal points, then prefer already logged exercises. Required slots must fill, walking Substitutions if needed. Optional slots drop first on short sessions. Sets and reps per slot come from Prescription Logic. Compounds never sit after isolation work for the same muscle. Session budget: 4 to 6 exercises and 12 to 22 working sets at 45 to 60 minutes, 3 to 4 exercises and 9 to 14 sets at 30 minutes. Slot counts are a base, not a cap: Weekly Volume reconciliation may add or trim slots.
+
+slot_id	day_type	order	slot_name	muscle_group_filter	movement_pattern_filter	type_filter	required	note
+Full-1	Full	1	Squat compound	Quads	Squat|Lunge	Compound	Yes	The biggest lift goes first, freshest.
+Full-2	Full	2	Push	Chest	Horizontal Push|Vertical Push	Compound	Yes	Main press of the day.
+Full-3	Full	3	Pull	Back	Horizontal Pull|Vertical Pull	Compound	Yes	Every push is matched by a pull.
+Full-4	Full	4	Hinge	Hamstrings & Glutes|Back	Hinge	Compound	Yes	Hinge pattern every session.
+Full-5	Full	5	Isolation filler	Shoulders|Biceps|Triceps	Any	Isolation	Optional	Filled when session time allows, rotated across the week.
+Full-6	Full	6	Core	Core	Any	Isolation	Yes	Core finishes every full body day.
+Upper-1	Upper	1	Horizontal push	Chest	Horizontal Push	Compound	Yes	Main press first.
+Upper-2	Upper	2	Horizontal pull	Back	Horizontal Pull	Compound	Yes	Row to match the press.
+Upper-3	Upper	3	Vertical push	Shoulders	Vertical Push	Compound	Yes	Overhead work.
+Upper-4	Upper	4	Vertical pull	Back	Vertical Pull	Compound	Yes	Pulldown or chin up pattern.
+Upper-5	Upper	5	Biceps isolation	Biceps	Any	Isolation	Optional	Arms fill remaining time.
+Upper-6	Upper	6	Triceps isolation	Triceps	Any	Isolation	Optional	Arms fill remaining time.
+Lower-1	Lower	1	Squat compound	Quads	Squat	Compound	Yes	Main lift first.
+Lower-2	Lower	2	Hinge	Hamstrings & Glutes	Hinge	Compound	Yes	Squat and hinge in every lower session.
+Lower-3	Lower	3	Single leg	Quads	Lunge	Compound	Yes	Unilateral work every lower day.
+Lower-4	Lower	4	Knee flexion	Hamstrings & Glutes	Isolation	Isolation	Yes	Direct hamstring work.
+Lower-5	Lower	5	Calves	Calves	Any	Isolation	Optional	Filled when time allows.
+Lower-6	Lower	6	Core	Core	Any	Isolation	Yes	Core finishes the session.
+Push-1	Push	1	Horizontal push	Chest	Horizontal Push	Compound	Yes	Main press first.
+Push-2	Push	2	Vertical push	Shoulders	Vertical Push	Compound	Yes	Overhead second.
+Push-3	Push	3	Secondary press or fly	Chest	Any	Any	Yes	A second chest angle or a fly.
+Push-4	Push	4	Lateral delt	Shoulders	Isolation	Isolation	Yes	Direct side delt work.
+Push-5	Push	5	Triceps	Triceps	Any	Isolation	Yes	Triceps close the day.
+Pull-1	Pull	1	Hinge or heavy row	Back	Hinge|Horizontal Pull	Compound	Yes	Heaviest pull first.
+Pull-2	Pull	2	Vertical pull	Back	Vertical Pull	Compound	Yes	Lat width work.
+Pull-3	Pull	3	Second row	Back	Horizontal Pull	Compound	Yes	A different row angle.
+Pull-4	Pull	4	Rear delt	Shoulders	Isolation|Horizontal Pull	Isolation	Yes	Rear delts every pull day.
+Pull-5	Pull	5	Biceps	Biceps	Any	Isolation	Yes	Biceps close the day.
+Legs-1	Legs	1	Squat compound	Quads	Squat	Compound	Yes	Main lift first.
+Legs-2	Legs	2	Hinge	Hamstrings & Glutes	Hinge	Compound	Yes	Hip hinge second.
+Legs-3	Legs	3	Single leg	Quads	Lunge	Compound	Yes	Unilateral work.
+Legs-4	Legs	4	Knee flexion	Hamstrings & Glutes	Isolation	Isolation	Yes	Direct hamstrings.
+Legs-5	Legs	5	Calves	Calves	Any	Isolation	Yes	Calves every leg day.
+Legs-6	Legs	6	Core	Core	Any	Isolation	Optional	When time allows.
+Focus-1	Focus	1	Focal slot 1	FOCAL_1	Any	Compound>Isolation	Yes	Compound preferred, isolation if the focal muscle has no compound (Core, Calves).
+Focus-2	Focus	2	Focal slot 2	FOCAL_1	Any, different pattern to slot 1	Compound>Isolation	Yes	A second angle on the same target.
+Focus-3	Focus	3	Focal isolation 1	FOCAL_1	Any	Isolation>Compound	Yes	Direct volume.
+Focus-4	Focus	4	Focal isolation 2	FOCAL_2|FOCAL_1	Any	Isolation>Compound	Yes	Second focal point if declared, otherwise more of the first.
+Focus-5	Focus	5	Core	Core	Any	Isolation	Optional	When time allows.
+Cond-1	Cond	1	Interval block	Full Body & Conditioning	Conditioning|Full Body|Hinge	Any, Prescription Class = Interval or Power	Yes	The main conditioning piece: erg, bike, intervals or swings, prescribed off the Interval or Power grid row for the user's goal.
+Cond-2	Cond	2	Second block	Full Body & Conditioning	Any	Any, Prescription Class = Interval	Optional	A second modality when session length allows, different to block 1.
+Cond-3	Cond	3	Carry	Full Body & Conditioning	Carry	Compound	Optional	Farmer or suitcase carry as a finisher.
+Cond-4	Cond	4	Core	Core	Any	Isolation	Optional	Low fatigue core to close.

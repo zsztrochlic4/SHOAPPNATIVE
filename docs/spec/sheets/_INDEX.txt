@@ -1,0 +1,32 @@
+0	Onboarding Questions	00_Onboarding_Questions.tsv	39 rows
+1	Coach AI Operating Rules	01_Coach_AI_Operating_Rules.tsv	56 rows
+2	Build Backlog	02_Build_Backlog.tsv	36 rows
+3	Claude Code Notes	03_Claude_Code_Notes.tsv	10 rows
+4	Exercise Database	04_Exercise_Database.tsv	117 rows
+5	Substitutions	05_Substitutions.tsv	546 rows
+6	Exercise Swaps	06_Exercise_Swaps.tsv	12 rows
+7	Summary	07_Summary.tsv	60 rows
+8	Substitution Matrix	08_Substitution_Matrix.tsv	114 rows
+9	Field Guide	09_Field_Guide.tsv	53 rows
+10	Prescription Logic	10_Prescription_Logic.tsv	24 rows
+11	Progression Engine	11_Progression_Engine.tsv	25 rows
+12	Safety Rules	12_Safety_Rules.tsv	19 rows
+13	Screening Outcomes	13_Screening_Outcomes.tsv	20 rows
+14	Injury Modifications	14_Injury_Modifications.tsv	21 rows
+15	Age Routing	15_Age_Routing.tsv	8 rows
+16	Splits	16_Splits.tsv	14 rows
+17	Custom Split Rules	17_Custom_Split_Rules.tsv	11 rows
+18	Custom Split Resolution	18_Custom_Split_Resolution.tsv	18 rows
+19	Split Selector	19_Split_Selector.tsv	17 rows
+20	Goal Change	20_Goal_Change.tsv	13 rows
+21	External Commitments	21_External_Commitments.tsv	16 rows
+22	Session Templates	22_Session_Templates.tsv	47 rows
+23	Weekly Volume	23_Weekly_Volume.tsv	21 rows
+24	Schedule Rules	24_Schedule_Rules.tsv	14 rows
+25	Exam Survival Protocol	25_Exam_Survival_Protocol.tsv	18 rows
+26	Exam Protocol Build Spec	26_Exam_Protocol_Build_Spec.tsv	10 rows
+27	Generator Flow	27_Generator_Flow.tsv	18 rows
+28	Data Schemas	28_Data_Schemas.tsv	11 rows
+29	Onboarding Contract	29_Onboarding_Contract.tsv	46 rows
+30	Example Week	30_Example_Week.tsv	31 rows
+31	Rep Range Guide	31_Rep_Range_Guide.tsv	18 rows

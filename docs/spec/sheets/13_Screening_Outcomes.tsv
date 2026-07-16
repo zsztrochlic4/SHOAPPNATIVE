@@ -1,0 +1,20 @@
+Screening Outcomes
+The pre exercise screening (modelled on the Adult Pre Exercise Screening System used in Australia) maps every user to exactly one outcome before anything is generated. Completing the screen does not itself guarantee safety, which is why outcomes route to professionals rather than to a softer program.
+
+outcome	triggered_by	generator_action	note
+CLEAR	No flags on the pre exercise screening questionnaire.	Generate the program normally.	No restriction.
+MODIFY_AND_CONTINUE	A joint or soft tissue flag (screening q5) that the FOLLOW-UPS confirm is minor: not currently painful, not under active professional treatment, exercise not restricted, issue resolved or stable. Also: low activity history, mild niggles without current pain.	Generate with modifications: raise rir_min by 1, block Power class, prefer low impact and machine or supported variations for the flagged region, exclude exercises the user marks as aggravating. Apply the flagged region's row from the Injury Modifications sheet to every session.	Modifications stay on until the user reports 4 symptom free weeks.
+REQUIRE_PROFESSIONAL_CLEARANCE	Flags needing a professional first: any cardiovascular, metabolic or renal condition; chest pain or unusual breathlessness with activity; dizziness or fainting; pregnancy or birth within 6 months; recent surgery; OR a joint/soft tissue problem the follow-ups show is currently painful, under active treatment, or exercise-restricted.	Do not generate a program. Show a message directing the user to a GP, physiotherapist or accredited exercise professional. Unlock generation only after the user confirms clearance, then apply any conditions the professional sets. Pregnancy follows its own clearance path, it is never treated as a generic injury flag.	The app never decides that a gentler workout is safe enough for a flagged medical condition. A professional does.
+DO_NOT_GENERATE	Acute red flags: current chest pain, symptoms at rest, a professional has advised against exercise.	Block program generation entirely. Advise the user to seek medical care.	Hard stop.
+
+Joint flag follow-ups (asked only when screening q5 = Yes)
+A bare yes/no joint question cannot decide the route. When q5 is Yes, ask these and route on the answers. Any answer in the 'to clearance' column sends the user to REQUIRE_PROFESSIONAL_CLEARANCE. If all are in the 'to modify' column, route to MODIFY_AND_CONTINUE and store the affected region.
+follow_up_question	answer_to_modify	answer_to_clearance
+Is the problem painful right now?	No / mild and settling	Yes, currently painful
+Is it being treated by a health professional?	No / discharged	Yes, under active treatment
+Have you been told to limit or avoid exercise?	No	Yes, exercise restricted
+Is the issue resolved, or still active?	Resolved or stable	Still active / flaring
+Which movements make it worse? (free text)	Stored as affected_region for SW02 filtering	-
+
+Free-text red-flag scan ('anything else we should know?')
+The optional free-text box is scanned before it is treated as harmless. If it mentions a cardiac, neurological, respiratory or metabolic condition, pregnancy, recent surgery, or medical-advice language ('my doctor said', 'I was told not to'), route the user to REQUIRE_PROFESSIONAL_CLEARANCE and do not generate until cleared. Otherwise store it as context. It is never a substitute for the seven screening questions.

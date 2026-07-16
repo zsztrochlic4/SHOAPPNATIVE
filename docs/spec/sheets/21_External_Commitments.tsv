@@ -1,0 +1,16 @@
+External Commitments
+Fixed weekly activities declared at onboarding (day, type, intensity). The AI classifies free text into one commitment_type, the generator applies the numeric adjustments. volume_cut_sets applies across the muscles in volume_cut_muscles. adjacency_block_hours blocks Legs or Lower (or Pull, for climbing) that many hours either side. interval_slots_removed comes off the weekly conditioning budget. rir_penalty_next_day is added to rir_min on the following day. A commitment is training the app did not prescribe but the body still pays for.
+
+commitment_type	examples	load_profile	volume_cut_muscles	volume_cut_sets_min	volume_cut_sets_max	adjacency_block_hours	interval_slots_removed	rir_penalty_next_day	notes
+basketball	Basketball, netball, volleyball	lower_body_impact|conditioning	Quads|Hamstrings & Glutes	2	4	24	1	0	Never place a Legs or Lower day within adjacency_block_hours either side of the commitment.
+football	Soccer, AFL, rugby, touch	lower_body_impact|conditioning|contact	Quads|Hamstrings & Glutes	3	4	24	2	1	Removes all standalone Interval work. The day after a match runs at rir_min plus rir_penalty_next_day.
+running	Running, park run, athletics	lower_body_impact|conditioning	Quads|Hamstrings & Glutes	2	4	24	1	0	Adjacency applies to hard or long runs only. Easy runs need no adjustment beyond the Interval slot removal.
+racquet	Tennis, badminton, squash	lower_body_impact|unilateral|conditioning	Quads|Hamstrings & Glutes	2	2	24	1	0	No extra rotation core work in commitment weeks, the sport supplies it.
+swimming	Swimming, water polo	full_body|low_impact_conditioning	0		0	0	1	0	Low impact, low recovery cost. Only the Interval slot removal applies.
+cycling	Cycling, spin classes	lower_body|low_impact_conditioning	Quads	0	2	0	1	0	Cut Quads sets only when riding is hard or hilly, otherwise zero.
+climbing	Climbing, bouldering	upper_pull|grip	Back|Biceps	2	4	24	0	0	Never place a Pull day within adjacency_block_hours. Grip heavy exercises (deadlifts, carries, rows) move away from climbing days. Counts as half an Interval session, round down.
+martial_arts	Martial arts, boxing, BJJ	full_body|conditioning|contact	user_reported	2	2	0	2	1	Removes all standalone Interval work. Volume cut applies to whichever muscle the user reports as most worked.
+dance	Dance, cheer, gymnastics	full_body|lower_body_impact	Quads|Hamstrings & Glutes	2	2	24	1	0	Adjacency applies before performances and hard rehearsals.
+physical_job	Hospitality, labouring, retail on feet	chronic_low_load	0		0	0	0	0	Start weekly volume at the bottom of the goal's range. Apply F03 after long shifts the user flags.
+social_sport	Casual grade, under 1 hour, low intensity	light_activity	0		0	0	0	0	Counts toward general activity only. No adjustment.
+other	Anything not listed	unknown	user_reported	0	2	24	1	0	Default: treat as full body conditioning, ask the user which muscles it works, then reclassify into a row above.

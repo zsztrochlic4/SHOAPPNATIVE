@@ -1,0 +1,18 @@
+Custom Split Resolution
+Turns a fuzzy structural request into a specific day_structure, so the same request always resolves the same way. The AI matches the user's day count and what they want to de-emphasise or emphasise, reads the resolved day_structure, then validates it through Custom Split Rules (coverage, 48-hour spacing, shared volume). If the user's phrasing does not match a row, offer the two nearest rows and let them pick. The resolved structure still passes through every safety and volume rule unchanged. This table decides STRUCTURE only, never how hard anything is trained.
+
+days_per_week	user_request	resolved_day_structure	note
+2	none / balanced	Full|Full	Two days is always full body. Nothing to bias.
+3	none / balanced	Full|Full|Full	Default 3-day. Everything 3x if beginner, or PPL by preference.
+3	legs once	Upper|Push|Lower	One lower day, two upper-focused days. Legs hit once, directly.
+3	upper once / legs focus	Lower|Upper|Lower	Two lower days, one upper day. Upper muscles hit once, legs twice.
+3	push emphasis	Push|Pull|Lower	One of each, push gets the freshest day.
+4	none / balanced	Upper|Lower|Upper|Lower	Default 4-day. Everything twice.
+4	legs once	Push|Pull|Upper|Lower	One lower day, three upper-focused days. Legs hit once, upper muscles twice or more.
+4	upper once / legs focus	Lower|Lower|Push|Pull	Two lower days plus push and pull. Legs emphasised.
+4	push/pull preference (2 push 1 pull 1 leg)	Push|Pull|Push|Lower	Honours a push-biased week with legs still once.
+5	none / balanced	Upper|Lower|Upper|Lower|Focus	Default 5-day with a focal day.
+5	legs once	Push|Pull|Upper|Focus|Lower	One lower day, upper volume spread across four days.
+5	legs focus	Lower|Upper|Lower|Push|Pull	Two lower days across five.
+6	none / balanced	Push|Pull|Legs|Push|Pull|Legs	Default 6-day PPL, everything twice.
+6	legs once	Push|Pull|Upper|Push|Pull|Lower	Legs once across six days, everything else high frequency.

@@ -1,0 +1,31 @@
+Example Week
+What the pipeline produces for one concrete user: Intermediate, Hypertrophy goal, 4 days, Basic Gym, no focal points, screening CLEAR. Split Selector returns UL4. Every exercise passes the Basic Gym and skill filters, prescriptions come from Hypertrophy rows of the grid, all sets at RIR 1 to 2, rest 90 to 180 sec on compounds and 60 to 90 on isolations. This sheet is illustrative only, the generator never reads it.
+
+day	day_type	slot_1	slot_2	slot_3	slot_4	slot_5	slot_6
+Day 1	Upper	Dumbbell Bench Press 3x8-12	Seated Cable Row 3x8-12	Seated Dumbbell Shoulder Press 3x8-12	Lat Pulldown 3x10-12	Hammer Curl 2x10-15	Triceps Pushdown 2x10-15
+Day 2	Lower	Goblet Squat 3x8-12	Romanian Deadlift 3x8-12	Split Squat 3x8-10 each	Lying Leg Curl 3x10-15	Standing Calf Raise 2x10-15	Plank 3x30-45 sec
+Day 3	Rest
+Day 4	Upper	Incline Dumbbell Press 3x8-12	Chest Supported Dumbbell Row 3x8-12	Arnold Press 3x8-12	Band Assisted Chin Up 3x6-10	Barbell Curl 2x8-12	Overhead Cable Extension 2x10-15
+Day 5	Lower	Leg Press 3x8-12	Hip Thrust 3x8-12	Walking Lunge 3x10 each	Seated Leg Curl 3x10-15	Seated Calf Raise 2x10-15	Dead Bug 3x8-10 each
+Day 6	Rest
+Day 7	Rest
+
+Scheduling Example: Same User, Basketball Every Monday
+day	placed	why
+Monday	Basketball (commitment)	Declared at onboarding. Classified as basketball: lower body impact plus conditioning.
+Tuesday	Upper	SCH04: the day after basketball gets Upper, never Legs. Adjacency handled.
+Wednesday	Lower	48 hours clear of basketball on both sides. SCH05 placed this day first.
+Thursday	Rest	SCH02 rest floor.
+Friday	Upper	48 hours after Tuesday's Upper, satisfies SCH03.
+Saturday	Lower	48 hours after Wednesday's Lower, and two clear days before Monday's basketball.
+Sunday	Rest	Second rest day before the commitment.
+Volume note	-	External Commitments: weekly Quads and Hamstrings & Glutes budget reduced by 3 sets, one Interval slot removed because basketball already covers conditioning.
+
+
+Custom Split Example: User Requests Push Pull Legs Push
+check	result
+CS01 compile	Stored as 'Push|Pull|Legs|Push'. Downstream sheets unchanged.
+CS02 coverage	All muscles covered: chest, shoulders and triceps twice, back, biceps and legs once. Passes, no warning.
+CS03 spacing	Scheduled Mon Push, Tue Pull, Thu Legs, Sat Push. Both Push days more than 48 hours apart.
+CS04 volume	Weekly chest, shoulder and triceps budget split across the two Push days. Second Push day draws different exercises: Monday gets Barbell Bench Press and Barbell Overhead Press, Saturday gets Incline Dumbbell Press and Arnold Press.
+CS05 caps	All prescriptions, RIR floors and safety rules unchanged.

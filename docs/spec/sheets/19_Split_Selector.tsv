@@ -1,0 +1,17 @@
+Split Selector
+Decision table. Match on days_per_week, then experience, then goal, first matching row wins. experience and goal are pipe separated tokens, 'All' matches everything. Focal points never change the split, they change slot filling and Weekly Volume distribution.
+
+days_per_week	experience	goal	split_id	reason
+1	All	All	FB1	One day only ever gets full body.
+2	All	All	FB2	Two days, full body both.
+3	Beginner	All	FB3	Beginners get the pattern practice of three full body days.
+3	Intermediate|Advanced	Strength|General Fitness|Fat Loss	FB3	Frequency beats session focus for these goals.
+3	Intermediate|Advanced	Hypertrophy	FB3	Full body three times hits every muscle at least twice a week, the current strength standard. PPL3 stays available as an opt-in preference for users who prefer it.
+4	All	Fat Loss	FB3C	Three lifting days plus a real conditioning day suits a deficit better than four lifting days.
+4	All	Strength|Hypertrophy|General Fitness	UL4	Upper Lower is the four day answer.
+5	Beginner	All	UL4C1	A beginner's fifth day is conditioning, not more lifting.
+5	Intermediate|Advanced	Hypertrophy	UL5	The fifth day is built from focal points.
+5	Intermediate|Advanced	Strength|General Fitness|Fat Loss	UL4C1	Four lifting days plus one conditioning day.
+6	Beginner	All	FB3C	Beginners are not served six training days. Four is the ceiling.
+6	Intermediate|Advanced	Hypertrophy	PPL6	Six real training days, everything twice.
+6	Intermediate|Advanced	Strength|General Fitness|Fat Loss	UL4C2	Four lifting days, two conditioning days.

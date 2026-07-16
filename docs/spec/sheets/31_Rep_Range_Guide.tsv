@@ -1,0 +1,18 @@
+What The Rep Number Actually Means
+Reference material for the app, and for anything user facing. Reps are a proxy for load. That is the whole idea.
+
+Rep Range	Roughly	Primary Adaptation	What It Feels Like	Use It When	The Catch
+1 to 3	90%+ of 1RM	Maximal strength. Almost entirely neural. The muscle barely changes, the nervous system learns to recruit it	Heavy, slow, total concentration. The bar moves whether you like it or not	Testing a max, or peaking a strength block. Rare for a student population	Highest technical and injury risk. Needs a spotter and a lift the user has done for months. Not for a remote app to prescribe casually
+4 to 6	80 to 90%	Strength with a little size. The best all round strength range	Hard from rep one. Speed drops noticeably on the last rep	The default strength range. Where a compound lift should live in a strength block	Fatiguing on the joints and the nervous system. Needs long rest, so sessions run long
+6 to 12	70 to 80%	The classic hypertrophy range. Enough load for tension, enough reps for volume	Burning by rep eight, genuinely hard by rep ten	The default for most users on most exercises. If in doubt, prescribe here	It is not magic. It is popular because it balances load and volume efficiently, not because the muscle counts reps
+12 to 20	60 to 70%	Hypertrophy plus muscular endurance. Equal growth to the mid range IF taken close to failure	A deep burn. The last few reps are grim and slow	Isolation work, bodyweight exercises, anything where load cannot be added easily	Most people stop well short of failure here because it is uncomfortable. Under effort, this range does very little
+20+	Under 60%	Muscular endurance, work capacity, local conditioning	Cardiovascular before it is muscular. Lungs give up before the muscle	Conditioning, circuits, warm ups, rehab	Poor return on time for both strength and size. The set ends because you are out of breath, not because the muscle failed
+
+
+Rules That Override The Table Above
+Effort beats rep range	For muscle growth, a set of 8 and a set of 20 produce similar results IF both are taken within a couple of reps of failure. A set of 8 at RIR 5 produces almost nothing. Proximity to failure is the variable that matters. Rep range mostly decides how unpleasant getting there is.
+Load cannot be faked for strength	Strength is specific to heavy load. There is no rep scheme that makes a bodyweight squat build a heavy back squat. This is the hard ceiling for the 20 Rep class and 8 Time class exercises in the database, and the app should say so rather than pretend.
+Compounds get fewer reps and more rest	A compound lift fatigues the whole system, so it goes first in the session, in a lower rep range, with longer rest. An isolation lift fatigues one muscle, so it goes last, higher reps, short rest. The Type column already carries this.
+Never take Power or Advanced exercises to failure	A failed jump squat is a fall. A failed deadlift is a back injury. These exercises stop at RIR 2 or higher regardless of the user goal. This is a hard rule in the generator, not a suggestion.
+Weekly sets per muscle matter more than any single session	Roughly 10 to 20 hard sets per muscle per week for growth, 6 to 10 for general fitness. The generator should budget at this level and let session structure follow, not the reverse.
+Fat loss does not change the lifting	In a deficit, lifting exists to keep muscle. Keep the load, cut the volume, add conditioning separately. Turning the weights session into cardio is the single most common mistake and it costs the user the muscle they are trying to keep.

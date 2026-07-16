@@ -1,0 +1,53 @@
+How The Program Generator Should Read Each Column
+
+Column	What it does
+ID	Stable primary key. Never reuse or renumber. Log sets against this, not the exercise name.
+Muscle Group	Top level filter. Used to hit weekly volume targets per muscle.
+Movement Pattern	Ensures a program covers push, pull, squat, hinge, lunge, carry and core rather than repeating one pattern.
+Type	Compound movements are placed first in a session. Isolation movements fill remaining volume.
+Equipment Tier	Hard filter set at onboarding. Bodyweight is a strict subset of Basic Gym, which is a strict subset of Full Gym.
+Skill Level	Gate against user experience. A first time lifter is never served an Advanced movement in week one.
+Unilateral	Flag for imbalance correction and for low equipment users who need more stimulus from light loads.
+Loadable	If No, progress via reps, tempo or leverage instead of adding weight.
+Primary Goal Fit	Weighting, not a hard filter. A hypertrophy user can still be given a Strength tagged lift.
+Why It Is In The Database	Selection rationale. Each exercise earns its slot by covering something no other exercise covers.
+What It Does	One line shown under the video on the exercise screen. Sells the exercise to the user in plain language.
+Step 1 / Step 2 / Step 3	The numbered cues shown on the exercise screen. Never more than three. Written as instructions, not theory.
+Common Mistake	The single most common error. Rendered in the grey callout box under the steps.
+Substitutions (Best First)	Ordered list. Position 1 is the closest match the app can serve. The swap button walks this list top down, skipping anything the user's equipment tier or skill level blocks.
+Substitution Count	Sanity check. Should never be zero. Anything under 3 is a coverage risk.
+Min RIR	The closest to failure this exercise may ever be taken, for any user and any goal. The generator raises the grid RIR to meet this number, never lowers it.
+Safety Note	Shown to the user on the exercise screen and used by the generator when a set is flagged.
+Prescription Logic sheet	Flat lookup. Key is Goal|Class. Every cell is a number or empty. Read the row, clamp it against Safety Rules, then write the set.
+Safety Rules sheet	Applied after the grid lookup, in rule_id order. HARD rules block the session. SOFT rules warn and adjust.
+Substitutions sheet	The source of truth for swaps, keyed by ID so renames never break relationships. The name based columns on the other sheets are human readable views of this data.
+Substitution IDs / Failure Allowed / Spotter Recommended	Substitution IDs mirror the name list by ID. Failure Allowed = No forces the Min RIR floor. Spotter Recommended triggers rule S09 for users training alone.
+Splits + Split Selector	Which weekly structures exist and which one a given user gets. Selector matches days, then experience, then goal, first row wins.
+Session Templates	The slot recipe for each day type. Filters map onto Exercise Database columns of the same name.
+Weekly Volume	Weekly hard set budget per muscle, with the focal point adjustment and the 20 set cap.
+Generator Flow	The thirteen step order of operations. Anything the AI does when prescribing must trace back to a step on this sheet.
+Screening Outcomes	Screening maps to exactly one of four outcomes. The app never softens a program as a substitute for professional clearance.
+External Commitments	Fixed weekly activities count against the weekly volume and conditioning budget. The AI classifies free text into a commitment_type and applies the row's adjustment.
+Schedule Rules	Day types are placed onto real weekdays: rest floor, 48 hour spacing, commitment adjacency, missed session handling, exam mode. Rest days are calculated, never assumed.
+Custom Split Rules	Any user built structure compiles to a day_structure string, is validated (coverage, spacing, shared volume), and flows through the rest of the pipeline with zero special cases.
+Required / Optional Equipment Tags	Structured equipment. Tags are comma separated, a slash inside a tag means any one of those satisfies it (bench/chair/bed). Onboarding collects the user's exact tags, the generator filters on them. Equipment Tier remains the coarse filter, tags are the precise one.
+Impact Level / Supported	Impact: Low, Moderate or High landing forces. Supported: torso externally supported or ground based. These are what MODIFY_AND_CONTINUE screening modifications filter on.
+Active / video_url	Active = No removes an exercise from selection without deleting its history. video_url is the placeholder for the Form & video button content.
+Cond day type	Conditioning is a first class day type with its own template, so Interval prescriptions are placed deterministically instead of floating.
+Data Schemas sheet	The Firestore collections for dynamic user state: programs, workout instances, set logs, progression, swaps, flags. The static workbook plus these collections is the complete backend.
+Weekly Volume reconciliation	Template slots are a base, not the budget. The seven reconciliation rules close the gap between slot counts and weekly targets in a fixed order.
+Onboarding Contract sheet	Maps every onboarding wizard field to the backend field and canonical value it produces. 'ask' fields are collected in the wizard, 'infer_ok' fields may be defaulted and refined later. The screening block gates generation under S05.
+Exercise Swaps sheet	Runtime playbook for user-initiated exercise changes. Resolves every swap through the Substitutions list, re-prescribes and re-clamps safety. Distinguishes a swap from an S06 stop-symptom escalation.
+Progression Engine sheet	Runtime playbook for adjusting reps, sets and load from logged performance. Bounded by the grid ranges and Safety Rules; progresses only when safe, pauses on fatigue, reverses on missed reps.
+Goal Change sheet	Runtime playbook for a mid-program goal change. Re-runs goal-dependent steps, preserves loads and history, eases intensity over one week, versions the program.
+Measurement Type / Load Unit / Stress Regions	Measurement Type says how an exercise is logged and progressed (weight_reps, reps, duration, interval, assisted). Load Unit is its unit. Stress Regions are the joints/areas loaded, matched against users.affected_regions for injury-aware swaps (SW02).
+Age Routing sheet	Age (from date_of_birth, never defaulted) chooses the screening pathway. Under-18s use the young-person path with guardian consent; under-16 is blocked.
+Joint flag follow-ups	A Yes on the joint screening question triggers follow-ups that decide MODIFY vs professional clearance. A bare yes/no cannot route safely.
+Load Increments by Equipment	Progression rounds to the smallest achievable increment for the equipment type, not a fixed 2.5/5 kg.
+Injury Modifications sheet	Deterministic rules for the MODIFY_AND_CONTINUE screening branch. One row per flaggable region (lower_back, knee, shoulder, wrist, hip, ankle) giving exclude_ids, downgrade_ids, preferred alternatives, an RIR bump and a review period. Turns 'the AI avoids the injured area' into a fixed lookup the AI reads.
+Coach AI Operating Rules sheet	The governing instruction set for the coach AI: its job, hard nevers, the order it consults other sheets, out-of-scope refusals, and the fallback for unlisted requests. The app's extraInstructions field points here.
+Custom Split Resolution sheet	Deterministic lookup from a fuzzy structural request (day count + what to emphasise/de-emphasise) to a specific day_structure, so 'legs once a week' always resolves the same way.
+Exam Survival Protocol sheet	Lets a user declare a future date range and pick how training adapts (full pause, maintenance, just-walk, fewer days, deload, or no change). Proactive twin of the missed-session rules. Protects progress; nothing below full_pause loses strength.
+Exam Protocol Build Spec sheet	The implementation companion: what Claude Code builds (data model, screen, generator check, scheduler exemption) and what changes on-platform to ship the feature.
+Build Backlog sheet	Every implementation task from across the workbook in one ordered, prioritised checklist (P0 safe-launch, P1 core engine, P2 enhancement), each pointing to its spec sheet and an acceptance check. The build plan for the repo.
+Claude Code Notes sheet	In-app engineering notes (editable training days, catch-up on misses, pulling activity into the generator, optional activity step, injury region mapping, free-text red-flag scan). Fold into the Build Backlog.

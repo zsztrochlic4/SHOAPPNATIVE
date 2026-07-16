@@ -1,0 +1,14 @@
+Training Splits
+The splits the generator can serve. day_structure is pipe separated day types, each mapping to a Session Templates row set. best_for_goals and experience are pipe separated tokens, 'All' matches everything. Conditioning is a first class day type (Cond) with its own template, so Interval prescriptions always have a deterministic home. Rest days fill the remaining calendar days per Schedule Rules.
+
+split_id	name	days_min	days_max	day_structure	best_for_goals	experience	why
+FB1	Full Body x1	1	1	Full	All	All	One quality full body session. Not optimal, vastly better than nothing, and honest about it.
+FB2	Full Body x2	2	2	Full|Full	All	All	Every muscle twice a week in two sessions. The most efficient use of two gym days that exists.
+FB3	Full Body x3	3	3	Full|Full|Full	All	Beginner|Intermediate	Three full body days with a rest day between each. The default for beginners.
+FB3C	Full Body x3 + Conditioning	4	4	Full|Full|Full|Cond	Fat Loss|General Fitness	All	The beginner friendly four day week: three full body days plus a dedicated conditioning day.
+PPL3	Push Pull Legs (rotating)	3	3	Push|Pull|Legs	Hypertrophy|General Fitness	Intermediate|Advanced	Classic three way split, each muscle once per week directly. Focused sessions over maximum frequency.
+UL4	Upper Lower	4	4	Upper|Lower|Upper|Lower	All	All	Every muscle twice a week with sessions under an hour. The best default for four days.
+UL4C1	Upper Lower + Conditioning	5	5	Upper|Lower|Upper|Lower|Cond	Strength|Fat Loss|General Fitness	All	Four lifting days plus a dedicated conditioning day. The five day answer outside hypertrophy.
+UL4C2	Upper Lower + 2 Conditioning	6	6	Upper|Lower|Upper|Lower|Cond|Cond	Fat Loss|General Fitness	Intermediate|Advanced	Four lifting days, two conditioning days. For users who want six active days without six lifting days.
+UL5	Upper Lower + Focus	5	5	Upper|Lower|Upper|Lower|Focus	Hypertrophy	Intermediate|Advanced	Upper Lower base with a fifth day built entirely from the user's focal points.
+PPL6	Push Pull Legs x2	6	6	Push|Pull|Legs|Push|Pull|Legs	Hypertrophy	Intermediate|Advanced	Everything twice a week at high volume. Only for users who genuinely train six days.

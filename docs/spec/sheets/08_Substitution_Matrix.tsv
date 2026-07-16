@@ -1,0 +1,114 @@
+Swap Logic
+Every exercise has at least three prepared alternatives, listed best first. Tier 1 is a true like for like swap from the same substitution group. Tier 2 is a same muscle group swap, used when a user simply dislikes or cannot access the movement. Advanced lifts always list an easier swap first.
+
+ID	Exercise	Substitution Group	Substitutions (Best First)	Total	Tier 1	Swap Note
+CH01	Barbell Bench Press	Chest | Press	Dumbbell Bench Press, Machine Chest Press, Incline Barbell Bench Press, Incline Dumbbell Press, Close Grip Bench Press, Decline Barbell Bench Press, Feet Elevated Push Up, Push Up, Incline Push Up, Dumbbell Chest Fly	10	8	Multiple like for like swaps available.
+CH02	Dumbbell Bench Press	Chest | Press	Machine Chest Press, Barbell Bench Press, Incline Dumbbell Press, Feet Elevated Push Up, Push Up, Incline Push Up, Dumbbell Chest Fly, Cable Chest Fly	8	6	Multiple like for like swaps available.
+CH03	Incline Dumbbell Press	Chest | Press	Incline Barbell Bench Press, Dumbbell Bench Press, Machine Chest Press, Barbell Bench Press, Feet Elevated Push Up, Push Up, Incline Push Up, Cable Chest Fly	8	7	Multiple like for like swaps available.
+CH04	Push Up	Chest | Press	Incline Push Up, Feet Elevated Push Up, Machine Chest Press, Dumbbell Bench Press, Barbell Bench Press, Diamond Push Up, Dumbbell Chest Fly	7	5	Multiple like for like swaps available.
+CH05	Machine Chest Press	Chest | Press	Dumbbell Bench Press, Barbell Bench Press, Incline Dumbbell Press, Push Up, Incline Push Up, Cable Chest Fly	6	5	Multiple like for like swaps available.
+CH06	Cable Chest Fly	Chest | Fly	Dumbbell Chest Fly, Machine Chest Press, Dumbbell Bench Press, Push Up, Incline Push Up	5	1	One like for like swap (Dumbbell Chest Fly). Rest are same muscle group.
+CH07	Dumbbell Chest Fly	Chest | Fly	Cable Chest Fly, Machine Chest Press, Dumbbell Bench Press, Push Up, Incline Push Up	5	1	One like for like swap (Cable Chest Fly). Rest are same muscle group.
+CH08	Dip (Chest Lean)	Chest | Press	Feet Elevated Push Up, Dumbbell Bench Press, Machine Chest Press, Decline Barbell Bench Press, Push Up, Bench Dip, Incline Push Up	7	6	Advanced only. Serve Feet Elevated Push Up to beginner and intermediate users.
+CH09	Incline Barbell Bench Press	Chest | Press	Incline Dumbbell Press, Barbell Bench Press, Dumbbell Bench Press, Machine Chest Press, Push Up, Incline Push Up	6	6	Multiple like for like swaps available.
+CH10	Decline Barbell Bench Press	Chest | Press	Barbell Bench Press, Dumbbell Bench Press, Dip (Chest Lean), Machine Chest Press, Feet Elevated Push Up, Push Up	6	6	Multiple like for like swaps available.
+CH11	Incline Push Up	Chest | Press	Push Up, Machine Chest Press, Dumbbell Bench Press, Feet Elevated Push Up, Dumbbell Chest Fly	5	4	Multiple like for like swaps available.
+CH12	Feet Elevated Push Up	Chest | Press	Push Up, Incline Push Up, Dip (Chest Lean), Dumbbell Bench Press, Machine Chest Press	5	5	Multiple like for like swaps available.
+BK01	Conventional Deadlift	Back | Hinge	Trap Bar Deadlift, Rack Pull, Dumbbell Deadlift, Romanian Deadlift, Cable Pull Through, Hip Thrust, Back Extension, Single Leg Romanian Deadlift, Prone Superman	9	3	Advanced only. Serve Trap Bar Deadlift to beginner and intermediate users.
+BK02	Barbell Bent Over Row	Back | Horizontal Pull	Chest Supported Dumbbell Row, Dumbbell Single Arm Row, Seated Cable Row, Inverted Row, Band Bent Over Row, Lat Pulldown	6	5	Multiple like for like swaps available.
+BK03	Dumbbell Single Arm Row	Back | Horizontal Pull	Chest Supported Dumbbell Row, Seated Cable Row, Barbell Bent Over Row, Inverted Row, Band Bent Over Row	5	5	Multiple like for like swaps available.
+BK04	Chin Up	Back | Vertical Pull	Lat Pulldown, Band Assisted Chin Up, Band Lat Pulldown, Inverted Row, Seated Cable Row, Chest Supported Dumbbell Row	6	3	Advanced only. Serve Lat Pulldown to beginner and intermediate users.
+BK05	Lat Pulldown	Back | Vertical Pull	Chin Up, Band Assisted Chin Up, Band Lat Pulldown, Straight Arm Pulldown, Seated Cable Row, Chest Supported Dumbbell Row	6	4	Multiple like for like swaps available.
+BK06	Seated Cable Row	Back | Horizontal Pull	Chest Supported Dumbbell Row, Dumbbell Single Arm Row, Barbell Bent Over Row, Inverted Row, Band Bent Over Row	5	5	Multiple like for like swaps available.
+BK07	Inverted Row	Back | Horizontal Pull	Band Bent Over Row, Chest Supported Dumbbell Row, Dumbbell Single Arm Row, Seated Cable Row, Supinated Inverted Row	5	4	Multiple like for like swaps available.
+BK08	Chest Supported Dumbbell Row	Back | Horizontal Pull	Dumbbell Single Arm Row, Seated Cable Row, Inverted Row, Band Bent Over Row, Barbell Bent Over Row	5	5	Multiple like for like swaps available.
+BK09	Straight Arm Pulldown	Back | Vertical Pull	Band Lat Pulldown, Lat Pulldown, Chest Supported Dumbbell Row, Seated Cable Row	4	2	Multiple like for like swaps available.
+BK10	Rack Pull	Back | Hinge	Trap Bar Deadlift, Conventional Deadlift, Romanian Deadlift, Dumbbell Deadlift, Back Extension, Cable Pull Through	6	3	Multiple like for like swaps available.
+BK11	Band Lat Pulldown	Back | Vertical Pull	Lat Pulldown, Band Assisted Chin Up, Straight Arm Pulldown, Inverted Row, Band Bent Over Row	5	3	Multiple like for like swaps available.
+SH01	Barbell Overhead Press	Shoulders | Vertical Push	Seated Dumbbell Shoulder Press, Arnold Press, Band Overhead Press, Pike Push Up, Dumbbell Lateral Raise	5	4	Multiple like for like swaps available.
+SH02	Seated Dumbbell Shoulder Press	Shoulders | Vertical Push	Arnold Press, Barbell Overhead Press, Band Overhead Press, Pike Push Up, Dumbbell Lateral Raise	5	4	Multiple like for like swaps available.
+SH03	Dumbbell Lateral Raise	Shoulders | Lateral Delt	Cable Lateral Raise, Band Lateral Raise, Seated Dumbbell Shoulder Press, Band Overhead Press	4	2	Multiple like for like swaps available.
+SH04	Cable Lateral Raise	Shoulders | Lateral Delt	Dumbbell Lateral Raise, Band Lateral Raise, Arnold Press, Pike Push Up	4	2	Multiple like for like swaps available.
+SH05	Rear Delt Fly	Shoulders | Rear Delt	Band Pull Apart, Face Pull, Prone Y-T-W Raise	3	3	Multiple like for like swaps available.
+SH06	Face Pull	Shoulders | Rear Delt	Rear Delt Fly, Band Pull Apart, Prone Y-T-W Raise	3	3	Multiple like for like swaps available.
+SH07	Arnold Press	Shoulders | Vertical Push	Seated Dumbbell Shoulder Press, Barbell Overhead Press, Band Overhead Press, Pike Push Up, Dumbbell Lateral Raise	5	4	Multiple like for like swaps available.
+SH08	Pike Push Up	Shoulders | Vertical Push	Band Overhead Press, Seated Dumbbell Shoulder Press, Arnold Press, Barbell Overhead Press, Band Lateral Raise	5	4	Multiple like for like swaps available.
+SH09	Band Lateral Raise	Shoulders | Lateral Delt	Dumbbell Lateral Raise, Cable Lateral Raise, Band Pull Apart, Pike Push Up	4	2	Multiple like for like swaps available.
+SH10	Prone Y-T-W Raise	Shoulders | Rear Delt	Band Pull Apart, Rear Delt Fly, Face Pull	3	3	Multiple like for like swaps available.
+QD01	Barbell Back Squat	Quads | Squat	Front Squat, Leg Press, Goblet Squat, Bulgarian Split Squat, Split Squat, Bodyweight Squat, Step Up, Wall Sit	8	5	Multiple like for like swaps available.
+QD02	Goblet Squat	Quads | Squat	Barbell Back Squat, Leg Press, Bodyweight Squat, Split Squat, Step Up, Wall Sit	6	4	Multiple like for like swaps available.
+QD03	Bulgarian Split Squat	Quads | Lunge	Split Squat, Walking Lunge, Step Up, Goblet Squat, Leg Press	5	3	Multiple like for like swaps available.
+QD04	Walking Lunge	Quads | Lunge	Split Squat, Step Up, Bulgarian Split Squat, Bodyweight Squat, Goblet Squat	5	3	Multiple like for like swaps available.
+QD05	Leg Press	Quads | Squat	Barbell Back Squat, Goblet Squat, Bulgarian Split Squat, Bodyweight Squat, Wall Sit	5	4	Multiple like for like swaps available.
+QD06	Front Squat	Quads | Squat	Goblet Squat, Barbell Back Squat, Leg Press, Bulgarian Split Squat, Bodyweight Squat	5	4	Advanced only. Serve Goblet Squat to beginner and intermediate users.
+QD07	Leg Extension	Quads | Knee Extension	Sissy Squat, Reverse Nordic Curl, Leg Press, Bodyweight Squat, Wall Sit	5	2	Multiple like for like swaps available.
+QD08	Step Up	Quads | Lunge	Split Squat, Walking Lunge, Bulgarian Split Squat, Bodyweight Squat	4	3	Multiple like for like swaps available.
+QD09	Bodyweight Squat	Quads | Squat	Goblet Squat, Split Squat, Wall Sit, Leg Press, Step Up	5	3	Multiple like for like swaps available.
+QD10	Reverse Nordic Curl	Quads | Knee Extension	Sissy Squat, Leg Extension, Wall Sit, Bodyweight Squat	4	2	Multiple like for like swaps available.
+QD11	Split Squat	Quads | Lunge	Walking Lunge, Step Up, Bulgarian Split Squat, Bodyweight Squat	4	3	Multiple like for like swaps available.
+QD12	Wall Sit	Quads | Squat	Bodyweight Squat, Goblet Squat, Leg Press, Split Squat	4	3	Multiple like for like swaps available.
+QD13	Jump Squat	Quads | Squat	Bodyweight Squat, Goblet Squat, Walking Lunge, Step Up	4	2	Multiple like for like swaps available.
+HG01	Romanian Deadlift	Hamstrings & Glutes | Hinge	Single Leg Romanian Deadlift, Cable Pull Through, Dumbbell Deadlift, Back Extension, Hip Thrust, Glute Bridge, Prone Superman	7	4	Multiple like for like swaps available.
+HG02	Hip Thrust	H&G | Glute Bridge	Glute Bridge, Single Leg Glute Bridge, Cable Pull Through, Romanian Deadlift, Back Extension	5	2	Multiple like for like swaps available.
+HG03	Glute Bridge	H&G | Glute Bridge	Hip Thrust, Single Leg Glute Bridge, Cable Pull Through, Back Extension, Prone Superman	5	2	Multiple like for like swaps available.
+HG04	Seated Leg Curl	H&G | Knee Flexion	Lying Leg Curl, Slider Hamstring Curl, Nordic Hamstring Curl, Romanian Deadlift, Single Leg Romanian Deadlift	5	3	Multiple like for like swaps available.
+HG05	Lying Leg Curl	H&G | Knee Flexion	Seated Leg Curl, Slider Hamstring Curl, Nordic Hamstring Curl, Romanian Deadlift	4	3	Multiple like for like swaps available.
+HG06	Nordic Hamstring Curl	H&G | Knee Flexion	Slider Hamstring Curl, Lying Leg Curl, Seated Leg Curl, Single Leg Romanian Deadlift, Romanian Deadlift	5	3	Advanced only. Serve Slider Hamstring Curl to beginner and intermediate users.
+HG07	Single Leg Romanian Deadlift	Hamstrings & Glutes | Hinge	Romanian Deadlift, Cable Pull Through, Back Extension, Single Leg Glute Bridge, Prone Superman	5	4	Multiple like for like swaps available.
+HG08	Cable Pull Through	Hamstrings & Glutes | Hinge	Romanian Deadlift, Hip Thrust, Glute Bridge, Back Extension, Prone Superman	5	3	Multiple like for like swaps available.
+HG09	Back Extension	Hamstrings & Glutes | Hinge	Prone Superman, Romanian Deadlift, Cable Pull Through, Glute Bridge	4	3	Multiple like for like swaps available.
+HG10	Hip Abduction	H&G | Abduction	Lateral Band Walk, Single Leg Glute Bridge, Glute Bridge, Side Plank	4	1	One like for like swap (Lateral Band Walk). Rest are same muscle group.
+HG11	Single Leg Glute Bridge	H&G | Glute Bridge	Glute Bridge, Hip Thrust, Cable Pull Through, Back Extension	4	2	Multiple like for like swaps available.
+HG12	Prone Superman	Hamstrings & Glutes | Hinge	Back Extension, Glute Bridge, Single Leg Glute Bridge, Romanian Deadlift	4	2	Multiple like for like swaps available.
+BI01	Barbell Curl	Biceps | Curl	Cable Curl, Dumbbell Incline Curl, Hammer Curl, Band Curl, Chin Up (Close Grip), Supinated Inverted Row	6	4	Multiple like for like swaps available.
+BI02	Dumbbell Incline Curl	Biceps | Curl	Barbell Curl, Cable Curl, Hammer Curl, Band Curl	4	4	Multiple like for like swaps available.
+BI03	Hammer Curl	Biceps | Curl	Barbell Curl, Cable Curl, Dumbbell Incline Curl, Band Curl	4	4	Multiple like for like swaps available.
+BI04	Cable Curl	Biceps | Curl	Barbell Curl, Dumbbell Incline Curl, Hammer Curl, Band Curl	4	4	Multiple like for like swaps available.
+BI05	Chin Up (Close Grip)	Biceps | Compound Pull	Supinated Inverted Row, Band Assisted Chin Up, Barbell Curl, Cable Curl, Hammer Curl	5	1	Advanced only. Serve Supinated Inverted Row to beginner and intermediate users.
+BI06	Band Curl	Biceps | Curl	Hammer Curl, Barbell Curl, Cable Curl, Supinated Inverted Row	4	3	Multiple like for like swaps available.
+BI07	Supinated Inverted Row	Biceps | Compound Pull	Band Assisted Chin Up, Chin Up (Close Grip), Band Curl, Hammer Curl, Barbell Curl	5	1	One like for like swap (Chin Up (Close Grip)). Rest are same muscle group.
+TR01	Close Grip Bench Press	Triceps | Compound Press	Skull Crusher, Triceps Pushdown, Overhead Cable Extension, Diamond Push Up, Bench Dip, Band Triceps Pushdown	6	2	Multiple like for like swaps available.
+TR02	Overhead Cable Extension	Triceps | Extension	Skull Crusher, Triceps Pushdown, Band Triceps Pushdown, Close Grip Bench Press, Diamond Push Up	5	3	Multiple like for like swaps available.
+TR03	Triceps Pushdown	Triceps | Extension	Band Triceps Pushdown, Overhead Cable Extension, Skull Crusher, Diamond Push Up, Bench Dip	5	3	Multiple like for like swaps available.
+TR04	Skull Crusher	Triceps | Extension	Overhead Cable Extension, Triceps Pushdown, Band Triceps Pushdown, Close Grip Bench Press, Diamond Push Up	5	3	Multiple like for like swaps available.
+TR05	Bench Dip	Triceps | Compound Press	Diamond Push Up, Triceps Pushdown, Band Triceps Pushdown, Close Grip Bench Press	4	2	Multiple like for like swaps available.
+TR06	Diamond Push Up	Triceps | Compound Press	Bench Dip, Band Triceps Pushdown, Triceps Pushdown, Close Grip Bench Press	4	2	Multiple like for like swaps available.
+TR07	Band Triceps Pushdown	Triceps | Extension	Triceps Pushdown, Overhead Cable Extension, Diamond Push Up, Bench Dip	4	2	Multiple like for like swaps available.
+CO01	Plank	Core | Anti Extension	Dead Bug, Hollow Body Hold, Bird Dog, Ab Wheel Rollout, Reverse Crunch	5	4	Multiple like for like swaps available.
+CO02	Dead Bug	Core | Anti Extension	Plank, Bird Dog, Reverse Crunch, Hollow Body Hold	4	3	Multiple like for like swaps available.
+CO03	Hanging Leg Raise	Core | Anti Extension	Reverse Crunch, Hollow Body Hold, Cable Crunch, Dead Bug, Plank	5	5	Advanced only. Serve Reverse Crunch to beginner and intermediate users.
+CO04	Cable Woodchop	Core | Rotation	Standing Band Rotation, Russian Twist, Pallof Press, Side Plank	4	2	Multiple like for like swaps available.
+CO05	Pallof Press	Core | Anti Rotation	Standing Band Rotation, Bird Dog, Plank, Dead Bug, Side Plank	5	1	One like for like swap (Bird Dog). Rest are same muscle group.
+CO06	Ab Wheel Rollout	Core | Anti Extension	Hollow Body Hold, Plank, Dead Bug, Cable Crunch, Reverse Crunch	5	5	Advanced only. Serve Hollow Body Hold to beginner and intermediate users.
+CO07	Side Plank	Core | Lateral Flexion	Copenhagen Plank, Suitcase Carry, Pallof Press, Plank	4	1	One like for like swap (Copenhagen Plank). Rest are same muscle group.
+CO08	Cable Crunch	Core | Anti Extension	Reverse Crunch, Hanging Leg Raise, Hollow Body Hold, Plank, Dead Bug	5	5	Multiple like for like swaps available.
+CO09	Reverse Crunch	Core | Anti Extension	Hollow Body Hold, Dead Bug, Cable Crunch, Plank	4	4	Multiple like for like swaps available.
+CO10	Standing Band Rotation	Core | Rotation	Cable Woodchop, Russian Twist, Pallof Press	3	2	Multiple like for like swaps available.
+CO11	Hollow Body Hold	Core | Anti Extension	Dead Bug, Plank, Reverse Crunch, Ab Wheel Rollout	4	4	Multiple like for like swaps available.
+CO12	Bird Dog	Core | Anti Rotation	Dead Bug, Pallof Press, Plank	3	1	One like for like swap (Pallof Press). Rest are same muscle group.
+CO13	Copenhagen Plank	Core | Lateral Flexion	Side Plank, Suitcase Carry, Pallof Press, Plank	4	1	Advanced only. Serve Side Plank to beginner and intermediate users.
+CA01	Standing Calf Raise	Calves | Isolation	Seated Calf Raise, Single Leg Calf Raise, Pogo Hop	3	3	Multiple like for like swaps available.
+CA02	Seated Calf Raise	Calves | Isolation	Standing Calf Raise, Single Leg Calf Raise, Pogo Hop	3	3	Multiple like for like swaps available.
+CA03	Single Leg Calf Raise	Calves | Isolation	Standing Calf Raise, Seated Calf Raise, Pogo Hop	3	3	Multiple like for like swaps available.
+FB01	Kettlebell Swing	Full Body & Conditioning | Hinge	Dumbbell Swing, Cable Pull Through, Romanian Deadlift, Jump Squat, Burpee	5	1	One like for like swap (Dumbbell Swing). Rest are same muscle group.
+FB02	Farmer Carry	Full Body | Carry	Suitcase Carry, Side Plank, Plank	3	1	One like for like swap (Suitcase Carry). Rest are same muscle group.
+FB07	Suitcase Carry	Full Body | Carry	Farmer Carry, Side Plank, Pallof Press	3	1	One like for like swap (Farmer Carry). Rest are same muscle group.
+CA04	Pogo Hop	Calves | Isolation	Single Leg Calf Raise, Standing Calf Raise, Seated Calf Raise	3	3	Multiple like for like swaps available.
+FB03	Burpee	Full Body & Conditioning | Full Body	Mountain Climber, Jumping Jack, High Knees, Bear Crawl, Jump Squat	5	2	Multiple like for like swaps available.
+FB04	Mountain Climber	Full Body & Conditioning | Full Body	Bear Crawl, High Knees, Jumping Jack, Plank, Burpee	5	2	Multiple like for like swaps available.
+FB08	Jumping Jack	Full Body & Conditioning | Conditioning	High Knees, Mountain Climber, Pogo Hop, Bear Crawl	4	1	One like for like swap (High Knees). Rest are same muscle group.
+FB09	Bear Crawl	Full Body & Conditioning | Full Body	Mountain Climber, Plank, Burpee, High Knees	4	2	Multiple like for like swaps available.
+FB05	Rowing Machine Interval	Full Body & Conditioning | Conditioning	Assault Bike or Stationary Bike Interval, High Knees, Jumping Jack, Burpee, Mountain Climber	5	3	Multiple like for like swaps available.
+FB06	Assault Bike or Stationary Bike Interval	Full Body & Conditioning | Conditioning	Rowing Machine Interval, High Knees, Jumping Jack, Burpee, Mountain Climber	5	3	Multiple like for like swaps available.
+BK12	Trap Bar Deadlift	Back | Hinge	Conventional Deadlift, Dumbbell Deadlift, Rack Pull, Romanian Deadlift, Cable Pull Through, Goblet Squat	6	3	Multiple like for like swaps available.
+BK13	Dumbbell Deadlift	Back | Hinge	Trap Bar Deadlift, Romanian Deadlift, Rack Pull, Cable Pull Through, Back Extension, Glute Bridge, Prone Superman	7	2	Multiple like for like swaps available.
+BK14	Band Bent Over Row	Back | Horizontal Pull	Inverted Row, Chest Supported Dumbbell Row, Dumbbell Single Arm Row, Seated Cable Row	4	4	Multiple like for like swaps available.
+BK15	Band Assisted Chin Up	Back | Vertical Pull	Lat Pulldown, Chin Up, Band Lat Pulldown, Inverted Row, Straight Arm Pulldown	5	4	Multiple like for like swaps available.
+SH11	Band Overhead Press	Shoulders | Vertical Push	Seated Dumbbell Shoulder Press, Arnold Press, Pike Push Up, Barbell Overhead Press	4	4	Multiple like for like swaps available.
+SH12	Band Pull Apart	Shoulders | Rear Delt	Rear Delt Fly, Face Pull, Prone Y-T-W Raise	3	3	Multiple like for like swaps available.
+QD14	Sissy Squat	Quads | Knee Extension	Reverse Nordic Curl, Leg Extension, Wall Sit, Bodyweight Squat	4	2	Multiple like for like swaps available.
+HG13	Lateral Band Walk	H&G | Abduction	Hip Abduction, Single Leg Glute Bridge, Glute Bridge, Side Plank	4	1	One like for like swap (Hip Abduction). Rest are same muscle group.
+HG14	Slider Hamstring Curl	H&G | Knee Flexion	Lying Leg Curl, Seated Leg Curl, Nordic Hamstring Curl, Single Leg Glute Bridge	4	3	Multiple like for like swaps available.
+CO14	Russian Twist	Core | Rotation	Standing Band Rotation, Cable Woodchop, Side Plank, Pallof Press	4	2	Multiple like for like swaps available.
+FB10	High Knees	Full Body & Conditioning | Conditioning	Jumping Jack, Mountain Climber, Bear Crawl, Burpee	4	1	One like for like swap (Jumping Jack). Rest are same muscle group.
+FB11	Dumbbell Swing	Full Body & Conditioning | Hinge	Kettlebell Swing, Cable Pull Through, Romanian Deadlift, Jump Squat	4	1	One like for like swap (Kettlebell Swing). Rest are same muscle group.
