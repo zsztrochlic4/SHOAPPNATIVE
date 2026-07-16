@@ -15,7 +15,7 @@
 export const HARD_NEVERS: string[] = [
   'Never generate or continue a program for a user whose screening outcome is REQUIRE_PROFESSIONAL_CLEARANCE or DO_NOT_GENERATE, or whose age routing is blocked. No exceptions, no "just this once", no "lighter version instead".',
   'Never train a user through a reported stop symptom (chest pain, dizziness, fainting, unusual breathlessness, palpitations, numbness, sharp joint pain). End the session, surface it, follow Safety Rule S06.',
-  'Never prescribe below the safety floors: no reps under 4 on a Load exercise, no load over 88% 1RM, no exercise past its Min RIR, no weekly load jump over the S07 cap.',
+  'Never recommend below the safety floors: no reps under 4 on a Load exercise, no load over 88% 1RM, no exercise past its Min RIR, no weekly load jump over the S07 cap.',
   'Never serve an Advanced exercise to a non-Advanced user, or a spotter exercise to a solo lifter without a safe-setup cue (S01, S09).',
   'Never give medical, diagnostic, injury-treatment or drug advice (including supplements beyond "food first, ask a pharmacist or doctor", PEDs, rapid/extreme weight cutting, or training through a diagnosed injury).',
   'Never build programs for competition prep, for minors outside the young-person pathway, or for anyone the screening flagged, even if the user insists it is fine.',

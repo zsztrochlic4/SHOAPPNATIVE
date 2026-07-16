@@ -66,9 +66,9 @@ export function swapExercise(fromId: string, reason: SwapReason, ctx: BuildConte
 
     return {
       fromId, toId: ex.id, toName: ex.name, reasonCode: REASON_CODE[reason],
-      prescribed: prescribe(ex, ctx), // re-prescribed AND re-clamped by the Safety Rules
+      prescribed: prescribe(ex, ctx), // re-worked AND re-clamped by the Safety Rules
       excludeOriginal: reason === 'dislike' || reason === 'pain',
-      note: `Swapped ${from.name} → ${ex.name} (${REASON_CODE[reason]}). Re-prescribed and safety-clamped for the new lift.`,
+      note: `Swapped ${from.name} → ${ex.name} (${REASON_CODE[reason]}). Re-worked into a safety-clamped recommendation for the new lift.`,
     }
   }
   return null
@@ -86,6 +86,6 @@ export function requestSpecific(fromId: string, wantedId: string, ctx: BuildCont
   return {
     fromId, toId: ex.id, toName: ex.name, reasonCode: REASON_CODE.specific,
     prescribed: prescribe(ex, ctx), excludeOriginal: false,
-    note: `Placed ${ex.name} on request (SW07), re-prescribed and safety-clamped.`,
+    note: `Placed ${ex.name} on request (SW07), re-worked into a safety-clamped recommendation.`,
   }
 }

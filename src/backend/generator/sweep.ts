@@ -23,6 +23,10 @@ import { generateProgram, contextForUser, type GeneratedProgram } from './genera
 import { swapExercise } from './swaps'
 import { progressExercise } from './progress'
 import { changeGoal } from './goalChange'
+import { generateCustomSplit } from './customSplit'
+import { applyPlannedAbsence } from './exam'
+import { adjustProgram, DELOAD } from './deload'
+import type { AbsenceMode } from '../schema'
 
 const SPREAD: Weekday[] = ['Monday', 'Wednesday', 'Friday', 'Saturday', 'Tuesday', 'Thursday', 'Sunday']
 const WEEK: Weekday[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -58,7 +62,8 @@ function makeUser(goal: BackendGoal, experience: BackendExperience, days: number
 
 const MAJOR = ['Chest', 'Back', 'Quads', 'Hamstrings & Glutes', 'Shoulders']
 
-function assertProgram(label: string, user: UserDoc, program: GeneratedProgram, fails: string[]) {
+/** Per-exercise HARD-safety checks (used by both the full and the transform-only asserts). */
+function assertExerciseSafety(label: string, user: UserDoc, program: GeneratedProgram, fails: string[]) {
   const push = (ok: boolean, msg: string) => { if (!ok) fails.push(`${label}: ${msg}`) }
   push(!program.audit.some((a) => a.includes('UNFILLED')), 'has an unfilled required slot')
   for (const day of program.days) {
@@ -77,6 +82,12 @@ function assertProgram(label: string, user: UserDoc, program: GeneratedProgram, 
       if (solo && ex.spotterRecommended) push(e.appliedRules.includes('S09_CUE'), `${e.exerciseId} solo spotter without cue (S09)`)
     }
   }
+}
+
+/** Full assert: per-exercise safety + the Weekly-Volume floor/cap (normal programs only). */
+function assertProgram(label: string, user: UserDoc, program: GeneratedProgram, fails: string[]) {
+  const push = (ok: boolean, msg: string) => { if (!ok) fails.push(`${label}: ${msg}`) }
+  assertExerciseSafety(label, user, program, fails)
   for (const m of MAJOR) {
     push((program.weeklySetsByMuscle[m] ?? 0) >= 4, `${m} below volume floor (4)`)
     push((program.weeklySetsByMuscle[m] ?? 0) <= 20, `${m} above volume cap (20)`)
@@ -190,6 +201,29 @@ export function runProfileSweep(): SweepResult {
           if (s && (EXERCISE_BY_ID[s.toId]?.stressRegions.includes('knee'))) failures.push(`pain-swap/${e.exerciseId}: swapped into a knee-loading exercise`)
         }
       }
+    }
+
+    // Custom splits (CS02 coverage + safety/volume unchanged) across goals + a legs-once bias.
+    for (const goal of goals) {
+      for (const request of ['none / balanced', 'legs once']) {
+        const user = makeUser(goal, 'Intermediate', 4)
+        const r = generateCustomSplit(user, request); count++
+        if (!r.ok) failures.push(`custom/${goal}/${request}: failed (${r.reason})`)
+        else assertProgram(`custom/${goal}/${request}`, user, r.program, failures)
+      }
+    }
+
+    // Exam / planned-absence modes + a standalone deload: transforms only raise RIR / cut
+    // sets, so per-exercise safety must still hold (volume floor deliberately drops here).
+    {
+      const user = makeUser('Hypertrophy', 'Intermediate', 4)
+      const modes: AbsenceMode[] = ['maintenance', 'active_rest', 'reduced_frequency', 'no_change']
+      for (const mode of modes) {
+        const plan = applyPlannedAbsence(user, { absence_id: 'a', start_date: '2026-06-01', end_date: '2026-06-14', mode_id: mode, status: 'scheduled' }); count++
+        if (plan.program) assertExerciseSafety(`exam/${mode}`, user, plan.program, failures)
+      }
+      const base = generateProgram(user)
+      if (base.ok) { assertExerciseSafety('deload', user, adjustProgram(base.program, DELOAD, 'F01'), failures); count++ }
     }
 
     // Edge: consecutive training days.

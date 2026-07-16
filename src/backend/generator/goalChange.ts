@@ -49,7 +49,7 @@ export function changeGoal(
     program: gen.program,
     transitionProgram: withTransitionWeek(gen.program),
     notes: [
-      'GC06: progression_state is untouched — your logged loads carry into the new prescription; only the rep/set targets move.',
+      'GC06: progression_state is untouched — your logged loads carry into the new recommendation; only the rep/set targets move.',
       'GC05: load is the last thing cut — the main compounds stay; accessory volume shifts first.',
       'GC07: week one runs one RIR easier than target, then settles (no intensity spike).',
       'GC08: confirm nothing health-relevant has changed; if it has, re-run screening before applying.',

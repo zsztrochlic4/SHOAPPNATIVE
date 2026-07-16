@@ -34,6 +34,8 @@ export interface GeneratedProgram {
   /** Honest, user-facing notes about deliberate coverage tradeoffs (e.g. no direct calves). */
   coverageNotes: string[]
   startingLoadNote: string
+  /** Framing: everything here is a recommendation, not a medical prescription. */
+  recommendationNote: string
   audit: string[]
 }
 
@@ -72,7 +74,12 @@ export function contextForUser(user: UserDoc, weeksTrained = 0): BuildContext {
   }
 }
 
-export function generateProgram(user: UserDoc): GenResult {
+export interface GenerateOptions {
+  /** Override the split's day_structure (custom splits CS01, exam-maintenance FB2). */
+  dayStructure?: string[]
+}
+
+export function generateProgram(user: UserDoc, opts: GenerateOptions = {}): GenResult {
   // Step 1 — screening + age + platform sign-off gate.
   const gate = canGenerate(user)
   if (!gate.ok) return { ok: false, reason: gate.reason ?? 'blocked' }
@@ -81,11 +88,14 @@ export function generateProgram(user: UserDoc): GenResult {
   const ctx = contextForUser(user)
   const audit: string[] = []
 
-  // Step 3 — pick split. Step 4 — schedule. SCH06 compression: if the rest floor leaves
-  // fewer usable lifting days than the split needs, re-select for the reduced count.
-  let sel = selectSplit(user.days_available.length, user.experience, user.goal)
+  // Step 3 — pick split (or use an explicit day_structure). Step 4 — schedule. SCH06
+  // compression: if the rest floor leaves fewer usable lifting days than the split needs,
+  // re-select for the reduced count.
+  let sel = opts.dayStructure
+    ? { split: { splitId: 'custom', name: 'Custom', daysMin: opts.dayStructure.length, daysMax: opts.dayStructure.length, dayStructure: opts.dayStructure, bestForGoals: ['All'], experience: ['All'], why: 'Custom structure' }, dayStructure: [...opts.dayStructure], reason: 'custom day_structure' }
+    : selectSplit(user.days_available.length, user.experience, user.goal)
   let sched = buildSchedule(sel.dayStructure, user.days_available, user.commitments)
-  if (sched.placements.length < sel.dayStructure.length && sched.placements.length >= 1) {
+  if (!opts.dayStructure && sched.placements.length < sel.dayStructure.length && sched.placements.length >= 1) {
     audit.push(`SCH06 compression: usable days ${sched.placements.length} < split needs ${sel.dayStructure.length}; re-selecting`)
     sel = selectSplit(sched.placements.length, user.experience, user.goal)
     sched = buildSchedule(sel.dayStructure, user.days_available, user.commitments)
@@ -120,9 +130,11 @@ export function generateProgram(user: UserDoc): GenResult {
   // ---- Reconciliation (Weekly Volume rules 1, 2, 3, 7) ----
   const setsFor = (muscle: string) => days.reduce((n, d) => n + d.exercises.filter((e) => e.muscleGroup === muscle).reduce((a, e) => a + e.sets, 0), 0)
   const excl = new Set<string>([...ctx.excludedIds, ...injuryExcludeIds(ctx.affectedRegions)])
+  const SKILL: Record<string, number> = { Beginner: 0, Intermediate: 1, Advanced: 2 }
   const eligible = (ex: (typeof ACTIVE_EXERCISES)[number], usedIds: Set<string>) =>
     !excl.has(ex.id) && !usedIds.has(ex.id) &&
     (ex.equipmentTier === 'Bodyweight' || (ex.equipmentTier === 'Basic Gym' && ctx.equipmentTier !== 'Bodyweight') || ctx.equipmentTier === 'Full Gym') &&
+    (SKILL[ex.skillLevel] ?? 9) <= (SKILL[ctx.experience] ?? 0) && // S01: never add an Advanced lift for a non-Advanced user
     ex.requiredEquipmentTags.every((t) => t.split('/').some((x) => ctx.equipmentTags.includes(x.trim())))
   const daySizeCap = budget + 2 // reconciliation may push a day slightly past its base budget
 
@@ -219,7 +231,8 @@ export function generateProgram(user: UserDoc): GenResult {
       weeklySetsByMuscle,
       days,
       coverageNotes,
-      startingLoadNote: 'Week one starts light (around RIR 4–5); the working weight is found over the first two sessions (Generator Flow step 8 / Safety P01).',
+      startingLoadNote: 'Week one starts light (around RIR 4–5); the recommended working weight is found over the first two sessions (Generator Flow step 8 / Safety P01).',
+      recommendationNote: 'These are recommended sets, reps and weights based on your inputs and logged performance — guidance to adjust to how you feel on the day, not a medical prescription.',
       audit,
     },
   }

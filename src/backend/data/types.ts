@@ -122,6 +122,14 @@ export interface CommitmentRow {
   notes: string
 }
 
+/** Custom Split Resolution row (sheet "Custom Split Resolution"): fuzzy request → structure. */
+export interface CustomSplitRow {
+  daysPerWeek: number
+  userRequest: string // e.g. 'legs once', 'none / balanced'
+  resolvedDayStructure: string[]
+  note: string
+}
+
 /** Injury Modifications region row (sheet "Injury Modifications"). */
 export interface InjuryModRow {
   region: string

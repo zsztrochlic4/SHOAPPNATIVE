@@ -108,7 +108,7 @@ export interface Commitment {
 }
 
 export type AbsenceMode =
-  | 'full_pause' | 'maintenance' | 'just_walk' | 'fewer_days' | 'deload' | 'no_change'
+  | 'full_pause' | 'maintenance' | 'minimal_movement' | 'reduced_frequency' | 'active_rest' | 'no_change'
 
 export type AbsenceStatus = 'scheduled' | 'active' | 'completed' | 'cancelled'
 

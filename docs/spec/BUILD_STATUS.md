@@ -84,8 +84,36 @@ raises RIR). Plus a pain-swap-avoids-region check.
 Coverage transparency: `program.coverageNotes` surfaces the calves-at-0 tradeoff on 2-day
 splits (owner decision: no forced floor; say so honestly + suggest a third day).
 
-Still P1: calendar adaptation SCH07/08 (missed-session/re-plan), deload prompts, re-screen,
-Custom Splits, Exam Survival Protocol, CC01–CC05. Sign-off gate stays unsigned.
+**Remaining runtime/scheduling steps DONE:**
+- `adapt.ts` — calendar adaptation SCH07 (missed → shift/fold), SCH08 (3-week re-plan),
+  SCH10 (planned-absence exempt) + CC01 (editable/reschedulable days) + CC02 (catch-up).
+- `deload.ts` — F01 (6-week offer / fatigue-applied deload: sets −40%, hold load, +1 RIR),
+  F02, F03; `adjustProgram` transform.
+- `reScreen.ts` — re-screen on a health change (new injury → MODIFY + region; stop symptom →
+  S06; any answer change → re-route). Reuses the single screening + stop-symptom logic.
+- `customSplit.ts` — Custom Splits: fuzzy request → day_structure via the Resolution table
+  (CS06), validate (CS01 blocks/length, CS02 coverage), then flow through generateProgram
+  unchanged (CS05 — no relaxed safety).
+- `exam.ts` — Exam Survival Protocol: the 6 planned-absence modes, restore + re-entry ramp,
+  overlaps take the more conservative mode; progression_state never wiped.
+- CC03 (activity → generator) and CC05 (injury region chips) were already wired via the
+  mapping + generator; CC04 (optional/editable activity, re-apply) is regeneration-driven;
+  CC06 (free-text red-flag) done earlier.
+
+**Terminology:** programming outputs are framed as **recommended**, not prescribed
+(`program.recommendationNote`, swap/goal-change notes updated; internal data names like
+`prescriptionClass` keep the sheet's wording).
+
+**Sweep now 81 profiles** — adds custom splits, the exam/deload transforms (per-exercise
+safety asserted; the volume floor deliberately drops on a deload) and the runtime paths.
+Caught a real S01 breach in the process: the reconciliation's add-slot path wasn't checking
+skill level — fixed.
+
+## Open item (blocks real-user launch)
+Professional confirmation of the **7 screening questions and their routing** (and the safety
+sheets generally) is **pending** — NOT yet done. `canGenerate()` stays closed to real users
+(`PROFESSIONAL_SIGNOFF.signed = false`) until it's on file. Everything above is built and
+sweep/CI-gated behind that.
 
 ## P2 — enhancements
 Exercise media, structured equipment taxonomy, conversational entry points, notifications,
