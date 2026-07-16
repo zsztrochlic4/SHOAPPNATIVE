@@ -39,8 +39,6 @@ export interface UserSafetyContext {
   trains_alone: boolean
   /** Completed training weeks on the current program — drives P01 (< 4 weeks). */
   weeks_trained: number
-  /** 16–17 young-person conservative envelope (Age Routing). */
-  young_person: boolean
 }
 
 export interface Prescription {
@@ -74,8 +72,6 @@ const SAFETY_FLOORS = {
 /** S01: an Advanced exercise served to a non-Advanced user must be swapped. */
 export function isSkillBlocked(ex: ExerciseSafetyMeta, user: UserSafetyContext): boolean {
   if (ex.skill_level === 'Advanced' && user.experience !== 'Advanced') return true
-  // Young-person envelope also blocks Advanced.
-  if (ex.skill_level === 'Advanced' && user.young_person) return true
   return false
 }
 
@@ -83,7 +79,7 @@ export function isSkillBlocked(ex: ExerciseSafetyMeta, user: UserSafetyContext):
 export function isClassBlocked(ex: ExerciseSafetyMeta, user: UserSafetyContext): boolean {
   const beginnerPhase =
     user.experience === 'Beginner' && user.weeks_trained < SAFETY_FLOORS.beginnerFirstWeeks
-  if ((beginnerPhase || user.young_person) && ex.prescription_class === 'Power') return true
+  if (beginnerPhase && ex.prescription_class === 'Power') return true
   return false
 }
 
@@ -146,9 +142,6 @@ export function clampPrescription(
   const beginnerPhase =
     user.experience === 'Beginner' && user.weeks_trained < SAFETY_FLOORS.beginnerFirstWeeks
   if (beginnerPhase) raiseRir(SAFETY_FLOORS.beginnerRirMin, 'P01')
-
-  // Young-person conservative bump.
-  if (user.young_person) raiseRir(ex.min_rir + 1, 'YOUTH')
 
   // P02: minimum rest floor outside Fat Loss circuits / Interval work (a default).
   if ((ex.prescription_class === 'Load' || ex.prescription_class === 'Rep') &&

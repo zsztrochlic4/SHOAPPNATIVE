@@ -6,6 +6,10 @@ work lands. Source of truth = `StrengthHub_Workout_Backend_v16.xlsx` (see `sheet
 ## Confirmed decisions (owner)
 - **B1** joint follow-ups trigger on screening **Q5 = Yes** or an injury chip (hard req).
 - **B2** store `date_of_birth`; **no `?? 20` default**; block generation on unverified age (hard req).
+- **Strictly 18+** (owner, 2026-07-17): under-18 is blocked entirely — **no** young-person or
+  guardian-consent pathway. Enforced in `ageRouting.ts` (bands `adult`/`under_18`/`unverified`),
+  `safetyRules.ts` (no `young_person` context), the onboarding `Under18` block screen + a Terms
+  "I am 18 or older" confirmation, and the Age Routing workbook sheet (+ TSV mirror).
 - `planned_absences` **embedded on `users`**.
 - **M1** `followed_structured_program` stored; asked for Advanced too.
 - **M2** `diet` / `tight_budget` are **infer_ok** (nutrition-only; defaulted, refined later).
@@ -114,6 +118,11 @@ Professional confirmation of the **7 screening questions and their routing** (an
 sheets generally) is **pending** — NOT yet done. `canGenerate()` stays closed to real users
 (`PROFESSIONAL_SIGNOFF.signed = false`) until it's on file. Everything above is built and
 sweep/CI-gated behind that.
+
+The reviewer-facing artifact for this sign-off is **`docs/spec/PROFESSIONAL_REVIEW_PACKET.md`**
+— plain-language, no code, four sections (screening, age gate, injury handling, safety limits)
+built around one worked example (20yo, Intermediate/Hypertrophy, 4 days, minor knee flag, weekly
+basketball). Every number in it is pulled from the live seeded values / generator output.
 
 ## P2 — enhancements
 Exercise media, structured equipment taxonomy, conversational entry points, notifications,

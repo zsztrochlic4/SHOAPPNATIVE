@@ -816,7 +816,7 @@ function TopBack({ onBack, label }: { onBack: () => void; label?: string }) {
 
 /* ──────────────────────────── the screen ─────────────────────────────────── */
 
-type Phase = 'splash' | 'welcome' | 'login' | 'flow' | 'gate-under16' | 'gate-guardian' | 'terms' | 'processing' | 'summary' | 'account'
+type Phase = 'splash' | 'welcome' | 'login' | 'flow' | 'gate-under18' | 'terms' | 'processing' | 'summary' | 'account'
 
 export default function Onboarding() {
   const dispatch = useDispatch()
@@ -852,8 +852,8 @@ export default function Onboarding() {
     if (step.key === 'name' && answers.name) set('name', normalizeName(answers.name))
     if (step.key === 'dob') {
       const age = ageFromDob(answers.dob)
-      if (age !== null && age < 16) { setDir('fwd'); setPhase('gate-under16'); return }
-      if (age !== null && age < 18 && !answers.guardianConsent) { setDir('fwd'); setPhase('gate-guardian'); return }
+      // StrengthHub is strictly 18+. Anyone under 18 is blocked — no guardian pathway.
+      if (age !== null && age < 18) { setDir('fwd'); setPhase('gate-under18'); return }
     }
     // The blocked-outcome screen is a dead-end (its own "come back later" button).
     if (step.type === 'safetyoutcome') return
@@ -891,8 +891,7 @@ export default function Onboarding() {
   if (phase === 'splash') view = <Splash onDone={() => { setDir('fwd'); setPhase('welcome') }} />
   else if (phase === 'welcome') view = <Welcome onStart={() => { setDir('fwd'); setIndex(0); setPhase('flow') }} onLogin={() => { setDir('fwd'); setPhase('login') }} />
   else if (phase === 'login') view = <Login onBack={() => { setDir('back'); setPhase('welcome') }} />
-  else if (phase === 'gate-under16') view = <Under16 onBack={() => { setDir('back'); setPhase('flow') }} />
-  else if (phase === 'gate-guardian') view = <Guardian answers={answers} set={set} onBack={() => { setDir('back'); setPhase('flow') }} onContinue={() => { set('guardianConsent', true); setPhase('flow'); advance() }} />
+  else if (phase === 'gate-under18') view = <Under18 onBack={() => { setDir('back'); setPhase('flow') }} />
   else if (phase === 'terms') view = <Terms answers={answers} set={set} onBack={() => { setDir('back'); setPhase('flow'); setIndex(flow.length - 1) }} onContinue={() => { setDir('fwd'); setPhase('processing') }} />
   else if (phase === 'processing') view = <Processing onDone={() => { setDir('fwd'); setPhase('summary') }} />
   else if (phase === 'summary') view = <Summary answers={answers} onEdit={onEdit} onContinue={() => { setDir('fwd'); setPhase('account') }} onBack={() => { setDir('back'); setPhase('flow'); setIndex(flow.length - 1) }} />
@@ -1495,7 +1494,7 @@ function CheckboxCard({ checked, onToggle, children }: { checked: boolean; onTog
   )
 }
 
-function Under16({ onBack }: { onBack: () => void }) {
+function Under18({ onBack }: { onBack: () => void }) {
   const tok = useTok()
   return (
     <View style={{ flex: 1 }}>
@@ -1505,31 +1504,12 @@ function Under16({ onBack }: { onBack: () => void }) {
       <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 26 }}>
         <Reveal delay={80}><View style={{ width: 66, height: 66, borderRadius: 20, backgroundColor: tok.rgb('--fg', 0.06), alignItems: 'center', justifyContent: 'center' }}><Icon name="heart" size={32} color={tok.rgb('--fg', 0.8)} /></View></Reveal>
         <Reveal delay={180}><Text style={{ marginTop: 24, fontSize: 26, fontWeight: '800', letterSpacing: -0.5, color: tok.rgb('--fg'), lineHeight: 31 }}>Thanks for your interest in StrengthHub</Text></Reveal>
-        <Reveal delay={260}><Text style={{ marginTop: 14, fontSize: 15.5, lineHeight: 25, color: tok.rgb('--fg', 0.6) }}>StrengthHub creates personalised training programs for people aged 16 and over. We can’t generate a program just yet — but we’d love to have you when the time is right.</Text></Reveal>
-        <Reveal delay={340}><Text style={{ marginTop: 12, fontSize: 14, lineHeight: 21.7, color: tok.rgb('--fg', 0.45) }}>In the meantime, staying active with school sports and everyday movement is a great foundation.</Text></Reveal>
+        <Reveal delay={260}><Text style={{ marginTop: 14, fontSize: 15.5, lineHeight: 25, color: tok.rgb('--fg', 0.6) }}>StrengthHub creates personalised training programs for people aged 18 and over. We can’t generate a program for you yet — but we’d love to have you when the time is right.</Text></Reveal>
+        <Reveal delay={340}><Text style={{ marginTop: 12, fontSize: 14, lineHeight: 21.7, color: tok.rgb('--fg', 0.45) }}>In the meantime, staying active with sport and everyday movement is a great foundation.</Text></Reveal>
       </View>
       <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 26 }}>
         <Pressable onPress={onBack} style={{ height: 54, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: tok.rgb('--fg', 0.1) }}><Text style={{ fontSize: 16, fontWeight: '700', color: tok.rgb('--fg') }}>Back</Text></Pressable>
       </View>
-    </View>
-  )
-}
-
-function Guardian({ answers, set, onContinue, onBack }: { answers: Answers; set: SetFn; onContinue: () => void; onBack: () => void }) {
-  const tok = useTok()
-  const ok = answers.guardianConsent
-  return (
-    <View style={{ flex: 1 }}>
-      <View style={{ paddingTop: 10, paddingHorizontal: 20 }}>
-        <Pressable onPress={onBack} hitSlop={8} style={{ width: 40, height: 40, marginLeft: -8, borderRadius: 999, alignItems: 'center', justifyContent: 'center' }}><Icon name="back" size={22} color={tok.rgb('--fg', 0.7)} /></Pressable>
-      </View>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 26, paddingTop: 10 }} keyboardShouldPersistTaps="handled">
-        <Reveal delay={80}><View style={{ width: 62, height: 62, borderRadius: 18, backgroundColor: tok.rgb('--brand-400', 0.12), alignItems: 'center', justifyContent: 'center' }}><Icon name="shield" size={30} color={tok.rgb('--brand-300')} /></View></Reveal>
-        <Reveal delay={180}><Text style={{ marginTop: 20, fontSize: 26, fontWeight: '800', letterSpacing: -0.5, color: tok.rgb('--fg'), lineHeight: 31 }}>A quick step for under-18s</Text></Reveal>
-        <Reveal delay={260}><Text style={{ marginTop: 12, marginBottom: 20, fontSize: 15, lineHeight: 23, color: tok.rgb('--fg', 0.6) }}>Because you’re 16 or 17, we ask that a parent or guardian is aware you’re setting up StrengthHub and consents to you training with a personalised program.</Text></Reveal>
-        <Reveal delay={340}><CheckboxCard checked={ok} onToggle={() => set('guardianConsent', !ok)}>My parent or guardian is aware and consents to me setting up and using StrengthHub.</CheckboxCard></Reveal>
-      </ScrollView>
-      <ActionBar disabled={!ok} onPress={onContinue} />
     </View>
   )
 }
@@ -1544,7 +1524,7 @@ function Terms({ answers, set, onContinue, onBack }: { answers: Answers; set: Se
         <QHeader title="A quick acknowledgement" sub="One last thing before we build your experience." />
         <Reveal delay={160}>
           <CheckboxCard checked={checked} onToggle={() => set('terms', !checked)}>
-            <>I have read and agree to the Terms of Use and acknowledge that StrengthHub provides general fitness and wellness information, <Text style={{ fontWeight: '700', color: tok.rgb('--fg') }}>not medical advice</Text>.</>
+            <>I confirm I am <Text style={{ fontWeight: '700', color: tok.rgb('--fg') }}>18 or older</Text>, and I have read and agree to the Terms of Use. I acknowledge that StrengthHub provides general fitness and wellness information, <Text style={{ fontWeight: '700', color: tok.rgb('--fg') }}>not medical advice</Text>.</>
           </CheckboxCard>
         </Reveal>
         <Reveal delay={230}>

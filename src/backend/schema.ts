@@ -61,7 +61,7 @@ export type ScreeningOutcome =
   | 'REQUIRE_PROFESSIONAL_CLEARANCE'
   | 'DO_NOT_GENERATE'
 
-export type ScreeningVersion = 'adult_v1' | 'youth_v1' | 'none'
+export type ScreeningVersion = 'adult_v1' | 'none'
 
 /** The 7 pre-exercise screening answers (q1..q7), true = "Yes". */
 export interface ScreeningAnswers {

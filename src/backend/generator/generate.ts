@@ -10,7 +10,6 @@ import { SESSION_TEMPLATES } from '../data/sessionTemplates'
 import { ACTIVE_EXERCISES } from '../data'
 import { prescriptionFor } from '../data'
 import { canGenerate } from '../mapping/onboardingContract'
-import { ageFromDob } from '../safety/ageRouting'
 import type { UserDoc } from '../schema'
 import { selectSplit } from './select'
 import { buildSchedule, type Placement } from './schedule'
@@ -56,7 +55,6 @@ function maxExercises(sessionMin: number): number {
  * safety envelope as initial generation. `weeksTrained` defaults to 0 (week one, P01).
  */
 export function contextForUser(user: UserDoc, weeksTrained = 0): BuildContext {
-  const age = ageFromDob(user.date_of_birth)
   return {
     goal: user.goal,
     focalPoints: user.focal_points,
@@ -69,7 +67,6 @@ export function contextForUser(user: UserDoc, weeksTrained = 0): BuildContext {
       experience: user.experience,
       trains_alone: user.trains_alone === 'always' || user.trains_alone === 'usually',
       weeks_trained: weeksTrained,
-      young_person: age !== null && age >= 16 && age < 18,
     },
   }
 }
