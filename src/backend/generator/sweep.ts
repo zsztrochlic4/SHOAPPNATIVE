@@ -14,11 +14,15 @@
 import { EXERCISE_BY_ID, prescriptionFor } from '../data'
 import { BODYWEIGHT_TAGS, BASIC_GYM_TAGS, FULL_GYM_TAGS } from '../data/equipmentTags'
 import { PROFESSIONAL_SIGNOFF, REQUIRED_REVIEW_SHEETS } from '../coach/signOff'
+import { weeklyLoadCapKg } from '../safety/safetyRules'
 import type {
   BackendExperience, BackendGoal, Commitment, EquipmentTier, FocalPoint, InjuryRegion,
-  ScreeningOutcome, UserDoc, Weekday,
+  ProgressionStateDoc, ScreeningOutcome, UserDoc, Weekday,
 } from '../schema'
-import { generateProgram, type GeneratedProgram } from './generate'
+import { generateProgram, contextForUser, type GeneratedProgram } from './generate'
+import { swapExercise } from './swaps'
+import { progressExercise } from './progress'
+import { changeGoal } from './goalChange'
 
 const SPREAD: Weekday[] = ['Monday', 'Wednesday', 'Friday', 'Saturday', 'Tuesday', 'Thursday', 'Sunday']
 const WEEK: Weekday[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -79,6 +83,73 @@ function assertProgram(label: string, user: UserDoc, program: GeneratedProgram, 
   }
 }
 
+const GOAL_CLASS_FLOOR = (goal: BackendGoal, cls: string, exMinRir: number) => {
+  const g = prescriptionFor(goal, cls)
+  return Math.max(exMinRir, g?.rirMin ?? exMinRir)
+}
+
+/** Re-clamp checks shared by swaps, progression and goal change. */
+function assertClamp(label: string, exId: string, goal: BackendGoal, rx: { repsMin: number | null; pct1rmMax: number | null; rirMin: number; prescriptionClass: string }, fails: string[]) {
+  const ex = EXERCISE_BY_ID[exId]
+  if (!ex) { fails.push(`${label}: unknown exercise ${exId}`); return }
+  if (rx.prescriptionClass === 'Load') {
+    if (!(rx.repsMin != null && rx.repsMin >= 4)) fails.push(`${label}: ${exId} reps<4 after re-clamp (S04)`)
+    if (!(rx.pct1rmMax == null || rx.pct1rmMax <= 88)) fails.push(`${label}: ${exId} %1RM>88 after re-clamp (S04)`)
+  }
+  if (rx.rirMin < ex.minRir) fails.push(`${label}: ${exId} rir<minRIR after re-clamp`)
+  if (rx.rirMin < GOAL_CLASS_FLOOR(goal, rx.prescriptionClass, ex.minRir)) fails.push(`${label}: ${exId} rir<gridFloor after re-clamp`)
+}
+
+/** Runtime paths — swaps, progression, goal change — all re-clamp through the safety rules. */
+function assertRuntime(user: UserDoc, program: GeneratedProgram, fails: string[]) {
+  const ctx = contextForUser(user)
+  for (const day of program.days) {
+    for (const e of day.exercises) {
+      const ex = EXERCISE_BY_ID[e.exerciseId]
+      if (!ex) continue
+
+      // SW01 dislike swap → a different, safety-clamped exercise (when one exists).
+      const s = swapExercise(e.exerciseId, 'dislike', ctx)
+      if (s) {
+        if (s.toId === e.exerciseId) fails.push(`swap/${e.exerciseId}: dislike swap returned the same exercise`)
+        assertClamp('swap-dislike', s.toId, user.goal, s.prescribed, fails)
+      }
+
+      // Progression: a top-of-range session progresses within the S07 cap; a missed session
+      // reduces and never below the floor; a fatigued session never progresses.
+      const grid = prescriptionFor(user.goal, ex.prescriptionClass)
+      if (grid && ex.loadable && grid.repsMax != null) {
+        const state: ProgressionStateDoc = { uid: user.uid, exercise_id: ex.id, current_load_kg: 50, current_rep_target: grid.repsMin ?? 5, last_progressed_at: null, sessions_at_current: 1, stall_count: 0, deload_count: 0 }
+        const top = progressExercise({ ex, grid, state, sets: [{ reps_done: grid.repsMax, rir_reported: grid.rirMin ?? ex.minRir }, { reps_done: grid.repsMax, rir_reported: grid.rirMin ?? ex.minRir }], requiredSessionsToProgress: 2 })
+        if (top.rule === 'PR01') {
+          const inc = top.nextState.current_load_kg - 50
+          const cap = weeklyLoadCapKg(50, ex.bodyRegion)
+          if (inc > cap + 1e-6) fails.push(`progress/${ex.id}: load jump ${inc}kg exceeds S07 cap ${cap}kg`)
+          if ((grid.repsMin ?? 0) < 4) fails.push(`progress/${ex.id}: reps reset below 4 (S04)`) // grid guarantees, defensive
+        }
+        const missed = progressExercise({ ex, grid, state, sets: [{ reps_done: (grid.repsMin ?? 5) - 1, rir_reported: 0 }, { reps_done: (grid.repsMin ?? 5) - 1, rir_reported: 0 }] })
+        if (!['PR04', 'PR05'].includes(missed.rule)) fails.push(`progress/${ex.id}: missed session did not reduce (got ${missed.rule})`)
+        if (missed.nextState.current_load_kg < 0) fails.push(`progress/${ex.id}: reduced below zero`)
+        const fatigued = progressExercise({ ex, grid, state, sets: [{ reps_done: grid.repsMax, rir_reported: 0 }], fatigue: { rpe10OrFailureSets: 3 } })
+        if (fatigued.rule !== 'PR06' || fatigued.nextState.current_load_kg !== state.current_load_kg) fails.push(`progress/${ex.id}: fatigued session still progressed`)
+      }
+    }
+  }
+
+  // Goal change → a new, fully safety-clamped program for the new goal; transition week only raises RIR.
+  const others: BackendGoal[] = (['Hypertrophy', 'Fat Loss', 'Strength', 'General Fitness'] as BackendGoal[]).filter((g) => g !== user.goal)
+  const gc = changeGoal(user, others[0])
+  if (!gc.ok) fails.push(`goalchange: failed (${gc.reason})`)
+  else {
+    assertProgram(`goalchange→${gc.newGoal}`, { ...user, goal: gc.newGoal }, gc.program, fails)
+    for (let i = 0; i < gc.program.days.length; i++) {
+      for (let j = 0; j < gc.program.days[i].exercises.length; j++) {
+        if (gc.transitionProgram.days[i].exercises[j].rirMin < gc.program.days[i].exercises[j].rirMin) fails.push('goalchange: transition week lowered RIR')
+      }
+    }
+  }
+}
+
 export interface SweepResult { passed: boolean; count: number; failures: string[] }
 
 export function runProfileSweep(): SweepResult {
@@ -98,6 +169,27 @@ export function runProfileSweep(): SweepResult {
       const r = generateProgram(user); count++
       if (!r.ok) { failures.push(`${goal}/${exp}/${d}d: generation failed (${r.reason})`); continue }
       assertProgram(`${goal}/${exp}/${d}d`, user, r.program, failures)
+    }
+
+    // Runtime paths (swaps, progression, goal change) for a representative profile per goal.
+    for (const goal of goals) {
+      const user = makeUser(goal, 'Intermediate', 4)
+      const r = generateProgram(user); count++
+      if (r.ok) assertRuntime(user, r.program, failures)
+    }
+    // Pain swap must avoid the aggravated region.
+    {
+      const user = makeUser('Hypertrophy', 'Intermediate', 4, { affected_regions: ['knee'], outcome: 'MODIFY_AND_CONTINUE' })
+      const r = generateProgram(user); count++
+      if (r.ok) {
+        const ctx = contextForUser(user)
+        for (const e of r.program.days.flatMap((d) => d.exercises)) {
+          const ex = EXERCISE_BY_ID[e.exerciseId]
+          if (!ex || !ex.stressRegions.includes('knee')) continue
+          const s = swapExercise(e.exerciseId, 'pain', ctx)
+          if (s && (EXERCISE_BY_ID[s.toId]?.stressRegions.includes('knee'))) failures.push(`pain-swap/${e.exerciseId}: swapped into a knee-loading exercise`)
+        }
+      }
     }
 
     // Edge: consecutive training days.

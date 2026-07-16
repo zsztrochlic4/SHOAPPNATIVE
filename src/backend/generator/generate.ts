@@ -31,6 +31,8 @@ export interface GeneratedProgram {
   volumeTargets: VolumeTargets
   weeklySetsByMuscle: Record<string, number>
   days: BuiltDay[]
+  /** Honest, user-facing notes about deliberate coverage tradeoffs (e.g. no direct calves). */
+  coverageNotes: string[]
   startingLoadNote: string
   audit: string[]
 }
@@ -46,14 +48,14 @@ function maxExercises(sessionMin: number): number {
   return 7
 }
 
-export function generateProgram(user: UserDoc): GenResult {
-  // Step 1 — screening + age + platform sign-off gate.
-  const gate = canGenerate(user)
-  if (!gate.ok) return { ok: false, reason: gate.reason ?? 'blocked' }
-
-  // Step 2 — collect inputs from the canonical doc.
+/**
+ * Build the shared selection/prescription context from the canonical user doc. Exported so
+ * the runtime paths (swaps, progression) prescribe against exactly the same context and
+ * safety envelope as initial generation. `weeksTrained` defaults to 0 (week one, P01).
+ */
+export function contextForUser(user: UserDoc, weeksTrained = 0): BuildContext {
   const age = ageFromDob(user.date_of_birth)
-  const ctx: BuildContext = {
+  return {
     goal: user.goal,
     focalPoints: user.focal_points,
     equipmentTier: user.equipment_tier,
@@ -64,10 +66,19 @@ export function generateProgram(user: UserDoc): GenResult {
     safety: {
       experience: user.experience,
       trains_alone: user.trains_alone === 'always' || user.trains_alone === 'usually',
-      weeks_trained: 0, // week one → P01 active for beginners
+      weeks_trained: weeksTrained,
       young_person: age !== null && age >= 16 && age < 18,
     },
   }
+}
+
+export function generateProgram(user: UserDoc): GenResult {
+  // Step 1 — screening + age + platform sign-off gate.
+  const gate = canGenerate(user)
+  if (!gate.ok) return { ok: false, reason: gate.reason ?? 'blocked' }
+
+  // Step 2 — collect inputs from the canonical doc.
+  const ctx = contextForUser(user)
   const audit: string[] = []
 
   // Step 3 — pick split. Step 4 — schedule. SCH06 compression: if the rest floor leaves
@@ -188,6 +199,13 @@ export function generateProgram(user: UserDoc): GenResult {
   const weeklySetsByMuscle: Record<string, number> = {}
   for (const m of ALL_MUSCLES) weeklySetsByMuscle[m] = setsFor(m)
 
+  // Honest coverage notes — surface deliberate tradeoffs instead of omitting silently. On
+  // a short split some low-return muscles get no direct slot; say so and how to fix it.
+  const coverageNotes: string[] = []
+  if ((weeklySetsByMuscle.Calves ?? 0) === 0) {
+    coverageNotes.push('On this split we prioritise your highest-return movements, so there’s no direct calf slot — your calves still get indirect work from squats and lunges. Add a third training day if you want direct calf work.')
+  }
+
   return {
     ok: true,
     program: {
@@ -200,6 +218,7 @@ export function generateProgram(user: UserDoc): GenResult {
       volumeTargets: targets,
       weeklySetsByMuscle,
       days,
+      coverageNotes,
       startingLoadNote: 'Week one starts light (around RIR 4–5); the working weight is found over the first two sessions (Generator Flow step 8 / Safety P01).',
       audit,
     },

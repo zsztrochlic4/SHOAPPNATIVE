@@ -66,9 +66,26 @@ slot and calves aren't a floored major muscle).
 Equipment taxonomy reconciled to the Exercise Database's own 46-tag vocabulary
 (`equipmentTags.ts`); the onboarding mapping now emits those tags (fixes M4).
 
-Still P1: runtime steps 9–14 (Progression Engine, Exercise Swaps, Goal Change, calendar
-adaptation SCH07/08, deload, re-screen), Custom Splits, Exam Survival Protocol, CC01–CC05.
-Not started — on hold per owner (safety review in progress).
+**Runtime steps 9, 10, 14 DONE** (each re-clamps through the Safety Rules):
+- `progress.ts` — Progression Engine (PR01–PR08 + equipment increments), bounded by grid
+  ranges + S07 cap + Min RIR + reps≥4; fatigue/missed reps pause or reverse it.
+- `swaps.ts` — Exercise Swaps (SW01–SW08): walk Substitutions to the first compatible
+  option, re-prescribe + re-clamp; pain swaps avoid the aggravated region; dislike/pain
+  exclude the original.
+- `goalChange.ts` — Goal Change (GC01–GC09): re-run split/volume/prescription for the new
+  goal, preserve progression_state (loads/history), one easy transition week (rir+1),
+  version the program.
+
+**The sweep/CI now covers the runtime paths too** (68 profiles): for representative programs
+it swaps every exercise (re-clamp asserted), progresses/reduces/fatigues each loadable lift
+(S07 cap + floors asserted), and changes goal (new program re-checked; transition week only
+raises RIR). Plus a pain-swap-avoids-region check.
+
+Coverage transparency: `program.coverageNotes` surfaces the calves-at-0 tradeoff on 2-day
+splits (owner decision: no forced floor; say so honestly + suggest a third day).
+
+Still P1: calendar adaptation SCH07/08 (missed-session/re-plan), deload prompts, re-screen,
+Custom Splits, Exam Survival Protocol, CC01–CC05. Sign-off gate stays unsigned.
 
 ## P2 — enhancements
 Exercise media, structured equipment taxonomy, conversational entry points, notifications,
