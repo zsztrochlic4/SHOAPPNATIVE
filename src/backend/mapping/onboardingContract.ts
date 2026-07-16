@@ -19,6 +19,7 @@ import {
 } from '../schema'
 import { ageFromDob, routeByAge } from '../safety/ageRouting'
 import { evaluateScreening } from '../safety/screening'
+import { platformCleared } from '../coach/signOff'
 
 /* ------------------------------------------------------------------ */
 /*  Raw onboarding answer shape (the wizard's vocabulary)              */
@@ -349,6 +350,10 @@ export function buildUserDoc(input: OnboardingInput, opts: BuildOptions = {}): U
  * Generator Flow step 1 and refuse to build anything when it returns false.
  */
 export function canGenerate(user: UserDoc): { ok: boolean; reason: string | null } {
+  // P0 #11: nothing generates for real users until the accredited-professional sign-off
+  // is on file. This is a hard, global gate on top of the per-user checks below.
+  const platform = platformCleared()
+  if (!platform.ok) return { ok: false, reason: platform.reason }
   const route = routeByAge(user.date_of_birth, user.screening.guardian_consent)
   if (route.blocked) return { ok: false, reason: `age_${route.band}` }
   if (user.screening.outcome === 'DO_NOT_GENERATE') return { ok: false, reason: 'screening_do_not_generate' }

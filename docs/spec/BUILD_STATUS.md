@@ -26,10 +26,15 @@ work lands. Source of truth = `StrengthHub_Workout_Backend_v16.xlsx` (see `sheet
 | 3 | Seed substitutions (ID-based) | Substitutions | ✅ done (542) | `src/backend/data/substitutions.ts` |
 | 5 | Wire new onboarding: B1 flow reorder, B2 dob storage, M1 structured for Advanced, produce UserDoc | Onboarding Questions/Contract | ✅ done | `src/screens/Onboarding.tsx` |
 | 5b | Firestore persistence (write UserDoc / read on load) | Data Schemas | ⏳ todo (currently in app state `backendUser`) | `src/backend/repo/*` |
-| 9 | Stop-symptom escalation (S06) | Safety Rules S06 | ⏳ todo | `src/backend/safety/stopSymptom.ts` |
-| 10 | Coach AI Operating Rules as system-prompt contract | Coach AI Operating Rules | ⏳ todo | `src/backend/coach/operatingRules.ts` |
+| 9 | Stop-symptom escalation (S06) | Safety Rules S06 | ✅ logic done | `src/backend/safety/stopSymptom.ts` |
+| 10 | Coach AI Operating Rules as system-prompt contract | Coach AI Operating Rules | ✅ done | `src/backend/coach/operatingRules.ts` |
 | CC06 | Free-text red-flag scan on `notes` | Screening Outcomes / S05 | ✅ done | `src/backend/safety/redFlagScan.ts` |
-| 11 | **Accredited professional sign-off gate** (coach stays disabled until on file) | Safety sheets | ⏳ todo (config flag) | — |
+| 11 | **Accredited professional sign-off gate** (coach + generation blocked until on file) | Safety sheets | ✅ gate done (defaults unsigned) | `src/backend/coach/signOff.ts` |
+
+**P0 status: all logic/data items done except 5b (Firestore persistence — the canonical
+doc currently lives in app state `backendUser`). The sign-off gate ships unsigned, so
+`canGenerate()` blocks real-user generation until an accredited professional signs off.**
+Verified by 65 deterministic assertions over the pure modules (see scratch verify).
 
 ## P1 — engine
 14-step Generator Flow, Split Selector, Session Templates, Weekly Volume, Prescription Logic,
