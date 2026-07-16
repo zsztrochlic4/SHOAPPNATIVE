@@ -25,16 +25,22 @@ work lands. Source of truth = `StrengthHub_Workout_Backend_v16.xlsx` (see `sheet
 | 2 | Seed exercises (all columns) | Exercise Database | ✅ done (113) | `src/backend/data/exercises.ts` |
 | 3 | Seed substitutions (ID-based) | Substitutions | ✅ done (542) | `src/backend/data/substitutions.ts` |
 | 5 | Wire new onboarding: B1 flow reorder, B2 dob storage, M1 structured for Advanced, produce UserDoc | Onboarding Questions/Contract | ✅ done | `src/screens/Onboarding.tsx` |
-| 5b | Firestore persistence (write UserDoc / read on load) | Data Schemas | ⏳ todo (currently in app state `backendUser`) | `src/backend/repo/*` |
+| 5b | Firestore persistence (write UserDoc / read on load) | Data Schemas | ✅ done | `src/backend/repo/userRepo.ts` |
 | 9 | Stop-symptom escalation (S06) | Safety Rules S06 | ✅ logic done | `src/backend/safety/stopSymptom.ts` |
 | 10 | Coach AI Operating Rules as system-prompt contract | Coach AI Operating Rules | ✅ done | `src/backend/coach/operatingRules.ts` |
 | CC06 | Free-text red-flag scan on `notes` | Screening Outcomes / S05 | ✅ done | `src/backend/safety/redFlagScan.ts` |
 | 11 | **Accredited professional sign-off gate** (coach + generation blocked until on file) | Safety sheets | ✅ gate done (defaults unsigned) | `src/backend/coach/signOff.ts` |
 
-**P0 status: all logic/data items done except 5b (Firestore persistence — the canonical
-doc currently lives in app state `backendUser`). The sign-off gate ships unsigned, so
-`canGenerate()` blocks real-user generation until an accredited professional signs off.**
-Verified by 65 deterministic assertions over the pure modules (see scratch verify).
+**P0 status: ALL P0 items complete.** The sign-off gate ships unsigned, so `canGenerate()`
+blocks real-user generation until an accredited professional signs off. Verified by 65
+deterministic assertions over the pure modules. P1 (generator) not started — on hold
+pending the owner's safety review.
+
+The canonical `users` doc persists to Firestore at `users/{uid}.backendUser` (merge write,
+so it never clobbers the app root doc that cloudRepo owns) and round-trips via AsyncStorage
+in demo mode. Naming note: the workbook calls the collection `users`; the app already owned
+`users/{uid}`, so the canonical record lives under that doc's `backendUser` field rather than
+at its top level.
 
 ## P1 — engine
 14-step Generator Flow, Split Selector, Session Templates, Weekly Volume, Prescription Logic,
@@ -64,11 +70,19 @@ The core safety/generation columns are clean and complete. Four columns are not 
 handled deterministically and flagged here:
 1. **Measurement Type** is blank sheet-wide → derived 1:1 from **Load Unit**
    (`kg→weight_reps`, `bodyweight→reps`, `rounds→interval`, `seconds→duration`,
-   `assist_kg→assisted`). Deterministic, but confirm this is intended.
-2. **Optional Equipment Tags** holds a constant number (432) for every row → treated as empty.
-   Required Equipment Tags are clean and used for filtering.
-3. **video_url** holds numbers (433/480…), not URLs → treated as absent. Media is P2 (#24).
-4. **Impact Level** is populated ("Low") on only 4 rows → used where present, else null. Injury-Mod
-   Impact=Low filtering will only match those 4 unless the sheet is filled in.
+   `assist_kg→assisted`). **APPROVED by owner.**
+2. **Optional Equipment Tags** is **corrupted, not empty-by-design**: 109/113 cells are
+   numeric cells whose value is the shared-string INDEX of an Impact word — the Impact Level
+   data leaked here with its `t="s"` string flag stripped (e.g. cell value `432` where
+   `sharedStrings[432]="Low"`; also `342="High"`, `1598="Moderate"`). Only 4 cells hold real
+   optional tags (`dumbbell`×3, `dumbbell/plate`×1), which the seed keeps; the numeric ones are
+   dropped. So the authored Impact data technically exists but is unreliable/mis-typed.
+3. **video_url** holds numbers (shared-string indices like `weight_reps`), not URLs → absent.
+   Media is P2 (#24).
+4. **Impact Level** — **now DERIVED deterministically** (owner decision), not read from the
+   corrupted column: High = jumping/plyometric/running-based conditioning, Low = everything
+   else, matched on name + movement pattern with word boundaries. Result: 6 High
+   (Jump Squat, Pogo Hop, Burpee, Jumping Jack, High Knees, Treadmill Interval), 107 Low —
+   consistent with the Injury-Mod ankle/knee exclusions.
 - Row counts differ from the Backlog prose: **113** exercises (not 110) and **542** substitutions
   (not 528). Seeded the actual sheet contents; 0 dangling refs, 0 exercises with empty substitutes.

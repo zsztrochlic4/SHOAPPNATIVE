@@ -31,7 +31,7 @@ export const EXERCISES: Exercise[] = [
       "bench"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "weight_reps",
@@ -92,7 +92,7 @@ export const EXERCISES: Exercise[] = [
       "bench"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "weight_reps",
@@ -151,7 +151,7 @@ export const EXERCISES: Exercise[] = [
       "incline_bench"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "weight_reps",
@@ -209,7 +209,7 @@ export const EXERCISES: Exercise[] = [
       "none"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "reps",
@@ -266,7 +266,7 @@ export const EXERCISES: Exercise[] = [
       "machine_chest_press"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "weight_reps",
@@ -322,7 +322,7 @@ export const EXERCISES: Exercise[] = [
       "cable_machine"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -378,7 +378,7 @@ export const EXERCISES: Exercise[] = [
       "bench"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "weight_reps",
@@ -433,7 +433,7 @@ export const EXERCISES: Exercise[] = [
       "dip_bars"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -490,7 +490,7 @@ export const EXERCISES: Exercise[] = [
       "incline_bench"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "weight_reps",
@@ -547,7 +547,7 @@ export const EXERCISES: Exercise[] = [
       "decline_bench"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "weight_reps",
@@ -603,7 +603,7 @@ export const EXERCISES: Exercise[] = [
       "bench/desk/wall"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "reps",
@@ -658,7 +658,7 @@ export const EXERCISES: Exercise[] = [
       "bench/chair/bed"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "reps",
@@ -714,7 +714,7 @@ export const EXERCISES: Exercise[] = [
       "plates"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -772,7 +772,7 @@ export const EXERCISES: Exercise[] = [
       "barbell"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -829,7 +829,7 @@ export const EXERCISES: Exercise[] = [
       "bench"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "weight_reps",
@@ -883,7 +883,7 @@ export const EXERCISES: Exercise[] = [
       "pull_up_bar"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -937,7 +937,7 @@ export const EXERCISES: Exercise[] = [
       "machine_lat_pulldown"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "weight_reps",
@@ -991,7 +991,7 @@ export const EXERCISES: Exercise[] = [
       "machine_cable_row"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "weight_reps",
@@ -1045,7 +1045,7 @@ export const EXERCISES: Exercise[] = [
       "low_bar/rings/sturdy_table"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "reps",
@@ -1100,7 +1100,7 @@ export const EXERCISES: Exercise[] = [
       "incline_bench"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "weight_reps",
@@ -1154,7 +1154,7 @@ export const EXERCISES: Exercise[] = [
       "cable_machine"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -1207,7 +1207,7 @@ export const EXERCISES: Exercise[] = [
       "rack"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -1263,7 +1263,7 @@ export const EXERCISES: Exercise[] = [
       "anchor_point"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -1316,7 +1316,7 @@ export const EXERCISES: Exercise[] = [
       "barbell"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -1372,7 +1372,7 @@ export const EXERCISES: Exercise[] = [
       "bench"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "weight_reps",
@@ -1426,7 +1426,7 @@ export const EXERCISES: Exercise[] = [
       "dumbbell"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -1477,7 +1477,7 @@ export const EXERCISES: Exercise[] = [
       "cable_machine"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -1528,7 +1528,7 @@ export const EXERCISES: Exercise[] = [
       "dumbbell/cable_machine"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -1581,7 +1581,7 @@ export const EXERCISES: Exercise[] = [
       "rope_attachment"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -1633,7 +1633,7 @@ export const EXERCISES: Exercise[] = [
       "dumbbell"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -1687,7 +1687,7 @@ export const EXERCISES: Exercise[] = [
       "none"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "reps",
@@ -1741,7 +1741,7 @@ export const EXERCISES: Exercise[] = [
       "band"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -1792,7 +1792,7 @@ export const EXERCISES: Exercise[] = [
       "none"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "reps",
@@ -1845,7 +1845,7 @@ export const EXERCISES: Exercise[] = [
       "rack"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -1902,7 +1902,7 @@ export const EXERCISES: Exercise[] = [
       "dumbbell/kettlebell"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -1958,7 +1958,7 @@ export const EXERCISES: Exercise[] = [
       "bench"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -2068,7 +2068,7 @@ export const EXERCISES: Exercise[] = [
       "machine_leg_press"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "weight_reps",
@@ -2123,7 +2123,7 @@ export const EXERCISES: Exercise[] = [
       "rack"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -2177,7 +2177,7 @@ export const EXERCISES: Exercise[] = [
       "machine_leg_extension"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "weight_reps",
@@ -2284,7 +2284,7 @@ export const EXERCISES: Exercise[] = [
       "none"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "reps",
@@ -2338,7 +2338,7 @@ export const EXERCISES: Exercise[] = [
       "none"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "reps",
@@ -2389,7 +2389,7 @@ export const EXERCISES: Exercise[] = [
       "none"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -2442,7 +2442,7 @@ export const EXERCISES: Exercise[] = [
       "wall"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "duration",
@@ -2495,7 +2495,7 @@ export const EXERCISES: Exercise[] = [
       "none"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "High",
     "supported": false,
     "active": true,
     "measurementType": "reps",
@@ -2548,7 +2548,7 @@ export const EXERCISES: Exercise[] = [
       "barbell/dumbbell"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -2605,7 +2605,7 @@ export const EXERCISES: Exercise[] = [
       "bench"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "weight_reps",
@@ -2659,7 +2659,7 @@ export const EXERCISES: Exercise[] = [
       "none"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "reps",
@@ -2713,7 +2713,7 @@ export const EXERCISES: Exercise[] = [
       "machine_leg_curl"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "weight_reps",
@@ -2766,7 +2766,7 @@ export const EXERCISES: Exercise[] = [
       "machine_leg_curl"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "weight_reps",
@@ -2818,7 +2818,7 @@ export const EXERCISES: Exercise[] = [
       "partner/anchor_point"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "reps",
@@ -2928,7 +2928,7 @@ export const EXERCISES: Exercise[] = [
       "rope_attachment"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -2982,7 +2982,7 @@ export const EXERCISES: Exercise[] = [
       "back_extension_bench"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "weight_reps",
@@ -3035,7 +3035,7 @@ export const EXERCISES: Exercise[] = [
       "band/machine_abduction"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "weight_reps",
@@ -3087,7 +3087,7 @@ export const EXERCISES: Exercise[] = [
       "none"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "reps",
@@ -3140,7 +3140,7 @@ export const EXERCISES: Exercise[] = [
       "none"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "reps",
@@ -3193,7 +3193,7 @@ export const EXERCISES: Exercise[] = [
       "barbell/ez_bar"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -3247,7 +3247,7 @@ export const EXERCISES: Exercise[] = [
       "incline_bench"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "weight_reps",
@@ -3298,7 +3298,7 @@ export const EXERCISES: Exercise[] = [
       "dumbbell"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -3349,7 +3349,7 @@ export const EXERCISES: Exercise[] = [
       "cable_machine"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -3400,7 +3400,7 @@ export const EXERCISES: Exercise[] = [
       "pull_up_bar"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -3453,7 +3453,7 @@ export const EXERCISES: Exercise[] = [
       "band"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -3504,7 +3504,7 @@ export const EXERCISES: Exercise[] = [
       "low_bar/rings/sturdy_table"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "reps",
@@ -3559,7 +3559,7 @@ export const EXERCISES: Exercise[] = [
       "bench"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -3616,7 +3616,7 @@ export const EXERCISES: Exercise[] = [
       "rope_attachment"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -3668,7 +3668,7 @@ export const EXERCISES: Exercise[] = [
       "cable_machine"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -3720,7 +3720,7 @@ export const EXERCISES: Exercise[] = [
       "ez_bar/dumbbell"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "weight_reps",
@@ -3772,7 +3772,7 @@ export const EXERCISES: Exercise[] = [
       "bench/chair"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "reps",
@@ -3825,7 +3825,7 @@ export const EXERCISES: Exercise[] = [
       "none"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "reps",
@@ -3880,7 +3880,7 @@ export const EXERCISES: Exercise[] = [
       "anchor_point"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -3931,7 +3931,7 @@ export const EXERCISES: Exercise[] = [
       "none"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "duration",
@@ -3984,7 +3984,7 @@ export const EXERCISES: Exercise[] = [
       "none"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "reps",
@@ -4036,7 +4036,7 @@ export const EXERCISES: Exercise[] = [
       "pull_up_bar"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "reps",
@@ -4089,7 +4089,7 @@ export const EXERCISES: Exercise[] = [
       "cable_machine"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -4141,7 +4141,7 @@ export const EXERCISES: Exercise[] = [
       "cable_machine/band"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -4193,7 +4193,7 @@ export const EXERCISES: Exercise[] = [
       "ab_wheel"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "reps",
@@ -4246,7 +4246,7 @@ export const EXERCISES: Exercise[] = [
       "none"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "duration",
@@ -4298,7 +4298,7 @@ export const EXERCISES: Exercise[] = [
       "rope_attachment"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -4350,7 +4350,7 @@ export const EXERCISES: Exercise[] = [
       "none"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "reps",
@@ -4401,7 +4401,7 @@ export const EXERCISES: Exercise[] = [
       "band"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -4452,7 +4452,7 @@ export const EXERCISES: Exercise[] = [
       "none"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "duration",
@@ -4503,7 +4503,7 @@ export const EXERCISES: Exercise[] = [
       "none"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "duration",
@@ -4554,7 +4554,7 @@ export const EXERCISES: Exercise[] = [
       "bench/chair"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "duration",
@@ -4606,7 +4606,7 @@ export const EXERCISES: Exercise[] = [
       "machine_calf/dumbbell/step"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -4656,7 +4656,7 @@ export const EXERCISES: Exercise[] = [
       "machine_seated_calf"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "weight_reps",
@@ -4706,7 +4706,7 @@ export const EXERCISES: Exercise[] = [
       "step/stair"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "reps",
@@ -4756,7 +4756,7 @@ export const EXERCISES: Exercise[] = [
       "kettlebell"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "reps",
@@ -4810,7 +4810,7 @@ export const EXERCISES: Exercise[] = [
       "dumbbell/kettlebell"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "duration",
@@ -4863,7 +4863,7 @@ export const EXERCISES: Exercise[] = [
       "dumbbell/kettlebell"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "duration",
@@ -4916,7 +4916,7 @@ export const EXERCISES: Exercise[] = [
       "none"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "High",
     "supported": false,
     "active": true,
     "measurementType": "reps",
@@ -4966,7 +4966,7 @@ export const EXERCISES: Exercise[] = [
       "none"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "High",
     "supported": false,
     "active": true,
     "measurementType": "interval",
@@ -5020,7 +5020,7 @@ export const EXERCISES: Exercise[] = [
       "none"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "interval",
@@ -5073,7 +5073,7 @@ export const EXERCISES: Exercise[] = [
       "none"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "High",
     "supported": false,
     "active": true,
     "measurementType": "interval",
@@ -5126,7 +5126,7 @@ export const EXERCISES: Exercise[] = [
       "none"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "interval",
@@ -5179,7 +5179,7 @@ export const EXERCISES: Exercise[] = [
       "rowing_erg"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "interval",
@@ -5233,7 +5233,7 @@ export const EXERCISES: Exercise[] = [
       "stationary_bike"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "interval",
@@ -5288,7 +5288,7 @@ export const EXERCISES: Exercise[] = [
       "plates"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -5343,7 +5343,7 @@ export const EXERCISES: Exercise[] = [
       "dumbbell"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -5399,7 +5399,7 @@ export const EXERCISES: Exercise[] = [
       "band"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -5453,7 +5453,7 @@ export const EXERCISES: Exercise[] = [
       "band"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "assisted",
@@ -5506,7 +5506,7 @@ export const EXERCISES: Exercise[] = [
       "band"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -5560,7 +5560,7 @@ export const EXERCISES: Exercise[] = [
       "band"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -5612,7 +5612,7 @@ export const EXERCISES: Exercise[] = [
       "wall/rack"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "reps",
@@ -5663,7 +5663,7 @@ export const EXERCISES: Exercise[] = [
       "band"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "weight_reps",
@@ -5715,7 +5715,7 @@ export const EXERCISES: Exercise[] = [
       "sliders/towel/smooth_floor"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": true,
     "active": true,
     "measurementType": "reps",
@@ -5821,7 +5821,7 @@ export const EXERCISES: Exercise[] = [
       "none"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "High",
     "supported": false,
     "active": true,
     "measurementType": "interval",
@@ -5874,7 +5874,7 @@ export const EXERCISES: Exercise[] = [
       "dumbbell"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "reps",
@@ -5928,7 +5928,7 @@ export const EXERCISES: Exercise[] = [
       "treadmill"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "High",
     "supported": false,
     "active": true,
     "measurementType": "interval",
@@ -5982,7 +5982,7 @@ export const EXERCISES: Exercise[] = [
       "stairmaster"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "interval",
@@ -6036,7 +6036,7 @@ export const EXERCISES: Exercise[] = [
       "stationary_bike"
     ],
     "optionalEquipmentTags": [],
-    "impactLevel": null,
+    "impactLevel": "Low",
     "supported": false,
     "active": true,
     "measurementType": "interval",

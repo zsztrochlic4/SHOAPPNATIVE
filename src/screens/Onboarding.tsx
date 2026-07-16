@@ -38,6 +38,7 @@ import {
 import { deriveLocalProfile } from '../backend/mapping/projection'
 import { evaluateScreening } from '../backend/safety/screening'
 import { hasRedFlag } from '../backend/safety/redFlagScan'
+import { writeBackendUser } from '../backend/repo/userRepo'
 
 const NATIVE = Platform.OS !== 'web'
 /** Prototype motion curve (cubic-bezier(0.22,0.8,0.28,1)). */
@@ -878,6 +879,9 @@ export default function Onboarding() {
     const profile: Partial<Profile> = { ...deriveLocalProfile(userDoc), createdAtKey: todayKey }
     thud()
     dispatch({ type: 'COMPLETE_ONBOARDING', profile, backendUser: userDoc })
+    // Persist the canonical doc to Firestore immediately (no-op in demo mode, where the
+    // store's AsyncStorage persistence covers it). The debounced CloudSync also writes it.
+    if (user?.uid) void writeBackendUser(user.uid, userDoc).catch(() => { /* retried by CloudSync */ })
   }
 
   const header = <ProgressHeader sectionIdx={sectionIdx} sectionProgress={sectionProgress} onBack={back} />

@@ -33,7 +33,9 @@ export interface Exercise {
   /** Structured tags; comma-separated in the sheet, a slash = any-one-of (bench/chair). */
   requiredEquipmentTags: string[]
   optionalEquipmentTags: string[]
-  impactLevel: 'Low' | 'Moderate' | 'High' | null
+  /** Derived: High = jumping/plyometric/running-based conditioning; Low = everything else.
+   *  (The sheet's Impact column is corrupted — see docs/spec/BUILD_STATUS.md.) */
+  impactLevel: 'Low' | 'High'
   supported: boolean
   active: boolean
   /** Derived from Load Unit (the sheet's Measurement Type column is blank). */
