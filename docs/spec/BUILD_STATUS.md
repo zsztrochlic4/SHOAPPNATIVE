@@ -22,8 +22,8 @@ work lands. Source of truth = `StrengthHub_Workout_Backend_v16.xlsx` (see `sheet
 | 6 | Screening routing (+ B1 Q5 fix) | Screening Outcomes | ✅ logic done | `src/backend/safety/screening.ts` |
 | 7 | Age routing (+ B2 no-default) | Age Routing | ✅ logic done | `src/backend/safety/ageRouting.ts` |
 | 8 | Safety Rules engine (S01–S09, P01–P03 floors) | Safety Rules | ✅ core done | `src/backend/safety/safetyRules.ts` |
-| 2 | Seed 110 exercises (all columns) | Exercise Database | ⏳ next | `src/backend/data/exercises.ts` |
-| 3 | Seed 528 substitutions (ID-based) | Substitutions | ⏳ next | `src/backend/data/substitutions.ts` |
+| 2 | Seed exercises (all columns) | Exercise Database | ✅ done (113) | `src/backend/data/exercises.ts` |
+| 3 | Seed substitutions (ID-based) | Substitutions | ✅ done (542) | `src/backend/data/substitutions.ts` |
 | 5 | Wire new onboarding: B1 flow reorder, B2 dob storage, M1 structured for Advanced, produce UserDoc, persist | Onboarding Questions/Contract | ⏳ next | `src/screens/Onboarding.tsx` |
 | 5b | Firestore persistence (write UserDoc / read on load) | Data Schemas | ⏳ todo | `src/backend/repo/*` |
 | 9 | Stop-symptom escalation (S06) | Safety Rules S06 | ⏳ todo | `src/backend/safety/stopSymptom.ts` |
@@ -53,3 +53,17 @@ profile-sweep safety test harness. Not started.
    `Sliders or a towel` not yet collected by the UI. Full structured taxonomy is P2 (#25).
 5. **`trains_alone`** stored as the 4-value frequency (`always`/`usually`/`sometimes`/`never`);
    Safety S09 fires on `always`/`usually`.
+
+## Workbook data-quality findings (Exercise Database) — confirm
+The core safety/generation columns are clean and complete. Four columns are not usable as-is;
+handled deterministically and flagged here:
+1. **Measurement Type** is blank sheet-wide → derived 1:1 from **Load Unit**
+   (`kg→weight_reps`, `bodyweight→reps`, `rounds→interval`, `seconds→duration`,
+   `assist_kg→assisted`). Deterministic, but confirm this is intended.
+2. **Optional Equipment Tags** holds a constant number (432) for every row → treated as empty.
+   Required Equipment Tags are clean and used for filtering.
+3. **video_url** holds numbers (433/480…), not URLs → treated as absent. Media is P2 (#24).
+4. **Impact Level** is populated ("Low") on only 4 rows → used where present, else null. Injury-Mod
+   Impact=Low filtering will only match those 4 unless the sheet is filled in.
+- Row counts differ from the Backlog prose: **113** exercises (not 110) and **542** substitutions
+  (not 528). Seeded the actual sheet contents; 0 dangling refs, 0 exercises with empty substitutes.
