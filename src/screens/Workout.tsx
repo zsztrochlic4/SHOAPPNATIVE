@@ -15,6 +15,7 @@ import { todaySession, sessionProgress, completedSessions, activitiesForDay } fr
 import { brand, useColors } from '../theme'
 import { useToast } from '../components/Toast'
 import { syncAll } from '../lib/integrations'
+import { ProgramHolding, GeneratedProgramView } from './GeneratedProgramView'
 
 const TABS = ['Today', 'Program', 'Exercises', 'History']
 
@@ -48,6 +49,17 @@ function TodayTab() {
   const units = state.settings.units
   const session = todaySession(state)
   const prog = sessionProgress(session)
+
+  // Gate closed (age / screening / waiver / professional sign-off): no program yet — show
+  // the holding state instead of a misleading "rest day" empty card.
+  if (state.programStatus && !state.programStatus.ok && !session) {
+    return (
+      <>
+        <ProgramHolding status={state.programStatus} />
+        <OtherActivities />
+      </>
+    )
+  }
 
   return (
     <>
@@ -190,6 +202,11 @@ function OtherActivities() {
 
 function ProgramTab() {
   const { state } = useStore()
+  // Once a user has been through the safety-gated backend, their program comes from the
+  // generator (or a holding state when the gate is closed). The legacy static split is only
+  // the fallback for demo/seed sessions that never ran the backend.
+  if (state.programStatus && !state.programStatus.ok) return <ProgramHolding status={state.programStatus} />
+  if (state.generatedProgram) return <GeneratedProgramView program={state.generatedProgram} />
   return (
     <View className="gap-3">
       <Text className="text-[13px] text-white/50">Your weekly split · {state.profile.daysPerWeek}-day program</Text>
