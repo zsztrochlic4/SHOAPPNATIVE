@@ -413,6 +413,8 @@ export function buildSeed(): AppState {
     partners: PARTNER_CANDIDATES,
     coachThread,
     beginnerProgress: [],
+    generatedProgram: null,
+    programStatus: null,
     v: SCHEMA_VERSION,
   }
 }

@@ -1,5 +1,6 @@
 import type { Language } from '../lib/i18n'
 import type { UserDoc } from '../backend/schema'
+import type { StoredProgram, ProgramStatus } from '../backend/runtime/activate'
 
 export type Units = 'metric' | 'imperial'
 export type Theme = 'dark' | 'light'
@@ -460,6 +461,12 @@ export interface AppState {
   /** Canonical backend `users` document (workout backend source of truth). Written
    *  only by the onboarding mapping module; the local Profile above is derived from it. */
   backendUser?: UserDoc
+  /** The generated recommended program (compact render projection). Null/undefined until
+   *  the generation gate opens and a program is produced (see backend/runtime/activate). */
+  generatedProgram?: StoredProgram | null
+  /** Generation-gate status. `{ ok:false, reason }` drives the "program being finalised"
+   *  holding screen; `{ ok:true }` means `generatedProgram` is present. */
+  programStatus?: ProgramStatus | null
   /** schema version for migrations */
   v: number
 }

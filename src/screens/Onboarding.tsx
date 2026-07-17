@@ -39,6 +39,8 @@ import { deriveLocalProfile } from '../backend/mapping/projection'
 import { evaluateScreening } from '../backend/safety/screening'
 import { hasRedFlag } from '../backend/safety/redFlagScan'
 import { writeBackendUser } from '../backend/repo/userRepo'
+import { writeActiveProgram } from '../backend/repo/programRepo'
+import { activateProgram } from '../backend/runtime/activate'
 
 const NATIVE = Platform.OS !== 'web'
 /** Prototype motion curve (cubic-bezier(0.22,0.8,0.28,1)). */
@@ -877,11 +879,28 @@ export default function Onboarding() {
     const input = answersToInput(answers, user?.uid ?? 'local')
     const userDoc = buildUserDoc(input, { redFlag: hasRedFlag(answers.moreInfo) })
     const profile: Partial<Profile> = { ...deriveLocalProfile(userDoc), createdAtKey: todayKey }
+    // Run the HARD generation gate + the deterministic generator. If the gate is closed
+    // (age, screening, waiver, or the accredited-professional sign-off) this returns
+    // status.ok === false and NO program — the app then shows the "being finalised"
+    // holding screen. No safety rule is relaxed here; the generator self-clamps.
+    const activation = activateProgram(userDoc)
     thud()
-    dispatch({ type: 'COMPLETE_ONBOARDING', profile, backendUser: userDoc })
-    // Persist the canonical doc to Firestore immediately (no-op in demo mode, where the
-    // store's AsyncStorage persistence covers it). The debounced CloudSync also writes it.
-    if (user?.uid) void writeBackendUser(user.uid, userDoc).catch(() => { /* retried by CloudSync */ })
+    dispatch({
+      type: 'COMPLETE_ONBOARDING',
+      profile,
+      backendUser: userDoc,
+      generatedProgram: activation.program,
+      programStatus: activation.status,
+    })
+    // Persist the canonical docs to Firestore immediately (no-op in demo mode, where the
+    // store's AsyncStorage persistence covers it). The debounced CloudSync also writes them.
+    if (user?.uid) {
+      void writeBackendUser(user.uid, userDoc).catch(() => { /* retried by CloudSync */ })
+      if (activation.programDoc) {
+        void writeActiveProgram(user.uid, activation.programDoc, activation.instances)
+          .catch(() => { /* retried by CloudSync */ })
+      }
+    }
   }
 
   const header = <ProgressHeader sectionIdx={sectionIdx} sectionProgress={sectionProgress} onBack={back} />

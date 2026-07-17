@@ -20,6 +20,7 @@ import type {
   WorkoutSession,
 } from './types'
 import type { UserDoc } from '../backend/schema'
+import type { StoredProgram, ProgramStatus } from '../backend/runtime/activate'
 
 const STORAGE_KEY = 'sho.state.v1'
 
@@ -28,7 +29,7 @@ export type Action =
   | { type: 'HYDRATE'; state: AppState }
   | { type: 'SET_SETTINGS'; patch: Partial<Settings> }
   | { type: 'SET_PROFILE'; patch: Partial<Profile> }
-  | { type: 'COMPLETE_ONBOARDING'; profile: Partial<Profile>; backendUser?: UserDoc }
+  | { type: 'COMPLETE_ONBOARDING'; profile: Partial<Profile>; backendUser?: UserDoc; generatedProgram?: StoredProgram | null; programStatus?: ProgramStatus | null }
   | { type: 'LOG_WEIGHT'; kg: number }
   | { type: 'ADJUST_WATER'; deltaL: number }
   | { type: 'PATCH_TODAY_HABIT'; patch: Partial<{ steps: number; sleepH: number; mindsetMin: number; waterL: number }> }
@@ -108,6 +109,8 @@ function reducer(state: AppState, action: Action): AppState {
         ...state,
         profile: { ...state.profile, ...action.profile, onboarded: true },
         backendUser: action.backendUser ?? state.backendUser,
+        generatedProgram: action.generatedProgram ?? null,
+        programStatus: action.programStatus ?? null,
       }
 
     case 'LOG_WEIGHT': {
