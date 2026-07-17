@@ -2,6 +2,7 @@ import { getAI, getGenerativeModel, GoogleAIBackend, type AI } from 'firebase/ai
 import { app, firebaseEnabled } from './firebase'
 import type { AppState } from '../store/types'
 import { buildUserContext } from './userContext'
+import { coachAvailable } from '../backend/coach/coachGate'
 
 /**
  * Live AI coach, powered by Gemini via Firebase AI Logic.
@@ -62,6 +63,9 @@ function toGeminiHistory(s: AppState) {
 
 /** Send a message to the Gemini coach. Resolves with the reply text. */
 export async function askCoach(s: AppState, text: string, _signal?: AbortSignal): Promise<string> {
+  // HARD gate: the coach ships OFF until its own review + App Check. Refuse before any
+  // AI call, independent of whether Firebase AI Logic is enabled on the project.
+  if (!coachAvailable()) throw new Error('coach_disabled')
   if (!firebaseEnabled) throw new Error('Coach is not configured')
 
   const model = getGenerativeModel(getAiInstance(), {

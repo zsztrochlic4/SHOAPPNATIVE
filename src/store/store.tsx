@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { todayKey } from '../lib/date'
 import { buildSeed, emptyState, SCHEMA_VERSION } from './seed'
 import { coachReply } from '../lib/coachChat'
+import { coachAvailable } from '../backend/coach/coachGate'
 import type {
   AppNotification,
   AppState,
@@ -213,6 +214,8 @@ function reducer(state: AppState, action: Action): AppState {
       if (!text) return state
       const id = Date.now()
       const userMsg: ChatMessage = { id: `c-${id}`, role: 'user', text, dateKey: todayKey, time: nowTime(), read: true }
+      // Coach gated OFF: record the user's message but produce no coach reply.
+      if (!coachAvailable()) return { ...state, chat: [...state.chat, userMsg] }
       const coachMsg: ChatMessage = { id: `c-${id + 1}`, role: 'coach', text: coachReply(state, text), dateKey: todayKey, time: nowTime(), read: false }
       return { ...state, chat: [...state.chat, userMsg, coachMsg] }
     }
