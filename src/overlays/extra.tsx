@@ -23,6 +23,7 @@ import { coachThreadView } from '../store/coach'
 import { CHAT_SUGGESTIONS, coachReply } from '../lib/coachChat'
 import { askCoach } from '../lib/coachApi'
 import { coachAvailable } from '../backend/coach/coachGate'
+import { CoachComingSoon } from '../components/CoachComingSoon'
 import { todaySession, leaderboardSorted, youRank } from '../store/selectors'
 import { relativeLabel } from '../lib/date'
 import { CHART_METRICS, STAT_METRICS, progressMetricId, dashboardStatIds } from '../lib/metrics'
@@ -40,17 +41,6 @@ const coachIcon: Record<CoachKind, ReactNode> = {
   celebration: <Trophy size={16} color={brand[400]} />,
   exam: <GraduationCap size={16} color={brand[400]} />,
   qa: <ShieldQuestion size={16} color={brand[400]} />,
-}
-
-/** Shown in place of any coach surface while the coach is gated OFF (pre-review). */
-function CoachComingSoon() {
-  return (
-    <View className="items-center rounded-3xl border border-white/8 bg-ink-800 px-6 py-10">
-      <View className="h-16 w-16 items-center justify-center rounded-2xl bg-brand-400/10"><Sparkles size={28} color={brand[400]} /></View>
-      <Text className="mt-5 text-center text-xl font-extrabold text-white">Coach is coming soon</Text>
-      <Text className="mt-2.5 max-w-[300px] text-center text-[14px] leading-6 text-white/60">Your coach is being reviewed by a qualified professional before it goes live. We’ll switch it on here once it’s ready.</Text>
-    </View>
-  )
 }
 
 export function CoachSheet({ open, onClose }: Props) {

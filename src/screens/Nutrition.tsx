@@ -23,6 +23,8 @@ import { todayHabit, nutritionTagsForDay } from '../store/selectors'
 import { dailyTargets } from '../store/training'
 import { fmtFluid, pct } from '../lib/format'
 import { coachRespond, STARTER_QUESTIONS, type DayReview } from '../lib/nutritionCoach'
+import { coachAvailable } from '../backend/coach/coachGate'
+import { CoachComingSoon } from '../components/CoachComingSoon'
 import type { MealName, MealCategory, BudgetMeal } from '../store/types'
 import { brand, accent, useColors } from '../theme'
 
@@ -133,6 +135,7 @@ function CoachTab() {
   }, [open])
 
   function send(raw?: string) {
+    if (!coachAvailable()) return // HARD gate: the food coach does not answer until reviewed.
     const msg = (raw ?? input).trim()
     if (!msg || typing) return
     setInput('')
@@ -166,6 +169,7 @@ function CoachTab() {
   }
 
   function openChat(initial?: string) {
+    if (!coachAvailable()) return // Coach gated OFF: the chat cannot be opened.
     setOpen(true)
     if (initial) send(initial)
   }
@@ -178,8 +182,11 @@ function CoachTab() {
       {/* Quick day tags: fast, tap-only "how did your eating today go" */}
       <DayTagsCard />
 
-      {/* Unified nutrition coach: one chat for "what I ate" and "ask anything" */}
-      <NutritionCoachCard onOpen={() => openChat()} onAsk={(q) => openChat(q)} />
+      {/* Unified nutrition coach: one chat for "what I ate" and "ask anything".
+          Gated OFF (with the rest of the coach) until its professional review. */}
+      {coachAvailable()
+        ? <NutritionCoachCard onOpen={() => openChat()} onAsk={(q) => openChat(q)} />
+        : <CoachComingSoon />}
 
       {/* Water quick-log */}
       <WaterCard />
