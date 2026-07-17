@@ -25,10 +25,23 @@ service cloud.firestore {
       allow read, write: if isOwner();
 
       // Every per-user subcollection document (sessions, weights, …) inherits
-      // the same owner-only rule at any depth.
+      // the same owner-only rule at any depth. Includes the workout-backend
+      // records: programs/{id} and workout_instances/{id}.
       match /{document=**} {
         allow read, write: if isOwner();
       }
+    }
+
+    // Global coach runtime config (config/coach: message limits, guardrail prompt).
+    // Not per-user and not sensitive, but it does not need to be world-readable — the
+    // coach is a signed-in feature — so it is readable by any authenticated user and
+    // never client-writable (set from the console/admin only).
+    // NOTE: the live project currently allows PUBLIC read here. Before deploying this
+    // tightened rule, confirm nothing in the deployed client reads config/coach BEFORE
+    // sign-in, or that pre-login read will start failing.
+    match /config/{doc} {
+      allow read: if request.auth != null;
+      allow write: if false;
     }
 
     // Deny everything outside a user's own tree.
