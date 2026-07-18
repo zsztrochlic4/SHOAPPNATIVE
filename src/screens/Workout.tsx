@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { View, Text, Pressable, Image, TextInput, StyleSheet } from 'react-native'
 import Svg, { Path, Circle } from 'react-native-svg'
 import { CalendarDays, Clock, Play, ChevronRight, Check, Leaf, Plus, Trash2, Activity, Repeat, RefreshCw, Dumbbell } from 'lucide-react-native'
@@ -10,7 +10,7 @@ import { useStore } from '../store/store'
 import { useNav } from '../nav'
 import { EXERCISES } from '../data/catalog'
 import { fmtVolume, fmtWeight } from '../lib/format'
-import { relativeLabel } from '../lib/date'
+import { relativeLabel, todayKey } from '../lib/date'
 import { todaySession, sessionProgress, completedSessions, activitiesForDay } from '../store/selectors'
 import { brand, useColors } from '../theme'
 import { useToast } from '../components/Toast'
@@ -49,6 +49,15 @@ function TodayTab() {
   const units = state.settings.units
   const session = todaySession(state)
   const prog = sessionProgress(session)
+
+  // Once the generation gate is open, materialise today's loggable session from the
+  // generated program's instance for this weekday (no-op if one already exists, if there's
+  // no program, or if today is a rest day). This is what makes the generated plan loggable.
+  const gateOpen = state.programStatus?.ok === true
+  const hasInstances = (state.workoutInstances?.length ?? 0) > 0
+  useEffect(() => {
+    if (gateOpen && hasInstances) dispatch({ type: 'START_PROGRAM_DAY', dateKey: todayKey })
+  }, [gateOpen, hasInstances, dispatch])
 
   // Gate closed (age / screening / waiver / professional sign-off): no program yet — show
   // the holding state instead of a misleading "rest day" empty card.

@@ -149,11 +149,13 @@ export function GeneratedProgramView({ program }: { program: StoredProgram }) {
         </View>
       )}
 
-      {/* Honest Phase-1 note: this is the plan, not yet the set logger. */}
+      {/* Set-by-set logging is now wired: today's session on the Today tab logs against this
+       *  program and feeds the progression engine. */}
       <View className="flex-row items-center gap-2 rounded-2xl border border-white/5 bg-white/[0.02] px-4 py-3">
         <Clock3 size={15} color="rgba(255,255,255,0.4)" />
         <Text className="flex-1 text-[12px] leading-5 text-white/45">
-          {program.startingLoadNote} Set-by-set logging against this program is coming soon.
+          {program.startingLoadNote} Head to the Today tab to log each session set by set — your
+          weights adapt automatically as you progress.
         </Text>
       </View>
     </View>

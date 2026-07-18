@@ -20,8 +20,10 @@ import type {
   UserMeal,
   WorkoutSession,
 } from './types'
-import type { UserDoc } from '../backend/schema'
+import type { UserDoc, WorkoutInstanceDoc } from '../backend/schema'
 import type { StoredProgram, ProgramStatus } from '../backend/runtime/activate'
+import { sessionFromInstance, fullWeekday } from './programSession'
+import { sessionForDay } from './selectors'
 
 const STORAGE_KEY = 'sho.state.v1'
 
@@ -30,7 +32,8 @@ export type Action =
   | { type: 'HYDRATE'; state: AppState }
   | { type: 'SET_SETTINGS'; patch: Partial<Settings> }
   | { type: 'SET_PROFILE'; patch: Partial<Profile> }
-  | { type: 'COMPLETE_ONBOARDING'; profile: Partial<Profile>; backendUser?: UserDoc; generatedProgram?: StoredProgram | null; programStatus?: ProgramStatus | null }
+  | { type: 'COMPLETE_ONBOARDING'; profile: Partial<Profile>; backendUser?: UserDoc; generatedProgram?: StoredProgram | null; programStatus?: ProgramStatus | null; workoutInstances?: WorkoutInstanceDoc[] }
+  | { type: 'START_PROGRAM_DAY'; dateKey: string }
   | { type: 'LOG_WEIGHT'; kg: number }
   | { type: 'ADJUST_WATER'; deltaL: number }
   | { type: 'PATCH_TODAY_HABIT'; patch: Partial<{ steps: number; sleepH: number; mindsetMin: number; waterL: number }> }
@@ -112,7 +115,25 @@ function reducer(state: AppState, action: Action): AppState {
         backendUser: action.backendUser ?? state.backendUser,
         generatedProgram: action.generatedProgram ?? null,
         programStatus: action.programStatus ?? null,
+        workoutInstances: action.workoutInstances ?? undefined,
       }
+
+    case 'START_PROGRAM_DAY': {
+      // Materialise a loggable session for the given day from the generated program's
+      // instance whose weekday matches. No-op if a session already exists for that day,
+      // if there's no program, or if the day is a rest day (no matching instance).
+      if (sessionForDay(state, action.dateKey)) return state
+      const instances = state.workoutInstances ?? []
+      if (instances.length === 0) return state
+      const wd = fullWeekday(action.dateKey)
+      const instance = instances.find((i) => i.instance_id.endsWith(`_${wd}`))
+      if (!instance) return state
+      const session = sessionFromInstance(instance, action.dateKey, {
+        durationMin: state.backendUser?.session_length_min,
+      })
+      if (!session) return state
+      return { ...state, sessions: [...state.sessions, recalc(session)] }
+    }
 
     case 'LOG_WEIGHT': {
       const others = state.weights.filter((w) => w.dateKey !== todayKey)

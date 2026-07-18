@@ -41,6 +41,7 @@ import { hasRedFlag } from '../backend/safety/redFlagScan'
 import { writeBackendUser } from '../backend/repo/userRepo'
 import { writeActiveProgram } from '../backend/repo/programRepo'
 import { activateProgram } from '../backend/runtime/activate'
+import { ACTIVE_EXERCISE_NAMES, resolveExerciseIdsByName } from '../backend/runtime/logging'
 
 const NATIVE = Platform.OS !== 'web'
 /** Prototype motion curve (cubic-bezier(0.22,0.8,0.28,1)). */
@@ -174,7 +175,9 @@ const SAFETY_FOLLOWUPS = [
   ] },
 ] as const
 const MOVEMENT_CATEGORIES = ['Squatting', 'Overhead pressing', 'Deadlifting', 'Pulling', 'Pushing', 'Lunging', 'Jumping', 'Twisting']
-const EXERCISE_LIB = ['Barbell Squat', 'Deadlift', 'Bench Press', 'Pull-up', 'Overhead Press', 'Romanian Deadlift', 'Barbell Row', 'Lunge', 'Hip Thrust', 'Lat Pulldown', 'Dumbbell Curl', 'Face Pull', 'Leg Press', 'Plank', 'Dips', 'Bulgarian Split Squat', 'Incline Press', 'Cable Fly', 'Calf Raise', 'Burpee']
+/** The searchable exercise list is the 113-exercise Exercise Database (backend), so any
+ *  loved/avoided pick resolves to a real id via the M3 name→id resolver in `finish()`. */
+const EXERCISE_LIB = ACTIVE_EXERCISE_NAMES
 const PROCESSING_STAGES = [
   'Reviewing your goals', 'Matching your experience level', 'Building your weekly structure',
   'Working around your commitments', 'Accounting for your equipment', 'Applying your exercise preferences',
@@ -237,10 +240,6 @@ function evaluateSafety(a: Answers): Verdict {
   }
 }
 
-/** B1: the joint follow-ups are needed on an injury chip OR a Yes to screening Q5. */
-function needsFollowup(a: Answers) {
-  return trainAroundAreas(a).length > 0 || a.safety?.s5 === 'yes'
-}
 const targetsFor = (goal: Goal) => {
   switch (goal) {
     case 'build-muscle': return { calorieTarget: 2600, proteinTarget: 170, carbTarget: 300, fatTarget: 75 }
@@ -379,18 +378,28 @@ function buildFlow(a: Answers): Step[] {
   push({ id: 'j1', type: 'text', section: 'lifestyle', key: 'motivation', title: 'What’s driving you?', sub: 'There’s no wrong answer. This helps make your experience feel more relevant to you.', placeholder: 'e.g. I want to feel fitter and build a routine I can keep', optional: true, multiline: true, appendPrompts: true, prompts: ['I want to look better', 'I’m getting ready for summer', 'I want to feel fitter', 'I want to build a better routine', 'I want to feel more confident', 'I want to prove I can stay consistent'] })
   push({ id: 'p_motivation', type: 'interstitial', section: 'lifestyle', compute: () => ({ title: 'That’s worth working toward', sub: 'We’ll keep this front of mind as we build your plan.' }) })
 
-  // B1: the 7-question screening runs FIRST, then the joint follow-ups fire on either an
-  // injury chip OR a Yes to screening Q5 (bone/joint/soft-tissue). A bare Q5 = Yes is no
-  // longer auto-blocked; the follow-ups decide MODIFY vs professional clearance.
-  push({ id: 'safetyall', type: 'safetyall', section: 'safety' })
-  if (needsFollowup(a)) {
-    // Q5 = Yes with no chip: capture which area it is so the MODIFY rules have a region.
-    if (a.safety?.s5 === 'yes' && trainAroundAreas(a).length === 0) {
-      push({ id: 'sregion', type: 'multi', section: 'safety', key: 'screeningRegions', title: 'Which area is affected?', sub: 'Pick the area your answer was about so we can train around it safely.', options: TRAIN_AROUND_OPTIONS })
-    }
+  // The 7-question screening plus, for a joint/soft-tissue flag, the "extra care" joint
+  // follow-ups. Ordering: when the user flagged an injury chip earlier IN onboarding, the
+  // area is already known, so we ask the extra-care follow-ups about it FIRST and then run
+  // the 7-question screening. Otherwise the screening runs first, and a Yes to Q5 (a joint
+  // issue disclosed only there) then captures the region + asks the same follow-ups. A bare
+  // Q5 = Yes is not auto-blocked (B1); the follow-ups decide MODIFY vs professional clearance.
+  const injuryChip = trainAroundAreas(a).length > 0
+  const pushFollowups = () => {
     push({ id: 'fintro', type: 'followupintro', section: 'safety' })
     SAFETY_FOLLOWUPS.forEach((q) => push({ id: q.id, type: 'followup', section: 'safety', key: q.id, q }))
     push({ id: 'fmoves', type: 'movements', section: 'safety', key: 'movements', title: 'Which movements cause discomfort?', sub: 'Optional. Select any that apply and add your own.' })
+  }
+  if (injuryChip) {
+    pushFollowups()
+    push({ id: 'safetyall', type: 'safetyall', section: 'safety' })
+  } else {
+    push({ id: 'safetyall', type: 'safetyall', section: 'safety' })
+    if (a.safety?.s5 === 'yes') {
+      // Q5 = Yes with no chip: capture which area it is so the MODIFY rules have a region.
+      push({ id: 'sregion', type: 'multi', section: 'safety', key: 'screeningRegions', title: 'Which area is affected?', sub: 'Pick the area your answer was about so we can train around it safely.', options: TRAIN_AROUND_OPTIONS })
+      pushFollowups()
+    }
   }
   const v = evaluateSafety(a)
   if (v === 'block' || v === 'donotgenerate') push({ id: 'outcome', type: 'safetyoutcome', section: 'safety' })
@@ -877,7 +886,13 @@ export default function Onboarding() {
     // text, then derive the local Profile from it — one-directional, no write-back.
     // B2: date_of_birth is carried through and age is derived, never defaulted to 20.
     const input = answersToInput(answers, user?.uid ?? 'local')
-    const userDoc = buildUserDoc(input, { redFlag: hasRedFlag(answers.moreInfo) })
+    // M3 resolver: turn the loved/avoided exercise names into Exercise Database ids so the
+    // generator honours them as preferred / excluded. Unmatched free text is dropped.
+    const userDoc = buildUserDoc(input, {
+      redFlag: hasRedFlag(answers.moreInfo),
+      preferredExerciseIds: resolveExerciseIdsByName(answers.loveExercises),
+      excludedExerciseIds: resolveExerciseIdsByName(answers.avoidExercises),
+    })
     const profile: Partial<Profile> = { ...deriveLocalProfile(userDoc), createdAtKey: todayKey }
     // Run the HARD generation gate + the deterministic generator. If the gate is closed
     // (age, screening, waiver, or the accredited-professional sign-off) this returns
@@ -891,6 +906,7 @@ export default function Onboarding() {
       backendUser: userDoc,
       generatedProgram: activation.program,
       programStatus: activation.status,
+      workoutInstances: activation.instances,
     })
     // Persist the canonical docs to Firestore immediately (no-op in demo mode, where the
     // store's AsyncStorage persistence covers it). The debounced CloudSync also writes them.

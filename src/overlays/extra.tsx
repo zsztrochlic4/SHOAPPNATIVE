@@ -14,10 +14,11 @@ import { useStore } from '../store/store'
 import { useToast } from '../components/Toast'
 import { useNav } from '../nav'
 import {
-  BUDGET_MEALS, BEGINNER_LESSONS, exerciseDetail, exById, REP_TARGETS, BASE_WEIGHTS,
+  BUDGET_MEALS, BEGINNER_LESSONS, exerciseDetail, REP_TARGETS, BASE_WEIGHTS,
   ACTIVITY_PRESETS, activityPreset, INTENSITY_MULT,
 } from '../data/catalog'
 import { ActivityIcon } from '../components/ActivityIcon'
+import { exerciseView } from '../store/programSession'
 import { nextSetRecommendation } from '../store/training'
 import { coachThreadView } from '../store/coach'
 import { CHAT_SUGGESTIONS, coachReply } from '../lib/coachChat'
@@ -210,20 +211,22 @@ export function BudgetEatsSheet({ open, onClose }: Props) {
 export function ExerciseDetailSheet({ open, onClose, params }: Props) {
   const { state } = useStore()
   const defId = (params?.defId as string) ?? 'bench'
-  const def = exById(defId)
-  const detail = exerciseDetail(defId)
+  // Resolve the demo catalogue first, then the 113-exercise Database so a generated-program
+  // row (backend id like CH02) opens with real technique copy instead of a blank sheet.
+  const view = exerciseView(defId)
+  const detail = view?.detail ?? exerciseDetail(defId)
   const target = REP_TARGETS[defId] ?? '8-12'
   const sessionEx = todaySession(state)?.exercises.find((e) => e.defId === defId)
   const fallback = sessionEx ? Math.max(...sessionEx.sets.map((s) => s.weightKg)) : BASE_WEIGHTS[defId] ?? 20
   const rec = nextSetRecommendation(state, defId, sessionEx?.targetReps ?? target, fallback)
 
-  if (!def) return null
+  if (!view) return null
   return (
-    <Sheet open={open} onClose={onClose} title={def.name}>
-      <TechniqueClip exerciseId={defId} poster={def.image} label="Form clip coming soon" />
+    <Sheet open={open} onClose={onClose} title={view.name}>
+      <TechniqueClip exerciseId={defId} poster={view.image} label="Form clip coming soon" />
 
       <View className="mt-3 flex-row items-center gap-2">
-        <Chip color="gray">{def.muscle}</Chip>
+        <Chip color="gray">{view.muscle}</Chip>
         {detail.beginnerFriendly && <Chip color="green">Beginner friendly</Chip>}
       </View>
 

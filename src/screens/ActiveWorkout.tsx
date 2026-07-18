@@ -20,6 +20,9 @@ import { todaySession, sessionProgress } from '../store/selectors'
 import { examState, examTrim } from '../store/training'
 import { prForSession, type PR } from '../store/coach'
 import { exerciseDetail, workoutGoalLine } from '../data/catalog'
+import { exerciseView } from '../store/programSession'
+import { logCompletedProgramSession } from '../backend/repo/setLogRepo'
+import type { LoggedSetInput } from '../backend/runtime/logging'
 import { fmtWeightNum, weightUnit, fmtVolume, fmtWeight, toKg } from '../lib/format'
 import { brand, accent, useColors } from '../theme'
 import type { Units, WorkoutSession } from '../store/types'
@@ -36,6 +39,12 @@ function restSecondsFor(defId: string): number {
   if (COMPOUND_LIFTS.includes(defId)) return 120
   if (ISOLATION_LIFTS.includes(defId)) return 60
   return 90
+}
+
+/** Technique copy for a set — resolves demo-catalogue ids and generated-program backend ids
+ *  (via the Exercise Database), falling back to the generic catalogue cue card. */
+function detailFor(defId: string) {
+  return exerciseView(defId)?.detail ?? exerciseDetail(defId)
 }
 
 const prefersReducedMotion = () =>
@@ -283,6 +292,22 @@ export default function ActiveWorkout({ open, onClose }: { open: boolean; onClos
     finishStatsRef.current = { time: total, volume: session.volumeKg, sets: sessionProgress(session).done }
     setFinishPR(prForSession(state, session))
     dispatch({ type: 'COMPLETE_WORKOUT', id: session.id })
+    // If this session was materialised from a generated program day, record the completed
+    // set logs (keyed by the backend exercise_id) and feed them into the Progression Engine,
+    // which re-clamps the next prescription through the Safety Rules. No-op in demo mode /
+    // without Firebase — the pure logging + progression maths is covered by the profile sweep.
+    if (session.instanceId && state.backendUser) {
+      const instance = (state.workoutInstances ?? []).find((i) => i.instance_id === session.instanceId)
+      if (instance) {
+        const logged: Record<string, LoggedSetInput[]> = {}
+        for (const ex of session.exercises) {
+          logged[ex.defId] = ex.sets.map((s) => ({ weightKg: s.weightKg, reps: s.reps, done: s.done }))
+        }
+        void logCompletedProgramSession(state.backendUser.uid, state.backendUser, instance, logged).catch(() => {
+          /* retried opportunistically; never blocks finishing a workout */
+        })
+      }
+    }
     thud() // native haptic; the web vibrate below is a no-op on most phones
     if (!prefersReducedMotion()) (typeof navigator !== 'undefined' ? (navigator as any) : undefined)?.vibrate?.([0, 55, 45, 120])
     successChime()
@@ -323,7 +348,7 @@ export default function ActiveWorkout({ open, onClose }: { open: boolean; onClos
         sessionTotal={total}
         exIndex={cursor.exIdx}
         exTotal={session.exercises.length}
-        detail={exerciseDetail(cursorEx.defId)}
+        detail={detailFor(cursorEx.defId)}
         reps={cursorSet.reps}
         onLogReps={(v) => setSet(cursor.exIdx, cursor.setIdx, 'reps', v)}
         onBack={backToList}
@@ -403,7 +428,7 @@ export default function ActiveWorkout({ open, onClose }: { open: boolean; onClos
           const isOptional = trim?.optionalIds.has(ex.defId)
           const exDone = ex.sets.length > 0 && ex.sets.every((s) => s.done)
           const isActive = exIdx === activeIdx
-          const detail = exerciseDetail(ex.defId)
+          const detail = detailFor(ex.defId)
           const howToOpen = howTo.has(ex.defId)
           // Compact performance line: shared weight once, then each set's reps.
           const weights = ex.sets.map((s) => s.weightKg)

@@ -20,6 +20,8 @@ import type {
   ProgressionStateDoc, ScreeningOutcome, UserDoc, Weekday,
 } from '../schema'
 import { generateProgram, contextForUser, type GeneratedProgram } from './generate'
+import { activateProgram } from '../runtime/activate'
+import { buildSetLogs, loggableSlots, progressionFromSession, type LoggedSetInput } from '../runtime/logging'
 import { swapExercise } from './swaps'
 import { progressExercise } from './progress'
 import { changeGoal } from './goalChange'
@@ -161,6 +163,57 @@ function assertRuntime(user: UserDoc, program: GeneratedProgram, fails: string[]
   }
 }
 
+const MEASUREMENT_TYPES = ['weight_reps', 'reps', 'duration', 'interval', 'assisted']
+
+/**
+ * Logging path (M3): activate the program to its persisted instances, resolve every day to
+ * loggable slots, simulate a completed session, and assert the set logs are keyed by the
+ * backend exercise_id and the progression it feeds stays inside the Safety Rules (S07 load
+ * cap, non-negative loads, reps ≥ floor on Load).
+ */
+function assertLoggingPath(user: UserDoc, fails: string[]) {
+  const push = (ok: boolean, msg: string) => { if (!ok) fails.push(`logging/${user.goal}: ${msg}`) }
+  const act = activateProgram(user, '2026-07-17T00:00:00.000Z')
+  push(act.status.ok, `activation gate closed (${act.status.reason})`)
+  push(act.instances.length > 0, 'activation produced no instances')
+
+  for (const inst of act.instances) {
+    const slots = loggableSlots(inst)
+    push(slots.length === inst.exercises.length, `${inst.instance_id}: slot/exercise count mismatch`)
+    for (const s of slots) {
+      push(!!s.name, `${inst.instance_id}: ${s.exerciseId} resolved to an empty name`)
+      push(MEASUREMENT_TYPES.includes(s.measurementType), `${inst.instance_id}: ${s.exerciseId} bad measurementType ${s.measurementType}`)
+    }
+
+    // Simulate a strong session: every prescribed set completed at the top of its range.
+    const logged: Record<string, LoggedSetInput[]> = {}
+    for (const pe of inst.exercises) {
+      const reps = pe.reps_max ?? pe.reps_min ?? 8
+      const weight = pe.load_kg_target ?? 50
+      logged[pe.exercise_id] = Array.from({ length: pe.sets }, () => ({ weightKg: weight, reps, done: true }))
+    }
+
+    const logs = buildSetLogs(user.uid, inst, logged, '2026-07-17T00:00:00.000Z')
+    const expected = inst.exercises.reduce((a, pe) => a + pe.sets, 0)
+    push(logs.length === expected, `${inst.instance_id}: ${logs.length} set logs, expected ${expected}`)
+    for (const log of logs) {
+      push(!!EXERCISE_BY_ID[log.exercise_id], `${inst.instance_id}: set log for unknown id ${log.exercise_id}`)
+      push(!!log.measurement_type, `${inst.instance_id}: set log ${log.log_id} missing measurement_type`)
+    }
+
+    for (const { exerciseId, result } of progressionFromSession(user.uid, user.goal, inst, logged)) {
+      const ex = EXERCISE_BY_ID[exerciseId]!
+      push(result.nextState.current_load_kg >= 0, `${exerciseId}: progression drove load below zero`)
+      if (ex.loadable && result.rule === 'PR01') {
+        const seed = inst.exercises.find((p) => p.exercise_id === exerciseId)?.load_kg_target ?? 0
+        const inc = result.nextState.current_load_kg - seed
+        const cap = weeklyLoadCapKg(seed || 20, ex.bodyRegion)
+        push(inc <= cap + 1e-6, `${exerciseId}: progression jump ${inc}kg exceeds S07 cap ${cap}kg`)
+      }
+    }
+  }
+}
+
 export interface SweepResult { passed: boolean; count: number; failures: string[] }
 
 export function runProfileSweep(): SweepResult {
@@ -191,6 +244,8 @@ export function runProfileSweep(): SweepResult {
       const user = makeUser(goal, 'Intermediate', 4)
       const r = generateProgram(user); count++
       if (r.ok) assertRuntime(user, r.program, failures)
+      // Logging path (M3): activation → instances → set logs → progression, safety intact.
+      assertLoggingPath(user, failures); count++
     }
     // Pain swap must avoid the aggravated region.
     {

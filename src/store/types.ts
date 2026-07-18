@@ -1,5 +1,5 @@
 import type { Language } from '../lib/i18n'
-import type { UserDoc } from '../backend/schema'
+import type { UserDoc, WorkoutInstanceDoc } from '../backend/schema'
 import type { StoredProgram, ProgramStatus } from '../backend/runtime/activate'
 
 export type Units = 'metric' | 'imperial'
@@ -218,6 +218,10 @@ export interface WorkoutSession {
   calories: number
   exercises: LoggedExercise[]
   completed: boolean
+  /** For sessions materialised from a generated program: the `WorkoutInstanceDoc` id this
+   *  was built from. Links completed sets back to the prescription for set-log + progression
+   *  persistence. Absent on demo/seed sessions and self-built sessions. */
+  instanceId?: string
 }
 
 export interface ProgramDay {
@@ -464,6 +468,10 @@ export interface AppState {
   /** The generated recommended program (compact render projection). Null/undefined until
    *  the generation gate opens and a program is produced (see backend/runtime/activate). */
   generatedProgram?: StoredProgram | null
+  /** The canonical per-day `WorkoutInstanceDoc` templates the program was built from
+   *  (schema.ts). Source of truth for building a loggable session from a program day; the
+   *  set-by-set logger reads these. Written only when the generation gate opens. */
+  workoutInstances?: WorkoutInstanceDoc[]
   /** Generation-gate status. `{ ok:false, reason }` drives the "program being finalised"
    *  holding screen; `{ ok:true }` means `generatedProgram` is present. */
   programStatus?: ProgramStatus | null
