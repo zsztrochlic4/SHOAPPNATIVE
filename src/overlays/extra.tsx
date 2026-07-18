@@ -24,6 +24,7 @@ import { coachThreadView } from '../store/coach'
 import { CHAT_SUGGESTIONS, coachReply } from '../lib/coachChat'
 import { askCoach } from '../lib/coachApi'
 import { coachAvailable } from '../backend/coach/coachGate'
+import { coachContext, guardIncoming, guardOutgoing, newSafetySession } from '../lib/coachSafety'
 import { CoachComingSoon } from '../components/CoachComingSoon'
 import { todaySession, leaderboardSorted, youRank } from '../store/selectors'
 import { relativeLabel } from '../lib/date'
@@ -392,6 +393,8 @@ export function CoachChatSheet({ open, onClose }: Props) {
   const [showBook, setShowBook] = useState(false)
   const [booked, setBooked] = useState<string | null>(null)
   const [typing, setTyping] = useState(false)
+  // Per-conversation safety state (persistence + retraction across messages, spec §2).
+  const safety = useRef(newSafetySession())
   const premium = state.profile.premium
   const messages = state.chat
   const showSuggestions = messages.filter((m) => m.role === 'user').length === 0
@@ -408,15 +411,23 @@ export function CoachChatSheet({ open, onClose }: Props) {
     setText('')
     // Show the user's message immediately, then a typing indicator.
     dispatch({ type: 'PUSH_CHAT', role: 'user', text: msg })
+    // SAFETY: the pre-response guard runs BEFORE any reply and BEFORE any rate limit, enforcing
+    // identically on the live-AI and fallback paths (spec §2/§7). A blocked message reaches
+    // neither the model nor the rules engine; the fixed response is shown instead.
+    const ctx = coachContext(state)
+    const guard = guardIncoming(msg, ctx, safety.current)
+    if (guard.outcome === 'block') {
+      dispatch({ type: 'PUSH_CHAT', role: 'coach', text: guard.response.text })
+      return
+    }
     setTyping(true)
     try {
-      // Real Claude coach (via the serverless endpoint).
+      // Real coach (via Firebase AI Logic), then the post-response validator.
       const reply = await askCoach(state, msg)
-      dispatch({ type: 'PUSH_CHAT', role: 'coach', text: reply })
+      dispatch({ type: 'PUSH_CHAT', role: 'coach', text: guardOutgoing(reply, guard.decision, ctx, safety.current) })
     } catch {
-      // Graceful fallback to the on-device rules engine so the demo always
-      // responds, used when no API key/endpoint is configured.
-      dispatch({ type: 'PUSH_CHAT', role: 'coach', text: coachReply(state, msg) })
+      // Fallback to the on-device rules engine — SAME guardrails, same validator.
+      dispatch({ type: 'PUSH_CHAT', role: 'coach', text: guardOutgoing(coachReply(state, msg), guard.decision, ctx, safety.current) })
     } finally {
       setTyping(false)
     }

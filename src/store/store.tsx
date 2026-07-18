@@ -4,6 +4,7 @@ import { todayKey } from '../lib/date'
 import { buildSeed, emptyState, SCHEMA_VERSION } from './seed'
 import { coachReply } from '../lib/coachChat'
 import { coachAvailable } from '../backend/coach/coachGate'
+import { coachContext, guardIncoming, guardOutgoing, newSafetySession } from '../lib/coachSafety'
 import type {
   AppNotification,
   AppState,
@@ -237,7 +238,16 @@ function reducer(state: AppState, action: Action): AppState {
       const userMsg: ChatMessage = { id: `c-${id}`, role: 'user', text, dateKey: todayKey, time: nowTime(), read: true }
       // Coach gated OFF: record the user's message but produce no coach reply.
       if (!coachAvailable()) return { ...state, chat: [...state.chat, userMsg] }
-      const coachMsg: ChatMessage = { id: `c-${id + 1}`, role: 'coach', text: coachReply(state, text), dateKey: todayKey, time: nowTime(), read: false }
+      // SAFETY: enforce the same guardrails as the 1:1 chat (spec §7). This reducer path is
+      // stateless per message, so it covers every single-message guardrail; multi-message
+      // persistence lives in the chat surface's own retained session.
+      const ctx = coachContext(state)
+      const session = newSafetySession()
+      const guard = guardIncoming(text, ctx, session)
+      const replyText = guard.outcome === 'block'
+        ? guard.response.text
+        : guardOutgoing(coachReply(state, text), guard.decision, ctx, session)
+      const coachMsg: ChatMessage = { id: `c-${id + 1}`, role: 'coach', text: replyText, dateKey: todayKey, time: nowTime(), read: false }
       return { ...state, chat: [...state.chat, userMsg, coachMsg] }
     }
 

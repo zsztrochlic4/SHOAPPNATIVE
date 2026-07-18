@@ -24,6 +24,7 @@ import { dailyTargets } from '../store/training'
 import { fmtFluid, pct } from '../lib/format'
 import { coachRespond, STARTER_QUESTIONS, type DayReview } from '../lib/nutritionCoach'
 import { coachAvailable } from '../backend/coach/coachGate'
+import { coachContext, guardIncoming, guardOutgoing, newSafetySession } from '../lib/coachSafety'
 import { CoachComingSoon } from '../components/CoachComingSoon'
 import type { MealName, MealCategory, BudgetMeal } from '../store/types'
 import { brand, accent, useColors } from '../theme'
@@ -122,6 +123,8 @@ function CoachTab() {
   const [typing, setTyping] = useState(false)
   const scrollRef = useRef<ScrollView>(null)
   const inputRef = useRef<TextInput>(null)
+  // Per-conversation safety state, shared source with the 1:1 coach (spec §2/§7).
+  const safety = useRef(newSafetySession())
 
   function handleClose() {
     setOpen(false)
@@ -150,6 +153,18 @@ function CoachTab() {
       setMessages((m) => m.map((x) => (x.id === id ? { ...x, status: 'sent' } : x)))
     }, 480)
 
+    // SAFETY: guard the nutrition coach too — disordered-eating, rapid weight-loss and meal-plan
+    // requests must be caught here, on the same shared source (spec §4/§5/§7).
+    const ctx = coachContext(state)
+    const guard = guardIncoming(msg, ctx, safety.current)
+    if (guard.outcome === 'block') {
+      setTyping(true)
+      setTimeout(() => {
+        setTyping(false)
+        setMessages((m) => [...m, { id: nextId(), role: 'coach', text: guard.response.text }])
+      }, 700)
+      return
+    }
     setTyping(true)
     const reply = coachRespond(msg, goal)
     // Keep saving day reviews so the dashboard food check-in stays in sync.
@@ -163,7 +178,7 @@ function CoachTab() {
         ...m,
         reply.kind === 'review'
           ? { id: nextId(), role: 'coach', review: reply.review }
-          : { id: nextId(), role: 'coach', text: reply.answer.answer, topic: reply.answer.matched ? reply.answer.question : undefined },
+          : { id: nextId(), role: 'coach', text: guardOutgoing(reply.answer.answer, guard.decision, ctx, safety.current), topic: reply.answer.matched ? reply.answer.question : undefined },
       ])
     }, delay)
   }
