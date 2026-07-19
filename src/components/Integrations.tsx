@@ -1,62 +1,22 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { View, Text, Pressable, ActivityIndicator } from 'react-native'
-import * as WebBrowser from 'expo-web-browser'
-import { makeRedirectUri, useAuthRequest, type AuthRequestConfig } from 'expo-auth-session'
-import { Zap, HeartPulse, Activity, Watch, RefreshCw } from 'lucide-react-native'
+import { HeartPulse, Activity, Watch, RefreshCw } from 'lucide-react-native'
 import { useStore } from '../store/store'
 import { useToast } from './Toast'
-import {
-  PROVIDERS, OAUTH_CLIENT_IDS, OAUTH_ENDPOINTS, providerAvailable,
-  exchangeToken, syncAll, lastSyncLabel, type Provider, type ProviderId,
-} from '../lib/integrations'
+import { PROVIDERS, providerAvailable, syncAll, lastSyncLabel, type Provider, type ProviderId } from '../lib/integrations'
 import { brand, accent } from '../theme'
 
-WebBrowser.maybeCompleteAuthSession()
-
 const ICONS: Record<ProviderId, ReactNode> = {
-  strava: <Zap size={18} color={accent.orange} />,
-  whoop: <Activity size={18} color={brand[400]} />,
   appleHealth: <HeartPulse size={18} color="#f87171" />,
   healthConnect: <Activity size={18} color={accent.blue} />,
   garmin: <Watch size={18} color="rgba(255,255,255,0.6)" />,
   fitbit: <Watch size={18} color="rgba(255,255,255,0.6)" />,
 }
 
-const redirectUri = makeRedirectUri({ scheme: 'strengthhub' })
-
-/** One OAuth request per provider, wired to the token exchange + first sync. */
-function useProviderAuth(id: ProviderId, onConnected: (id: ProviderId) => void) {
-  const endpoint = OAUTH_ENDPOINTS[id]
-  const config: AuthRequestConfig = {
-    clientId: OAUTH_CLIENT_IDS[id] ?? 'unset',
-    scopes: endpoint?.scopes ?? [],
-    redirectUri,
-    responseType: 'code',
-  }
-  const [, response, promptAsync] = useAuthRequest(config, endpoint ? { authorizationEndpoint: endpoint.auth } : null)
-  const { dispatch } = useStore()
-  const toast = useToast()
-
-  useEffect(() => {
-    if (response?.type !== 'success') return
-    const code = response.params.code
-    if (!code) return
-    exchangeToken(id, { code, redirectUri })
-      .then((tokens) => {
-        dispatch({ type: 'SET_INTEGRATION', id, patch: { connected: true, ...tokens } })
-        toast(`${id === 'strava' ? 'Strava' : 'Whoop'} connected`)
-        onConnected(id)
-      })
-      .catch(() => toast('Connection failed — try again'))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [response])
-
-  return promptAsync
-}
-
 /**
- * Renders nothing; syncs connected platforms once per app session on launch,
- * so data "pulls through by itself" — the Sync now buttons cover the rest.
+ * Renders nothing; syncs connected platforms once per app session on launch, so data
+ * "pulls through by itself". No provider can connect until the native builds ship, so this
+ * is currently a no-op.
  */
 export function IntegrationsAutoSync() {
   const { state, dispatch } = useStore()
@@ -73,9 +33,9 @@ export function IntegrationsAutoSync() {
 }
 
 /**
- * "Connected apps" section: connect Strava/Whoop via OAuth, see native-app
- * providers' status, and pull the latest data with Sync now. Synced runs,
- * rides and sleep flow into Workout history and the habit tracker.
+ * "Connected apps" section. Apple Health / Health Connect connect on-device in the native
+ * store-release build; until then each shows its status. Synced workouts, steps and sleep
+ * flow into Workout history and the habit tracker.
  */
 export function IntegrationsSection() {
   const { state, dispatch } = useStore()
@@ -94,9 +54,6 @@ export function IntegrationsSection() {
     }
   }
 
-  const promptStrava = useProviderAuth('strava', runSync)
-  const promptWhoop = useProviderAuth('whoop', runSync)
-
   function onPress(p: Provider) {
     const st = integ[p.id]
     if (st?.connected) {
@@ -104,13 +61,9 @@ export function IntegrationsSection() {
       toast(`${p.name} disconnected`)
       return
     }
+    // Nothing is connectable yet (native builds pending) — explain why.
     const avail = providerAvailable(p)
-    if (!avail.ok) {
-      toast(avail.why ?? `${p.name} is not available yet`)
-      return
-    }
-    if (p.id === 'strava') promptStrava()
-    else if (p.id === 'whoop') promptWhoop()
+    toast(avail.why ?? `${p.name} is not available yet`)
   }
 
   return (
@@ -147,7 +100,7 @@ export function IntegrationsSection() {
         </Pressable>
       )}
       <Text className="mt-0.5 px-1 text-[11px] leading-snug text-white/35">
-        Connected apps sync automatically when you open StrengthHub. Runs, rides and swims land in Workout history; steps and sleep feed your habit tracking.
+        Apple Health and Health Connect sync automatically once the native app ships — your workouts, steps and sleep land in Workout history and feed your habit tracking.
       </Text>
     </View>
   )
