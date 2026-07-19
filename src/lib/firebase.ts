@@ -12,6 +12,7 @@ import { getFirestore, type Firestore } from 'firebase/firestore'
 import { getStorage, type FirebaseStorage } from 'firebase/storage'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { initAppCheck } from './appCheck'
+import { startCoachKillSwitch } from './coachKillSwitch'
 
 /**
  * Firebase web config. These values are NOT secrets — access is governed by
@@ -80,6 +81,8 @@ if (firebaseEnabled) {
   }
 
   db = getFirestore(app)
+  // Coach kill-switch source (spec §20). Dormant while COACH_ENABLED is false — no listener.
+  startCoachKillSwitch(db)
   storage = getStorage(app)
 }
 
