@@ -23,8 +23,9 @@ import { todayHabit, nutritionTagsForDay } from '../store/selectors'
 import { dailyTargets } from '../store/training'
 import { fmtFluid, pct } from '../lib/format'
 import { coachRespond, STARTER_QUESTIONS, type DayReview } from '../lib/nutritionCoach'
-import { coachAvailable } from '../backend/coach/coachGate'
-import { coachContext, guardIncoming, guardOutgoing, newSafetySession } from '../lib/coachSafety'
+import { coachContext, coachOperational, coachPrecheck, guardOutgoing, newSafetySession, type ContactButton } from '../lib/coachSafety'
+import { SafetyContactButtons } from '../components/SafetyContactButtons'
+import { todayKey } from '../lib/date'
 import { CoachComingSoon } from '../components/CoachComingSoon'
 import type { MealName, MealCategory, BudgetMeal } from '../store/types'
 import { brand, accent, useColors } from '../theme'
@@ -83,6 +84,8 @@ interface ChatMsg {
   topic?: string
   review?: DayReview
   status?: 'sending' | 'sent'
+  /** Tap-to-call / tap-to-text buttons for a fixed safety response (spec §20). */
+  buttons?: ContactButton[]
 }
 
 let msgSeq = 0
@@ -138,7 +141,7 @@ function CoachTab() {
   }, [open])
 
   function send(raw?: string) {
-    if (!coachAvailable()) return // HARD gate: the food coach does not answer until reviewed.
+    if (!coachOperational()) return // HARD gate: the food coach does not answer until reviewed.
     const msg = (raw ?? input).trim()
     if (!msg || typing) return
     setInput('')
@@ -153,18 +156,19 @@ function CoachTab() {
       setMessages((m) => m.map((x) => (x.id === id ? { ...x, status: 'sent' } : x)))
     }, 480)
 
-    // SAFETY: guard the nutrition coach too — disordered-eating, rapid weight-loss and meal-plan
-    // requests must be caught here, on the same shared source (spec §4/§5/§7).
+    // SAFETY: same shared precheck as the 1:1 coach — safety guard first (a crisis is never gated by
+    // the daily limit), then the limit — enforcing identically here (spec §4/§5/§7/§21).
     const ctx = coachContext(state)
-    const guard = guardIncoming(msg, ctx, safety.current)
-    if (guard.outcome === 'block') {
+    const pre = coachPrecheck(msg, ctx, safety.current, state.coachUsage, todayKey)
+    if (pre.kind !== 'allow') {
       setTyping(true)
       setTimeout(() => {
         setTyping(false)
-        setMessages((m) => [...m, { id: nextId(), role: 'coach', text: guard.response.text }])
+        setMessages((m) => [...m, { id: nextId(), role: 'coach', text: pre.response.text, buttons: pre.response.buttons }])
       }, 700)
       return
     }
+    dispatch({ type: 'BUMP_COACH_USAGE' })
     setTyping(true)
     const reply = coachRespond(msg, goal)
     // Keep saving day reviews so the dashboard food check-in stays in sync.
@@ -178,13 +182,13 @@ function CoachTab() {
         ...m,
         reply.kind === 'review'
           ? { id: nextId(), role: 'coach', review: reply.review }
-          : { id: nextId(), role: 'coach', text: guardOutgoing(reply.answer.answer, guard.decision, ctx, safety.current), topic: reply.answer.matched ? reply.answer.question : undefined },
+          : { id: nextId(), role: 'coach', text: guardOutgoing(reply.answer.answer, pre.decision, ctx, safety.current), topic: reply.answer.matched ? reply.answer.question : undefined },
       ])
     }, delay)
   }
 
   function openChat(initial?: string) {
-    if (!coachAvailable()) return // Coach gated OFF: the chat cannot be opened.
+    if (!coachOperational()) return // Coach gated OFF: the chat cannot be opened.
     setOpen(true)
     if (initial) send(initial)
   }
@@ -199,7 +203,7 @@ function CoachTab() {
 
       {/* Unified nutrition coach: one chat for "what I ate" and "ask anything".
           Gated OFF (with the rest of the coach) until its professional review. */}
-      {coachAvailable()
+      {coachOperational()
         ? <NutritionCoachCard onOpen={() => openChat()} onAsk={(q) => openChat(q)} />
         : <CoachComingSoon />}
 
@@ -266,6 +270,7 @@ function CoachTab() {
                       >
                         {!isUser && m.topic && <Text className="mb-1 text-[12.5px] font-bold text-brand-400">{m.topic}</Text>}
                         <Text className={`text-[14.5px] leading-snug ${isUser ? 'text-black' : 'text-white'}`}>{m.text}</Text>
+                        {!isUser && m.buttons && <SafetyContactButtons buttons={m.buttons} />}
                       </View>
                     </View>
                     {isUser && (

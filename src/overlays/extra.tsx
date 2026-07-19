@@ -23,11 +23,11 @@ import { nextSetRecommendation } from '../store/training'
 import { coachThreadView } from '../store/coach'
 import { CHAT_SUGGESTIONS, coachReply } from '../lib/coachChat'
 import { askCoach } from '../lib/coachApi'
-import { coachAvailable } from '../backend/coach/coachGate'
-import { coachContext, guardIncoming, guardOutgoing, newSafetySession } from '../lib/coachSafety'
+import { coachContext, coachOperational, coachPrecheck, guardOutgoing, newSafetySession } from '../lib/coachSafety'
+import { SafetyContactButtons } from '../components/SafetyContactButtons'
 import { CoachComingSoon } from '../components/CoachComingSoon'
 import { todaySession, leaderboardSorted, youRank } from '../store/selectors'
-import { relativeLabel } from '../lib/date'
+import { relativeLabel, todayKey } from '../lib/date'
 import { CHART_METRICS, STAT_METRICS, progressMetricId, dashboardStatIds } from '../lib/metrics'
 import { weightVal, toKg, weightUnit } from '../lib/format'
 import { brand, useColors } from '../theme'
@@ -50,7 +50,7 @@ export function CoachSheet({ open, onClose }: Props) {
   const nav = useNav()
   const thread = coachThreadView(state)
 
-  if (!coachAvailable()) {
+  if (!coachOperational()) {
     return (
       <Sheet open={open} onClose={onClose} title="Your coach">
         <CoachComingSoon />
@@ -405,29 +405,30 @@ export function CoachChatSheet({ open, onClose }: Props) {
   }, [open, messages.length, showBook, booked, typing, dispatch])
 
   async function send(t?: string) {
-    if (!coachAvailable()) return // HARD gate: no reply (AI or fallback) until enabled.
+    if (!coachOperational()) return // HARD gate + server-side kill switch (spec §20).
     const msg = (t ?? text).trim()
     if (!msg || typing) return
     setText('')
     // Show the user's message immediately, then a typing indicator.
     dispatch({ type: 'PUSH_CHAT', role: 'user', text: msg })
-    // SAFETY: the pre-response guard runs BEFORE any reply and BEFORE any rate limit, enforcing
-    // identically on the live-AI and fallback paths (spec §2/§7). A blocked message reaches
-    // neither the model nor the rules engine; the fixed response is shown instead.
+    // SAFETY: one shared precheck runs BEFORE any reply — the safety guard first (a crisis is never
+    // gated by the daily limit), then the limit — enforcing identically on the live-AI and fallback
+    // paths (spec §2/§7/§21). A blocked message reaches neither the model nor the rules engine.
     const ctx = coachContext(state)
-    const guard = guardIncoming(msg, ctx, safety.current)
-    if (guard.outcome === 'block') {
-      dispatch({ type: 'PUSH_CHAT', role: 'coach', text: guard.response.text })
+    const pre = coachPrecheck(msg, ctx, safety.current, state.coachUsage, todayKey)
+    if (pre.kind !== 'allow') {
+      dispatch({ type: 'PUSH_CHAT', role: 'coach', text: pre.response.text, buttons: pre.response.buttons })
       return
     }
+    dispatch({ type: 'BUMP_COACH_USAGE' })
     setTyping(true)
     try {
       // Real coach (via Firebase AI Logic), then the post-response validator.
       const reply = await askCoach(state, msg)
-      dispatch({ type: 'PUSH_CHAT', role: 'coach', text: guardOutgoing(reply, guard.decision, ctx, safety.current) })
+      dispatch({ type: 'PUSH_CHAT', role: 'coach', text: guardOutgoing(reply, pre.decision, ctx, safety.current) })
     } catch {
       // Fallback to the on-device rules engine — SAME guardrails, same validator.
-      dispatch({ type: 'PUSH_CHAT', role: 'coach', text: guardOutgoing(coachReply(state, msg), guard.decision, ctx, safety.current) })
+      dispatch({ type: 'PUSH_CHAT', role: 'coach', text: guardOutgoing(coachReply(state, msg), pre.decision, ctx, safety.current) })
     } finally {
       setTyping(false)
     }
@@ -448,7 +449,7 @@ export function CoachChatSheet({ open, onClose }: Props) {
   for (let i = messages.length - 1; i >= 0; i--) { if (messages[i].role === 'user') { lastUserIdx = i; break } }
   const seen = lastUserIdx >= 0 && messages.slice(lastUserIdx + 1).some((m) => m.role === 'coach')
 
-  if (!coachAvailable()) {
+  if (!coachOperational()) {
     return (
       <Sheet open={open} onClose={onClose} title="Coach">
         <CoachComingSoon />
@@ -524,6 +525,7 @@ export function CoachChatSheet({ open, onClose }: Props) {
           <View key={m.id} className={`flex-row ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <View className={`max-w-[82%] rounded-2xl px-3.5 py-2.5 ${m.role === 'user' ? 'rounded-br-md bg-brand-400' : 'rounded-bl-md border border-white/8 bg-ink-800'}`}>
               <Text className={`text-[14px] leading-snug ${m.role === 'user' ? 'text-black' : 'text-white/85'}`}>{m.text}</Text>
+              {m.role === 'coach' && m.buttons && <SafetyContactButtons buttons={m.buttons} />}
               <Text className={`mt-1 text-[10px] ${m.role === 'user' ? 'text-black/50' : 'text-white/35'}`}>{m.time}</Text>
             </View>
           </View>

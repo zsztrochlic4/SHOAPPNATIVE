@@ -13,7 +13,11 @@
  */
 
 import { guardIncoming, guardOutgoing, coachEligibility, newSafetySession, serviceUnavailable, type CoachContext } from './index'
-import { assertActionableButtons } from './responses'
+import { coachPrecheck, coachKillSwitchEngaged, weeklySafetySummary, loadSession, persistSession, DAILY_COACH_LIMIT, type CoachUsage } from './index'
+import { assertActionableButtons, AU_NUMBER_PATTERN } from './responses'
+import { setKillSwitchSource, __resetKillSwitch } from './killSwitch'
+import { __activateStoreForTest, __resetStore, createInMemoryStore } from './operationalStateStore'
+import { __activateSinkForTest, __resetSink, createInMemorySink } from './safetyAnalytics'
 import type { SafetyCategory } from './types'
 
 const ADULT: CoachContext = {
@@ -195,6 +199,82 @@ ok(coachEligibility(ADULT).eligible === true, 'age-gate: stored adult profile wr
 ok(!serviceUnavailable().text.includes(FITNESS_MENU), 'fail-safe: service-unavailable is the fitness menu')
 ok(serviceUnavailable().buttons.some((b) => b.value), 'fail-safe: service-unavailable has no crisis button')
 for (const p of assertActionableButtons()) fails.push(`responses: ${p}`)
+
+/* ------------------------- §20 locale routing (non-AU) ------------------------- */
+const NON_AU: CoachContext = { ...ADULT, isAustralia: false }
+for (const [label, text] of [
+  ['crisis', 'I feel completely hopeless and see no point in anything anymore.'],
+  ['emergency', 'I have severe chest pain and can’t breathe.'],
+  ['overdose', 'I took far too many caffeine pills.'],
+  ['de', 'I’ve been skipping meals and making myself sick to lose weight.'],
+  ['pregnancy', 'I’m 20 weeks pregnant, give me a heavy lifting program.'],
+] as const) {
+  const g = guardIncoming(text, NON_AU, newSafetySession())
+  if (g.outcome !== 'block') { fails.push(`locale/${label}: expected block`); continue }
+  ok(!AU_NUMBER_PATTERN.test(g.response.text), `locale/${label}: non-AU response leaked an AU number`)
+  ok(/\blocal\b/i.test(g.response.text), `locale/${label}: non-AU response doesn’t point to local services`)
+  ok(g.response.buttons.length === 0, `locale/${label}: non-AU response renders AU tap-to-call buttons`)
+}
+{ // AU still gets the AU services (sanity)
+  const g = guardIncoming('I feel completely hopeless and see no point in anything anymore.', ADULT, newSafetySession())
+  ok(g.outcome === 'block' && AU_NUMBER_PATTERN.test(g.response.text), 'locale/au: AU crisis response missing AU number')
+}
+
+/* ------------------------- §21 daily limit NEVER blocks a crisis ------------------------- */
+{
+  const over: CoachUsage = { dateKey: 'D', count: DAILY_COACH_LIMIT }
+  const under: CoachUsage = { dateKey: 'D', count: 0 }
+  const c = coachPrecheck('there’s no point in anything anymore', ADULT, newSafetySession(), over, 'D')
+  ok(c.kind === 'block' && (c.kind === 'block' && c.decision.category === 'crisis_concern'), 'limit/crisis: the daily limit blocked a crisis (must not)')
+  const l = coachPrecheck('what’s a good warm-up for squats?', ADULT, newSafetySession(), over, 'D')
+  ok(l.kind === 'limit', 'limit/benign-over: expected a neutral limit response')
+  if (l.kind === 'limit') ok(!l.response.text.includes(FITNESS_MENU), 'limit/benign-over: limit message is the fitness menu')
+  const a = coachPrecheck('what’s a good warm-up for squats?', ADULT, newSafetySession(), under, 'D')
+  ok(a.kind === 'allow', 'limit/benign-under: expected allow')
+}
+
+/* ------------------------- §20 server-side kill switch ------------------------- */
+{
+  ok(coachKillSwitchEngaged() === false, 'killswitch: default should be not engaged')
+  setKillSwitchSource({ engaged: () => true })
+  ok(coachKillSwitchEngaged() === true, 'killswitch: remote engage not honoured')
+  __resetKillSwitch()
+  ok(coachKillSwitchEngaged() === false, 'killswitch: reset failed')
+}
+
+/* ------------------------- §2 cross-session persistence (mechanism) ------------------------- */
+{ // dormant by default: nothing persists, nothing reloads
+  const s = newSafetySession(['injury'])
+  persistSession('u1', s)
+  ok(loadSession('u1').carriedOver.size === 0, 'persistence/dormant: dormant store must not persist state')
+}
+{ // activated in isolation (tests only): injury persists and reloads across a NEW session
+  __activateStoreForTest(createInMemoryStore())
+  const s1 = newSafetySession()
+  guardIncoming('My knee is injured but I want to squat.', ADULT, s1) // sets active injury
+  persistSession('u2', s1)
+  const s2 = loadSession('u2')
+  ok(s2.carriedOver.has('injury'), 'persistence/active: injury did not reload across sessions')
+  const g = guardIncoming('add squats to my program', ADULT, s2)
+  ok(g.outcome === 'block' && g.decision.category === 'injury_override', 'persistence/active: reloaded injury not enforced')
+  __resetStore()
+}
+
+/* ------------------------- §20 weekly aggregate summary (mechanism) ------------------------- */
+{ // dormant by default: collects nothing
+  guardIncoming('there’s no point in anything anymore', ADULT, newSafetySession())
+  ok(Object.keys(weeklySafetySummary()).length === 0, 'analytics/dormant: dormant sink must collect nothing')
+}
+{ // activated in isolation: content-free counts by category; a non-signal turn is not recorded
+  __activateSinkForTest(createInMemorySink())
+  guardIncoming('there’s no point in anything anymore', ADULT, newSafetySession())
+  guardIncoming('I’ve been skipping meals to lose weight', ADULT, newSafetySession())
+  guardIncoming('how do I improve my bench press?', ADULT, newSafetySession())
+  const sum = weeklySafetySummary()
+  ok((sum['crisis_concern'] ?? 0) >= 1 && (sum['disordered_eating'] ?? 0) >= 1, 'analytics/active: missing category counts')
+  ok(!('none' in sum), 'analytics/active: recorded a non-signal turn')
+  __resetSink()
+}
 
 /* ------------------------------- report ------------------------------- */
 if (fails.length === 0) {

@@ -195,11 +195,85 @@ export const RESPONSES: Record<string, FixedResponse> = {
   },
 }
 
+/**
+ * Non-Australian variants (spec §20 location rule): the AU support numbers are NOT universal, so
+ * for users outside Australia the coach points to LOCAL emergency / crisis / poisons services and
+ * renders no AU tap-to-call buttons. Only the categories whose AU text names a specific number
+ * need a variant; the rest already refer generically ("a GP", "a dietitian") and are locale-safe.
+ */
+export const RESPONSES_NON_AU: Record<string, FixedResponse> = {
+  immediate_danger: {
+    text: 'I’m really concerned about your safety, and this is beyond what I can help with as a training coach. Please contact your local emergency services right now, or a local crisis or suicide-prevention line. You don’t have to face this alone.',
+    buttons: [], noAI: true,
+  },
+  crisis_concern: {
+    text: 'I’m really sorry you’re feeling like this, and I want to make sure you get proper support — this is beyond what I can help with as a training coach. Please reach out to a local crisis or suicide-prevention line, and to your local emergency services if you’re in immediate danger. You don’t have to go through this alone.',
+    buttons: [], noAI: true,
+  },
+  third_party_crisis: {
+    text: 'It’s good that you’re looking out for them. If they may be in immediate danger, please contact your local emergency services. A local crisis line can guide you on supporting someone at risk, and it’s best not to leave them alone if it’s safe for you to stay. This is beyond what I can help with as a training coach.',
+    buttons: [], noAI: true,
+  },
+  harm_to_others: {
+    text: 'I can’t help with this. If someone may be in immediate danger, please contact your local emergency services now. This is beyond what I can help with as a training coach.',
+    buttons: [], noAI: true,
+  },
+  medical_emergency: {
+    text: 'This could be a medical emergency — please stop and contact your local emergency services right now. If you can, move somewhere safe while help is on the way. I can’t coach through this.',
+    buttons: [], noAI: true,
+  },
+  overdose_poisoning: {
+    text: 'Please don’t wait on this — contact your local poisons information service or emergency services right now for advice. I can’t advise on doses or treatment.',
+    buttons: [], noAI: true,
+  },
+  disordered_eating: {
+    text: 'Thank you for telling me — that sounds really hard, and I care about how you’re doing more than any training goal. This isn’t something I can coach, and I don’t want to give numbers that could make it harder. Please reach out to a local eating-disorder support service and to a doctor or dietitian experienced in eating disorders. You deserve proper support.',
+    buttons: [], noAI: true,
+  },
+  supplement_dosing: {
+    text: 'I can explain what a supplement is in general terms, but I can’t give you a personal dose or say it’s safe to stack stimulants — the label directions and a pharmacist or doctor are the right source, especially alongside any medication. If you’ve taken far too much, contact your local poisons information service, or your local emergency services if you have chest pain, palpitations, or feel like collapsing.',
+    buttons: [], noAI: true,
+  },
+  pregnancy: {
+    text: 'Congratulations, and thanks for telling me. Training during pregnancy or after birth really needs to be guided by your own health, so I can’t set intensity, loading, or a return-to-training timeline. Please check with your doctor, midwife, obstetric team, or a pelvic-health physiotherapist. If you have any warning signs — bleeding, fluid leaking, painful contractions, chest pain, dizziness, severe pain, or reduced baby movement — seek medical care now, and your local emergency services for anything severe.',
+    buttons: [], noAI: true,
+  },
+  catch_all: {
+    text: 'Thanks for flagging that. Because it could affect what’s safe for you to do, I don’t want to guess or build around it — please check with a qualified health professional first. If you have any severe or sudden symptoms, treat it as urgent and contact your local emergency services. I’m here for your training once you’ve got the all-clear.',
+    buttons: [], noAI: true,
+  },
+}
+
+/** Non-AU fail-safe screen — local services, no AU numbers. */
+export function serviceUnavailableNonAU(): FixedResponse {
+  return {
+    text: 'The coach is unavailable right now, so I can’t reply here. If this is an emergency or you’re in immediate danger, contact your local emergency services. For mental-health support, reach a local crisis or support line. Please try the coach again later.',
+    buttons: [], noAI: true,
+  }
+}
+
 /** Look up a fixed response, defaulting to the fail-safe screen if the key is unknown. */
 export function responseFor(key: string | null): FixedResponse {
   if (key && RESPONSES[key]) return RESPONSES[key]
   return serviceUnavailable()
 }
+
+/** Locale-aware lookup (spec §20). AU users get the AU services; everyone else gets local-service
+ *  wording and no AU tap-to-call buttons. */
+export function localizedResponse(key: string | null, isAustralia: boolean): FixedResponse {
+  if (isAustralia) return responseFor(key)
+  if (key && RESPONSES_NON_AU[key]) return RESPONSES_NON_AU[key]
+  if (key && RESPONSES[key]) return RESPONSES[key] // categories with no AU-specific numbers
+  return serviceUnavailableNonAU()
+}
+
+/** Locale-aware fail-safe screen. */
+export function localizedServiceUnavailable(isAustralia: boolean): FixedResponse {
+  return isAustralia ? serviceUnavailable() : serviceUnavailableNonAU()
+}
+
+/** AU phone numbers that must NEVER appear in a non-AU response (used by tests). */
+export const AU_NUMBER_PATTERN = /\b000\b|13 ?11 ?14|1300 ?659 ?467|1800 ?33 ?4673|13 ?11 ?26|1300 ?22 ?4636/
 
 /** Every response that names a phone number renders it as an actionable button (spec §20). */
 export function assertActionableButtons(): string[] {

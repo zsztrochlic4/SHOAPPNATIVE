@@ -3,8 +3,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { todayKey } from '../lib/date'
 import { buildSeed, emptyState, SCHEMA_VERSION } from './seed'
 import { coachReply } from '../lib/coachChat'
-import { coachAvailable } from '../backend/coach/coachGate'
-import { coachContext, guardIncoming, guardOutgoing, newSafetySession } from '../lib/coachSafety'
+import { coachContext, coachOperational, coachPrecheck, guardOutgoing, newSafetySession } from '../lib/coachSafety'
+import type { ContactButton } from '../backend/coach/safety'
 import type {
   AppNotification,
   AppState,
@@ -53,7 +53,7 @@ export type Action =
   | { type: 'ADD_MY_MEAL'; meal: Omit<UserMeal, 'id' | 'createdAtKey'> }
   | { type: 'REMOVE_MY_MEAL'; id: string }
   | { type: 'SEND_CHAT'; text: string }
-  | { type: 'PUSH_CHAT'; role: 'user' | 'coach'; text: string }
+  | { type: 'PUSH_CHAT'; role: 'user' | 'coach'; text: string; buttons?: ContactButton[] }
   | { type: 'BUMP_COACH_USAGE' }
   | { type: 'SET_INTEGRATION'; id: string; patch: Partial<IntegrationState> }
   | {
@@ -237,17 +237,18 @@ function reducer(state: AppState, action: Action): AppState {
       const id = Date.now()
       const userMsg: ChatMessage = { id: `c-${id}`, role: 'user', text, dateKey: todayKey, time: nowTime(), read: true }
       // Coach gated OFF: record the user's message but produce no coach reply.
-      if (!coachAvailable()) return { ...state, chat: [...state.chat, userMsg] }
-      // SAFETY: enforce the same guardrails as the 1:1 chat (spec §7). This reducer path is
-      // stateless per message, so it covers every single-message guardrail; multi-message
+      if (!coachOperational()) return { ...state, chat: [...state.chat, userMsg] }
+      // SAFETY: same shared source as the 1:1 chat (spec §7) — the safety guard runs first, then the
+      // daily message limit (which never blocks a crisis). Stateless per message here; multi-message
       // persistence lives in the chat surface's own retained session.
       const ctx = coachContext(state)
       const session = newSafetySession()
-      const guard = guardIncoming(text, ctx, session)
-      const replyText = guard.outcome === 'block'
-        ? guard.response.text
-        : guardOutgoing(coachReply(state, text), guard.decision, ctx, session)
-      const coachMsg: ChatMessage = { id: `c-${id + 1}`, role: 'coach', text: replyText, dateKey: todayKey, time: nowTime(), read: false }
+      const pre = coachPrecheck(text, ctx, session, state.coachUsage, todayKey)
+      const replyText = pre.kind !== 'allow'
+        ? pre.response.text
+        : guardOutgoing(coachReply(state, text), pre.decision, ctx, session)
+      const buttons = pre.kind !== 'allow' ? pre.response.buttons : undefined
+      const coachMsg: ChatMessage = { id: `c-${id + 1}`, role: 'coach', text: replyText, buttons, dateKey: todayKey, time: nowTime(), read: false }
       return { ...state, chat: [...state.chat, userMsg, coachMsg] }
     }
 
@@ -262,6 +263,7 @@ function reducer(state: AppState, action: Action): AppState {
         time: nowTime(),
         // user messages are read by definition; coach replies are read while the thread is open
         read: action.role === 'user',
+        buttons: action.buttons,
       }
       return { ...state, chat: [...state.chat, msg] }
     }

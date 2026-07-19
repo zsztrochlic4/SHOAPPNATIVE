@@ -1,4 +1,5 @@
 import type { Language } from '../lib/i18n'
+import type { ContactButton } from '../backend/coach/safety'
 import type { UserDoc, WorkoutInstanceDoc } from '../backend/schema'
 import type { StoredProgram, ProgramStatus } from '../backend/runtime/activate'
 
@@ -80,6 +81,8 @@ export interface ChatMessage {
   dateKey: string
   time: string
   read: boolean
+  /** Tap-to-call / tap-to-text buttons for a fixed safety response (spec §20). */
+  buttons?: ContactButton[]
 }
 
 export interface Settings {
