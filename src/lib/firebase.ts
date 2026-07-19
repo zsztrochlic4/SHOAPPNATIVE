@@ -11,6 +11,7 @@ import {
 import { getFirestore, type Firestore } from 'firebase/firestore'
 import { getStorage, type FirebaseStorage } from 'firebase/storage'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { initAppCheck } from './appCheck'
 
 /**
  * Firebase web config. These values are NOT secrets — access is governed by
@@ -65,6 +66,10 @@ let storage: FirebaseStorage | null = null
 
 if (firebaseEnabled) {
   app = initializeApp(config as Required<typeof config>)
+
+  // App Check (abuse/attestation protection) — client scaffolding; a safe no-op until a
+  // reCAPTCHA site key is set AND App Check is enabled in the Firebase console (ops step).
+  void initAppCheck(app)
 
   // Native needs AsyncStorage-backed persistence so a login survives app
   // restarts; on web the SDK uses IndexedDB/local storage by default.
