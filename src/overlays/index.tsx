@@ -22,6 +22,7 @@ import { useToast } from '../components/Toast'
 import { useNav } from '../nav'
 import { FOODS, QUICK_WORKOUTS } from '../data/catalog'
 import { pick, makeRng } from '../lib/rng'
+import { requestPushPermission, cancelAllReminders } from '../lib/notifications'
 import { todayKey, relativeLabel, shortDate, fromKey } from '../lib/date'
 import {
   fmtWeight, fmtWeightNum, toKg, weightUnit, fmtFluid,
@@ -102,6 +103,10 @@ export function SettingsSheet({ open, onClose }: Props) {
   function toggleNotifs() {
     const next = !notificationsEnabled
     dispatch({ type: 'SET_SETTINGS', patch: { notificationsEnabled: next } })
+    // Enable → PushRegistration asks permission + registers the token. Disable →
+    // clear any scheduled local reminders so nothing keeps firing on-device.
+    if (next) void requestPushPermission()
+    else void cancelAllReminders()
     toast(next ? t('toast.notifsOn') : t('toast.notifsOff'))
   }
 

@@ -33,6 +33,12 @@
       "expo-video",
       "expo-web-browser",
       [
+        "expo-notifications",
+        {
+          "color": "#0A0A0B"
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon.png",

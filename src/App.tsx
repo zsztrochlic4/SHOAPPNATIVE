@@ -11,6 +11,7 @@ import { AuthScreen } from './auth/AuthScreen'
 import { WelcomeScreen } from './screens/Welcome'
 import { CloudSync } from './store/CloudSync'
 import { IntegrationsAutoSync } from './components/Integrations'
+import { PushRegistration } from './components/PushRegistration'
 import { ToastProvider } from './components/Toast'
 import { NavProvider, type Overlay } from './nav'
 import { themeVars, useThemeName, brand, cssVars } from './theme'
@@ -258,6 +259,7 @@ function AuthGate() {
     <>
       <CloudSync />
       <IntegrationsAutoSync />
+      <PushRegistration />
       <Shell />
     </>
   )
