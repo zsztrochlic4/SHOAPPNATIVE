@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../auth/AuthProvider'
 import { useStore } from './store'
+import { resetSharedCoachSession } from '../lib/coachSafety'
 import { loadUserState, saveUserState } from './cloudRepo'
 import { SCHEMA_VERSION } from './seed'
 import type { AppState } from './types'
@@ -30,6 +31,9 @@ export function CloudSync() {
   const savedRef = useRef<Partial<AppState> | undefined>(undefined)
 
   useEffect(() => {
+    // Account switch / sign-out: drop the reducer path's in-memory coach safety state so a crisis
+    // or health state can never carry across users (spec §2; in-memory only, never synced).
+    resetSharedCoachSession()
     if (!user) { setSynced(false); savedRef.current = undefined; return }
     let cancelled = false
     setSynced(false)

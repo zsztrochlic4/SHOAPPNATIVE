@@ -12,7 +12,8 @@
 import type { AppState } from '../store/types'
 import { coachAvailable } from '../backend/coach/coachGate'
 import {
-  guardIncoming, guardOutgoing, coachPrecheck, coachEligibility, coachKillSwitchEngaged, newSafetySession,
+  guardIncoming, guardOutgoing, coachPrecheck, coachPrecheckAsync, coachEligibility, coachKillSwitchEngaged,
+  newSafetySession,
   type CoachContext, type SafetySession, type SafetyDecision, type GuardOutcome, type CoachPrecheck,
   type ContactButton, type CoachUsage,
 } from '../backend/coach/safety'
@@ -46,5 +47,16 @@ export function coachOperational(): boolean {
   return coachAvailable() && !coachKillSwitchEngaged()
 }
 
-export { guardIncoming, guardOutgoing, coachPrecheck, coachEligibility, coachKillSwitchEngaged, newSafetySession }
+/**
+ * Retained in-memory safety session for non-component coach callers (the reducer `SEND_CHAT` path),
+ * so multi-turn persistence + retraction are enforced IDENTICALLY to the 1:1 chat and food coach,
+ * which hold their own retained session (spec §2/§7). In-memory ONLY — never persisted or cloud-
+ * synced: crisis / health safety-state must not be stored ahead of the §19 privacy foundation.
+ * Reset on account switch / sign-out so state never leaks between users.
+ */
+let sharedSession: SafetySession = newSafetySession()
+export function sharedCoachSession(): SafetySession { return sharedSession }
+export function resetSharedCoachSession(): void { sharedSession = newSafetySession() }
+
+export { guardIncoming, guardOutgoing, coachPrecheck, coachPrecheckAsync, coachEligibility, coachKillSwitchEngaged, newSafetySession }
 export type { CoachContext, SafetySession, SafetyDecision, GuardOutcome, CoachPrecheck, ContactButton, CoachUsage }

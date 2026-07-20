@@ -23,7 +23,7 @@ import { todayHabit, nutritionTagsForDay } from '../store/selectors'
 import { dailyTargets } from '../store/training'
 import { fmtFluid, pct } from '../lib/format'
 import { coachRespond, STARTER_QUESTIONS, type DayReview } from '../lib/nutritionCoach'
-import { coachContext, coachOperational, coachPrecheck, guardOutgoing, newSafetySession, type ContactButton } from '../lib/coachSafety'
+import { coachContext, coachOperational, coachPrecheckAsync, guardOutgoing, newSafetySession, type ContactButton } from '../lib/coachSafety'
 import { SafetyContactButtons } from '../components/SafetyContactButtons'
 import { todayKey } from '../lib/date'
 import { CoachComingSoon } from '../components/CoachComingSoon'
@@ -140,7 +140,7 @@ function CoachTab() {
     return () => clearTimeout(t)
   }, [open])
 
-  function send(raw?: string) {
+  async function send(raw?: string) {
     if (!coachOperational()) return // HARD gate: the food coach does not answer until reviewed.
     const msg = (raw ?? input).trim()
     if (!msg || typing) return
@@ -159,7 +159,9 @@ function CoachTab() {
     // SAFETY: same shared precheck as the 1:1 coach — safety guard first (a crisis is never gated by
     // the daily limit), then the limit — enforcing identically here (spec §4/§5/§7/§21).
     const ctx = coachContext(state)
-    const pre = coachPrecheck(msg, ctx, safety.current, state.coachUsage, todayKey)
+    // Recent prior turns give the classifier multi-turn context (messages is pre-this-message here).
+    const recent = messages.filter((m) => m.text).slice(-6).map((m) => m.text as string)
+    const pre = await coachPrecheckAsync(msg, ctx, safety.current, state.coachUsage, todayKey, recent)
     if (pre.kind !== 'allow') {
       setTyping(true)
       setTimeout(() => {

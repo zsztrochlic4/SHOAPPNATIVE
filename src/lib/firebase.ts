@@ -13,6 +13,7 @@ import { getStorage, type FirebaseStorage } from 'firebase/storage'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { initAppCheck } from './appCheck'
 import { startCoachKillSwitch } from './coachKillSwitch'
+import { initCoachClassifier } from './coachClassifier'
 
 /**
  * Firebase web config. These values are NOT secrets — access is governed by
@@ -83,6 +84,9 @@ if (firebaseEnabled) {
   db = getFirestore(app)
   // Coach kill-switch source (spec §20). Dormant while COACH_ENABLED is false — no listener.
   startCoachKillSwitch(db)
+  // LLM safety-classifier transport (Gemini via AI Logic). Registered only; it fires solely when a
+  // live coach surface runs the async precheck, which stays gated off while COACH_ENABLED is false.
+  initCoachClassifier()
   storage = getStorage(app)
 }
 

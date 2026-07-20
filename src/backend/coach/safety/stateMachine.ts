@@ -11,7 +11,7 @@
 import type { CoachContext, DetectorHit, PersistentState, SafetyDecision, SafetySession } from './types'
 import { PERSISTENT_FOR } from './types'
 import { engineExcludedExerciseIds } from './engineBridge'
-import { normalize } from './rules'
+import { normalize, hasActiveCrisisSignal } from './rules'
 
 const p = (text: string) => normalize(text).p
 
@@ -20,14 +20,35 @@ const BARE_RETRACTION = ['jk', 'j k', 'just kidding', 'only kidding', 'im kiddin
   'i m fine', 'im fine now', 'i m fine now', 'just give me the workout', 'just give me my workout',
   'just build the', 'just add the', 'just add squats', 'stop overreacting', 'i was joking', 'im joking', 'i m joking']
 
-const GENUINE_CORRECTION = ['i meant', 'i mean my', 'not me', 'talking about my', 'that was last year',
-  'was last year', 'it s fine now', 'its fine now', 'was a typo', 'it was a typo', 'i was quoting',
-  'meant my roommate', 'meant my friend', 'about my friend', 'about my roommate', 'about my mate']
+const GENUINE_CORRECTION = ['i meant', 'i mean my', 'i mean because', 'i meant because', 'i mean about',
+  'i meant about', 'not me', 'talking about my', 'that was last year', 'was last year', 'it s fine now',
+  'its fine now', 'was a typo', 'it was a typo',
+  'meant my roommate', 'meant my friend', 'about my friend', 'about my roommate', 'about my mate',
+  // Quotation class — the earlier line was a quote/lyric, not a personal statement.
+  'i was quoting', 'was quoting', 'a quote', 'a lyric', 'lyrics', 'from a song', 'from a book',
+  'from a movie', 'from a poem', 'a line from', 'reciting',
+  // Figurative / clarification class — the earlier line was figurative, not literal.
+  'figure of speech', 'being figurative', 'being dramatic', 'not literally', 'didnt mean it literally',
+  'didnt mean that literally', 'exaggerating', 'that came out wrong', 'not what i meant']
 
+/**
+ * A correction may only be treated as GENUINE (and so allowed to re-open / downgrade a state) when
+ * it is contextually CONSISTENT — i.e. the same message does not still assert a live crisis. The
+ * ROUTER makes this call on full context (spec §2), never the coaching model, and never a bare token
+ * match: "I was quoting a song" with no live signal may re-evaluate; "I'm quoting… I'm going to do
+ * it tonight" may not. A bare retraction / minimisation is handled separately and never downgrades.
+ */
 export function isGenuineCorrection(text: string): boolean {
+  if (hasActiveCrisisSignal(text)) return false // contradicted by a concurrent signal → not genuine
   return GENUINE_CORRECTION.some((f) => p(text).includes(f))
 }
 
+/**
+ * A bare retraction / minimisation ("forget what I said", "I'm fine", "just give me the workout").
+ * By the state-resolution rule it NEVER clears an active protective state — it is not a genuine,
+ * credible, contextually-consistent correction (spec §2/§14). Recognising it explicitly lets the
+ * router log the distinction; the safety outcome (state persists) is the default either way.
+ */
 export function isBareRetraction(text: string): boolean {
   const t = p(text)
   return BARE_RETRACTION.some((f) => t.includes(f)) && !isGenuineCorrection(text)
@@ -37,6 +58,9 @@ export function isBareRetraction(text: string): boolean {
  * Re-evaluate a genuine contextual correction (spec §2/§18). Mutates the session to downgrade a
  * state only where the correction genuinely resolves it, and returns any replacement hits (e.g.
  * a first-person crisis that is actually about a roommate becomes a third-party case).
+ *
+ * Guarded by `isGenuineCorrection`, so a message that still carries a live crisis signal is NEVER
+ * downgraded here — most-protective wins on full context, and the state survives to the next turn.
  */
 export function correctionAdjust(session: SafetySession, text: string): DetectorHit[] {
   if (!isGenuineCorrection(text)) return []
@@ -64,6 +88,16 @@ export function stateHits(session: SafetySession, text: string, ctx: CoachContex
   // Crisis: not resumed by a bare retraction / minimisation (spec §2/§18 retraction rule).
   if (active.has('crisis') && !isGenuineCorrection(text)) {
     out.push({ category: 'crisis_concern', source: 'state', reason: 'crisis_state_persists' })
+  }
+  // Overdose / medical emergency (Jack §2): an acute disclosure must NOT be cleared by a later bare
+  // minimisation (a passing "I'm fine, ignore that"). It persists on ANY follow-up until a genuine
+  // correction on full context clears it — exactly the crisis rule. The overdose/emergency escalation
+  // in the router then re-derives the 000-vs-Poisons tier from the current turn's danger signals.
+  if (active.has('overdose') && !isGenuineCorrection(text)) {
+    out.push({ category: 'overdose_poisoning', source: 'state', reason: 'overdose_state_persists' })
+  }
+  if (active.has('emergency') && !isGenuineCorrection(text)) {
+    out.push({ category: 'medical_emergency', source: 'state', reason: 'emergency_state_persists' })
   }
   // Under-18: coach remains unavailable until age eligibility is resolved (cross-session).
   if (active.has('under_18')) out.push({ category: 'under_18', source: 'state', reason: 'under18_state_persists' })

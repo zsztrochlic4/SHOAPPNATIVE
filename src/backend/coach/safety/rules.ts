@@ -43,6 +43,15 @@ const has = (n: Norm, ...frags: string[]) => frags.some((f) => n.p.includes(` ${
 const hasRe = (n: Norm, re: RegExp) => re.test(n.p)
 const hit = (category: SafetyCategory, reason: string): DetectorHit => ({ category, source: 'rules', reason })
 
+/**
+ * "want to die" as a whole phrase — NOT inside "want to diet"/"dieting" (Jack round-2 §4 word
+ * boundary). `has` matches raw substrings, which is REQUIRED for stems ("hopeless"→"hopelessness",
+ * "injur"→"injured"), so the one crisis term with a benign-longer-word collision ("die" in "diet")
+ * is checked here with an explicit boundary and kept OUT of the substring CRISIS_IDEATION list. All
+ * other crisis matching keeps full substring recall — this narrows one false positive, nothing else.
+ */
+const wantsToDie = (n: Norm): boolean => hasRe(n, /\bwants? to die\b/)
+
 /* ------------------------------------------------------------------ */
 /*  Subject + negation helpers (I vs they, denials)                    */
 /* ------------------------------------------------------------------ */
@@ -61,8 +70,8 @@ export function isThirdParty(n: Norm): boolean {
 /** A bare denial of a crisis term (e.g. "I'm not suicidal") with no other crisis signal. */
 function negatedCrisisOnly(n: Norm): boolean {
   const denied = hasRe(n, /\b(not|isn t|aren t|never|no)\s+(feeling\s+)?(suicidal|going to hurt|self harm)/)
-  const otherSignal = has(n, 'hopeless', 'no point', 'want to die', 'end my life', 'kill myself',
-    'better off without', 'want to disappear', 'harm myself', 'hurt myself')
+  const otherSignal = has(n, 'hopeless', 'no point', 'end my life', 'kill myself',
+    'better off without', 'want to disappear', 'harm myself', 'hurt myself') || wantsToDie(n)
   return denied && !otherSignal
 }
 
@@ -79,7 +88,7 @@ function isWorkoutHyperbole(n: Norm): boolean {
 const CRISIS_IDEATION = ['hopeless', 'no point in anything', 'no point in living', 'don t see the point',
   'dont see the point', 'no point to anything', 'want to disappear', 'better off without me',
   'everyone would be better off', 'worthless', 'can t go on', 'cant go on', 'give up on everything',
-  'giving up on everything', 'want to die', 'wish i was dead', 'wish i wasn t here', 'don t want to live',
+  'giving up on everything', 'wish i was dead', 'wish i wasn t here', 'don t want to live',
   'dont want to live', 'don t want to be here', 'no reason to keep going', 'tired of living', 'end it all']
 
 const SELF_HARM = ['kill myself', 'killing myself', 'suicidal', 'take my own life', 'end my life',
@@ -94,10 +103,42 @@ const OTHER_HARM = ['kill himself', 'kill herself', 'kill themselves', 'kill the
   'end her life', 'hurt himself', 'hurt herself', 'harm himself', 'harm herself', 'going to kill himself',
   'going to kill herself']
 
+/** Whole-word first-person distress/intent — used to guard the topical suppressor so it can NEVER
+ *  hide a genuine disclosure that merely mentions an academic setting (Jack round-2 §3 critical guard). */
+function hasFirstPersonDistress(n: Norm): boolean {
+  return has(n, ...CRISIS_IDEATION) || wantsToDie(n) ||
+    has(n, 'kill myself', 'killing myself', 'take my own life', 'end my life', 'harm myself',
+      'hurt myself', 'cut myself', 'cutting myself', 'harming myself', 'self harming', 'i self harm',
+      'im suicidal', 'i m suicidal', 'feel suicidal', 'feeling suicidal', 'been suicidal') ||
+    has(n, ...OTHER_HARM)
+}
+
+/**
+ * A crisis/self-harm word appearing as the OBJECT OF STUDY/RESEARCH/WRITING, a topic label, or a
+ * named exercise drill — not a personal disclosure. Requires tight ADJACENCY between an academic
+ * verb/noun and the crisis term (or a topic-label suffix), so a genuine disclosure that merely
+ * mentions study ("I feel suicidal and can't focus on my thesis") is NOT caught. Suppress only when
+ * there is also no first-person distress. Generalises to any wording, not specific reported cases.
+ * (The normaliser maps "suicide" → "suicidal".)
+ */
+function isTopicalCrisisReference(n: Norm): boolean {
+  const drillName = has(n, 'suicidal sprint', 'suicidal sprints', 'suicidal drill', 'suicidal drills',
+    'suicidal run', 'suicidal runs', 'suicidal shuttle', 'suicidal shuttles')
+  // academic verb/noun immediately (within ~40 chars) followed by the crisis term
+  const studyOfTopic = hasRe(n,
+    /\b(research|researching|study|studying|studies|thesis|dissertation|essay|assignment|project|paper|degree|coursework|module|lecture|presentation|report|writing|analysing|analyzing|literature review)\b[a-z0-9 ]{0,40}\b(suicidal|self harm|self harming|eating disorder|eating disorders|anorexia|bulimia)\b/)
+  // crisis term immediately followed by a topic-label suffix
+  const topicLabel = hasRe(n,
+    /\b(suicidal|self harm|eating disorder|eating disorders)\b[a-z0-9 ]{0,25}\b(prevention|awareness|risk factor|risk factors|statistics|rates|campaign|in athletes|in sport|in sports|programme|program|module)\b/)
+  if (!drillName && !studyOfTopic && !topicLabel) return false
+  return !hasFirstPersonDistress(n)
+}
+
 function detectCrisis(n: Norm): DetectorHit[] {
-  if (isWorkoutHyperbole(n) && !has(n, ...CRISIS_IDEATION, ...SELF_HARM, ...OTHER_HARM)) return []
+  if (isWorkoutHyperbole(n) && !has(n, ...CRISIS_IDEATION, ...SELF_HARM, ...OTHER_HARM) && !wantsToDie(n)) return []
   if (negatedCrisisOnly(n)) return []
-  const anyCrisis = has(n, ...CRISIS_IDEATION) || has(n, ...SELF_HARM) || has(n, ...OTHER_HARM)
+  if (isTopicalCrisisReference(n)) return [] // named drill or academic topic, no personal distress
+  const anyCrisis = has(n, ...CRISIS_IDEATION) || wantsToDie(n) || has(n, ...SELF_HARM) || has(n, ...OTHER_HARM)
   if (!anyCrisis) return []
   if (isThirdParty(n)) return [hit('third_party_crisis', 'crisis_term_third_party')]
   if (has(n, ...IMMEDIATE)) return [hit('immediate_danger', 'self_harm_intent_now')]
@@ -180,6 +221,18 @@ function detectPregnancy(n: Norm): DetectorHit[] {
   if (!preg) return []
   const warning = has(n, 'bleeding', 'fluid leak', 'contractions', 'chest pain', 'dizzy', 'faint', 'fever',
     'severe pain', 'reduced movement', 'baby not moving')
+  // First-person vs third-party (Jack round-2 §1): the pregnancy RESTRICTION applies to the USER. If
+  // it is clearly SOMEONE ELSE who is pregnant (a partner, family member, or friend) and the user is
+  // not, don't apply the user restriction. A warning sign is still surfaced as an emergency (whoever
+  // it concerns). Guarded by an explicit first-person cue so a genuine disclosure is never dropped.
+  const thirdPartyPreg = hasRe(n,
+    /\b(my (partner|wife|husband|girlfriend|boyfriend|missus|friend|mate|sister|mum|mom|mother|daughter|colleague|room ?mate|housemate|flatmate|teammate)|a friend|someone)\b[a-z0-9 ]{0,20}\b(pregnant|pregnancy|expecting|gave birth|had a baby|postpartum)/)
+  const firstPersonPreg = has(n, 'im pregnant', 'i m pregnant', 'i am pregnant', 'my pregnancy', 'im expecting',
+    'i gave birth', 'i had my baby', 'my baby', 'weeks pregnant', 'since i gave birth', 'my c section',
+    'my caesarean', 'after i gave birth', 'im postpartum', 'im postnatal')
+  if (thirdPartyPreg && !firstPersonPreg) {
+    return warning ? [hit('medical_emergency', 'third_party_pregnancy_warning')] : []
+  }
   if (warning) return [hit('medical_emergency', 'pregnancy_warning_sign'), hit('pregnancy', 'pregnancy_disclosed')]
   return [hit('pregnancy', 'pregnancy_disclosed')]
 }
@@ -332,6 +385,46 @@ export function runRules(text: string, _ctx: CoachContext): DetectorHit[] {
 export function isKnownFalsePositive(text: string): boolean {
   const n = normalize(text)
   return isWorkoutHyperbole(n) || negatedCrisisOnly(n)
+}
+
+/**
+ * True if the message itself carries an active crisis / self-harm signal, using ONLY the existing
+ * detector lexicons (no new phrases). The state machine uses this so a correction/retraction can
+ * never downgrade a protective state while the SAME message still asserts a crisis — "most
+ * protective wins on full context" (spec §2). This is routing/precedence, not new detection.
+ */
+export function hasActiveCrisisSignal(text: string): boolean {
+  const n = normalize(text)
+  if (isWorkoutHyperbole(n) && !has(n, ...CRISIS_IDEATION, ...SELF_HARM, ...OTHER_HARM) && !wantsToDie(n)) return false
+  if (negatedCrisisOnly(n)) return false
+  return has(n, ...CRISIS_IDEATION) || wantsToDie(n) || has(n, ...SELF_HARM) || has(n, ...OTHER_HARM)
+}
+
+/**
+ * Generic IMMEDIACY modifier (spec §3 "active intent with immediacy → emergency"). Deliberately a
+ * small set of general time/intent adverbs — NOT any specific reported sentence — so the router can
+ * escalate an already-detected crisis category to the 000 tier when immediacy is present. Precedence
+ * logic over detected categories, not a new hazard detector.
+ */
+export function hasImmediacy(text: string): boolean {
+  const n = normalize(text)
+  // Intent-immediacy only. Deliberately NOT the bare adverbs "now"/"today", which fire on benign
+  // context ("I'm safe now"); we require an explicit imminence phrase so the escalation can't
+  // over-fire on incidental wording.
+  return hasRe(n, /\b(right now|tonight|this (minute|second|moment|evening)|about to|going to|gonna|planning to|plan to|have a plan)\b/)
+}
+
+/**
+ * True if the message indicates the user is OUTSIDE Australia (or their location is unknown), as a
+ * general concept — not a specific reported sentence. The guard uses this to serve local-services
+ * emergency wording instead of assuming AU 000, since device timezone alone can be wrong (Jack §3).
+ * Over-triggering is safe: "contact your local emergency services" is correct advice anywhere.
+ */
+export function indicatesNonAustralia(text: string): boolean {
+  const n = normalize(text)
+  return has(n, 'overseas', 'abroad', 'not in australia', 'not in au', 'outside australia', 'another country',
+    'different country', 'in the uk', 'in england', 'in the us', 'in america', 'in canada', 'in ireland',
+    'new zealand', 'in europe', 'location unknown', 'location is unknown', 'dont know where i am', 'don t know where i am')
 }
 
 /** Exposed for the classifier stub: is there ANY safety-adjacent token at all? */

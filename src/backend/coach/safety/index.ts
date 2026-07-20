@@ -14,9 +14,19 @@
  */
 
 import type { CoachContext, FixedResponse, GuardOutcome, SafetyDecision, SafetySession } from './types'
-import { route } from './router'
+import { route, routeAsync } from './router'
 import { validateOutgoing } from './validator'
+import { indicatesNonAustralia } from './rules'
 import { localizedResponse, localizedServiceUnavailable } from './responses'
+
+/**
+ * Effective locale for the RESPONSE (Jack §3). Device timezone (`ctx.isAustralia`) can be wrong when
+ * a user says they're overseas / location unknown, so a message-level non-AU signal downgrades to
+ * local-services wording. Only ever makes an emergency referral MORE generic (never less safe).
+ */
+function effectiveAustralia(ctx: CoachContext, text: string): boolean {
+  return ctx.isAustralia && !indicatesNonAustralia(text)
+}
 import { ageEligibility } from './engineBridge'
 import { recordSafetyEvent } from './safetyAnalytics'
 import { withinDailyLimit, dailyLimitResponse, type CoachUsage } from './dailyLimit'
@@ -25,6 +35,7 @@ export { newSafetySession } from './types'
 export type { CoachContext, SafetySession, SafetyDecision, GuardOutcome, FixedResponse, ContactButton } from './types'
 export { serviceUnavailable } from './responses'
 export { activeClassifier } from './classifier'
+export { setClassifierTransport, hasClassifierTransport, type ClassifierTransport } from './llmClassifier'
 export { coachKillSwitchEngaged } from './killSwitch'
 export { weeklySafetySummary, ANALYTICS_ACTIVE } from './safetyAnalytics'
 export { DAILY_COACH_LIMIT, type CoachUsage } from './dailyLimit'
@@ -32,21 +43,48 @@ export { loadSession, persistSession, clearState, PERSISTENCE_ACTIVE } from './o
 
 /** Lower-level guard: safety only (no rate limit). Both paths reach this via coachPrecheck. */
 export function guardIncoming(text: string, ctx: CoachContext, session: SafetySession): GuardOutcome {
+  const au = effectiveAustralia(ctx, text)
   try {
     const decision = route(text, ctx, session)
     recordSafetyEvent(decision.category) // content-free aggregate; no-op while dormant (spec §20)
     if (decision.action === 'allow') return { outcome: 'allow', decision }
     if (decision.action === 'service_unavailable') {
-      return { outcome: 'block', decision, response: localizedServiceUnavailable(ctx.isAustralia) }
+      return { outcome: 'block', decision, response: localizedServiceUnavailable(au) }
     }
-    return { outcome: 'block', decision, response: localizedResponse(decision.responseKey, ctx.isAustralia) }
+    return { outcome: 'block', decision, response: localizedResponse(decision.responseKey, au) }
   } catch {
     // Classification unavailable → neutral service-unavailable + crisis options. Never the menu.
     const decision: SafetyDecision = {
       category: 'none', tier: -1, action: 'service_unavailable', responseKey: null,
       allowCoaching: false, hits: [], reason: 'guard_threw',
     }
-    return { outcome: 'block', decision, response: localizedServiceUnavailable(ctx.isAustralia) }
+    return { outcome: 'block', decision, response: localizedServiceUnavailable(au) }
+  }
+}
+
+/**
+ * Async guard — same contract as `guardIncoming`, but detection uses the LLM classifier via
+ * `routeAsync` with `recent` conversation context. Both live coach paths reach this through
+ * `coachPrecheckAsync`. Fails safe to service-unavailable on any error.
+ */
+export async function guardIncomingAsync(
+  text: string, ctx: CoachContext, session: SafetySession, recent: string[] = [],
+): Promise<GuardOutcome> {
+  const au = effectiveAustralia(ctx, text)
+  try {
+    const decision = await routeAsync(text, ctx, session, recent)
+    recordSafetyEvent(decision.category) // content-free aggregate; no-op while dormant (spec §20)
+    if (decision.action === 'allow') return { outcome: 'allow', decision }
+    if (decision.action === 'service_unavailable') {
+      return { outcome: 'block', decision, response: localizedServiceUnavailable(au) }
+    }
+    return { outcome: 'block', decision, response: localizedResponse(decision.responseKey, au) }
+  } catch {
+    const decision: SafetyDecision = {
+      category: 'none', tier: -1, action: 'service_unavailable', responseKey: null,
+      allowCoaching: false, hits: [], reason: 'guard_threw',
+    }
+    return { outcome: 'block', decision, response: localizedServiceUnavailable(au) }
   }
 }
 
@@ -77,6 +115,21 @@ export function coachPrecheck(
   usage: CoachUsage | undefined, todayKey: string,
 ): CoachPrecheck {
   const g = guardIncoming(text, ctx, session)
+  if (g.outcome === 'block') return { kind: 'block', response: g.response, decision: g.decision }
+  if (!withinDailyLimit(usage, todayKey)) return { kind: 'limit', response: dailyLimitResponse() }
+  return { kind: 'allow', decision: g.decision }
+}
+
+/**
+ * Async precheck — identical order and guarantees to `coachPrecheck`, but detection runs the LLM
+ * classifier (with `recent` context). This is the entry BOTH live coach paths use so enforcement is
+ * identical; a safety block is still never gated by the daily limit, and it still fails safe.
+ */
+export async function coachPrecheckAsync(
+  text: string, ctx: CoachContext, session: SafetySession,
+  usage: CoachUsage | undefined, todayKey: string, recent: string[] = [],
+): Promise<CoachPrecheck> {
+  const g = await guardIncomingAsync(text, ctx, session, recent)
   if (g.outcome === 'block') return { kind: 'block', response: g.response, decision: g.decision }
   if (!withinDailyLimit(usage, todayKey)) return { kind: 'limit', response: dailyLimitResponse() }
   return { kind: 'allow', decision: g.decision }

@@ -92,6 +92,8 @@ export type PersistentState =
   | 'medical_condition'
   | 'under_18'
   | 'disordered_eating'
+  | 'overdose'
+  | 'emergency'
 
 /** Which categories set a persistent state, and whether that state crosses sessions. */
 export const PERSISTENT_FOR: Partial<Record<SafetyCategory, PersistentState>> = {
@@ -103,6 +105,11 @@ export const PERSISTENT_FOR: Partial<Record<SafetyCategory, PersistentState>> = 
   medical_condition: 'medical_condition',
   under_18: 'under_18',
   disordered_eating: 'disordered_eating',
+  // Acute safety states persist for the conversation and are NOT cleared by a bare minimisation —
+  // only the router's genuine-correction logic can clear them (spec §2/§14; Jack §2).
+  overdose_poisoning: 'overdose',
+  medical_emergency: 'emergency',
+  harm_to_others: 'emergency',
 }
 
 /** States that persist ACROSS sessions until an appropriate resolution (spec §2). */

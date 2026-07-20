@@ -23,7 +23,7 @@ import { nextSetRecommendation } from '../store/training'
 import { coachThreadView } from '../store/coach'
 import { CHAT_SUGGESTIONS, coachReply } from '../lib/coachChat'
 import { askCoach } from '../lib/coachApi'
-import { coachContext, coachOperational, coachPrecheck, guardOutgoing, newSafetySession } from '../lib/coachSafety'
+import { coachContext, coachOperational, coachPrecheckAsync, guardOutgoing, newSafetySession } from '../lib/coachSafety'
 import { SafetyContactButtons } from '../components/SafetyContactButtons'
 import { CoachComingSoon } from '../components/CoachComingSoon'
 import { todaySession, leaderboardSorted, youRank } from '../store/selectors'
@@ -415,7 +415,9 @@ export function CoachChatSheet({ open, onClose }: Props) {
     // gated by the daily limit), then the limit — enforcing identically on the live-AI and fallback
     // paths (spec §2/§7/§21). A blocked message reaches neither the model nor the rules engine.
     const ctx = coachContext(state)
-    const pre = coachPrecheck(msg, ctx, safety.current, state.coachUsage, todayKey)
+    // Recent prior turns give the classifier multi-turn context (state.chat is pre-this-message here).
+    const recent = state.chat.slice(-6).map((m) => m.text)
+    const pre = await coachPrecheckAsync(msg, ctx, safety.current, state.coachUsage, todayKey, recent)
     if (pre.kind !== 'allow') {
       dispatch({ type: 'PUSH_CHAT', role: 'coach', text: pre.response.text, buttons: pre.response.buttons })
       return

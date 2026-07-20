@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { todayKey } from '../lib/date'
 import { buildSeed, emptyState, SCHEMA_VERSION } from './seed'
 import { coachReply } from '../lib/coachChat'
-import { coachContext, coachOperational, coachPrecheck, guardOutgoing, newSafetySession } from '../lib/coachSafety'
+import { coachContext, coachOperational, coachPrecheck, guardOutgoing, sharedCoachSession } from '../lib/coachSafety'
 import type { ContactButton } from '../backend/coach/safety'
 import type {
   AppNotification,
@@ -239,10 +239,10 @@ function reducer(state: AppState, action: Action): AppState {
       // Coach gated OFF: record the user's message but produce no coach reply.
       if (!coachOperational()) return { ...state, chat: [...state.chat, userMsg] }
       // SAFETY: same shared source as the 1:1 chat (spec §7) — the safety guard runs first, then the
-      // daily message limit (which never blocks a crisis). Stateless per message here; multi-message
-      // persistence lives in the chat surface's own retained session.
+      // daily message limit (which never blocks a crisis). Uses the retained in-memory session so
+      // multi-turn persistence + retraction are enforced identically to the chat surfaces (spec §2).
       const ctx = coachContext(state)
-      const session = newSafetySession()
+      const session = sharedCoachSession()
       const pre = coachPrecheck(text, ctx, session, state.coachUsage, todayKey)
       const replyText = pre.kind !== 'allow'
         ? pre.response.text
