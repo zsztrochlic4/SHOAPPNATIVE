@@ -265,7 +265,24 @@ function AuthGate() {
   )
 }
 
+/**
+ * DEV-ONLY safety-holdout validation harness. Guarded two ways so it can NEVER ship:
+ *   1. `__DEV__` — false in any release/App-Store build; Metro's minifier constant-folds this
+ *      branch away, so the `require` (and the entire src/dev tree) is dropped from production bundles.
+ *   2. `EXPO_PUBLIC_SAFETY_HARNESS === '1'` — off unless explicitly set, so it never appears in a
+ *      normal dev session either.
+ * It measures the classifier only; it does not enable the coach or change the gate.
+ */
+function DevSafetyHarnessGate(): React.ReactElement | null {
+  if (!__DEV__ || process.env.EXPO_PUBLIC_SAFETY_HARNESS !== '1') return null
+  const { SafetyHarnessScreen } = require('./dev/SafetyHarnessScreen')
+  return <SafetyHarnessScreen />
+}
+
 export default function App() {
+  const devHarness = DevSafetyHarnessGate()
+  if (devHarness) return devHarness
+
   return (
     <WebPreviewFrame>
       <SafeAreaProvider>
