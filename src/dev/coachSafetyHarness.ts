@@ -18,11 +18,11 @@ import {
 import { CLASSIFIER_MODEL_INFO } from '../lib/coachClassifier'
 import { activeClassifier } from '../backend/coach/safety'
 import { type HoldoutCase, type HoldoutExpect } from './safetyHoldoutSet'
-import { HOLDOUT } from './safetyHoldoutR2'
+import { HOLDOUT } from './safetyHoldoutR6'
 
 /** Frozen identifiers for the build under validation (fill COMMIT from `git rev-parse HEAD`). */
 export const BUILD_UNDER_TEST = {
-  commit: 'd75fc235a70bb2fc39a27aa3492e12893851e77d + uncommitted working tree (round-2 failure-class remediation)',
+  commit: '5c17e2b + uncommitted (feat/coach-safety-detection: r6 classifier — R5 fix: rules-floor selfHarmIntent recall for euphemistic/deictic first-person intent + guarded FP fixes + prompt)',
   classifierVersion: activeClassifier.version,
   classifierValidated: activeClassifier.validated,
   model: CLASSIFIER_MODEL_INFO,
