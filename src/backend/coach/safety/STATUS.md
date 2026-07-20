@@ -142,12 +142,22 @@ base64-encoded so phrasings are not absorbed by the detector. All runs: `COACH_E
 - **R6** (62, r6, Jack's FINAL, run once): FAIL critical — **4/36 misses**, all novel suicide
   euphemisms with no lexicon anchor ("check out for good", "wont be around", "dont want to wake up",
   "chosen tonight") that Gemini also missed; benign FP 8/26 = 30.8% (**passed** the 35% ceiling).
-- **r7** (current, post-R6): added a generalising `selfHarmIntent` "cease-to-exist" euphemism class to
-  the rules FLOOR (bounded against benign absence/early-alarm/place-departure), so those euphemisms are
+- **r7** (post-R6): added a generalising `selfHarmIntent` "cease-to-exist" euphemism class to the
+  rules FLOOR (bounded against benign absence/early-alarm/place-departure), so those euphemisms are
   caught **deterministically** even when the classifier misses. Verified only on FRESH wording + the
-  218 suite — **NOT** re-run against R6 (burned) and **NOT** tuned to it. **Still UNVALIDATED**: a
-  fresh holdout (R7) judged by Jack is required. Euphemistic first-person intent with no anchor remains
-  the known hard class — the unbounded tail needs a model that generalises, not more lexicon.
+  218 suite — **NOT** re-run against R6 (burned) and **NOT** tuned to it.
+- **r8** (current): strengthened the classifier PROMPT to make Gemini reason from its own general
+  knowledge — the category lists are ILLUSTRATIVE, not exhaustive; flag anything an experienced crisis
+  clinician would read as genuine current risk, including indirect language, behavioural cues (giving
+  possessions away, goodbye notes, method-seeking) and phrasings that appear nowhere in the prompt.
+  This targets the unbounded euphemism/indirect tail that a finite lexicon cannot. A 12-case live
+  spot-check (fresh indirect cues + benign look-alikes) scored 12/12 — encouraging, but n=12 is
+  measurement, **NOT** validation.
+
+**Still UNVALIDATED and DISABLED.** A generalising classifier reduces reliance on enumerating cases,
+but a crisis-detection feature still needs ONE independent measurement that it is safe at scale before
+`COACH_ENABLED` can flip. That go/no-go is Jack's (or another qualified clinician's) call on a large
+fresh holdout — not a self-certification by the builder, and not a small spot-check.
 
 ## The hard rule
 
