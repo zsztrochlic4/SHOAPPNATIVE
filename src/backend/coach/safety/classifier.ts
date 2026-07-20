@@ -64,7 +64,7 @@ export const stubClassifier: SafetyClassifier = {
  * test is out of bounds.
  */
 export const activeClassifier: SafetyClassifier = {
-  version: 'llm-detect-r3 (UNVALIDATED)',
+  version: 'llm-detect-r7 (UNVALIDATED)',
   validated: false,
   classify: stubClassifier.classify,
   classifyAsync: llmClassify,

@@ -38,9 +38,13 @@ const GENUINE_CORRECTION = ['i meant', 'i mean my', 'i mean because', 'i meant b
  * match: "I was quoting a song" with no live signal may re-evaluate; "I'm quoting… I'm going to do
  * it tonight" may not. A bare retraction / minimisation is handled separately and never downgrades.
  */
+/** The general clarification pattern "I mean/meant [X]" or "by X I mean [Y]" — a later message that
+ *  reattributes the earlier one to a benign meaning. Gated below by the residual-signal check. */
+const CLARIFY_RE = /\b(i mean|i meant|by (it|that) i mean|what i mean(t)? (is|was)|meaning)\b/
+
 export function isGenuineCorrection(text: string): boolean {
   if (hasActiveCrisisSignal(text)) return false // contradicted by a concurrent signal → not genuine
-  return GENUINE_CORRECTION.some((f) => p(text).includes(f))
+  return GENUINE_CORRECTION.some((f) => p(text).includes(f)) || CLARIFY_RE.test(p(text))
 }
 
 /**

@@ -12,7 +12,7 @@
  * the stub fails safe (classifier.ts), so borderline input still escalates.
  */
 
-import type { CoachContext, DetectorHit, SafetyCategory } from './types'
+import type { CoachContext, DetectorHit, SafetyCategory, Suppression } from './types'
 
 export interface Norm {
   /** lowercased, punctuation→space, whitespace-collapsed, space-padded. */
@@ -103,6 +103,70 @@ const OTHER_HARM = ['kill himself', 'kill herself', 'kill themselves', 'kill the
   'end her life', 'hurt himself', 'hurt herself', 'harm himself', 'harm herself', 'going to kill himself',
   'going to kill herself']
 
+/**
+ * Euphemistic / deictic first-person present intent to end one's life, carrying NO explicit
+ * "kill"/"suicide"/means token — the gap Jack R5 §1 exposed: the paramount guard PRESERVED such a
+ * signal, but nothing GENERATED a hit, so the rules floor (and a missing classifier) let it through.
+ * Bounded to first-person volition + an end-of-life object ("want/going to end it/things/my life"),
+ * OR a deictic self-reveal ("i mean me", "it's about me", "not quoting") sitting beside an ending /
+ * method idiom — so ordinary "let's end it here", "ending things with my ex", or "going to do it
+ * tonight" (the workout) do NOT match without that self-harm framing. `immediate` is set only when the
+ * intent already fired AND an explicit imminence marker is present, so gating "today"/"tonight" here
+ * is safe (it escalates an existing self-harm hit, never benign wording). Generalises to phrasing,
+ * not to any specific reported case.
+ */
+function selfHarmIntent(n: Norm): { hit: boolean; immediate: boolean } {
+  // A RELATIONAL or occupational object means "end/finish things" is a break-up or a work/day
+  // wrap-up, NOT self-harm ("ending things with my ex", "finishing things at work / for the day").
+  const relationalEnd = hasRe(n, /\b(end|ending|finish|finishing)\s+(it|things|everything)\s+(with|at work|at the office|at uni|for the day|here)\b/)
+  const lifeIntent = !relationalEnd && (
+    hasRe(n, /\b(want|wanna|need|going|gonna|ready|about|decided|have|planning|trying)\s+to\s+(end|finish)\s+(it|it all|things|my life|everything)\b/) ||
+    hasRe(n, /\b(im|i m|i am)\s+(ending|finishing|going to end|about to end)\s+(it|it all|things|my life|everything)\b/))
+
+  // Euphemisms for ceasing to exist / to live, in the FIRST PERSON. These carry no explicit
+  // "kill"/"suicide"/means token, so nothing else generates a hit (Jack R6 §B1 misses: "check out for
+  // good", "wont be around after tonight", "dont want to wake up"). Bounded by three benign guards so
+  // ordinary talk does NOT match: future ABSENCE ("wont be around next week, travelling"), an early
+  // ALARM ("dont want to wake up early for the gym"), and DEPARTURE from a place/activity ("gone for
+  // good from this gym, moving cities"). Generalises to the euphemism class, not to any one phrasing.
+  const benignAbsence = hasRe(n, /\b(be around|be here|be back|around|here|away|be in|be on|be at)\b[a-z0-9 ]{0,18}\b(next week|next month|for a while|for a bit|this weekend|next weekend|on weekends|on the weekend|over the weekend|travelling|traveling|on holiday|on vacation|for work|for a few days|a few days|back on|tomorrow morning|later today|for the trip|much this)\b/)
+  const benignWake = hasRe(n, /\bwake up\b[a-z0-9 ]{0,12}\b(early|earlier|at \d|for the gym|for training|for work|in time|on time|refreshed|before)\b/)
+  const benignDeparture = hasRe(n, /\b(gone|leaving|left|check(ing)? out|checked out|done|quit|quitting|moving)\b[a-z0-9 ]{0,25}\b(from (here|this|the)|the gym|this gym|this club|this app|this place|this program|another gym|new gym|for the season|for the year|to (a )?new|cities|overseas|abroad|interstate)\b/)
+  const notExist =
+    (!benignWake && has(n, 'dont want to wake up', 'do not want to wake up', 'never want to wake up',
+      'never wake up', 'not going to wake up', 'wont wake up', 'just not wake up')) ||
+    has(n, 'wont see tomorrow', 'not see tomorrow', 'wont make it to tomorrow', 'not make it to tomorrow',
+      'not be here anymore', 'wont be here anymore', 'not be around anymore', 'wont be around anymore') ||
+    (!benignDeparture && has(n, 'check out for good', 'checking out for good', 'cash it in for good',
+      'be gone for good', 'gone for good', 'slip away for good')) ||
+    (!benignAbsence &&
+      has(n, 'wont be around', 'will not be around', 'not be around', 'wont be here', 'will not be here', 'not be here') &&
+      (has(n, 'for good', 'forever', 'permanently', 'for the last time', 'after tonight', 'after today', 'anymore') ||
+        hasRe(n, /\b(ive|i ve|i have)\s+(decided|chosen|made up my mind|made my decision)\b/)))
+
+  // Deictic self-reveal ("i mean ME", "it's about me") that turns a prior fiction/quote into the user
+  // themselves, beside an ending/method idiom OR a decision-to-act-now. "i mean it" is deliberately
+  // EXCLUDED — too benign-collision-prone with emphatic gym talk ("i mean it, doing it tonight").
+  const strongReveal = has(n, 'i mean me', 'i mean myself', 'its about me', 'it s about me', 'about me now',
+    'not quoting', 'im the one', 'i m the one', 'this is about me', 'talking about myself')
+  const endingOrMethod = has(n, 'end it', 'ending it', 'end things', 'ending things', 'go through with it',
+    'going through with it', 'going thru with it', 'the pills', 'took the pills', 'taken the pills',
+    'swallowed them all', 'step off', 'off the bridge') || wantsToDie(n)
+  const decisionImminent =
+    hasRe(n, /\b(ive|i ve|i have)\s+(chosen|decided|picked (the time|tonight|the day)|set a date|made up my mind|made my decision)\b/) &&
+    hasRe(n, /\b(tonight|today|this (evening|minute|moment)|after this|after tonight|right now|now)\b/)
+  const revealIntent = strongReveal && (endingOrMethod || decisionImminent)
+
+  const hit = lifeIntent || revealIntent || notExist
+  // Escalate to 000 only with a self-reveal, a decision-to-act-now, or an explicit finality/method
+  // marker — so a VAGUE euphemism floors at Lifeline, not an over-aggressive 000.
+  const finality = has(n, 'it all', 'my life', 'everything', 'for good', 'once and for all', 'for the last time',
+    'after tonight', 'after today', 'the pills', 'took the pills', 'taken the pills', 'step off', 'off the bridge') || wantsToDie(n)
+  const imminence = hasRe(n, /\b(tonight|today|right now|this (evening|minute|moment)|after this|after tonight|for good|once and for all|doing it now|do it now)\b/)
+  const immediate = hit && imminence && (revealIntent || decisionImminent || finality)
+  return { hit, immediate }
+}
+
 /** Whole-word first-person distress/intent — used to guard the topical suppressor so it can NEVER
  *  hide a genuine disclosure that merely mentions an academic setting (Jack round-2 §3 critical guard). */
 function hasFirstPersonDistress(n: Norm): boolean {
@@ -110,7 +174,7 @@ function hasFirstPersonDistress(n: Norm): boolean {
     has(n, 'kill myself', 'killing myself', 'take my own life', 'end my life', 'harm myself',
       'hurt myself', 'cut myself', 'cutting myself', 'harming myself', 'self harming', 'i self harm',
       'im suicidal', 'i m suicidal', 'feel suicidal', 'feeling suicidal', 'been suicidal') ||
-    has(n, ...OTHER_HARM)
+    has(n, ...OTHER_HARM) || selfHarmIntent(n).hit
 }
 
 /**
@@ -138,10 +202,11 @@ function detectCrisis(n: Norm): DetectorHit[] {
   if (isWorkoutHyperbole(n) && !has(n, ...CRISIS_IDEATION, ...SELF_HARM, ...OTHER_HARM) && !wantsToDie(n)) return []
   if (negatedCrisisOnly(n)) return []
   if (isTopicalCrisisReference(n)) return [] // named drill or academic topic, no personal distress
-  const anyCrisis = has(n, ...CRISIS_IDEATION) || wantsToDie(n) || has(n, ...SELF_HARM) || has(n, ...OTHER_HARM)
+  const shi = selfHarmIntent(n)
+  const anyCrisis = has(n, ...CRISIS_IDEATION) || wantsToDie(n) || has(n, ...SELF_HARM) || has(n, ...OTHER_HARM) || shi.hit
   if (!anyCrisis) return []
   if (isThirdParty(n)) return [hit('third_party_crisis', 'crisis_term_third_party')]
-  if (has(n, ...IMMEDIATE)) return [hit('immediate_danger', 'self_harm_intent_now')]
+  if (has(n, ...IMMEDIATE) || shi.immediate) return [hit('immediate_danger', 'self_harm_intent_now')]
   return [hit('crisis_concern', 'crisis_ideation_or_self_harm')]
 }
 
@@ -172,10 +237,16 @@ function detectMedicalEmergency(n: Norm): DetectorHit[] {
 }
 
 function detectOverdose(n: Norm): DetectorHit[] {
-  const tookTooMuch = hasRe(n, /\b(took|taken|had|swallowed)\b.*\b(too many|too much|a lot of|loads of|overdose)/) ||
-    has(n, 'overdosed', 'overdose', 'poisoned')
+  // Too-much / mixing / large-quantity ingestion wording (generalised — Jack R4-2D10: "mixed several
+  // stimulants", "took many", "a handful", "a whole box", "double the dose" all read as overdose).
+  const tookTooMuch =
+    hasRe(n, /\b(took|taken|had|swallowed|necked|downed)\b[a-z0-9 ]{0,25}\b(too many|too much|a lot of|lots of|loads of|a load of|overdose|a handful|handful of|a whole|a box|a bunch|a heap|large amount|large handful|way more|double|many of|all my|all of my|all of them|the whole lot|the lot)\b/) ||
+    hasRe(n, /\b(mixed|mixing|combined|stacked|took|taken)\b[a-z0-9 ]{0,25}\b(several|multiple|a few|a load|loads|a bunch|different|too many|lots)\b/) ||
+    hasRe(n, /\b(took|swallowed|had)\b[a-z0-9 ]{0,20}\bmany\b/) ||
+    has(n, 'overdosed', 'overdose', 'poisoned', 'double my', 'double the dose', 'twice the dose', 'exceeded the dose')
   const substance = has(n, 'fat burner', 'fat burners', 'caffeine', 'preworkout', 'pre workout', 'pills',
-    'tablets', 'supplement', 'supplements', 'medication', 'paracetamol', 'ibuprofen', 'panadol', 'creatine')
+    'tablets', 'supplement', 'supplements', 'stimulant', 'stimulants', 'medication', 'medicine', 'meds',
+    'paracetamol', 'ibuprofen', 'panadol', 'creatine', 'capsules', 'tablet', 'pill')
   if ((tookTooMuch && substance) || has(n, 'overdosed', 'i overdose'))
     return [hit('overdose_poisoning', 'possible_overdose')]
   return []
@@ -364,10 +435,190 @@ function detectCatchAll(n: Norm): DetectorHit[] {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Public: run all detectors                                          */
+/*  Cross-category SUPPRESSION scoping (Jack round-3 approved spec)     */
+/*                                                                      */
+/*  Reduces contextual false positives WITHOUT lowering critical        */
+/*  recall. A suppression fires only when the trigger is clearly        */
+/*  third-party / historical / negated / topical AND there is no        */
+/*  CURRENT first-person disclosure of that category. Uncertainty is    */
+/*  never benign — when unclear the flag is RETAINED. Every suppression */
+/*  is logged so each no-flag decision is auditable.                    */
 /* ------------------------------------------------------------------ */
 
-export function runRules(text: string, _ctx: CoachContext): DetectorHit[] {
+const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/** A present first-person symptom term (used by the current-disclosure guards). */
+const PRESENT_SYMPTOM = ['chest pain', 'cant breathe', 'can t breathe', 'trouble breathing', 'bleeding',
+  'vomiting', 'throwing up', 'dizzy', 'faint', 'collapsed', 'passed out', 'drowsy', 'slurred', 'swelling',
+  'swollen', 'numb', 'seizure', 'shaky', 'confused', 'passing out', 'sharp pain', 'stabbing pain']
+
+/** Is this specific term negated (a denial within a short span before it)? Allows a plural suffix so
+ *  "no heart problems" negates the singular term "heart problem". */
+function termNegated(n: Norm, t: string): boolean {
+  return hasRe(n, new RegExp(`\\b(no|not|never|dont|don t|didnt|did not|havent|haven t|isnt|isn t|am not|im not|i m not|do not have|dont have|without any|free of)\\b[a-z0-9 ]{0,12}\\b${esc(t)}(s|es)?\\b`))
+}
+/** A denial immediately governing one of `terms` (e.g. a denied condition or symptom). */
+function negatedTerm(n: Norm, terms: string[]): boolean {
+  return terms.some((t) => termNegated(n, t))
+}
+/** True if ANY of `terms` is present AND NOT itself negated — a real, un-denied symptom. Used so a
+ *  denied term can never suppress a DIFFERENT present symptom stated in the same message. */
+function unnegatedSymptom(n: Norm, terms: string[]): boolean {
+  return terms.some((t) => has(n, t) && !termNegated(n, t))
+}
+
+const RELATION = '(son|daughter|kid|child|children|boy|girl|brother|sister|sibling|mum|mom|mother|dad|father|parent|grandparent|grandma|grandpa|grandson|granddaughter|grandchild|nan|pop|partner|wife|husband|girlfriend|boyfriend|missus|fiance|fiancee|friend|mate|buddy|roommate|room mate|housemate|flatmate|teammate|team mate|colleague|coworker|co worker|coach|trainer|client|cousin|nephew|niece|aunt|uncle|neighbour|neighbor)'
+
+/** The attribute (`terms`) clearly belongs to ANOTHER person and the user is not self-attributing it. */
+function subjectThirdParty(n: Norm, terms: string[]): boolean {
+  const grp = `(${terms.map(esc).join('|')})`
+  // Allow up to two adjectives between "my" and the relation ("my teenage niece", "my older brother").
+  // Match the attribute AFTER the relation ("my niece is 15"), or as an adjective BEFORE it
+  // ("my teenage niece"), or attributed to another person via a pronoun.
+  const linked = hasRe(n, new RegExp(`\\bmy (?:[a-z]+ ){0,2}${RELATION}\\b[a-z0-9 ]{0,30}\\b${grp}\\b`)) ||
+    hasRe(n, new RegExp(`\\bmy (?:[a-z]+ ){0,2}${grp}\\b[a-z0-9 ]{0,2}\\b${RELATION}\\b`)) ||
+    hasRe(n, new RegExp(`\\b(he|she|they|his|her|their|hers|theirs)\\b[a-z0-9 ]{0,20}\\b${grp}\\b`))
+  if (!linked) return false
+  const selfAttr = hasRe(n, new RegExp(`\\b(i|im|i m|i am|i ve|ive|i have|i had|i take|i took|i use|my own)\\b[a-z0-9 ]{0,20}\\b${grp}\\b`))
+  return !selfAttr
+}
+
+/** Clearly resolved, past-tense reference with no present-tense signal. */
+function historicalResolved(n: Norm): boolean {
+  const past = has(n, 'years ago', 'a year ago', 'last year', 'a decade ago', 'decade ago', 'used to', 'back then',
+    'in the past', 'previously', 'when i was', 'as a teenager', 'as a kid', 'growing up', 'a while ago', 'long ago',
+    'five years ago', 'two years ago', 'ago and', 'at school', 'in school', 'back in school', 'in high school',
+    'in my teens', 'in my twenties', 'in my thirties', 'when younger', 'when i was younger', 'as a student', 'years back')
+  const resolved = has(n, 'recovered', 'fully recovered', 'have recovered', 'am better', 'im better', 'no longer',
+    'dont anymore', 'don t anymore', 'not anymore', 'medically cleared', 'was cleared', 'been cleared', 'am safe now',
+    'im safe now', 'safe now', 'im fine now', 'am fine now', 'do not use them now', 'dont use them now', 'no longer take',
+    'but do not use', 'and have recovered', 'and was medically cleared', 'resolved', 'all good now', 'all clear',
+    'no problems since', 'no issues since', 'no issue since', 'no trouble since', 'have stopped', 'stopped',
+    'quit', 'off it now', 'off them now', 'cleared up', 'went away', 'sorted now', 'fine since', 'fine ever since')
+  const presentSignal = has(n, 'still', 'currently', 'right now', 'these days', 'nowadays', 'again now', 'now i') ||
+    has(n, ...PRESENT_SYMPTOM) || hasFirstPersonDistress(n) || wantsToDie(n)
+  return past && resolved && !presentSignal
+}
+
+/** Academic / research / quoted / news / hypothetical framing (general, cross-category). */
+function topicalFrame(n: Norm): boolean {
+  return has(n, 'research', 'researching', 'studying', 'studies', 'thesis', 'dissertation', 'essay', 'assignment',
+    'project', 'coursework', 'lecture', 'presentation', 'literature review', 'my degree', 'my class', 'my course',
+    'my unit', 'for class', 'for uni', 'for university', 'for school', 'case study', 'case studies',
+    'poster', 'reading about', 'statistics for', 'for an essay', 'news story', 'article', 'documentary', 'a quote',
+    'a lyric', 'quoting', 'hypothetical', 'in a movie', 'in a book', 'for a project', 'writing a report on', 'covers')
+}
+
+/** A present FIRST-PERSON disclosure of `category` — if present, that category is NEVER suppressed. */
+function firstPersonPresent(n: Norm, category: SafetyCategory): boolean {
+  switch (category) {
+    case 'crisis_concern': case 'immediate_danger': case 'third_party_crisis':
+      return hasFirstPersonDistress(n) || wantsToDie(n)
+    case 'medical_emergency':
+      return unnegatedSymptom(n, [...EMERGENCY_REDFLAG, ...PRESENT_SYMPTOM])
+    case 'overdose_poisoning':
+      return hasRe(n, /\bi(ve| ve| have|m| m)?\s*(just\s*)?(took|taken|swallowed|had|necked|downed|swallow|take)\b/) &&
+        has(n, 'too much', 'too many', 'a lot', 'loads', 'overdose', 'handful', 'several', 'large', 'box of', 'bunch', 'double')
+    case 'pregnancy':
+      return has(n, 'im pregnant', 'i m pregnant', 'i am pregnant', 'my pregnancy', 'im expecting', 'weeks pregnant',
+        'i gave birth', 'i had my baby', 'my baby', 'since i gave birth', 'my c section', 'after i gave birth', 'im postpartum')
+    case 'steroids_ped':
+      return hasRe(n, /\bi(m| m| am|ve| ve| have)?\s*(currently\s*)?(take|taking|took|use|using|on|inject|injecting|started)\b[a-z0-9 ]{0,20}\b(steroids|sarm|sarms|testosterone|tren|anavar|dianabol|winstrol|clenbuterol|test e|cycle)\b/)
+    case 'disordered_eating':
+      return has(n, ...DE_SIGNALS)
+    case 'medical_condition': case 'medical_urgent': case 'prescribed_medication': case 'injury_override':
+      return unnegatedSymptom(n, PRESENT_SYMPTOM)
+    default:
+      return false
+  }
+}
+
+/**
+ * ANY current first-person safety signal — distress, INTENT, action, or a de-obfuscation reveal.
+ * This is the paramount guard (Jack R4): NO suppressor may fire while such a signal is present, so an
+ * academic/historical/topical frame can never hide a live suicide plan or method (fixes R4-2A05). It
+ * covers distress (`hasFirstPersonDistress`), intent-to-act (a plan / goodbye / a method), immediacy,
+ * and a "this is actually about me / not fictional" reveal used in adversarial framing.
+ */
+export function hasCurrentSafetySignal(n: Norm): boolean {
+  if (hasFirstPersonDistress(n) || wantsToDie(n)) return true
+  if (has(n, ...IMMEDIATE)) return true // "i have a plan", "going to kill myself", "this is goodbye", ...
+  // intent-to-act idioms (the crisis word is often not repeated after a suppressor frame)
+  if (hasRe(n, /\b(going to do it|gonna do it|doing it (tonight|now|today)|do it (tonight|now)|end it (tonight|all|now)|going through with it|ready to end (it|things|my life)|wont be here (much longer|tomorrow|anymore)|not be here (tomorrow|much longer)|planned it all|everything is ready|its all planned|got a plan to|made a plan to|have a plan to)\b/)) return true
+  // adversarial de-obfuscation: a "fictional/hypothetical" framing revealed to be real/the user
+  if (has(n, 'this is real', 'it is real', 'its real', 'really happening', 'happening to me', 'not fictional',
+    'not hypothetical', 'not made up', 'not a story', 'not a joke', 'this is actually real', 'im the one')) return true
+  // a lethal means/action co-present with immediacy (pills/weapon/rope/jump/traffic + now/tonight/about to)
+  if (has(n, 'took the pills', 'taking the pills', 'took everything', 'took the tablets', 'pills in my hand',
+    'the pills in my', 'a weapon', 'the weapon', 'a knife', 'a rope', 'the rope', 'jump', 'into traffic',
+    'off the bridge', 'on a bridge', 'on the roof') &&
+    hasRe(n, /\b(right now|tonight|this (minute|second|moment|evening)|about to|going to|gonna|doing it now|now)\b/)) return true
+  return false
+}
+
+/** Which scoping rules apply to which categories (Jack round-3). Crisis/emergency keep their in-detector
+ *  guards too; this adds the cross-category historical/third-party/negation/topical layer. */
+const SCOPED: Partial<Record<SafetyCategory, ('third_party' | 'historical' | 'negation' | 'topical')[]>> = {
+  crisis_concern: ['historical', 'topical'],
+  immediate_danger: ['historical', 'topical'],
+  medical_emergency: ['negation'],
+  overdose_poisoning: ['topical', 'negation', 'historical'],
+  medical_condition: ['third_party', 'historical', 'negation', 'topical'],
+  medical_urgent: ['third_party', 'historical', 'negation', 'topical'],
+  steroids_ped: ['third_party', 'historical', 'negation', 'topical'],
+  disordered_eating: ['third_party', 'historical', 'negation', 'topical'],
+  prescribed_medication: ['third_party', 'historical', 'negation'],
+  injury_override: ['third_party', 'historical', 'negation'],
+  pregnancy: ['third_party', 'historical', 'negation', 'topical'],
+  under_18: ['third_party', 'historical', 'negation'],
+}
+
+/** Trigger terms per category, used by the subject/negation checks. */
+const CATEGORY_TERMS: Partial<Record<SafetyCategory, string[]>> = {
+  medical_emergency: [...EMERGENCY_REDFLAG],
+  medical_condition: [...CONDITIONS, 'asthma', 'diabetes', 'medication', 'medicine', 'condition'],
+  medical_urgent: ['concussion', 'knocked out', 'hit my head', 'rhabdo', 'swollen', 'injury', 'injured'],
+  steroids_ped: ['steroids', 'sarm', 'sarms', 'testosterone', 'ped', 'anabolic', 'cycle'],
+  disordered_eating: ['eating disorder', 'eating disorders', 'anorexia', 'bulimia', 'purge', 'purging'],
+  prescribed_medication: ['medication', 'medicine', 'meds', 'prescription', 'tablets', 'pills'],
+  injury_override: [...INJURY_TERMS],
+  pregnancy: ['pregnant', 'pregnancy', 'expecting', 'postpartum'],
+  under_18: ['16', '15', '14', '13', '17', 'year old', 'years old', 'teenager', 'teenage'],
+}
+
+/** Decide whether a hit is suppressed by scoping, returning the rule name (or null to keep it). */
+function suppressionRule(n: Norm, category: SafetyCategory): string | null {
+  const rules = SCOPED[category]
+  if (!rules) return null
+  if (hasCurrentSafetySignal(n)) return null // PARAMOUNT: any live distress/intent/action blocks ALL suppression
+  if (firstPersonPresent(n, category)) return null // current first-person disclosure of this category wins
+  const terms = CATEGORY_TERMS[category] ?? []
+  if (rules.includes('third_party') && subjectThirdParty(n, terms)) return 'third_party_subject'
+  if (rules.includes('historical') && historicalResolved(n)) return 'historical_resolved'
+  if (rules.includes('negation') && terms.length > 0 && negatedTerm(n, terms)) return 'explicit_negation'
+  if (rules.includes('topical') && topicalFrame(n)) return 'topical_reference'
+  return null
+}
+
+export interface RulesResult { hits: DetectorHit[]; suppressions: Suppression[] }
+
+/* ------------------------------------------------------------------ */
+/*  Public: run all detectors, then apply scoping suppression          */
+/* ------------------------------------------------------------------ */
+
+/** Apply scoping suppression to a set of hits (shared by rules and classifier hits). */
+function scope(n: Norm, raw: DetectorHit[]): RulesResult {
+  const hits: DetectorHit[] = []
+  const suppressions: Suppression[] = []
+  for (const h of raw) {
+    const rule = suppressionRule(n, h.category)
+    if (rule) suppressions.push({ category: h.category, rule })
+    else hits.push(h)
+  }
+  return { hits, suppressions }
+}
+
+export function runRules(text: string, _ctx: CoachContext): RulesResult {
   const n = normalize(text)
   const detectors = [
     detectCrisis, detectHarmToOthers, detectMedicalEmergency, detectOverdose, detectInjuryOverride,
@@ -376,9 +627,17 @@ export function runRules(text: string, _ctx: CoachContext): DetectorHit[] {
     detectSupplementDosing, detectUnder18, detectUnsafeTraining, detectAiRelationship,
     detectOffTopic, detectCatchAll,
   ]
-  const hits: DetectorHit[] = []
-  for (const d of detectors) hits.push(...d(n))
-  return hits
+  const raw: DetectorHit[] = []
+  for (const d of detectors) raw.push(...d(n))
+  return scope(n, raw)
+}
+
+/**
+ * Apply the SAME scoping to CLASSIFIER hits — the LLM over-flags the same third-party / historical /
+ * negated / topical contexts, and the scoping guards (first-person present ALWAYS wins) keep it safe.
+ */
+export function scopeClassifierHits(text: string, hits: DetectorHit[]): RulesResult {
+  return scope(normalize(text), hits)
 }
 
 /** A known benign false-positive (workout hyperbole, or a bare crisis denial). */

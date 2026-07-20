@@ -54,8 +54,21 @@ and false positives reduced conceptually (first-person scope for crisis/under-18
 "suicide" guard, training-split ≠ meal_plan, colloquial appetite ≠ DE) without lowering critical
 recall. Coach suite still 218/218; a fresh-wording generic mechanism check passes.
 
+**Round-3 FP-precision (approved-with-conditions → cross-category scoping).** After R3 (critical clean,
+FP 43% > ceiling), Jack approved a cross-category false-positive fix. Built: a scoping post-pass
+(`rules.ts` `scopeClassifierHits`/`runRules`) that suppresses a category ONLY when the trigger is
+clearly THIRD-PARTY, HISTORICAL/resolved, NEGATED or TOPICAL/academic AND there is no CURRENT
+first-person disclosure of that category — applied to BOTH rule and classifier hits. Every suppression
+is LOGGED on the decision (`SafetyDecision.suppressions`, content-free) so each no-flag is auditable.
+Paramount guard held: a present first-person safety signal always overrides; per-symptom negation
+(a denied term can't suppress a different present symptom); emergency precedence + overdose/emergency
+persistence unchanged. Verified: 218 suite + a fresh-wording recall check (dangerous edges — real
+overdose with a "research" word, negated-term-with-other-symptom, historical-word-with-present-symptom,
+first-person-present — all still flag). NOT tuned to R3 (burned); no R3 phrasings in the detector.
+
 **Remaining blocker to release (unchanged):** an **independent clinical validation** of the
-classifier **against a fresh holdout set the builder never saw**, meeting Jack's section-4 standard
+classifier **against a fresh holdout set the builder never saw** (holdout #4 — R3 is burned), meeting
+Jack's section-4 standard
 (zero critical misses + agreed sensitivity/false-positive thresholds per tier, both paths). Testing
 the classifier — by me or via the harness — is **not** that. `COACH_ENABLED` stays `false` until the
 independent review signs off.
@@ -116,6 +129,25 @@ availability on both `COACH_ENABLED` **and** the kill switch.
 - Locale detection → `isAustralia` — **[BEST-EFFORT]** (device timezone; a fuller locale signal is a small [TO BUILD])
 - Privacy & incident governance (§19) — **[TO DO — business-level]** — GATES activation of the two dormant mechanisms
 - **Independent clinical / privacy / safety / security / implementation review of the built system (§23)** — **[REQUIRED BEFORE RELEASE — not done]**
+
+## Live-Gemini holdout history (measurement only — NOT validation)
+
+Independent holdout runs through the real Gemini path (`gemini-2.5-flash-lite`, temp 0), each set
+base64-encoded so phrasings are not absorbed by the detector. All runs: `COACH_ENABLED=false`,
+`validated=false`, not tuned to the set.
+
+- **R3** (120): 43% benign FP, critical clean.
+- **R4** (106, r4): 16.7% FP (pass) but 3 critical failures — FP-precision work introduced misses.
+- **R5** (54, r5): FAIL both — 4/32 critical (Section-1 benign-frame+current-signal), 40.9% FP.
+- **R6** (62, r6, Jack's FINAL, run once): FAIL critical — **4/36 misses**, all novel suicide
+  euphemisms with no lexicon anchor ("check out for good", "wont be around", "dont want to wake up",
+  "chosen tonight") that Gemini also missed; benign FP 8/26 = 30.8% (**passed** the 35% ceiling).
+- **r7** (current, post-R6): added a generalising `selfHarmIntent` "cease-to-exist" euphemism class to
+  the rules FLOOR (bounded against benign absence/early-alarm/place-departure), so those euphemisms are
+  caught **deterministically** even when the classifier misses. Verified only on FRESH wording + the
+  218 suite — **NOT** re-run against R6 (burned) and **NOT** tuned to it. **Still UNVALIDATED**: a
+  fresh holdout (R7) judged by Jack is required. Euphemistic first-person intent with no anchor remains
+  the known hard class — the unbounded tail needs a model that generalises, not more lexicon.
 
 ## The hard rule
 

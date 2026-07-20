@@ -129,6 +129,17 @@ export interface DetectorHit {
   reason: string
 }
 
+/**
+ * A record that a rules-detected category was SUPPRESSED (not flagged) by a scoping rule
+ * (third-party / historical / negation / topical). Content-free (category + rule name only). Jack
+ * round-3 requirement: every no-flag decision is auditable — you can see WHY something wasn't flagged.
+ */
+export interface Suppression {
+  category: SafetyCategory
+  /** The scoping rule that suppressed it, e.g. 'third_party_subject', 'historical_resolved'. */
+  rule: string
+}
+
 export interface SafetyDecision {
   category: SafetyCategory
   tier: number
@@ -141,6 +152,8 @@ export interface SafetyDecision {
   hits: DetectorHit[]
   /** Highest-tier detector's reason, for logging by tier. */
   reason: string
+  /** Scoping suppressions applied this turn (audit trail for no-flag decisions). Jack §3-log. */
+  suppressions?: Suppression[]
 }
 
 /**

@@ -10,7 +10,7 @@
 
 import type { CoachContext, DetectorHit, SafetyAction, SafetyCategory, SafetyDecision, SafetySession } from './types'
 import { CATEGORY_TIER } from './types'
-import { runRules, hasImmediacy } from './rules'
+import { runRules, scopeClassifierHits, hasImmediacy, hasCurrentSafetySignal, normalize } from './rules'
 import { activeClassifier } from './classifier'
 import { correctionAdjust, isGenuineCorrection, stateHits, applyDecision } from './stateMachine'
 
@@ -93,11 +93,14 @@ function escalateImmediacy(hits: DetectorHit[], text: string): DetectorHit[] {
  *   • A third party in immediate danger routes to 000, not the softer third-party-crisis route.
  * decide() then picks the escalated emergency tier; the emergency floor keeps it from being downgraded.
  */
-function escalateToEmergency(hits: DetectorHit[]): DetectorHit[] {
+function escalateToEmergency(hits: DetectorHit[], text: string): DetectorHit[] {
   const present = (c: SafetyCategory) => hits.some((h) => h.category === c)
   const out: DetectorHit[] = []
   const overdose = present('overdose_poisoning')
-  const selfHarm = present('immediate_danger') || present('crisis_concern')
+  // Self-harm intent = a crisis/immediate category OR any current first-person safety signal in the
+  // text (intent/action/reveal), so an overdose "about me" with no explicit self-harm term still
+  // escalates to 000 (Jack R4-2E08). Generalises via the signal, not the specific phrase.
+  const selfHarm = present('immediate_danger') || present('crisis_concern') || hasCurrentSafetySignal(normalize(text))
   const emergencySignal = present('medical_emergency') || present('harm_to_others')
   const thirdParty = present('third_party_crisis')
   // Overdose + self-harm intent → 000 (immediate danger); overdose + another emergency/third-party
@@ -135,18 +138,20 @@ function emergencyFloor(hits: DetectorHit[]): DetectorHit | null {
  */
 export function route(text: string, ctx: CoachContext, session: SafetySession): SafetyDecision {
   try {
-    const ruleHits = runRules(text, ctx)
+    const rules = runRules(text, ctx)
+    const ruleHits = rules.hits
     const correctionHits = correctionAdjust(session, text)
     const sHits = stateHits(session, text, ctx)
     const genuine = isGenuineCorrection(text)
-    const clsHits = genuine ? [] : activeClassifier.classify(text, ctx)
-    const detected = [...ruleHits, ...sHits, ...clsHits]
-    const escalated = [...escalateImmediacy(detected, text), ...escalateToEmergency(detected)]
+    const clsScoped = scopeClassifierHits(text, genuine ? [] : activeClassifier.classify(text, ctx))
+    const detected = [...ruleHits, ...sHits, ...clsScoped.hits]
+    const escalated = [...escalateImmediacy(detected, text), ...escalateToEmergency(detected, text)]
     let decision = decide([...correctionHits, ...detected, ...escalated])
     // Emergency floor (defence in depth): if a concrete emergency-tier signal is present but the
     // composed decision came out lower, the emergency wins. Most-protective route always prevails.
     const floor = emergencyFloor([...ruleHits, ...escalated])
     if (floor && decision.tier < CATEGORY_TIER[floor.category]) decision = decide([floor])
+    decision.suppressions = [...rules.suppressions, ...clsScoped.suppressions]
     applyDecision(session, decision)
     return decision
   } catch {
@@ -170,27 +175,30 @@ export async function routeAsync(
   text: string, ctx: CoachContext, session: SafetySession, recent: string[] = [],
 ): Promise<SafetyDecision> {
   try {
-    const ruleHits = runRules(text, ctx)
+    const rules = runRules(text, ctx)
+    const ruleHits = rules.hits
     const correctionHits = correctionAdjust(session, text)
     const sHits = stateHits(session, text, ctx)
     const genuine = isGenuineCorrection(text)
-    let clsHits: DetectorHit[] = []
+    let clsRaw: DetectorHit[] = []
     let clsUnavailable = false
     if (!genuine) {
       if (activeClassifier.classifyAsync) {
-        try { clsHits = await activeClassifier.classifyAsync(text, ctx, recent) }
+        try { clsRaw = await activeClassifier.classifyAsync(text, ctx, recent) }
         catch { clsUnavailable = true } // model down/uncertain → handled by the fail-safe below
       } else {
-        clsHits = activeClassifier.classify(text, ctx) // no async model wired → sync stub floor
+        clsRaw = activeClassifier.classify(text, ctx) // no async model wired → sync stub floor
       }
     }
-    const detected = [...ruleHits, ...sHits, ...clsHits]
-    const escalated = [...escalateImmediacy(detected, text), ...escalateToEmergency(detected)]
+    const clsScoped = scopeClassifierHits(text, clsRaw)
+    const detected = [...ruleHits, ...sHits, ...clsScoped.hits]
+    const escalated = [...escalateImmediacy(detected, text), ...escalateToEmergency(detected, text)]
     let decision = decide([...correctionHits, ...detected, ...escalated])
     const floor = emergencyFloor([...ruleHits, ...escalated])
     if (floor && decision.tier < CATEGORY_TIER[floor.category]) decision = decide([floor])
     // Fail-safe: classifier unavailable AND nothing else caught it → never allow normal coaching.
     if (clsUnavailable && decision.action === 'allow') return failSafe()
+    decision.suppressions = [...rules.suppressions, ...clsScoped.suppressions]
     applyDecision(session, decision)
     return decision
   } catch {
