@@ -8,11 +8,11 @@ import { ProgressBar, SegmentedTabs, ScreenHeader, Chip } from '../components/ui
 import { Hero } from '../components/Hero'
 import { useStore } from '../store/store'
 import { useNav } from '../nav'
-import { EXERCISES } from '../data/catalog'
+import { ACTIVE_EXERCISES } from '../backend/data'
 import { fmtVolume, fmtWeight } from '../lib/format'
 import { relativeLabel, todayKey } from '../lib/date'
 import { todaySession, sessionProgress, completedSessions, activitiesForDay } from '../store/selectors'
-import { buildCustomSession } from '../store/programSession'
+import { buildCustomSession, exerciseView, imageForMuscle } from '../store/programSession'
 import { brand, useColors } from '../theme'
 import { useToast } from '../components/Toast'
 import { syncAll } from '../lib/integrations'
@@ -294,11 +294,22 @@ function ProgramTab() {
 }
 
 function ExercisesTab() {
-  const { state } = useStore()
   const nav = useNav()
-  const dorm = state.profile.equipment === 'dorm-bodyweight'
   const [q, setQ] = useState('')
-  const filtered = useMemo(() => EXERCISES.filter((e) => e.name.toLowerCase().includes(q.toLowerCase()) || e.muscle.toLowerCase().includes(q.toLowerCase())), [q])
+  // The full canonical exercise database (workbook source of truth, 113), adapted for display
+  // through the same `exerciseView` used everywhere else so imagery/muscle stay consistent.
+  const all = useMemo(
+    () =>
+      ACTIVE_EXERCISES.map((e) => {
+        const v = exerciseView(e.id)
+        return { id: e.id, name: v?.name ?? e.name, muscle: v?.muscle ?? e.muscleGroup, image: v?.image ?? imageForMuscle(e.muscleGroup) }
+      }),
+    [],
+  )
+  const filtered = useMemo(
+    () => all.filter((e) => e.name.toLowerCase().includes(q.toLowerCase()) || e.muscle.toLowerCase().includes(q.toLowerCase())),
+    [q, all],
+  )
   return (
     <View>
       <Pressable onPress={() => nav.open('beginner')} className="mb-4 w-full flex-row items-center gap-3 rounded-2xl border border-brand-400/20 bg-brand-400/5 p-3.5 active:opacity-90">
@@ -311,16 +322,19 @@ function ExercisesTab() {
         onChangeText={setQ}
         placeholder="Search exercises or muscle…"
         placeholderTextColor="rgba(255,255,255,0.35)"
-        className="mb-4 w-full rounded-xl border border-white/10 bg-ink-800 px-4 py-3 text-sm text-white"
+        className="mb-3 w-full rounded-xl border border-white/10 bg-ink-800 px-4 py-3 text-sm text-white"
       />
+      <View className="mb-3 flex-row items-center justify-between px-0.5">
+        <Text className="text-[12px] font-semibold uppercase tracking-wide text-white/35">All exercises</Text>
+        <Text className="text-[12px] text-white/35">{filtered.length}</Text>
+      </View>
       <View className="flex-row flex-wrap gap-3">
         {filtered.map((e) => (
           <Pressable key={e.id} onPress={() => nav.open('exerciseDetail', { defId: e.id })} className="flex-1 basis-[47%] overflow-hidden rounded-2xl border border-white/5 bg-ink-800 active:opacity-90">
             <ExerciseThumb uri={e.image} />
             <View className="p-3">
-              <Text numberOfLines={1} className="text-sm font-bold text-white">{dorm && e.bodyweightAlt ? e.bodyweightAlt : e.name}</Text>
+              <Text numberOfLines={1} className="text-sm font-bold text-white">{e.name}</Text>
               <Text className="text-[12px] text-white/45">{e.muscle}</Text>
-              {dorm && e.bodyweightAlt && <Chip color="gray" className="mt-1.5">Bodyweight</Chip>}
             </View>
           </Pressable>
         ))}
