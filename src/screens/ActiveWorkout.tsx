@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import Svg, { Circle } from 'react-native-svg'
 import {
   Check, Plus, Minus, Flag, Info, ChevronDown, Bell, BookOpen, Play, Target,
-  ChevronLeft, Timer, ListChecks, HelpCircle, X,
+  ChevronLeft, Timer, ListChecks, HelpCircle, X, Dumbbell,
 } from 'lucide-react-native'
 import { Sheet } from '../components/Sheet'
 import { AppModal } from '../components/WebFrame'
@@ -17,7 +17,7 @@ import { useStore } from '../store/store'
 import { useToast } from '../components/Toast'
 import { useNav } from '../nav'
 import { todaySession, sessionProgress } from '../store/selectors'
-import { examState, examTrim } from '../store/training'
+import { examState, examTrim, nextSetRecommendation } from '../store/training'
 import { prForSession, type PR } from '../store/coach'
 import { exerciseDetail, workoutGoalLine } from '../data/catalog'
 import { exerciseView } from '../store/programSession'
@@ -332,6 +332,12 @@ export default function ActiveWorkout({ open, onClose, params }: { open: boolean
 
   const cursorEx = cursor ? session.exercises[cursor.exIdx] : null
   const cursorSet = cursor && cursorEx ? cursorEx.sets[cursor.setIdx] : null
+  // Progression-aware recommended weight for the current set. Memoised so the
+  // once-a-second work timer doesn't re-scan session history every tick.
+  const recWeightKg = useMemo(
+    () => (cursorEx && cursorSet ? nextSetRecommendation(state, cursorEx.defId, cursorEx.targetReps, cursorSet.weightKg).suggestedWeightKg : 0),
+    [cursorEx, cursorSet, state],
+  )
   const allDone = prog.total > 0 && prog.done === prog.total
   // The current exercise = first one not yet fully done; only it gets highlighted.
   const activeIdx = session.exercises.findIndex((ex) => !(ex.sets.length > 0 && ex.sets.every((s) => s.done)))
@@ -342,6 +348,10 @@ export default function ActiveWorkout({ open, onClose, params }: { open: boolean
   }
 
   if (mode === 'work' && cursor && cursorEx && cursorSet) {
+    // Set-level progress across the whole workout, for the top progress bar.
+    const setTotal = session.exercises.reduce((n, e) => n + e.sets.length, 0)
+    const setIndex = session.exercises.slice(0, cursor.exIdx).reduce((n, e) => n + e.sets.length, 0) + cursor.setIdx
+    const recWeight = fmtWeight(recWeightKg, units, units === 'imperial' ? 0 : 1)
     return (
       <WorkScreen
         open={open}
@@ -351,6 +361,9 @@ export default function ActiveWorkout({ open, onClose, params }: { open: boolean
         sessionTotal={total}
         exIndex={cursor.exIdx}
         exTotal={session.exercises.length}
+        setIndex={setIndex}
+        setTotal={setTotal}
+        recWeight={recWeight}
         detail={detailFor(cursorEx.defId)}
         reps={cursorSet.reps}
         onLogReps={(v) => setSet(cursor.exIdx, cursor.setIdx, 'reps', v)}
@@ -361,12 +374,16 @@ export default function ActiveWorkout({ open, onClose, params }: { open: boolean
   }
 
   if ((mode === 'rest' || mode === 'go') && cursor && cursorEx && cursorSet && rest !== null) {
+    const setTotal = session.exercises.reduce((n, e) => n + e.sets.length, 0)
+    const setIndex = session.exercises.slice(0, cursor.exIdx).reduce((n, e) => n + e.sets.length, 0) + cursor.setIdx
     return (
       <RestScreen
         open={open}
         go={mode === 'go'}
         remaining={Math.max(0, rest)}
         total={restTotal}
+        setIndex={setIndex}
+        setTotal={setTotal}
         nextEx={cursorEx}
         nextCursor={cursor}
         nextSet={cursorSet}
@@ -479,14 +496,14 @@ export default function ActiveWorkout({ open, onClose, params }: { open: boolean
                   )}
 
                   {/* Actions */}
-                  <View className="mt-3.5 flex-row gap-2">
-                    <PressableScale haptic={false} scaleTo={0.97} containerStyle={{ flex: 1 }} onPress={() => toggleHowTo(ex.defId)} className="flex-row items-center justify-center gap-1.5 rounded-xl bg-white/[0.09] py-2">
+                  <View className="mt-3.5 flex-row gap-2.5">
+                    <PressableScale haptic={false} scaleTo={0.97} containerStyle={{ flex: 1 }} onPress={() => toggleHowTo(ex.defId)} className="flex-row items-center justify-center gap-1.5 rounded-xl bg-white/[0.09] px-2 py-3">
                       <BookOpen size={14} color="rgba(255,255,255,0.85)" />
-                      <Text className="text-[12px] font-semibold text-white/85">Form & video</Text>
+                      <Text numberOfLines={1} adjustsFontSizeToFit className="text-[13px] font-semibold text-white/85">Form &amp; video</Text>
                     </PressableScale>
-                    <PressableScale scaleTo={0.97} containerStyle={{ flex: 1 }} onPress={() => startAt(exIdx)} className={`flex-row items-center justify-center gap-1.5 rounded-xl py-2 ${isActive ? 'bg-brand-400' : 'bg-white/[0.09]'}`}>
-                      <Play size={13} color={isActive ? '#000' : 'rgba(255,255,255,0.85)'} fill={isActive ? '#000' : 'rgba(255,255,255,0.85)'} />
-                      <Text className={`text-[12px] font-bold ${isActive ? 'text-black' : 'text-white/85'}`}>{exDone ? 'Redo' : 'Start'}</Text>
+                    <PressableScale scaleTo={0.97} containerStyle={{ flex: 1 }} onPress={() => startAt(exIdx)} className={`flex-row items-center justify-center gap-1.5 rounded-xl px-2 py-3 ${isActive ? 'bg-brand-400' : 'bg-white/[0.09]'}`}>
+                      <Play size={14} color={isActive ? '#000' : 'rgba(255,255,255,0.85)'} fill={isActive ? '#000' : 'rgba(255,255,255,0.85)'} />
+                      <Text numberOfLines={1} adjustsFontSizeToFit className={`text-[13px] font-bold ${isActive ? 'text-black' : 'text-white/85'}`}>{exDone ? 'Redo' : 'Start'}</Text>
                     </PressableScale>
                   </View>
                 </View>
@@ -621,7 +638,7 @@ function ManualSetRow({
 
 /* ============================ Work screen ============================ */
 function WorkScreen({
-  open, ex, cursor, elapsed, sessionTotal, exIndex, exTotal, detail, reps,
+  open, ex, cursor, elapsed, sessionTotal, exIndex, exTotal, setIndex, setTotal, recWeight, detail, reps,
   onLogReps, onBack, onStartRest,
 }: {
   open: boolean
@@ -631,6 +648,11 @@ function WorkScreen({
   sessionTotal: number
   exIndex: number
   exTotal: number
+  /** Global index of the current set (0-based) and total sets, for the progress bar. */
+  setIndex: number
+  setTotal: number
+  /** Progression-aware recommended working weight, pre-formatted with units. */
+  recWeight: string
   detail: { desc: string; cues: string[]; commonMistake: string; video?: string }
   reps: number
   onLogReps: (reps: number) => void
@@ -665,8 +687,11 @@ function WorkScreen({
           </View>
         </View>
 
+        {/* Progress across the whole workout — one segment per set, filled as you go */}
+        <WorkoutProgressBar index={setIndex} total={setTotal} />
+
         {/* Where am I: exercise position, name, what it is */}
-        <View className="items-center px-6">
+        <View className="mt-3 items-center px-6">
           <Text className="text-center text-[11px] font-black uppercase tracking-[2.4px] text-brand-400">
             Exercise {exIndex + 1} of {exTotal} · Set {cursor.setIdx + 1} of {ex.sets.length}
           </Text>
@@ -702,7 +727,10 @@ function WorkScreen({
       {/* Quick rep logger — tap as you go so the set records what you actually did,
        *  not just the planned number. Writes straight to the set. */}
       <View className="items-center px-6 pb-1">
-        <Text className="mb-2 text-[11px] font-bold uppercase tracking-[2px] text-white/35">Reps done</Text>
+        <View className="rounded-full border border-white/[0.07] bg-white/[0.05] px-3 py-1">
+          <Text className="text-[11px] font-semibold text-white/45">Recommended <Text className="font-bold text-brand-400">{recWeight}</Text></Text>
+        </View>
+        <Text className="mb-2 mt-2.5 text-[11px] font-bold uppercase tracking-[2px] text-white/35">Reps done</Text>
         <View className="flex-row items-center gap-5">
           <PressableScale onPress={() => onLogReps(Math.max(0, reps - 1))} scaleTo={0.9} className="h-12 w-12 items-center justify-center rounded-full bg-white/[0.08]">
             <Minus size={20} color="rgba(255,255,255,0.85)" />
@@ -825,12 +853,14 @@ function fmtClock(d: Date): string {
 }
 
 function RestScreen({
-  open, go, remaining, total, nextEx, nextCursor, nextSet, units, onSub, onAdd, onSkip, onGo, onBack,
+  open, go, remaining, total, setIndex, setTotal, nextEx, nextCursor, nextSet, units, onSub, onAdd, onSkip, onGo, onBack,
 }: {
   open: boolean
   go: boolean
   remaining: number
   total: number
+  setIndex: number
+  setTotal: number
   nextEx: WorkoutSession['exercises'][number]
   nextCursor: Cursor
   nextSet: { weightKg: number; reps: number }
@@ -898,6 +928,7 @@ function RestScreen({
             <Text className="text-[13px] font-semibold text-white/80">Skip</Text>
           </Pressable>
         </View>
+        <WorkoutProgressBar index={setIndex} total={setTotal} />
       </View>
 
       {/* Countdown ring, green → red */}
@@ -924,7 +955,9 @@ function RestScreen({
       {/* Up next */}
       <View className="items-center px-7">
         <View className="flex-row items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
-          <Image source={{ uri: nextEx.image }} resizeMode="cover" className="h-10 w-10 rounded-lg" />
+          <View className="h-10 w-10 items-center justify-center rounded-xl bg-white/[0.06]">
+            <Dumbbell size={20} color="rgba(255,255,255,0.7)" />
+          </View>
           <View>
             <Text className="text-[11px] font-bold uppercase tracking-wide text-white/40">Up next · Set {nextCursor.setIdx + 1} of {nextEx.sets.length}</Text>
             <Text className="text-[15px] font-extrabold leading-tight text-white">{nextEx.name}</Text>
@@ -936,19 +969,39 @@ function RestScreen({
       {/* Controls */}
       <View className="px-7 pb-12 pt-7">
         <View className="flex-row items-center justify-center gap-5">
-          <PressableScale onPress={onSub} className="h-16 w-16 items-center justify-center rounded-full bg-white/[0.08]">
-            <Text className="text-sm font-bold text-white">−15s</Text>
+          <PressableScale onPress={onSub} className="items-center justify-center rounded-[26px] bg-white/[0.08]" style={{ width: 78, height: 60 }}>
+            <Text className="text-[15px] font-bold text-white">−15s</Text>
           </PressableScale>
-          <PressableScale onPress={() => { thud(); onSkip() }} haptic={false} className="h-20 w-20 items-center justify-center rounded-full bg-brand-400">
-            <Play size={20} color="#000" fill="#000" />
+          <PressableScale
+            onPress={() => { thud(); onSkip() }}
+            haptic={false}
+            className="items-center justify-center rounded-full bg-brand-400"
+            style={{ width: 84, height: 84, shadowColor: brandColor, shadowOpacity: 0.55, shadowRadius: 22, shadowOffset: { width: 0, height: 0 }, elevation: 10 }}
+          >
+            <Play size={24} color="#000" fill="#000" />
           </PressableScale>
-          <PressableScale onPress={onAdd} className="h-16 w-16 items-center justify-center rounded-full bg-white/[0.08]">
-            <Text className="text-sm font-bold text-white">+15s</Text>
+          <PressableScale onPress={onAdd} className="items-center justify-center rounded-[26px] bg-white/[0.08]" style={{ width: 78, height: 60 }}>
+            <Text className="text-[15px] font-bold text-white">+15s</Text>
           </PressableScale>
         </View>
         <Text className="mt-3 text-center text-[12px] font-semibold text-white/35">Tap the centre to start now</Text>
       </View>
     </FullScreen>
+  )
+}
+
+/* Top-of-screen workout progress: one dash per set across the whole session,
+ * filled green as you go (bright = done, faint green = current, dim = ahead). */
+function WorkoutProgressBar({ index, total }: { index: number; total: number }) {
+  return (
+    <View className="flex-row gap-1 px-5 pt-1">
+      {Array.from({ length: Math.max(1, total) }).map((_, i) => (
+        <View
+          key={i}
+          className={`h-1 flex-1 rounded-full ${i < index ? 'bg-brand-400' : i === index ? 'bg-brand-400/55' : 'bg-white/[0.12]'}`}
+        />
+      ))}
+    </View>
   )
 }
 

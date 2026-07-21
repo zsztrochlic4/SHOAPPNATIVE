@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { View, Text, Pressable, Image, TextInput, Animated, Easing, ScrollView, KeyboardAvoidingView, Platform } from 'react-native'
+import { View, Text, Pressable, Image, TextInput, Animated, Easing, ScrollView, KeyboardAvoidingView, Platform, PanResponder } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
-  Sparkles, Check, CheckCheck, ChevronRight, ChevronDown, Salad, Trophy, Flame,
+  Sparkles, Check, CheckCheck, ChevronRight, ChevronDown, ChevronLeft, Salad, Trophy, Flame,
   GraduationCap, Dumbbell, Lightbulb, ShieldQuestion, Share2, Plus, MapPin, Phone,
   Send, Video, Lock, Crown, Clock, Repeat, Heart, MessageCircle, Award, Swords, Users, X,
-  Search, Minus, Trash2, Play, ArrowLeft,
+  Search, Minus, Trash2, Play, ArrowLeft, Activity, Reply,
 } from 'lucide-react-native'
 import { Sheet } from '../components/Sheet'
 import { Avatar } from '../components/Avatar'
@@ -25,7 +25,7 @@ import { exerciseView, imageForMuscle, buildCustomSession } from '../store/progr
 import { ACTIVE_EXERCISES, type Exercise } from '../backend/data'
 import { nextSetRecommendation } from '../store/training'
 import { coachThreadView } from '../store/coach'
-import { CHAT_SUGGESTIONS, coachReply } from '../lib/coachChat'
+import { coachReply } from '../lib/coachChat'
 import { askCoach } from '../lib/coachApi'
 import { coachContext, coachOperational, COACH_PREVIEW, coachPrecheckAsync, guardOutgoing, newSafetySession } from '../lib/coachSafety'
 import { SafetyContactButtons } from '../components/SafetyContactButtons'
@@ -35,8 +35,10 @@ import { relativeLabel, todayKey } from '../lib/date'
 import { CHART_METRICS, STAT_METRICS, progressMetricId, dashboardStatIds } from '../lib/metrics'
 import { weightVal, toKg, weightUnit } from '../lib/format'
 import { brand, useColors } from '../theme'
+import { IS_WEB } from '../components/WebFrame'
+import { thud } from '../lib/haptics'
 import type { ReactNode } from 'react'
-import type { CoachKind, TemplateExercise } from '../store/types'
+import type { CoachKind, TemplateExercise, ChatMessage } from '../store/types'
 
 type Props = { open: boolean; onClose: () => void; params?: Record<string, unknown> }
 
@@ -359,7 +361,25 @@ export function PRCelebrationSheet({ open, onClose, params }: Props) {
 }
 
 /* ===================== Coach messenger (1:1 chat) ================== */
-const BOOKING_SLOTS = ['Tomorrow · 6:00 PM', 'Thursday · 7:30 PM', 'Saturday · 10:00 AM']
+
+// Suggestion topics for the empty-thread grid (design: category + coloured dot).
+const COACH_TOPICS: { label: string; cat: string; tone: 'green' | 'orange' | 'blue' | 'purple' }[] = [
+  { label: 'Why did I train chest today?', cat: 'Training', tone: 'green' },
+  { label: 'Why do I feel so sore?', cat: 'Recovery', tone: 'orange' },
+  { label: 'Am I on track for my goal?', cat: 'Progress', tone: 'blue' },
+  { label: 'What should I eat tonight?', cat: 'Nutrition', tone: 'purple' },
+]
+
+function toneColorFor(tone: 'green' | 'orange' | 'blue' | 'purple', c: ReturnType<typeof useColors>): string {
+  return tone === 'green' ? c.brand400 : tone === 'orange' ? c.accentOrange : tone === 'blue' ? c.accentBlue : c.accentPurple
+}
+
+/** Hex → rgba so the theme's --fg / --brand can be tinted at low opacity (RN can't do CSS-var alpha). */
+function withAlpha(hex: string, a: number): string {
+  const h = hex.replace('#', '')
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16)
+  return `rgba(${r}, ${g}, ${b}, ${a})`
+}
 
 /* Three bouncing dots while the coach "types" (Animated loop, no CSS). */
 function TypingDots() {
@@ -380,57 +400,160 @@ function TypingDots() {
   }, [dots])
   return (
     <View className="flex-row justify-start">
-      <View className="flex-row items-center gap-1 rounded-2xl rounded-bl-md border border-white/8 bg-ink-800 px-4 py-3.5">
+      <View className="flex-row items-center gap-1.5 rounded-[18px] bg-ink-800 px-4 py-3.5">
         {dots.map((d, i) => (
-          <Animated.View key={i} style={{ transform: [{ translateY: d }] }} className="h-1.5 w-1.5 rounded-full bg-white/45" />
+          <Animated.View key={i} style={{ transform: [{ translateY: d }] }} className="h-[7px] w-[7px] rounded-full bg-white/45" />
         ))}
       </View>
     </View>
   )
 }
 
+/**
+ * One message row. Adopts the design's two swipe gestures on core PanResponder:
+ *   • drag LEFT  → reveal every row's timestamp (a SHARED offset so the whole
+ *     thread shifts together, like iMessage).
+ *   • drag RIGHT → reply to this message (a reply glyph fades in; past the
+ *     threshold it arms the reply banner). Vertical scroll still passes through.
+ */
+function CoachMessageRow({ m, revealX, colors, onReply }: {
+  m: ChatMessage
+  revealX: Animated.Value
+  colors: ReturnType<typeof useColors>
+  onReply: (m: ChatMessage) => void
+}) {
+  const user = m.role === 'user'
+  const replyX = useRef(new Animated.Value(0)).current
+  const iconOpacity = useRef(new Animated.Value(0)).current
+  const enter = useRef(new Animated.Value(0)).current
+  const mode = useRef<null | 'reveal' | 'reply'>(null)
+  useEffect(() => {
+    Animated.timing(enter, { toValue: 1, duration: 300, easing: Easing.bezier(0.22, 1, 0.36, 1), useNativeDriver: !IS_WEB }).start()
+  }, [enter])
+
+  const pan = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dx) > Math.abs(g.dy) * 1.4 && Math.abs(g.dx) > 8,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: () => { mode.current = null },
+      onPanResponderMove: (_e, g) => {
+        if (!mode.current) {
+          if (Math.abs(g.dx) < 6) return
+          mode.current = g.dx < 0 ? 'reveal' : 'reply'
+        }
+        if (mode.current === 'reveal') {
+          revealX.setValue(Math.max(g.dx, -72))
+        } else {
+          const off = Math.min(Math.max(g.dx, 0), 80)
+          replyX.setValue(off)
+          iconOpacity.setValue(Math.min(off / 48, 1))
+        }
+      },
+      onPanResponderRelease: (_e, g) => {
+        if (mode.current === 'reveal') {
+          Animated.spring(revealX, { toValue: 0, tension: 120, friction: 14, useNativeDriver: !IS_WEB }).start()
+        } else if (mode.current === 'reply') {
+          if (g.dx >= 48) { thud(); onReply(m) }
+          Animated.spring(replyX, { toValue: 0, tension: 120, friction: 14, useNativeDriver: !IS_WEB }).start()
+          Animated.timing(iconOpacity, { toValue: 0, duration: 150, useNativeDriver: !IS_WEB }).start()
+        }
+        mode.current = null
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(revealX, { toValue: 0, tension: 120, friction: 14, useNativeDriver: !IS_WEB }).start()
+        Animated.spring(replyX, { toValue: 0, tension: 120, friction: 14, useNativeDriver: !IS_WEB }).start()
+        iconOpacity.setValue(0)
+        mode.current = null
+      },
+    }),
+  ).current
+
+  const translateX = Animated.add(revealX, replyX)
+
+  return (
+    <Animated.View
+      {...pan.panHandlers}
+      style={{
+        position: 'relative',
+        width: '100%',
+        alignItems: user ? 'flex-end' : 'flex-start',
+        opacity: enter,
+        transform: [{ translateX }, { translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }],
+      }}
+    >
+      {/* Reply glyph, off the left edge — revealed by a rightward drag. */}
+      <Animated.View pointerEvents="none" style={{ position: 'absolute', right: '100%', top: 0, bottom: 0, justifyContent: 'center', paddingRight: 10, opacity: iconOpacity }}>
+        <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: withAlpha(colors.brand400, 0.18), alignItems: 'center', justifyContent: 'center' }}>
+          <Reply size={16} color={colors.brand400} strokeWidth={2} />
+        </View>
+      </Animated.View>
+
+      {/* Quoted message this one replies to. */}
+      {m.replyTo && (
+        <View style={{ maxWidth: '72%', backgroundColor: withAlpha(colors.fg, 0.06), borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 4 }}>
+          <Text style={{ fontSize: 10.5, fontWeight: '700', color: withAlpha(colors.fg, 0.5), marginBottom: 1 }}>{m.replyTo.role === 'user' ? 'You' : 'Coach'}</Text>
+          <Text numberOfLines={2} style={{ fontSize: 12, lineHeight: 16, color: withAlpha(colors.fg, 0.55) }}>{m.replyTo.text}</Text>
+        </View>
+      )}
+
+      {/* Bubble. */}
+      <View style={{ maxWidth: '82%', paddingHorizontal: 15, paddingVertical: 12, borderRadius: 18, backgroundColor: user ? colors.brand400 : colors.ink800 }}>
+        <Text style={{ fontSize: 15, lineHeight: 22, color: user ? '#0a0a0b' : colors.fg, fontWeight: user ? '500' : '400' }}>{m.text}</Text>
+        {m.role === 'coach' && m.buttons && <SafetyContactButtons buttons={m.buttons} />}
+      </View>
+
+      {/* Timestamp, off the right edge — revealed by a leftward drag. */}
+      <View pointerEvents="none" style={{ position: 'absolute', left: '100%', top: 0, bottom: 0, justifyContent: 'center', paddingLeft: 20 }}>
+        <Text numberOfLines={1} style={{ fontSize: 12, color: withAlpha(colors.fg, 0.4) }}>{m.time}</Text>
+      </View>
+    </Animated.View>
+  )
+}
+
 export function CoachChatSheet({ open, onClose }: Props) {
   const { state, dispatch } = useStore()
-  const toast = useToast()
   const colors = useColors()
   const insets = useSafeAreaInsets()
   const scrollRef = useRef<ScrollView>(null)
   const [text, setText] = useState('')
-  const [showBook, setShowBook] = useState(false)
-  const [booked, setBooked] = useState<string | null>(null)
   const [typing, setTyping] = useState(false)
+  const [focused, setFocused] = useState(false)
+  const [replyingTo, setReplyingTo] = useState<{ role: 'user' | 'coach'; text: string } | null>(null)
+  // Shared offset: dragging any row left reveals every row's timestamp together.
+  const revealX = useRef(new Animated.Value(0)).current
   // Per-conversation safety state (persistence + retraction across messages, spec §2).
   const safety = useRef(newSafetySession())
-  const premium = state.profile.premium
   const messages = state.chat
-  const showSuggestions = messages.filter((m) => m.role === 'user').length === 0
+  const hasHistory = messages.some((m) => m.role === 'user')
+  const showGrid = !hasHistory && !focused
+  const hasText = text.trim().length > 0
 
   // Mark coach messages read whenever the thread is open and grows.
   useEffect(() => {
     if (open) dispatch({ type: 'MARK_CHAT_READ' })
-  }, [open, messages.length, showBook, booked, typing, dispatch])
+  }, [open, messages.length, typing, dispatch])
 
   async function send(t?: string) {
     if (!coachOperational() && !COACH_PREVIEW) return // HARD gate + server-side kill switch (spec §20).
     const msg = (t ?? text).trim()
     if (!msg || typing) return
+    const replyTo = replyingTo ?? undefined
     setText('')
-    // Show the user's message immediately, then a typing indicator.
-    dispatch({ type: 'PUSH_CHAT', role: 'user', text: msg })
-    // DEV DESIGN PREVIEW only: the coach is NOT operational, so reply with the on-device scripted
-    // coach ONLY — never the live AI or the safety classifier (both stay gated). This lets the coach
-    // be redesigned without activating the unvalidated crisis detector.
+    setReplyingTo(null)
+    // Show the user's message immediately (with any reply quote), then a typing indicator.
+    dispatch({ type: 'PUSH_CHAT', role: 'user', text: msg, replyTo })
+    // DEV DESIGN PREVIEW only: reply with the on-device scripted coach ONLY — never the live AI or the
+    // safety classifier (both stay gated) — so the coach can be redesigned without the crisis detector.
     if (COACH_PREVIEW && !coachOperational()) {
       setTyping(true)
       const scripted = coachReply(state, msg)
-      setTimeout(() => { dispatch({ type: 'PUSH_CHAT', role: 'coach', text: scripted }); setTyping(false) }, 450)
+      setTimeout(() => { dispatch({ type: 'PUSH_CHAT', role: 'coach', text: scripted }); setTyping(false) }, 1100)
       return
     }
     // SAFETY: one shared precheck runs BEFORE any reply — the safety guard first (a crisis is never
     // gated by the daily limit), then the limit — enforcing identically on the live-AI and fallback
     // paths (spec §2/§7/§21). A blocked message reaches neither the model nor the rules engine.
     const ctx = coachContext(state)
-    // Recent prior turns give the classifier multi-turn context (state.chat is pre-this-message here).
     const recent = state.chat.slice(-6).map((m) => m.text)
     const pre = await coachPrecheckAsync(msg, ctx, safety.current, state.coachUsage, todayKey, recent)
     if (pre.kind !== 'allow') {
@@ -451,21 +574,6 @@ export function CoachChatSheet({ open, onClose }: Props) {
     }
   }
 
-  function unlock() {
-    dispatch({ type: 'SET_PROFILE', patch: { premium: true } })
-    toast('Premium unlocked. Enjoy your calls')
-  }
-
-  function pickSlot(slot: string) {
-    setBooked(slot)
-    toast('Video call booked')
-  }
-
-  // Find the last message the user sent, to show a Seen / Delivered receipt.
-  let lastUserIdx = -1
-  for (let i = messages.length - 1; i >= 0; i--) { if (messages[i].role === 'user') { lastUserIdx = i; break } }
-  const seen = lastUserIdx >= 0 && messages.slice(lastUserIdx + 1).some((m) => m.role === 'coach')
-
   if (!coachOperational() && !COACH_PREVIEW) {
     return (
       <Sheet open={open} onClose={onClose} title="Coach">
@@ -474,119 +582,113 @@ export function CoachChatSheet({ open, onClose }: Props) {
     )
   }
 
+  // Thread rows with a day divider before the first message of each day.
+  const rows: ReactNode[] = []
+  let prevKey: string | null = null
+  messages.forEach((m) => {
+    if (m.dateKey !== prevKey) {
+      rows.push(
+        <View key={`d-${m.id}`} style={{ alignItems: 'center', paddingVertical: 2 }}>
+          <Text style={{ fontSize: 11.5, color: withAlpha(colors.fg, 0.4) }}>
+            <Text style={{ fontWeight: '700', color: withAlpha(colors.fg, 0.55) }}>{relativeLabel(m.dateKey)}</Text>  {m.time}
+          </Text>
+        </View>,
+      )
+      prevKey = m.dateKey
+    }
+    rows.push(
+      <CoachMessageRow key={m.id} m={m} revealX={revealX} colors={colors} onReply={(msg) => setReplyingTo({ role: msg.role, text: msg.text })} />,
+    )
+  })
+
   return (
     <Sheet open={open} onClose={onClose} title="Coach" full bare>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={{ flex: 1, paddingTop: insets.top }}>
-          {/* Header (fixed) */}
-          <View className="flex-row items-center gap-2.5 border-b border-white/8 px-3 py-2.5">
-            <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Close chat" className="h-9 w-9 shrink-0 items-center justify-center rounded-full active:opacity-70">
-              <ChevronDown size={24} color={colors.fg} />
+          {/* Header — centered avatar + name, back arrow on the left */}
+          <View style={{ position: 'relative', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, paddingTop: 6, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: withAlpha(colors.fg, 0.05) }}>
+            <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Close chat" style={{ position: 'absolute', left: 16, top: 4, width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }} className="active:opacity-60">
+              <ChevronLeft size={22} color={colors.fg} strokeWidth={2.2} />
             </Pressable>
-            <View className="relative shrink-0">
-              <View className="h-9 w-9 items-center justify-center rounded-full bg-brand-400"><Sparkles size={18} color="#000" /></View>
-              <View className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-brand-400" style={{ borderWidth: 2, borderColor: colors.ink900 }} />
-            </View>
-            <View className="min-w-0 flex-1">
-              <Text numberOfLines={1} className="text-[15px] font-bold leading-tight text-white">Coach</Text>
-              <Text className="text-[12px] leading-tight text-white/45">Active now</Text>
-            </View>
-            <Pressable className="h-9 w-9 shrink-0 items-center justify-center rounded-full active:opacity-80">
-              <Phone size={20} color={brand[400]} />
-            </Pressable>
-            <Pressable onPress={() => setShowBook((v) => !v)} className="h-9 w-9 shrink-0 items-center justify-center rounded-full active:opacity-80">
-              <Video size={21} color={brand[400]} />
-            </Pressable>
-          </View>
-
-          {/* Book-a-call panel (drops down under the header) */}
-          {showBook && (
-            <View className="border-b border-white/8 px-4 py-3">
-              <View className="rounded-2xl border border-white/8 bg-ink-800 px-4 py-3.5">
-                {booked ? (
-                  <View className="flex-row items-start gap-2.5">
-                    <View className="h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-400"><Check size={18} strokeWidth={3} color="#000" /></View>
-                    <View className="flex-1">
-                      <Text className="font-bold leading-tight text-white">Call booked</Text>
-                      <Text className="text-[13px] text-white/60">{booked}. I'll send a video link to your email beforehand.</Text>
-                    </View>
-                  </View>
-                ) : premium ? (
-                  <>
-                    <View className="mb-2.5 flex-row items-center gap-2">
-                      <Video size={16} color={brand[400]} />
-                      <Text className="text-sm font-bold text-white">Book a 1:1 video call</Text>
-                      <View className="ml-auto flex-row items-center gap-1 rounded-full bg-brand-400/15 px-2 py-0.5"><Crown size={11} color={brand[400]} /><Text className="text-[10px] font-bold text-brand-400">Premium</Text></View>
-                    </View>
-                    <View className="gap-2">
-                      {BOOKING_SLOTS.map((slot) => (
-                        <Pressable key={slot} onPress={() => pickSlot(slot)} className="w-full flex-row items-center gap-2.5 rounded-xl border border-white/8 bg-ink-700 p-3 active:opacity-80">
-                          <Clock size={15} color={brand[400]} />
-                          <Text className="text-[14px] font-semibold text-white">{slot}</Text>
-                          <ChevronRight size={16} color="rgba(255,255,255,0.3)" style={{ marginLeft: 'auto' }} />
-                        </Pressable>
-                      ))}
-                    </View>
-                  </>
-                ) : (
-                  <View className="rounded-xl border border-brand-400/25 bg-brand-400/[0.06] p-4">
-                    <View className="flex-row items-center gap-2">
-                      <View className="h-8 w-8 items-center justify-center rounded-full bg-brand-400"><Crown size={16} color="#000" /></View>
-                      <Text className="font-bold text-white">Video calls are Premium</Text>
-                      <Lock size={15} color="rgba(255,255,255,0.4)" style={{ marginLeft: 'auto' }} />
-                    </View>
-                    <Text className="mt-2 text-[13px] leading-snug text-white/65">Go Premium to book live 1:1 video calls with your coach for form checks, plan reviews and accountability. Text coaching stays free, always.</Text>
-                    <Pressable onPress={unlock} className="btn-primary mt-3 w-full flex-row items-center justify-center gap-1.5 py-2.5 active:opacity-90"><Crown size={15} color="#000" /><Text className="text-sm font-semibold text-black">Unlock Premium</Text></Pressable>
-                  </View>
-                )}
+            <View style={{ alignItems: 'center', gap: 6 }}>
+              <View style={{ width: 40, height: 40 }}>
+                <View className="h-10 w-10 items-center justify-center rounded-full bg-brand-400">
+                  <Activity size={22} color="#0a0a0b" strokeWidth={2.4} />
+                </View>
+                <View style={{ position: 'absolute', right: -1, bottom: -1, width: 12, height: 12, borderRadius: 6, backgroundColor: colors.brand400, borderWidth: 2.5, borderColor: colors.ink900 }} />
+              </View>
+              <View style={{ alignItems: 'center' }}>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: colors.fg }}>Coach</Text>
+                <Text style={{ fontSize: 11.5, color: withAlpha(colors.fg, 0.45) }}>Active now</Text>
               </View>
             </View>
-          )}
+          </View>
 
-          {/* Messages — fill the space between header and input, scroll, stick to newest */}
+          {/* Thread — fills the space, scrolls, sticks to newest */}
           <ScrollView
             ref={scrollRef}
             className="flex-1"
-            contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 12 }}
+            contentContainerStyle={{ paddingHorizontal: 18, paddingTop: 14, paddingBottom: 8, gap: 12 }}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
           >
-            <View className="gap-3">
-              {messages.map((m) => (
-                <View key={m.id} className={`flex-row ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <View className={`max-w-[82%] rounded-2xl px-3.5 py-2.5 ${m.role === 'user' ? 'rounded-br-md bg-brand-400' : 'rounded-bl-md border border-white/8 bg-ink-800'}`}>
-                    <Text className={`text-[14px] leading-snug ${m.role === 'user' ? 'text-black' : 'text-white/85'}`}>{m.text}</Text>
-                    {m.role === 'coach' && m.buttons && <SafetyContactButtons buttons={m.buttons} />}
-                    <Text className={`mt-1 text-[10px] ${m.role === 'user' ? 'text-black/50' : 'text-white/35'}`}>{m.time}</Text>
-                  </View>
-                </View>
-              ))}
-              {typing && <TypingDots />}
-            </View>
-
-            {showSuggestions && !typing && (
-              <View className="mt-3 flex-row flex-wrap gap-2">
-                {CHAT_SUGGESTIONS.map((s) => (
-                  <Pressable key={s} onPress={() => send(s)} className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 active:opacity-80"><Text className="text-[12px] font-medium text-white/70">{s}</Text></Pressable>
-                ))}
-              </View>
-            )}
+            {rows}
+            {typing && <TypingDots />}
           </ScrollView>
 
-          {/* Input — pinned to the bottom */}
-          <View className="flex-row items-end gap-2 border-t border-white/8 px-4 pt-3" style={{ paddingBottom: insets.bottom + 10 }}>
-            <TextInput
-              value={text}
-              onChangeText={setText}
-              multiline
-              placeholder="Message your coach…"
-              placeholderTextColor="rgba(255,255,255,0.3)"
-              className="max-h-28 min-h-[44px] flex-1 rounded-2xl border border-white/8 bg-ink-800 px-4 py-3 text-[15px] text-white"
-            />
-            <Pressable onPress={() => send()} disabled={!text.trim() || typing} className={`h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-400 active:opacity-90 ${!text.trim() || typing ? 'opacity-40' : ''}`}>
-              <Send size={18} color="#000" />
-            </Pressable>
+          {/* Footer: suggestion grid, reply banner and the input pill (design: padding 10px 18px 12px) */}
+          <View style={{ paddingTop: 10, paddingHorizontal: 18, paddingBottom: insets.bottom + 12 }}>
+            {showGrid && (
+              <View style={{ marginBottom: 12, borderRadius: 18, borderWidth: 1, borderColor: withAlpha(colors.fg, 0.05), backgroundColor: colors.ink800, padding: 14 }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.fg }}>What can I help with?</Text>
+                <Text style={{ fontSize: 12, color: withAlpha(colors.fg, 0.45), marginTop: 2, marginBottom: 12 }}>Pick a topic or type your own</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {COACH_TOPICS.map((topic) => (
+                    <Pressable
+                      key={topic.label}
+                      onPress={() => send(topic.label)}
+                      style={{ width: '48%', gap: 9, backgroundColor: colors.ink700, borderWidth: 1, borderColor: withAlpha(colors.fg, 0.06), borderRadius: 14, padding: 12 }}
+                      className="active:opacity-80"
+                    >
+                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: toneColorFor(topic.tone, colors) }} />
+                      <Text style={{ fontSize: 10, fontWeight: '700', letterSpacing: 0.7, textTransform: 'uppercase', color: withAlpha(colors.fg, 0.4) }}>{topic.cat}</Text>
+                      <Text style={{ fontSize: 13, lineHeight: 17.5, color: colors.fg }}>{topic.label}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {replyingTo && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10, paddingVertical: 8, paddingLeft: 10, paddingRight: 8, backgroundColor: colors.ink800, borderRadius: 12, borderLeftWidth: 3, borderLeftColor: colors.brand400 }}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: colors.brand400, marginBottom: 1 }}>Replying to {replyingTo.role === 'user' ? 'You' : 'Coach'}</Text>
+                  <Text numberOfLines={1} style={{ fontSize: 12.5, color: withAlpha(colors.fg, 0.6) }}>{replyingTo.text}</Text>
+                </View>
+                <Pressable onPress={() => setReplyingTo(null)} hitSlop={6} style={{ width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: withAlpha(colors.fg, 0.08) }} className="active:opacity-70">
+                  <X size={14} color={withAlpha(colors.fg, 0.6)} />
+                </Pressable>
+              </View>
+            )}
+
+            {/* Input — a single rounded pill with the send button inside */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: withAlpha(colors.fg, 0.1), backgroundColor: colors.ink800, borderRadius: 22, paddingLeft: 14, paddingRight: 6, paddingVertical: 6 }}>
+              <TextInput
+                value={text}
+                onChangeText={setText}
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
+                multiline
+                placeholder="Message your coach…"
+                placeholderTextColor={withAlpha(colors.fg, 0.38)}
+                onSubmitEditing={() => send()}
+                style={{ flex: 1, maxHeight: 112, paddingVertical: 6, fontSize: 15, color: colors.fg }}
+              />
+              <Pressable onPress={() => send()} disabled={!hasText || typing} style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: hasText ? colors.brand400 : withAlpha(colors.fg, 0.1) }} className="active:opacity-90">
+                <Send size={19} color={hasText ? '#0a0a0b' : withAlpha(colors.fg, 0.35)} />
+              </Pressable>
+            </View>
           </View>
         </View>
       </KeyboardAvoidingView>

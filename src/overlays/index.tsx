@@ -5,7 +5,7 @@ import * as ImagePicker from 'expo-image-picker'
 import { LinearGradient } from 'expo-linear-gradient'
 import {
   Bell, Moon, Sun, GraduationCap, Wallet, RotateCcw, Trash2, Camera, Trophy,
-  Flame, Search, ScanLine, Plus, Check, Share2, ChevronRight, User, Sparkles, Dumbbell,
+  Flame, Search, ScanLine, Plus, Check, Share2, ChevronRight, ChevronLeft, User, Sparkles, Dumbbell,
   Droplet, Footprints, BedDouble, Leaf, Clock, Play, Award, BellRing,
   HeartPulse, Activity, Zap, Minus, X, LogOut, Volume2,
 } from 'lucide-react-native'
@@ -33,7 +33,7 @@ import {
   habitConsistencyWeek, leaderboardSorted, strengthProgress, activitiesInRange,
 } from '../store/selectors'
 import { ActivityIcon } from '../components/ActivityIcon'
-import { examState, dailyTargets, defaultExamWindow } from '../store/training'
+import { examState, dailyTargets } from '../store/training'
 import { translator, LANGUAGES, type Language } from '../lib/i18n'
 import { shareText } from '../lib/share'
 import type { MealName, Units, Theme, NotificationPrefs } from '../store/types'
@@ -1005,26 +1005,23 @@ export function BadgesSheet({ open, onClose }: Props) {
 /* ============================ Exam Mode ============================ */
 export function ExamModeSheet({ open, onClose }: Props) {
   const { state, dispatch } = useStore()
-  const toast = useToast()
-  const on = state.profile.examMode
-  const ex = examState(state)
-  const fallback = defaultExamWindow()
-  const [start, setStart] = useState(state.profile.examStartKey ?? fallback.startKey)
-  const [end, setEnd] = useState(state.profile.examEndKey ?? fallback.endKey)
   const t = dailyTargets(state)
   const p = state.profile
+  const ex = examState(state)
 
-  function save() {
-    if (end < start) { toast('End date is before the start'); return }
-    dispatch({ type: 'SET_EXAM_DATES', startKey: start, endKey: end })
-    toast('Exam plan set. I have your back.')
-    onClose()
-  }
-  function turnOff() {
-    dispatch({ type: 'SET_PROFILE', patch: { examMode: false } })
-    toast('Exam mode off')
-    onClose()
-  }
+  // Live, sorted list of exam dates. Legacy single-window users are expanded to
+  // individual days once, so nothing is lost the first time they edit.
+  const dates = useMemo(() => {
+    if (p.examDates && p.examDates.length) return [...p.examDates].sort()
+    if (p.examStartKey && p.examEndKey) return rangeKeys(p.examStartKey, p.examEndKey)
+    return []
+  }, [p.examDates, p.examStartKey, p.examEndKey])
+  const on = dates.length > 0
+
+  // Every edit persists immediately (SET_EXAM_DATES_LIST keeps start/end in sync).
+  const commit = (next: string[]) => dispatch({ type: 'SET_EXAM_DATES_LIST', dateKeys: next })
+  const toggle = (key: string) => commit(dates.includes(key) ? dates.filter((k) => k !== key) : [...dates, key])
+  const remove = (key: string) => commit(dates.filter((k) => k !== key))
 
   const phaseLabel: Record<string, string> = {
     none: 'Not in your exam window yet',
@@ -1038,32 +1035,41 @@ export function ExamModeSheet({ open, onClose }: Props) {
       <View className="rounded-3xl border border-accent-purple/25 bg-accent-purple/10 p-5">
         <GraduationCap size={30} color={accent.purple} />
         <Text className="mt-2 text-xl font-extrabold tracking-tight text-white">Train through exam season</Text>
-        <Text className="mt-1 text-[14px] leading-snug text-white/60">Tell me when your exams are. I will quietly adjust your plan so training supports your studying instead of competing with it.</Text>
+        <Text className="mt-1 text-[14px] leading-snug text-white/60">Tap the days you have exams. I'll quietly adjust your plan so training supports your studying instead of competing with it.</Text>
       </View>
 
-      <View className="mt-4 gap-2.5">
-        <DateStepper
-          label="Exams start"
-          value={start}
-          min={todayKey}
-          onChange={(k) => { setStart(k); if (end < k) setEnd(k) }}
-        />
-        <DateStepper label="Exams end" value={end} min={start} onChange={setEnd} />
-      </View>
-      <Text className="mt-2.5 text-center text-[12px] text-white/45">
-        {(() => {
-          const len = Math.round((fromKey(end).getTime() - fromKey(start).getTime()) / 86400000) + 1
-          const until = Math.round((fromKey(start).getTime() - fromKey(todayKey).getTime()) / 86400000)
-          const window = `${len} day${len === 1 ? '' : 's'} of exams`
-          if (until > 0) return `${window} · starts in ${until} day${until === 1 ? '' : 's'}`
-          if (until === 0) return `${window} · starts today`
-          return window
-        })()}
+      <Text className="mb-2 mt-5 text-[12px] font-bold uppercase tracking-wide text-white/40">Pick your exam dates</Text>
+      <MonthCalendar selected={dates} onToggle={toggle} minKey={todayKey} />
+
+      <Text className="mb-2 mt-5 text-[12px] font-bold uppercase tracking-wide text-white/40">
+        {on ? `Your exam dates · ${dates.length}` : 'Your exam dates'}
       </Text>
-
-      {on && (
-        <Text className="mt-3 text-center text-[13px] font-semibold text-accent-purple">{phaseLabel[ex.phase]}</Text>
+      {on ? (
+        <View className="gap-2">
+          {dates.map((k) => {
+            const until = Math.round((fromKey(k).getTime() - fromKey(todayKey).getTime()) / 86400000)
+            const when = until <= 0 ? 'Today' : until === 1 ? 'Tomorrow' : `in ${until} days`
+            return (
+              <View key={k} className="flex-row items-center gap-3 rounded-2xl border border-white/8 bg-ink-800 p-3.5">
+                <View className="h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-purple/15"><GraduationCap size={17} color={accent.purple} /></View>
+                <View className="flex-1">
+                  <Text className="font-semibold text-white">{longDate(k)}</Text>
+                  <Text className="text-[12px] text-white/45">{when}</Text>
+                </View>
+                <Pressable onPress={() => remove(k)} hitSlop={8} accessibilityLabel={`Remove ${longDate(k)}`} className="h-8 w-8 items-center justify-center rounded-full bg-white/8 active:opacity-70">
+                  <X size={16} color="rgba(255,255,255,0.6)" />
+                </Pressable>
+              </View>
+            )
+          })}
+        </View>
+      ) : (
+        <View className="items-center rounded-2xl border border-dashed border-white/12 px-5 py-6">
+          <Text className="text-center text-[13px] text-white/45">No exam dates yet. Tap the days above to add them.</Text>
+        </View>
       )}
+
+      {on && <Text className="mt-3 text-center text-[13px] font-semibold text-accent-purple">{phaseLabel[ex.phase]}</Text>}
 
       <Text className="mb-2 mt-5 text-[12px] font-bold uppercase tracking-wide text-white/40">While exams are on</Text>
       <View className="gap-2.5">
@@ -1073,39 +1079,79 @@ export function ExamModeSheet({ open, onClose }: Props) {
         <AdaptRow label="Step target" value={`${Math.round(p.stepTarget * 0.7).toLocaleString()}, eased off`} />
       </View>
 
-      <Pressable onPress={save} className="btn-primary mt-6 w-full active:opacity-90">
-        <Text className="font-semibold text-black">{on ? 'Update exam plan' : 'Turn on exam mode'}</Text>
-      </Pressable>
       {on && (
-        <Pressable onPress={turnOff} className="mt-2 w-full items-center rounded-full bg-ink-700 py-3 active:opacity-90">
-          <Text className="text-sm font-semibold text-white/70">Turn off</Text>
+        <Pressable onPress={() => { commit([]); onClose() }} className="mt-5 w-full flex-row items-center justify-center gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 py-3.5 active:opacity-80">
+          <Trash2 size={17} color="#f87171" />
+          <Text className="text-sm font-semibold text-red-400">Clear all exam dates</Text>
         </Pressable>
       )}
     </Sheet>
   )
 }
 
-/* Tappable date control — no free-text, so an invalid date is impossible. Nudges
- * the day by ±1 day / ±1 week and never lets a value fall before `min`. */
-function DateStepper({ label, value, min, onChange }: { label: string; value: string; min?: string; onChange: (key: string) => void }) {
-  const shift = (days: number) => {
-    let next = toKey(addDays(fromKey(value), days))
-    if (min && next < min) next = min
-    onChange(next)
-  }
-  const atMin = (days: number) => !!min && toKey(addDays(fromKey(value), days)) < min && value <= min
-  const btn = 'flex-1 items-center rounded-lg py-2 active:opacity-80'
+/** All date keys from start to end inclusive (used to migrate a legacy window). */
+function rangeKeys(startKey: string, endKey: string): string[] {
+  const out: string[] = []
+  let d = fromKey(startKey)
+  const end = fromKey(endKey)
+  while (d.getTime() <= end.getTime()) { out.push(toKey(d)); d = addDays(d, 1) }
+  return out
+}
+
+const CAL_WD = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
+
+/** A tap-to-toggle month calendar. Past days are disabled; selected days fill purple. */
+function MonthCalendar({ selected, onToggle, minKey }: { selected: string[]; onToggle: (key: string) => void; minKey: string }) {
+  const today = fromKey(todayKey)
+  const [ym, setYm] = useState({ y: today.getFullYear(), m: today.getMonth() })
+  const sel = new Set(selected)
+  const first = new Date(ym.y, ym.m, 1)
+  const startDow = (first.getDay() + 6) % 7 // Monday = 0
+  const daysInMonth = new Date(ym.y, ym.m + 1, 0).getDate()
+  const cells: (string | null)[] = []
+  for (let i = 0; i < startDow; i++) cells.push(null)
+  for (let d = 1; d <= daysInMonth; d++) cells.push(toKey(new Date(ym.y, ym.m, d)))
+  while (cells.length % 7 !== 0) cells.push(null)
+  const monthLabel = first.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  // Don't let the user page back before the current month (all past days anyway).
+  const atFirst = ym.y === today.getFullYear() && ym.m === today.getMonth()
+  const prev = () => { if (!atFirst) setYm((a) => (a.m === 0 ? { y: a.y - 1, m: 11 } : { y: a.y, m: a.m - 1 })) }
+  const next = () => setYm((a) => (a.m === 11 ? { y: a.y + 1, m: 0 } : { y: a.y, m: a.m + 1 }))
+
   return (
-    <View className="rounded-2xl border border-white/8 bg-ink-800 p-3.5">
-      <View className="flex-row items-baseline justify-between">
-        <Text className="text-[12px] font-semibold text-white/50">{label}</Text>
-        <Text className="text-[15px] font-extrabold text-white">{longDate(value)}</Text>
+    <View className="rounded-2xl border border-white/8 bg-ink-800 p-3">
+      <View className="mb-2 flex-row items-center justify-between px-1">
+        <Pressable onPress={prev} disabled={atFirst} hitSlop={8} className={`h-8 w-8 items-center justify-center rounded-full ${atFirst ? 'opacity-25' : 'active:opacity-60'}`}>
+          <ChevronLeft size={20} color="rgba(255,255,255,0.7)" />
+        </Pressable>
+        <Text className="text-[15px] font-bold text-white">{monthLabel}</Text>
+        <Pressable onPress={next} hitSlop={8} className="h-8 w-8 items-center justify-center rounded-full active:opacity-60">
+          <ChevronRight size={20} color="rgba(255,255,255,0.7)" />
+        </Pressable>
       </View>
-      <View className="mt-2.5 flex-row gap-2">
-        <Pressable onPress={() => shift(-7)} disabled={atMin(-7)} className={`${btn} bg-ink-700 ${atMin(-7) ? 'opacity-40' : ''}`}><Text className="text-[12px] font-bold text-white/70">−1w</Text></Pressable>
-        <Pressable onPress={() => shift(-1)} disabled={atMin(-1)} className={`${btn} bg-ink-700 ${atMin(-1) ? 'opacity-40' : ''}`}><Text className="text-[12px] font-bold text-white/70">−1d</Text></Pressable>
-        <Pressable onPress={() => shift(1)} className={`${btn} bg-brand-400/20`}><Text className="text-[12px] font-bold text-brand-400">+1d</Text></Pressable>
-        <Pressable onPress={() => shift(7)} className={`${btn} bg-brand-400/20`}><Text className="text-[12px] font-bold text-brand-400">+1w</Text></Pressable>
+      <View className="flex-row">
+        {CAL_WD.map((w) => (
+          <View key={w} style={{ width: `${100 / 7}%` }} className="items-center py-1"><Text className="text-[11px] font-bold text-white/35">{w}</Text></View>
+        ))}
+      </View>
+      <View className="flex-row flex-wrap">
+        {cells.map((key, i) => {
+          if (!key) return <View key={i} style={{ width: `${100 / 7}%`, height: 42 }} />
+          const past = key < minKey
+          const isSel = sel.has(key)
+          const isToday = key === todayKey
+          return (
+            <View key={i} style={{ width: `${100 / 7}%`, height: 42, padding: 3 }}>
+              <Pressable
+                onPress={() => onToggle(key)}
+                disabled={past}
+                className={`flex-1 items-center justify-center rounded-xl ${isSel ? 'bg-accent-purple' : isToday ? 'border border-accent-purple/50' : ''} ${past ? 'opacity-20' : 'active:opacity-60'}`}
+              >
+                <Text className={`text-[13px] ${isSel ? 'font-bold text-white' : 'font-semibold text-white/80'}`}>{fromKey(key).getDate()}</Text>
+              </Pressable>
+            </View>
+          )
+        })}
       </View>
     </View>
   )

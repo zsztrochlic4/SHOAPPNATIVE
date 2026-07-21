@@ -376,7 +376,18 @@ export default function Dashboard() {
           <View className="h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent-purple/20"><GraduationCap size={22} color={accent.purple} /></View>
           <View className="flex-1">
             <Text className="font-bold text-white">Exam Survival Protocol</Text>
-            <Text className="text-[13px] text-white/55">{exam.active ? 'On. Shorter sessions, more recovery.' : 'Add your exam dates and I will adapt your plan.'}</Text>
+            <Text className="text-[13px] text-white/55">
+              {(() => {
+                if (!state.profile.examMode) return 'Add your exam dates and I will adapt your plan.'
+                const ds = state.profile.examDates ?? []
+                if (ds.length === 0) return 'On. Shorter sessions, more recovery.'
+                const upcoming = ds.filter((k) => k >= todayKey)
+                if (upcoming.length === 0) return `${ds.length} exam date${ds.length === 1 ? '' : 's'} · all done`
+                const until = Math.round((fromKey(upcoming[0]).getTime() - fromKey(todayKey).getTime()) / 86400000)
+                const nextLabel = until === 0 ? 'today' : until === 1 ? 'tomorrow' : `in ${until} days`
+                return `${ds.length} date${ds.length === 1 ? '' : 's'} set · next ${nextLabel}`
+              })()}
+            </Text>
           </View>
           <ChevronRight size={20} color={accent.purple} />
         </Pressable>

@@ -43,15 +43,7 @@ export function Sheet({
   const nav = useNav()
 
   if (bare) {
-    return (
-      <AppModal visible={open} transparent animationType="slide" onRequestClose={onClose}>
-        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-          <View className="bg-ink-900" style={{ height }}>
-            {children}
-          </View>
-        </View>
-      </AppModal>
-    )
+    return <BarePanel open={open} onClose={onClose}>{children}</BarePanel>
   }
 
   // Latch the presentation the moment the menu pushes this overlay, SYNCHRONOUSLY
@@ -200,6 +192,46 @@ function MenuDetailPanel({
           {children}
         </ScrollView>
       </Animated.View>
+    </AppModal>
+  )
+}
+
+/**
+ * Full-screen surface that slides in from the RIGHT (right → left) — used by the
+ * coach messenger opened from the dashboard, so it feels like the coach is pulled
+ * in from the edge rather than rising from the bottom. The child owns its whole
+ * layout and its own safe-area padding; an absolute fill (not a fixed height)
+ * makes it match the device frame exactly, clear of the iPhone top bar. Kept
+ * mounted through the slide-out so the exit plays.
+ */
+function BarePanel({ open, onClose, children }: { open: boolean; onClose: () => void; children: ReactNode }) {
+  const win = useWindowDimensions()
+  const width = IS_WEB ? WEB_SCREEN.width : win.width
+  const [render, setRender] = useState(open)
+  const progress = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    if (open) {
+      setRender(true)
+      Animated.timing(progress, { toValue: 1, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: !IS_WEB }).start()
+    } else if (render) {
+      // Ease-IN on the way out: opacity holds, then drops fast at the end, so the
+      // panel leaves crisply instead of lingering as a faint ghost near zero.
+      Animated.timing(progress, { toValue: 0, duration: 240, easing: Easing.in(Easing.cubic), useNativeDriver: !IS_WEB }).start(({ finished }) => {
+        if (finished) setRender(false)
+      })
+    }
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+  // A short slide in from the right, crossfaded with opacity — a clean reveal
+  // rather than a full-width sweep across the screen.
+  const translateX = progress.interpolate({ inputRange: [0, 1], outputRange: [Math.round(width * 0.22), 0] })
+  const opacity = progress.interpolate({ inputRange: [0, 1], outputRange: [0, 1] })
+  return (
+    <AppModal visible={render} transparent animationType="none" onRequestClose={onClose}>
+      <View style={{ flex: 1 }}>
+        <Animated.View className="bg-ink-900" style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, opacity, transform: [{ translateX }] }}>
+          {children}
+        </Animated.View>
+      </View>
     </AppModal>
   )
 }

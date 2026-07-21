@@ -57,7 +57,7 @@ export type Action =
   | { type: 'SAVE_TEMPLATE'; template: WorkoutTemplate }
   | { type: 'REMOVE_TEMPLATE'; id: string }
   | { type: 'SEND_CHAT'; text: string }
-  | { type: 'PUSH_CHAT'; role: 'user' | 'coach'; text: string; buttons?: ContactButton[] }
+  | { type: 'PUSH_CHAT'; role: 'user' | 'coach'; text: string; buttons?: ContactButton[]; replyTo?: { role: 'user' | 'coach'; text: string } }
   | { type: 'BUMP_COACH_USAGE' }
   | { type: 'SET_INTEGRATION'; id: string; patch: Partial<IntegrationState> }
   | {
@@ -84,6 +84,7 @@ export type Action =
   | { type: 'ADD_PHOTO'; dataUrl: string; note?: string }
   | { type: 'REMOVE_PHOTO'; id: string }
   | { type: 'SET_EXAM_DATES'; startKey: string; endKey: string }
+  | { type: 'SET_EXAM_DATES_LIST'; dateKeys: string[] }
   | { type: 'COMPLETE_LESSON'; id: string }
   | { type: 'GIVE_KUDOS'; postId: string }
   | { type: 'CONNECT_PARTNER'; id: string }
@@ -281,6 +282,7 @@ function reducer(state: AppState, action: Action): AppState {
         // user messages are read by definition; coach replies are read while the thread is open
         read: action.role === 'user',
         buttons: action.buttons,
+        replyTo: action.replyTo,
       }
       return { ...state, chat: [...state.chat, msg] }
     }
@@ -440,6 +442,16 @@ function reducer(state: AppState, action: Action): AppState {
 
     case 'SET_EXAM_DATES':
       return { ...state, profile: { ...state.profile, examMode: true, examStartKey: action.startKey, examEndKey: action.endKey } }
+
+    case 'SET_EXAM_DATES_LIST': {
+      // Dedupe + sort the picked dates. Empty list = protocol off. Otherwise keep
+      // start/end in sync with the min/max so the phase logic (examState) is unchanged.
+      const dates = Array.from(new Set(action.dateKeys)).sort()
+      if (dates.length === 0) {
+        return { ...state, profile: { ...state.profile, examMode: false, examDates: undefined, examStartKey: undefined, examEndKey: undefined } }
+      }
+      return { ...state, profile: { ...state.profile, examMode: true, examDates: dates, examStartKey: dates[0], examEndKey: dates[dates.length - 1] } }
+    }
 
     case 'COMPLETE_LESSON':
       return state.beginnerProgress.includes(action.id)

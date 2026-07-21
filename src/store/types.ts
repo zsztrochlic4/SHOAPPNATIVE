@@ -36,9 +36,12 @@ export interface Profile {
   sleepTargetH: number
   onboarded: boolean
   examMode: boolean
-  /** inclusive exam window, 'YYYY-MM-DD' */
+  /** inclusive exam window, 'YYYY-MM-DD' — kept as min/max of examDates for the
+   *  plan-adaptation phase logic. */
   examStartKey?: string
   examEndKey?: string
+  /** The individual exam dates the user picked, sorted 'YYYY-MM-DD'. */
+  examDates?: string[]
   budgetMode: boolean
   /** opted into the New to the Gym first-90-days track */
   newToGym: boolean
@@ -83,6 +86,8 @@ export interface ChatMessage {
   read: boolean
   /** Tap-to-call / tap-to-text buttons for a fixed safety response (spec §20). */
   buttons?: ContactButton[]
+  /** The message this one is a reply to (quoted above the bubble). */
+  replyTo?: { role: 'user' | 'coach'; text: string }
 }
 
 /** Per-category local-notification preferences (see lib/notifications). */
