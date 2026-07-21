@@ -10,7 +10,7 @@ import {
   HeartPulse, Activity, Zap, Minus, X, LogOut, Volume2,
 } from 'lucide-react-native'
 import { Sheet, EmptyState } from '../components/Sheet'
-import { AppModal, DEVICE, IS_WEB, WEB_SCREEN } from '../components/WebFrame'
+import { AppModal, DEVICE, IS_WEB } from '../components/WebFrame'
 import { IntegrationsSection } from '../components/Integrations'
 import { Avatar } from '../components/Avatar'
 import { LogoMark } from '../components/Logo'
@@ -301,11 +301,12 @@ export function MenuDrawer({ open, onClose }: { open: boolean; onClose: () => vo
       <Animated.View
         onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
         className="flex-1 bg-ink-900"
-        // On web the modal's flex chain doesn't give this a definite height, so
-        // the inner ScrollView grows to its content and never scrolls. Pin it to
-        // the visible screen area (device height minus the status bar) so the
-        // ScrollView is bounded and scrolls. Native keeps flex-1.
-        style={{ paddingTop: insets.top, transform: [{ translateX }], ...(IS_WEB ? { height: WEB_SCREEN.height - 44 } : null) }}
+        // A flex child defaults to `min-height: auto`, so on web the inner
+        // ScrollView grew to its content height and never scrolled — the last
+        // rows (Settings / Log out) ended up clipped below the device frame.
+        // `minHeight: 0` lets this column shrink to the real (clamped) device
+        // height so the ScrollView is bounded and scrolls. Native keeps flex-1.
+        style={{ paddingTop: insets.top, transform: [{ translateX }], ...(IS_WEB ? { flex: 1, minHeight: 0 } : null) }}
       >
         <View className="flex-row items-center gap-2 px-3 py-2.5">
           <Pressable onPress={onClose} hitSlop={8} className="h-9 w-9 items-center justify-center rounded-full active:opacity-70">
@@ -314,7 +315,7 @@ export function MenuDrawer({ open, onClose }: { open: boolean; onClose: () => vo
           <Text className="text-[17px] font-bold text-white">Menu</Text>
         </View>
 
-        <ScrollView className="flex-1 px-4" contentContainerStyle={{ paddingBottom: insets.bottom + 32 }} showsVerticalScrollIndicator={false}>
+        <ScrollView className="flex-1 px-4" style={IS_WEB ? { minHeight: 0 } : undefined} contentContainerStyle={{ paddingBottom: insets.bottom + 32 }} showsVerticalScrollIndicator={false}>
           <View className="flex-row items-center gap-4 pt-1">
             <Avatar name={`${p.name} M`} size={64} />
             <View className="min-w-0 flex-1">
