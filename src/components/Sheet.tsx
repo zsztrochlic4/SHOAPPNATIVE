@@ -35,14 +35,18 @@ export function Sheet({
           style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)' }}
         />
         <View
-          className="rounded-t-3xl border-t border-white/10 bg-ink-900"
-          style={{ height: full ? height * 0.92 : undefined, maxHeight: height * 0.88 }}
+          className={full ? 'bg-ink-900' : 'rounded-t-3xl border-t border-white/10 bg-ink-900'}
+          // `full` = a genuine full-screen surface (chat, builders): fill the device
+          // screen edge-to-edge. Otherwise a bottom sheet capped at 88%.
+          style={{ height: full ? height : undefined, maxHeight: full ? height : height * 0.88 }}
         >
           <View className="px-5 pb-2 pt-4">
-            <View
-              style={{ position: 'absolute', left: '50%', top: 8, marginLeft: -20, height: 4, width: 40, borderRadius: 999 }}
-              className="bg-white/20"
-            />
+            {!full && (
+              <View
+                style={{ position: 'absolute', left: '50%', top: 8, marginLeft: -20, height: 4, width: 40, borderRadius: 999 }}
+                className="bg-white/20"
+              />
+            )}
             <View className="flex-row items-center justify-between">
               <Text className="text-lg font-bold text-white">{title}</Text>
               <Pressable
@@ -60,7 +64,7 @@ export function Sheet({
             // its content and won't scroll. Cap it to the card's inner height
             // (sheet height minus the ~56px header) so overflow scrolls. Native
             // keeps flex-1.
-            style={IS_WEB ? { maxHeight: (full ? height * 0.92 : height * 0.88) - 56 } : undefined}
+            style={IS_WEB ? { maxHeight: (full ? height : height * 0.88) - 56 } : undefined}
             contentContainerStyle={{ paddingBottom: 32 + insets.bottom }}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"

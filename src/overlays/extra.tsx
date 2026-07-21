@@ -471,7 +471,7 @@ export function CoachChatSheet({ open, onClose }: Props) {
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title="Coach">
+    <Sheet open={open} onClose={onClose} title="Coach" full>
       {/* Header row (in-sheet) */}
       <View className="mb-3 flex-row items-center gap-2.5">
         <View className="relative shrink-0">

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { View, Text, Pressable, Image, TextInput, StyleSheet } from 'react-native'
+import { View, Text, Pressable, Image, TextInput, StyleSheet, ScrollView } from 'react-native'
 import Svg, { Path, Circle } from 'react-native-svg'
-import { CalendarDays, Clock, Play, ChevronRight, Check, Leaf, Plus, Trash2, Activity, Repeat, RefreshCw, Dumbbell } from 'lucide-react-native'
+import { CalendarDays, Clock, Play, ChevronRight, Check, Leaf, Plus, Trash2, Activity, Repeat, RefreshCw, Dumbbell, X } from 'lucide-react-native'
 import { Icon } from '../components/Icon'
 import { ActivityIcon } from '../components/ActivityIcon'
 import { ProgressBar, SegmentedTabs, ScreenHeader, Chip } from '../components/ui'
@@ -293,9 +293,13 @@ function ProgramTab() {
   )
 }
 
+// Preset muscle-group filters, in a natural push→pull→legs order (only those present are shown).
+const MUSCLE_ORDER = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Core', 'Quads', 'Hamstrings & Glutes', 'Calves', 'Full Body & Conditioning']
+
 function ExercisesTab() {
   const nav = useNav()
   const [q, setQ] = useState('')
+  const [muscle, setMuscle] = useState<string | null>(null)
   // The full canonical exercise database (workbook source of truth, 113), adapted for display
   // through the same `exerciseView` used everywhere else so imagery/muscle stay consistent.
   const all = useMemo(
@@ -306,9 +310,18 @@ function ExercisesTab() {
       }),
     [],
   )
+  const muscles = useMemo(() => {
+    const present = new Set(all.map((e) => e.muscle))
+    return MUSCLE_ORDER.filter((m) => present.has(m))
+  }, [all])
   const filtered = useMemo(
-    () => all.filter((e) => e.name.toLowerCase().includes(q.toLowerCase()) || e.muscle.toLowerCase().includes(q.toLowerCase())),
-    [q, all],
+    () =>
+      all.filter(
+        (e) =>
+          (!muscle || e.muscle === muscle) &&
+          (e.name.toLowerCase().includes(q.toLowerCase()) || e.muscle.toLowerCase().includes(q.toLowerCase())),
+      ),
+    [q, muscle, all],
   )
   return (
     <View>
@@ -324,9 +337,32 @@ function ExercisesTab() {
         placeholderTextColor="rgba(255,255,255,0.35)"
         className="mb-3 w-full rounded-xl border border-white/10 bg-ink-800 px-4 py-3 text-sm text-white"
       />
+      {/* Muscle-group filter chips — tap to filter, tap again (or the ✕) to clear */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-4 mb-3" contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
+        {muscles.map((m) => {
+          const on = muscle === m
+          return (
+            <Pressable
+              key={m}
+              onPress={() => setMuscle(on ? null : m)}
+              className={`flex-row items-center gap-1.5 rounded-full px-3.5 py-2 active:opacity-80 ${on ? 'bg-brand-400' : 'border border-white/10 bg-ink-800'}`}
+            >
+              <Text className={`text-[13px] font-semibold ${on ? 'text-black' : 'text-white/70'}`}>{m}</Text>
+              {on && <X size={13} strokeWidth={3} color="#000" />}
+            </Pressable>
+          )
+        })}
+      </ScrollView>
       <View className="mb-3 flex-row items-center justify-between px-0.5">
-        <Text className="text-[12px] font-semibold uppercase tracking-wide text-white/35">All exercises</Text>
-        <Text className="text-[12px] text-white/35">{filtered.length}</Text>
+        <Text className="text-[12px] font-semibold uppercase tracking-wide text-white/35">{muscle ?? 'All exercises'}</Text>
+        {muscle ? (
+          <Pressable onPress={() => setMuscle(null)} className="flex-row items-center gap-1 active:opacity-70" hitSlop={8}>
+            <Text className="text-[12px] font-semibold text-brand-400">{filtered.length} · Clear</Text>
+            <X size={12} strokeWidth={2.75} color={brand[400]} />
+          </Pressable>
+        ) : (
+          <Text className="text-[12px] text-white/35">{filtered.length}</Text>
+        )}
       </View>
       <View className="flex-row flex-wrap gap-3">
         {filtered.map((e) => (

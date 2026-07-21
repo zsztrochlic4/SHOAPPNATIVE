@@ -1,9 +1,10 @@
 import { useMemo, useState, useRef, useEffect, type ReactNode } from 'react'
 import {
   View, Text, Pressable, ScrollView, TextInput, Image,
-  KeyboardAvoidingView, Platform, Share, Animated, Easing,
+  KeyboardAvoidingView, Platform, Animated, Easing,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import * as Clipboard from 'expo-clipboard'
 import { LinearGradient } from 'expo-linear-gradient'
 import Svg, { Circle, G } from 'react-native-svg'
 import {
@@ -773,11 +774,26 @@ function RecipeModal({ meal, onClose }: { meal: BudgetMeal | null; onClose: () =
 
   async function copyRecipe() {
     if (!meal) return
-    const txt = `${meal.name}\n\nIngredients\n${meal.ingredients.map((i) => `- ${i}`).join('\n')}\n\nMethod\n${meal.steps.map((s, i) => `${i + 1}. ${s}`).join('\n')}`
+    // Copy a cleanly-formatted recipe to the clipboard (works on native + web), then confirm.
+    const txt = [
+      meal.name,
+      `${meal.category} · ${meal.minutes} min · serves ${meal.serves}`,
+      `${meal.kcal} kcal · ${meal.p}g protein · ${meal.c}g carbs · ${meal.f}g fat`,
+      '',
+      'INGREDIENTS',
+      ...meal.ingredients.map((i) => `• ${i}`),
+      '',
+      'METHOD',
+      ...meal.steps.map((s, i) => `${i + 1}. ${s}`),
+      ...(meal.cookOnce ? ['', `Tip: ${meal.cookOnce}`] : []),
+      '',
+      '— via StrengthHub',
+    ].join('\n')
     try {
-      await Share.share({ message: txt })
+      await Clipboard.setStringAsync(txt)
+      toast('Recipe copied to clipboard')
     } catch {
-      toast('Recipe copied')
+      toast("Couldn't copy — try again")
     }
   }
 
