@@ -7,6 +7,12 @@ import { useNav } from '../nav'
 import { useHorizontalSwipe } from '../lib/useHorizontalSwipe'
 import { AppModal, IS_WEB, WEB_SCREEN } from './WebFrame'
 
+// Menu → detail slide timing. Mirrors the dashboard → menu drawer (same
+// decelerating ease-out) so pushing a detail and backing out of it feel like
+// one continuous motion, in both directions.
+const DETAIL_MS = 300
+const DETAIL_EASE = Easing.bezier(0.22, 1, 0.36, 1)
+
 /** Bottom sheet / modal used for logging flows and the active workout. */
 export function Sheet({
   open,
@@ -14,12 +20,19 @@ export function Sheet({
   title,
   children,
   full = false,
+  bare = false,
 }: {
   open: boolean
   onClose: () => void
   title?: string
   children: ReactNode
   full?: boolean
+  /**
+   * Full-screen surface with NO built-in header or scroll view — the child owns
+   * the whole layout. For screens that need a fixed header and a bottom-pinned
+   * bar (e.g. the coach chat), where a single wrapping ScrollView is wrong.
+   */
+  bare?: boolean
 }) {
   const win = useWindowDimensions()
   // On web the sheet lives inside the phone mockup, so measure against the
@@ -28,6 +41,18 @@ export function Sheet({
   const insets = useSafeAreaInsets()
   const colors = useColors()
   const nav = useNav()
+
+  if (bare) {
+    return (
+      <AppModal visible={open} transparent animationType="slide" onRequestClose={onClose}>
+        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <View className="bg-ink-900" style={{ height }}>
+            {children}
+          </View>
+        </View>
+      </AppModal>
+    )
+  }
 
   // Latch the presentation at open time: if the menu pushed this overlay, show
   // it as a right-sliding detail. Latching (rather than reading `menuStack`
@@ -125,11 +150,14 @@ function MenuDetailPanel({
   const [render, setRender] = useState(open)
   const progress = useRef(new Animated.Value(0)).current
   useEffect(() => {
+    // Match the dashboard → menu (hamburger) feel in BOTH directions: the same
+    // decelerating ease-out and duration, so back / ✕ glide out rather than
+    // snapping off (an ease-in exit read as rushed).
     if (open) {
       setRender(true)
-      Animated.timing(progress, { toValue: 1, duration: 280, easing: Easing.bezier(0.22, 1, 0.36, 1), useNativeDriver: !IS_WEB }).start()
+      Animated.timing(progress, { toValue: 1, duration: DETAIL_MS, easing: DETAIL_EASE, useNativeDriver: !IS_WEB }).start()
     } else if (render) {
-      Animated.timing(progress, { toValue: 0, duration: 220, easing: Easing.bezier(0.4, 0, 1, 1), useNativeDriver: !IS_WEB }).start(({ finished }) => {
+      Animated.timing(progress, { toValue: 0, duration: DETAIL_MS, easing: DETAIL_EASE, useNativeDriver: !IS_WEB }).start(({ finished }) => {
         if (finished) setRender(false)
       })
     }

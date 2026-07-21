@@ -1,11 +1,9 @@
-import { useEffect, useRef } from 'react'
-import { Animated, View, Text } from 'react-native'
+import { useEffect, useRef, useState } from 'react'
+import { Animated, Easing, View, Text } from 'react-native'
 import Svg, { Path, G, Polygon, Circle, Defs, LinearGradient, Stop } from 'react-native-svg'
 import type { WeeklyIndex } from '../store/selectors'
 import { useColors } from '../theme'
 import { useCountUp } from '../lib/useCountUp'
-
-const AnimatedG = Animated.createAnimatedComponent(G)
 
 /**
  * Compact semicircular performance gauge. The needle sits in the middle when
@@ -38,15 +36,18 @@ export function IndexGauge({ index }: { index: WeeklyIndex }) {
   }
 
   const targetDeg = ((Math.max(0, Math.min(100, index.score)) - 50) / 50) * 90
+  // Drive the needle via a plain `transform="rotate()"` string rather than an
+  // animated `<G rotation>` prop: react-native-svg-web can't animate that SVG
+  // prop and logs a render error (which also pops RN-Web's LogBox). A listener
+  // mirrors the JS-driven value into state, so the same one-shot mount sweep
+  // runs on web and native without touching an animated SVG attribute.
+  const [deg, setDeg] = useState(-90)
   const anim = useRef(new Animated.Value(-90)).current
   useEffect(() => {
-    // Animating an SVG `<G rotation>` prop (not a view style transform), which
-    // the native animated driver cannot handle — it must run on the JS driver
-    // on every platform. useNativeDriver:true here also warns on web ("native
-    // animated module is missing").
-    const a = Animated.timing(anim, { toValue: targetDeg, duration: 950, useNativeDriver: false })
+    const id = anim.addListener(({ value }) => setDeg(value))
+    const a = Animated.timing(anim, { toValue: targetDeg, duration: 950, easing: Easing.out(Easing.cubic), useNativeDriver: false })
     a.start()
-    return () => a.stop()
+    return () => { a.stop(); anim.removeListener(id) }
   }, [targetDeg, anim])
 
   const rN = r - 16
@@ -65,13 +66,9 @@ export function IndexGauge({ index }: { index: WeeklyIndex }) {
         </Defs>
         <Path d={d} fill="none" stroke="rgba(130,130,130,0.18)" strokeWidth={stroke + 5} strokeLinecap="round" />
         <Path d={d} fill="none" stroke="url(#gaugeArc)" strokeWidth={stroke} strokeLinecap="round" />
-        <AnimatedG
-          originX={cx}
-          originY={cy}
-          rotation={anim as unknown as number}
-        >
+        <G transform={`rotate(${deg} ${cx} ${cy})`}>
           <Polygon points={`${cx - baseW},${cy} ${cx},${cy - rN} ${cx + baseW},${cy}`} fill={colors.needle} />
-        </AnimatedG>
+        </G>
         <Circle cx={cx} cy={cy} r={9} fill={colors.needle} />
         <Circle cx={cx} cy={cy} r={4} fill={colors.ink900} />
       </Svg>

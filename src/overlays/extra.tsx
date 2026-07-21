@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { View, Text, Pressable, Image, TextInput, Animated, Easing } from 'react-native'
+import { View, Text, Pressable, Image, TextInput, Animated, Easing, ScrollView, KeyboardAvoidingView, Platform } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
   Sparkles, Check, CheckCheck, ChevronRight, ChevronDown, Salad, Trophy, Flame,
   GraduationCap, Dumbbell, Lightbulb, ShieldQuestion, Share2, Plus, MapPin, Phone,
@@ -392,6 +393,8 @@ export function CoachChatSheet({ open, onClose }: Props) {
   const { state, dispatch } = useStore()
   const toast = useToast()
   const colors = useColors()
+  const insets = useSafeAreaInsets()
+  const scrollRef = useRef<ScrollView>(null)
   const [text, setText] = useState('')
   const [showBook, setShowBook] = useState(false)
   const [booked, setBooked] = useState<string | null>(null)
@@ -472,104 +475,121 @@ export function CoachChatSheet({ open, onClose }: Props) {
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title="Coach" full>
-      {/* Header row (in-sheet) */}
-      <View className="mb-3 flex-row items-center gap-2.5">
-        <View className="relative shrink-0">
-          <View className="h-9 w-9 items-center justify-center rounded-full bg-brand-400"><Sparkles size={18} color="#000" /></View>
-          <View className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-brand-400" style={{ borderWidth: 2, borderColor: colors.ink900 }} />
-        </View>
-        <View className="min-w-0 flex-1">
-          <Text numberOfLines={1} className="text-[15px] font-bold leading-tight text-white">Coach</Text>
-          <Text className="text-[12px] leading-tight text-white/45">Active now</Text>
-        </View>
-        <Pressable className="h-9 w-9 shrink-0 items-center justify-center rounded-full active:opacity-80">
-          <Phone size={20} color={brand[400]} />
-        </Pressable>
-        <Pressable onPress={() => setShowBook((v) => !v)} className="h-9 w-9 shrink-0 items-center justify-center rounded-full active:opacity-80">
-          <Video size={21} color={brand[400]} />
-        </Pressable>
-      </View>
-
-      {/* Book-a-call panel */}
-      {showBook && (
-        <View className="mb-3 rounded-2xl border border-white/8 bg-ink-800 px-4 py-3.5">
-          {booked ? (
-            <View className="flex-row items-start gap-2.5">
-              <View className="h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-400"><Check size={18} strokeWidth={3} color="#000" /></View>
-              <View className="flex-1">
-                <Text className="font-bold leading-tight text-white">Call booked</Text>
-                <Text className="text-[13px] text-white/60">{booked}. I'll send a video link to your email beforehand.</Text>
-              </View>
+    <Sheet open={open} onClose={onClose} title="Coach" full bare>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={{ flex: 1, paddingTop: insets.top }}>
+          {/* Header (fixed) */}
+          <View className="flex-row items-center gap-2.5 border-b border-white/8 px-3 py-2.5">
+            <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Close chat" className="h-9 w-9 shrink-0 items-center justify-center rounded-full active:opacity-70">
+              <ChevronDown size={24} color={colors.fg} />
+            </Pressable>
+            <View className="relative shrink-0">
+              <View className="h-9 w-9 items-center justify-center rounded-full bg-brand-400"><Sparkles size={18} color="#000" /></View>
+              <View className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-brand-400" style={{ borderWidth: 2, borderColor: colors.ink900 }} />
             </View>
-          ) : premium ? (
-            <>
-              <View className="mb-2.5 flex-row items-center gap-2">
-                <Video size={16} color={brand[400]} />
-                <Text className="text-sm font-bold text-white">Book a 1:1 video call</Text>
-                <View className="ml-auto flex-row items-center gap-1 rounded-full bg-brand-400/15 px-2 py-0.5"><Crown size={11} color={brand[400]} /><Text className="text-[10px] font-bold text-brand-400">Premium</Text></View>
+            <View className="min-w-0 flex-1">
+              <Text numberOfLines={1} className="text-[15px] font-bold leading-tight text-white">Coach</Text>
+              <Text className="text-[12px] leading-tight text-white/45">Active now</Text>
+            </View>
+            <Pressable className="h-9 w-9 shrink-0 items-center justify-center rounded-full active:opacity-80">
+              <Phone size={20} color={brand[400]} />
+            </Pressable>
+            <Pressable onPress={() => setShowBook((v) => !v)} className="h-9 w-9 shrink-0 items-center justify-center rounded-full active:opacity-80">
+              <Video size={21} color={brand[400]} />
+            </Pressable>
+          </View>
+
+          {/* Book-a-call panel (drops down under the header) */}
+          {showBook && (
+            <View className="border-b border-white/8 px-4 py-3">
+              <View className="rounded-2xl border border-white/8 bg-ink-800 px-4 py-3.5">
+                {booked ? (
+                  <View className="flex-row items-start gap-2.5">
+                    <View className="h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-400"><Check size={18} strokeWidth={3} color="#000" /></View>
+                    <View className="flex-1">
+                      <Text className="font-bold leading-tight text-white">Call booked</Text>
+                      <Text className="text-[13px] text-white/60">{booked}. I'll send a video link to your email beforehand.</Text>
+                    </View>
+                  </View>
+                ) : premium ? (
+                  <>
+                    <View className="mb-2.5 flex-row items-center gap-2">
+                      <Video size={16} color={brand[400]} />
+                      <Text className="text-sm font-bold text-white">Book a 1:1 video call</Text>
+                      <View className="ml-auto flex-row items-center gap-1 rounded-full bg-brand-400/15 px-2 py-0.5"><Crown size={11} color={brand[400]} /><Text className="text-[10px] font-bold text-brand-400">Premium</Text></View>
+                    </View>
+                    <View className="gap-2">
+                      {BOOKING_SLOTS.map((slot) => (
+                        <Pressable key={slot} onPress={() => pickSlot(slot)} className="w-full flex-row items-center gap-2.5 rounded-xl border border-white/8 bg-ink-700 p-3 active:opacity-80">
+                          <Clock size={15} color={brand[400]} />
+                          <Text className="text-[14px] font-semibold text-white">{slot}</Text>
+                          <ChevronRight size={16} color="rgba(255,255,255,0.3)" style={{ marginLeft: 'auto' }} />
+                        </Pressable>
+                      ))}
+                    </View>
+                  </>
+                ) : (
+                  <View className="rounded-xl border border-brand-400/25 bg-brand-400/[0.06] p-4">
+                    <View className="flex-row items-center gap-2">
+                      <View className="h-8 w-8 items-center justify-center rounded-full bg-brand-400"><Crown size={16} color="#000" /></View>
+                      <Text className="font-bold text-white">Video calls are Premium</Text>
+                      <Lock size={15} color="rgba(255,255,255,0.4)" style={{ marginLeft: 'auto' }} />
+                    </View>
+                    <Text className="mt-2 text-[13px] leading-snug text-white/65">Go Premium to book live 1:1 video calls with your coach for form checks, plan reviews and accountability. Text coaching stays free, always.</Text>
+                    <Pressable onPress={unlock} className="btn-primary mt-3 w-full flex-row items-center justify-center gap-1.5 py-2.5 active:opacity-90"><Crown size={15} color="#000" /><Text className="text-sm font-semibold text-black">Unlock Premium</Text></Pressable>
+                  </View>
+                )}
               </View>
-              <View className="gap-2">
-                {BOOKING_SLOTS.map((slot) => (
-                  <Pressable key={slot} onPress={() => pickSlot(slot)} className="w-full flex-row items-center gap-2.5 rounded-xl border border-white/8 bg-ink-700 p-3 active:opacity-80">
-                    <Clock size={15} color={brand[400]} />
-                    <Text className="text-[14px] font-semibold text-white">{slot}</Text>
-                    <ChevronRight size={16} color="rgba(255,255,255,0.3)" style={{ marginLeft: 'auto' }} />
-                  </Pressable>
-                ))}
-              </View>
-            </>
-          ) : (
-            <View className="rounded-xl border border-brand-400/25 bg-brand-400/[0.06] p-4">
-              <View className="flex-row items-center gap-2">
-                <View className="h-8 w-8 items-center justify-center rounded-full bg-brand-400"><Crown size={16} color="#000" /></View>
-                <Text className="font-bold text-white">Video calls are Premium</Text>
-                <Lock size={15} color="rgba(255,255,255,0.4)" style={{ marginLeft: 'auto' }} />
-              </View>
-              <Text className="mt-2 text-[13px] leading-snug text-white/65">Go Premium to book live 1:1 video calls with your coach for form checks, plan reviews and accountability. Text coaching stays free, always.</Text>
-              <Pressable onPress={unlock} className="btn-primary mt-3 w-full flex-row items-center justify-center gap-1.5 py-2.5 active:opacity-90"><Crown size={15} color="#000" /><Text className="text-sm font-semibold text-black">Unlock Premium</Text></Pressable>
             </View>
           )}
-        </View>
-      )}
 
-      {/* Messages */}
-      <View className="gap-3">
-        {messages.map((m) => (
-          <View key={m.id} className={`flex-row ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <View className={`max-w-[82%] rounded-2xl px-3.5 py-2.5 ${m.role === 'user' ? 'rounded-br-md bg-brand-400' : 'rounded-bl-md border border-white/8 bg-ink-800'}`}>
-              <Text className={`text-[14px] leading-snug ${m.role === 'user' ? 'text-black' : 'text-white/85'}`}>{m.text}</Text>
-              {m.role === 'coach' && m.buttons && <SafetyContactButtons buttons={m.buttons} />}
-              <Text className={`mt-1 text-[10px] ${m.role === 'user' ? 'text-black/50' : 'text-white/35'}`}>{m.time}</Text>
+          {/* Messages — fill the space between header and input, scroll, stick to newest */}
+          <ScrollView
+            ref={scrollRef}
+            className="flex-1"
+            contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 12 }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+          >
+            <View className="gap-3">
+              {messages.map((m) => (
+                <View key={m.id} className={`flex-row ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <View className={`max-w-[82%] rounded-2xl px-3.5 py-2.5 ${m.role === 'user' ? 'rounded-br-md bg-brand-400' : 'rounded-bl-md border border-white/8 bg-ink-800'}`}>
+                    <Text className={`text-[14px] leading-snug ${m.role === 'user' ? 'text-black' : 'text-white/85'}`}>{m.text}</Text>
+                    {m.role === 'coach' && m.buttons && <SafetyContactButtons buttons={m.buttons} />}
+                    <Text className={`mt-1 text-[10px] ${m.role === 'user' ? 'text-black/50' : 'text-white/35'}`}>{m.time}</Text>
+                  </View>
+                </View>
+              ))}
+              {typing && <TypingDots />}
             </View>
+
+            {showSuggestions && !typing && (
+              <View className="mt-3 flex-row flex-wrap gap-2">
+                {CHAT_SUGGESTIONS.map((s) => (
+                  <Pressable key={s} onPress={() => send(s)} className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 active:opacity-80"><Text className="text-[12px] font-medium text-white/70">{s}</Text></Pressable>
+                ))}
+              </View>
+            )}
+          </ScrollView>
+
+          {/* Input — pinned to the bottom */}
+          <View className="flex-row items-end gap-2 border-t border-white/8 px-4 pt-3" style={{ paddingBottom: insets.bottom + 10 }}>
+            <TextInput
+              value={text}
+              onChangeText={setText}
+              multiline
+              placeholder="Message your coach…"
+              placeholderTextColor="rgba(255,255,255,0.3)"
+              className="max-h-28 min-h-[44px] flex-1 rounded-2xl border border-white/8 bg-ink-800 px-4 py-3 text-[15px] text-white"
+            />
+            <Pressable onPress={() => send()} disabled={!text.trim() || typing} className={`h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-400 active:opacity-90 ${!text.trim() || typing ? 'opacity-40' : ''}`}>
+              <Send size={18} color="#000" />
+            </Pressable>
           </View>
-        ))}
-        {typing && <TypingDots />}
-      </View>
-
-      {/* Suggestions */}
-      {showSuggestions && !typing && (
-        <View className="mt-2 flex-row flex-wrap gap-2">
-          {CHAT_SUGGESTIONS.map((s) => (
-            <Pressable key={s} onPress={() => send(s)} className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 active:opacity-80"><Text className="text-[12px] font-medium text-white/70">{s}</Text></Pressable>
-          ))}
         </View>
-      )}
-
-      {/* Input */}
-      <View className="mt-3 flex-row items-end gap-2 border-t border-white/8 pt-3">
-        <TextInput
-          value={text}
-          onChangeText={setText}
-          multiline
-          placeholder="Message your coach…"
-          placeholderTextColor="rgba(255,255,255,0.3)"
-          className="max-h-28 min-h-[44px] flex-1 rounded-2xl border border-white/8 bg-ink-800 px-4 py-3 text-[15px] text-white"
-        />
-        <Pressable onPress={() => send()} disabled={!text.trim() || typing} className={`h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-400 active:opacity-90 ${!text.trim() || typing ? 'opacity-40' : ''}`}>
-          <Send size={18} color="#000" />
-        </Pressable>
-      </View>
+      </KeyboardAvoidingView>
     </Sheet>
   )
 }
