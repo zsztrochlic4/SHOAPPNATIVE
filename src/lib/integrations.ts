@@ -28,6 +28,19 @@ export const PROVIDERS: Provider[] = [
   { id: 'healthConnect', name: 'Health Connect', sub: 'Steps, sleep & workouts (Android app)', kind: 'native' },
 ]
 
+/**
+ * Providers to show on the current platform: Apple Health is iOS-only, Health
+ * Connect is Android-only. On web (the preview) both show so the section is
+ * visible during design.
+ */
+export function platformProviders(): Provider[] {
+  return PROVIDERS.filter((p) => {
+    if (Platform.OS === 'ios') return p.id === 'appleHealth'
+    if (Platform.OS === 'android') return p.id === 'healthConnect'
+    return true
+  })
+}
+
 /** True when this provider can actually be connected in the current build. */
 export function providerAvailable(p: Provider): { ok: boolean; why?: string } {
   if (p.kind === 'soon') return { ok: false, why: `${p.name} support is coming soon.` }

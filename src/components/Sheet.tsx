@@ -7,11 +7,11 @@ import { useNav } from '../nav'
 import { useHorizontalSwipe } from '../lib/useHorizontalSwipe'
 import { AppModal, IS_WEB, WEB_SCREEN } from './WebFrame'
 
-// Menu → detail slide timing. Mirrors the dashboard → menu drawer (same
-// decelerating ease-out) so pushing a detail and backing out of it feel like
-// one continuous motion, in both directions.
-const DETAIL_MS = 300
-const DETAIL_EASE = Easing.bezier(0.22, 1, 0.36, 1)
+// Menu → detail transition: 280ms ease-out, both directions — a short slide
+// crossfaded with opacity (see MenuDetailPanel), calm enough to read as a clean,
+// natural reveal rather than an abrupt full-width sweep.
+const DETAIL_MS = 280
+const DETAIL_EASE = Easing.out(Easing.cubic)
 
 /** Bottom sheet / modal used for logging flows and the active workout. */
 export function Sheet({
@@ -54,13 +54,16 @@ export function Sheet({
     )
   }
 
-  // Latch the presentation at open time: if the menu pushed this overlay, show
-  // it as a right-sliding detail. Latching (rather than reading `menuStack`
-  // live) keeps the exit animation in detail mode after `close` clears the flag.
+  // Latch the presentation the moment the menu pushes this overlay, SYNCHRONOUSLY
+  // during render (the "adjust state when a prop changes" pattern) — a post-render
+  // effect would commit one frame of the bottom-sheet slide-up before switching to
+  // the right-slide panel, making the open feel different from the close. Latching
+  // (vs reading `menuStack` live) keeps the exit in detail mode after `close`
+  // clears the flag, so the slide-out plays in the same mode it slid in.
   const [menuMode, setMenuMode] = useState(false)
-  useEffect(() => {
-    if (open) setMenuMode(nav.menuStack)
-  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+  const wasOpen = useRef(false)
+  if (open && !wasOpen.current && menuMode !== nav.menuStack) setMenuMode(nav.menuStack)
+  wasOpen.current = open
 
   if (menuMode) {
     return (
@@ -125,7 +128,7 @@ export function Sheet({
  * A menu detail presented as a full-screen pane that slides in from the right
  * over the still-mounted menu. The top-left chevron returns to the menu
  * (`onBack`); the top-right ✕ dismisses everything to the dashboard
- * (`onDashboard`). A rightward swipe-back mirrors the chevron. Kept mounted
+ * (`onDashboard`). A leftward swipe-back mirrors the chevron. Kept mounted
  * through the slide-out so the exit animation plays (no hard cut).
  */
 function MenuDetailPanel({
@@ -150,9 +153,8 @@ function MenuDetailPanel({
   const [render, setRender] = useState(open)
   const progress = useRef(new Animated.Value(0)).current
   useEffect(() => {
-    // Match the dashboard → menu (hamburger) feel in BOTH directions: the same
-    // decelerating ease-out and duration, so back / ✕ glide out rather than
-    // snapping off (an ease-in exit read as rushed).
+    // Identical duration + easing in BOTH directions, so opening a detail and
+    // closing it are exact mirror animations at the same speed.
     if (open) {
       setRender(true)
       Animated.timing(progress, { toValue: 1, duration: DETAIL_MS, easing: DETAIL_EASE, useNativeDriver: !IS_WEB }).start()
@@ -163,17 +165,21 @@ function MenuDetailPanel({
     }
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const { panHandlers, dragX } = useHorizontalSwipe({ width, onSwipeRight: onBack })
-  // Base slide (progress) plus the live swipe-back drag, clamped to ≥ 0.
-  const base = progress.interpolate({ inputRange: [0, 1], outputRange: [width, 0] })
+  // Clean "rise into place": a short left-anchored slide (a fraction of the
+  // width, not a full-screen sweep) crossfaded with opacity, so the detail
+  // materialises from the menu's side rather than wiping across a dark backdrop.
+  // Swipe-back is a leftward drag toward that same exit edge.
+  const { panHandlers, dragX } = useHorizontalSwipe({ width, onSwipeLeft: onBack })
+  const base = progress.interpolate({ inputRange: [0, 1], outputRange: [-Math.round(width * 0.22), 0] })
   const translateX = Animated.add(base, dragX)
+  const opacity = progress.interpolate({ inputRange: [0, 1], outputRange: [0, 1] })
 
   return (
     <AppModal visible={render} animationType="none" onRequestClose={onBack}>
       <Animated.View
         {...panHandlers}
         className="flex-1 bg-ink-900"
-        style={{ paddingTop: insets.top, transform: [{ translateX }], ...(IS_WEB ? { flex: 1, minHeight: 0 } : null) }}
+        style={{ paddingTop: insets.top, opacity, transform: [{ translateX }], ...(IS_WEB ? { flex: 1, minHeight: 0 } : null) }}
       >
         <View className="flex-row items-center gap-1 px-3 py-2.5">
           <Pressable onPress={onBack} hitSlop={8} accessibilityLabel="Back to menu" className="h-9 w-9 items-center justify-center rounded-full active:opacity-70">

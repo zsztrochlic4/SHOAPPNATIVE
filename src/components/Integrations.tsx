@@ -3,7 +3,7 @@ import { View, Text, Pressable, ActivityIndicator } from 'react-native'
 import { HeartPulse, Activity, RefreshCw } from 'lucide-react-native'
 import { useStore } from '../store/store'
 import { useToast } from './Toast'
-import { PROVIDERS, providerAvailable, syncAll, lastSyncLabel, type Provider, type ProviderId } from '../lib/integrations'
+import { platformProviders, providerAvailable, syncAll, lastSyncLabel, type Provider, type ProviderId } from '../lib/integrations'
 import { brand, accent } from '../theme'
 
 const ICONS: Record<ProviderId, ReactNode> = {
@@ -66,7 +66,7 @@ export function IntegrationsSection() {
 
   return (
     <View className="gap-2.5">
-      {PROVIDERS.map((p) => {
+      {platformProviders().map((p) => {
         const st = integ[p.id]
         const on = !!st?.connected
         const sync = lastSyncLabel(st)

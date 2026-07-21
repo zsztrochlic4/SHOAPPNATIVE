@@ -6,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import {
   Bell, Moon, Sun, GraduationCap, Wallet, RotateCcw, Trash2, Camera, Trophy,
   Flame, Search, ScanLine, Plus, Check, Share2, ChevronRight, User, Sparkles, Dumbbell,
-  Droplet, Footprints, BedDouble, Leaf, Clock, Play, Award, BellRing, Crown,
+  Droplet, Footprints, BedDouble, Leaf, Clock, Play, Award, BellRing,
   HeartPulse, Activity, Zap, Minus, X, LogOut, Volume2,
 } from 'lucide-react-native'
 import { Sheet, EmptyState } from '../components/Sheet'
@@ -87,10 +87,17 @@ export function NotificationsSheet({ open, onClose }: Props) {
 }
 
 /* ============================ Settings ============================ */
-export function SettingsSheet({ open, onClose }: Props) {
+/**
+ * Every Settings control, with no surface of its own — rendered both inside the
+ * SettingsSheet modal and inline in the side menu, so the settings are reachable
+ * straight from the menu without a second tap. `visible` drives the
+ * reset-on-hide of transient state; `onDone` dismisses the host after a data
+ * reset (which drops back to onboarding / the fresh demo).
+ */
+export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: () => void }) {
   const { state, dispatch } = useStore()
   const toast = useToast()
-  const { units, theme, notificationsEnabled } = state.settings
+  const { notificationsEnabled } = state.settings
   const soundEnabled = state.settings.soundEnabled ?? true
   const lang = state.settings.language ?? 'en'
   const t = translator(lang)
@@ -98,7 +105,7 @@ export function SettingsSheet({ open, onClose }: Props) {
   // (RN's Alert is a no-op on react-native-web, so a dialog would never show).
   const [confirmingClear, setConfirmingClear] = useState(false)
   const [langOpen, setLangOpen] = useState(false)
-  useEffect(() => { if (!open) { setConfirmingClear(false); setLangOpen(false) } }, [open])
+  useEffect(() => { if (!visible) { setConfirmingClear(false); setLangOpen(false) } }, [visible])
   const currentLang = LANGUAGES.find((l) => l.code === lang) ?? LANGUAGES[0]
 
   function toggleNotifs() {
@@ -123,7 +130,7 @@ export function SettingsSheet({ open, onClose }: Props) {
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title={t('settings.title')}>
+    <>
       <Group label={t('settings.language')}>
         {/* Collapsed disclosure row (iOS Settings pattern) — opens the full
          *  picker on tap instead of a long always-open grid. */}
@@ -160,22 +167,6 @@ export function SettingsSheet({ open, onClose }: Props) {
         )}
       </Group>
 
-      <Group label={t('settings.units')}>
-        <Segmented<Units>
-          value={units}
-          options={[{ v: 'metric', l: t('settings.metric') }, { v: 'imperial', l: t('settings.imperial') }]}
-          onChange={(v) => dispatch({ type: 'SET_SETTINGS', patch: { units: v } })}
-        />
-      </Group>
-
-      <Group label={t('settings.appearance')}>
-        <Segmented<Theme>
-          value={theme}
-          options={[{ v: 'dark', l: t('settings.dark'), icon: <Moon size={15} color={theme === 'dark' ? '#000' : 'rgba(255,255,255,0.6)'} /> }, { v: 'light', l: t('settings.light'), icon: <Sun size={15} color={theme === 'light' ? '#000' : 'rgba(255,255,255,0.6)'} /> }]}
-          onChange={(v) => dispatch({ type: 'SET_SETTINGS', patch: { theme: v } })}
-        />
-      </Group>
-
       {/* Connected apps / integrations */}
       <Group label={t('settings.connected')}>
         <IntegrationsSection />
@@ -189,32 +180,10 @@ export function SettingsSheet({ open, onClose }: Props) {
         <Row icon={<Volume2 size={18} color={brand[400]} />} title={t('settings.sound')} sub={t('settings.soundSub')}>
           <Toggle on={soundEnabled} onPress={toggleSound} />
         </Row>
-        <Row icon={<GraduationCap size={18} color={accent.purple} />} title={t('settings.examMode')} sub={t('settings.examModeSub')}>
-          <Toggle
-            on={state.profile.examMode}
-            onPress={() => {
-              const next = !state.profile.examMode
-              // Enabling with no window would leave exam mode active forever. Seed a
-              // bounded 2-week window starting today (editable in the Exam sheet) so
-              // "on" always maps to a real, finite exam period.
-              if (next && (!state.profile.examStartKey || !state.profile.examEndKey)) {
-                dispatch({ type: 'SET_EXAM_DATES', startKey: todayKey, endKey: toKey(addDays(fromKey(todayKey), 13)) })
-              } else {
-                dispatch({ type: 'SET_PROFILE', patch: { examMode: next } })
-              }
-            }}
-          />
-        </Row>
-        <Row icon={<Wallet size={18} color={brand[400]} />} title={t('settings.budget')} sub={t('settings.budgetSub')}>
-          <Toggle on={state.profile.budgetMode} onPress={() => dispatch({ type: 'SET_PROFILE', patch: { budgetMode: !state.profile.budgetMode } })} />
-        </Row>
-        <Row icon={<Crown size={18} color={brand[400]} />} title={t('settings.premium')} sub={t('settings.premiumSub')}>
-          <Toggle on={state.profile.premium} onPress={() => dispatch({ type: 'SET_PROFILE', patch: { premium: !state.profile.premium } })} />
-        </Row>
       </Group>
 
       <Group label={t('settings.data')}>
-        <Pressable onPress={() => { dispatch({ type: 'RESET_DEMO' }); toast('Demo data restored'); onClose() }} className="w-full flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-4 active:opacity-90">
+        <Pressable onPress={() => { dispatch({ type: 'RESET_DEMO' }); toast('Demo data restored'); onDone?.() }} className="w-full flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-4 active:opacity-90">
           <RotateCcw size={18} color={brand[400]} />
           <View className="flex-1">
             <Text className="font-bold text-white">{t('settings.resetDemo')}</Text>
@@ -228,7 +197,7 @@ export function SettingsSheet({ open, onClose }: Props) {
             // into onboarding (Shell renders <Onboarding/> when !profile.onboarded).
             dispatch({ type: 'RESET_EMPTY' })
             setConfirmingClear(false)
-            onClose()
+            onDone?.()
           }}
           className={`w-full flex-row items-center gap-3 rounded-2xl border p-4 active:opacity-90 ${confirmingClear ? 'border-red-500/60 bg-red-500/15' : 'border-red-500/20 bg-red-500/5'}`}
         >
@@ -244,6 +213,46 @@ export function SettingsSheet({ open, onClose }: Props) {
         <LogoMark size={34} />
         <Text className="text-[12px] text-white/30">StrengthHub Online · v1.0</Text>
       </View>
+    </>
+  )
+}
+
+/**
+ * Units + appearance — the two quick display toggles, pulled out so they can sit
+ * at the very top of the menu for fast access (and reused in the Settings sheet).
+ */
+export function DisplaySettings() {
+  const { state, dispatch } = useStore()
+  const { units, theme } = state.settings
+  const t = translator(state.settings.language ?? 'en')
+  return (
+    <>
+      <Group label={t('settings.units')}>
+        <Segmented<Units>
+          value={units}
+          options={[{ v: 'metric', l: t('settings.metric') }, { v: 'imperial', l: t('settings.imperial') }]}
+          onChange={(v) => dispatch({ type: 'SET_SETTINGS', patch: { units: v } })}
+        />
+      </Group>
+
+      <Group label={t('settings.appearance')}>
+        <Segmented<Theme>
+          value={theme}
+          options={[{ v: 'dark', l: t('settings.dark'), icon: <Moon size={15} color={theme === 'dark' ? '#000' : 'rgba(255,255,255,0.6)'} /> }, { v: 'light', l: t('settings.light'), icon: <Sun size={15} color={theme === 'light' ? '#000' : 'rgba(255,255,255,0.6)'} /> }]}
+          onChange={(v) => dispatch({ type: 'SET_SETTINGS', patch: { theme: v } })}
+        />
+      </Group>
+    </>
+  )
+}
+
+export function SettingsSheet({ open, onClose }: Props) {
+  const { state } = useStore()
+  const t = translator(state.settings.language ?? 'en')
+  return (
+    <Sheet open={open} onClose={onClose} title={t('settings.title')}>
+      <DisplaySettings />
+      <SettingsBody visible={open} onDone={onClose} />
     </Sheet>
   )
 }
@@ -256,7 +265,6 @@ export function MenuDrawer({ open, onClose }: { open: boolean; onClose: () => vo
   const nav = useNav()
   const insets = useSafeAreaInsets()
   const p = state.profile
-  const earned = state.badges.filter((b) => b.earned).length
   const unread = state.notifications.filter((n) => !n.read).length
   const goalLabel: Record<string, string> = { 'build-muscle': 'Build Muscle', 'lose-fat': 'Lose Fat', 'gain-strength': 'Get Stronger', 'stay-healthy': 'Stay Healthy' }
   const joined = fromKey(p.createdAtKey).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
@@ -329,20 +337,18 @@ export function MenuDrawer({ open, onClose }: { open: boolean; onClose: () => vo
             </View>
           </View>
 
-          <MenuSection title="Your progress">
-            <MenuRow icon={<Sparkles size={17} color={brand[400]} />} title="Weekly recap" sub="Your week in numbers" onPress={go('recap')} first />
-            <MenuRow icon={<Award size={17} color={brand[400]} />} title="Badges" sub={`${earned} earned`} onPress={go('badges')} />
-            <MenuRow icon={<Camera size={17} color={brand[400]} />} title="Progress photos" sub={`${state.photos.length} photos`} onPress={go('photos')} />
-          </MenuSection>
+          {/* Quick display toggles up top for fast access. */}
+          <View className="mt-6">
+            <DisplaySettings />
+          </View>
 
           <MenuSection title="Coaching">
             <MenuRow icon={<Sparkles size={17} color={brand[400]} />} title="Your coach" sub="Daily check-ins and milestones" onPress={go('coach')} first />
-            <MenuRow icon={<GraduationCap size={17} color={brand[400]} />} title="Exam Survival Protocol" sub={p.examMode ? 'On' : 'Off'} onPress={go('examMode')} />
             {p.newToGym && <MenuRow icon={<Leaf size={17} color={brand[400]} />} title="New to the gym" sub="Your first 90 days" onPress={go('beginner')} />}
           </MenuSection>
 
-          <MenuSection title="Community">
-            <MenuRow icon={<Trophy size={17} color={brand[400]} />} title="Campus leaderboard" sub={p.university} onPress={go('leaderboard')} first />
+          <MenuSection title="Activity">
+            <MenuRow icon={<Sparkles size={17} color={brand[400]} />} title="Weekly recap" sub="Your week in numbers" onPress={go('recap')} first />
             <MenuRow
               icon={<Bell size={17} color={brand[400]} />}
               title="Notifications"
@@ -352,9 +358,12 @@ export function MenuDrawer({ open, onClose }: { open: boolean; onClose: () => vo
             />
           </MenuSection>
 
-          <MenuSection title="App">
-            <MenuRow icon={<User size={17} color="rgba(255,255,255,0.7)" />} title="Settings" sub="Units, theme and data" onPress={go('settings')} first />
-          </MenuSection>
+          {/* Settings opened out inline — no header, so it reads as one continuous
+              menu rather than a section you tap into. Each control's own Group
+              label carries the structure. */}
+          <View className="mt-5">
+            <SettingsBody visible={open} onDone={onClose} />
+          </View>
 
           {authEnabled && (
             <Pressable
@@ -1221,10 +1230,33 @@ function HourStepper({ label, value, onChange }: { label: string; value: number;
 }
 
 function Segmented<T extends string>({ value, options, onChange }: { value: T; options: { v: T; l: string; icon?: ReactNode }[]; onChange: (v: T) => void }) {
+  const n = options.length
+  const idx = Math.max(0, options.findIndex((o) => o.v === value))
+  const [w, setW] = useState(0)
+  // Slide the highlight pill between options instead of hard-swapping the
+  // background, so switching units/theme reads as one smooth motion.
+  const anim = useRef(new Animated.Value(idx)).current
+  useEffect(() => {
+    Animated.timing(anim, { toValue: idx, duration: 200, easing: Easing.out(Easing.cubic), useNativeDriver: !IS_WEB }).start()
+  }, [idx, anim])
+
+  const PAD = 4, GAP = 4
+  const itemW = w > 0 ? (w - PAD * 2 - GAP * (n - 1)) / n : 0
+  const translateX = anim.interpolate({
+    inputRange: options.map((_, i) => i),
+    outputRange: options.map((_, i) => PAD + i * (itemW + GAP)),
+  })
+
   return (
-    <View className="flex-row gap-1 rounded-xl bg-ink-700 p-1">
+    <View onLayout={(e) => setW(e.nativeEvent.layout.width)} className="relative flex-row gap-1 rounded-xl bg-ink-700 p-1">
+      {itemW > 0 && (
+        <Animated.View
+          pointerEvents="none"
+          style={{ position: 'absolute', top: PAD, bottom: PAD, left: 0, width: itemW, borderRadius: 8, backgroundColor: brand[400], transform: [{ translateX }] }}
+        />
+      )}
       {options.map((o) => (
-        <Pressable key={o.v} onPress={() => onChange(o.v)} className={`flex-1 flex-row items-center justify-center gap-1.5 rounded-lg py-2.5 active:opacity-90 ${value === o.v ? 'bg-brand-400' : ''}`}>
+        <Pressable key={o.v} onPress={() => onChange(o.v)} className="flex-1 flex-row items-center justify-center gap-1.5 rounded-lg py-2.5 active:opacity-90">
           {o.icon}
           <Text className={`text-sm font-semibold ${value === o.v ? 'text-black' : 'text-white/60'}`}>{o.l}</Text>
         </Pressable>
