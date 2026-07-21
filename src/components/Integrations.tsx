@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { View, Text, Pressable, ActivityIndicator } from 'react-native'
-import { HeartPulse, Activity, Watch, RefreshCw } from 'lucide-react-native'
+import { HeartPulse, Activity, RefreshCw } from 'lucide-react-native'
 import { useStore } from '../store/store'
 import { useToast } from './Toast'
 import { PROVIDERS, providerAvailable, syncAll, lastSyncLabel, type Provider, type ProviderId } from '../lib/integrations'
@@ -9,8 +9,6 @@ import { brand, accent } from '../theme'
 const ICONS: Record<ProviderId, ReactNode> = {
   appleHealth: <HeartPulse size={18} color="#f87171" />,
   healthConnect: <Activity size={18} color={accent.blue} />,
-  garmin: <Watch size={18} color="rgba(255,255,255,0.6)" />,
-  fitbit: <Watch size={18} color="rgba(255,255,255,0.6)" />,
 }
 
 /**

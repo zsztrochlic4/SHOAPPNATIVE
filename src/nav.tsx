@@ -4,6 +4,7 @@ export type Overlay =
   | 'notifications'
   | 'settings'
   | 'activeWorkout'
+  | 'createSession'
   | 'customize'
   | 'logWeight'
   | 'logHabit'

@@ -34,7 +34,7 @@ import type {
   WorkoutSession,
 } from './types'
 
-export const SCHEMA_VERSION = 9
+export const SCHEMA_VERSION = 10
 const DAYS = 40 // 0..38 completed history, 39 = today (in progress)
 
 /* round to nearest 2.5 (plate increments) */
@@ -415,6 +415,7 @@ export function buildSeed(): AppState {
     beginnerProgress: [],
     generatedProgram: null,
     programStatus: null,
+    demo: true,
     v: SCHEMA_VERSION,
   }
 }
@@ -424,6 +425,7 @@ export function emptyState(): AppState {
   const s = buildSeed()
   return {
     ...s,
+    demo: false,
     profile: { ...s.profile, onboarded: false },
     weights: [],
     habits: [],

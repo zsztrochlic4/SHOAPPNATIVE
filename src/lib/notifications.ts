@@ -4,6 +4,7 @@ import * as Device from 'expo-device'
 import * as Notifications from 'expo-notifications'
 import { doc, setDoc, deleteDoc } from 'firebase/firestore'
 import { db } from './firebase'
+import type { NotificationPrefs } from '../store/types'
 
 /**
  * Push-notification foundation (client side).
@@ -139,4 +140,51 @@ export async function cancelAllReminders(): Promise<void> {
   } catch {
     /* ignore */
   }
+}
+
+/* --------------------------- preferences → schedule --------------------------- */
+
+/** Sensible lean-quiet defaults (used when a user has never touched the settings). */
+export const DEFAULT_NOTIF_PREFS: NotificationPrefs = {
+  workoutReminder: true,
+  streakReminder: true,
+  reminderHour: 17, // 5pm — a common "head to the gym" time
+  quiet: true,
+  quietStartHour: 22, // 10pm–7am
+  quietEndHour: 7,
+}
+
+/** The evening streak nudge is fixed at 8pm (outside the default quiet window). */
+const STREAK_HOUR = 20
+
+/** Is `hour` inside the quiet window [startH, endH)? Handles windows that wrap midnight. */
+export function inQuietHours(hour: number, startH: number, endH: number): boolean {
+  if (startH === endH) return false
+  return startH < endH ? hour >= startH && hour < endH : hour >= startH || hour < endH
+}
+
+/** Merge stored prefs over the defaults so older saves always resolve fully. */
+export function resolveNotifPrefs(prefs?: Partial<NotificationPrefs>): NotificationPrefs {
+  return { ...DEFAULT_NOTIF_PREFS, ...(prefs ?? {}) }
+}
+
+/**
+ * Reconcile scheduled local reminders with the user's settings: clears everything, then
+ * re-schedules only the enabled categories at their times (skipping any that land inside
+ * quiet hours). Safe no-op on web / Expo Go. Call on launch and whenever prefs change.
+ */
+export async function syncReminders(enabled: boolean, prefs?: Partial<NotificationPrefs>): Promise<void> {
+  if (!NATIVE) return
+  await cancelAllReminders()
+  if (!enabled) return
+  const p = resolveNotifPrefs(prefs)
+  const quiet = (h: number) => p.quiet && inQuietHours(h, p.quietStartHour, p.quietEndHour)
+  const jobs: DailyReminder[] = []
+  if (p.workoutReminder && !quiet(p.reminderHour)) {
+    jobs.push({ id: 'workout-reminder', title: 'Time to train 💪', body: "Your session's ready when you are — 45 minutes and it's done.", hour: p.reminderHour })
+  }
+  if (p.streakReminder && !quiet(STREAK_HOUR)) {
+    jobs.push({ id: 'streak-reminder', title: 'Keep your streak alive 🔥', body: 'Log today to keep the run going. Even a quick check-in counts.', hour: STREAK_HOUR })
+  }
+  for (const j of jobs) await scheduleDailyReminder(j)
 }

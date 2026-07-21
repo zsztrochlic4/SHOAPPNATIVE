@@ -7,12 +7,13 @@ import type { Action } from '../store/store'
  *
  * Apple Health (iOS) and Health Connect (Android) read on-device via HealthKit / Health
  * Connect, which needs the native app build — they are shown with their status until those
- * builds exist. Garmin/Fitbit are placeholders ("coming soon").
+ * builds exist.
  *
  * (The former Strava/Whoop OAuth path — and its `oauthToken`/`providerFetch` Cloud Functions —
- * were removed in favour of the native Apple Health / Health Connect direction.)
+ * plus the Garmin/Fitbit placeholders, were removed in favour of the native Apple Health /
+ * Health Connect direction.)
  */
-export type ProviderId = 'appleHealth' | 'healthConnect' | 'garmin' | 'fitbit'
+export type ProviderId = 'appleHealth' | 'healthConnect'
 
 export type Provider = {
   id: ProviderId
@@ -25,8 +26,6 @@ export type Provider = {
 export const PROVIDERS: Provider[] = [
   { id: 'appleHealth', name: 'Apple Health', sub: 'Steps, sleep & workouts (iOS app)', kind: 'native' },
   { id: 'healthConnect', name: 'Health Connect', sub: 'Steps, sleep & workouts (Android app)', kind: 'native' },
-  { id: 'garmin', name: 'Garmin', sub: 'Coming soon', kind: 'soon' },
-  { id: 'fitbit', name: 'Fitbit', sub: 'Coming soon', kind: 'soon' },
 ]
 
 /** True when this provider can actually be connected in the current build. */

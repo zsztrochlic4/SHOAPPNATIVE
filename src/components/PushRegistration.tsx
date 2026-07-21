@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useAuth } from '../auth/AuthProvider'
 import { useStore } from '../store/store'
-import { requestPushPermission, getPushToken, savePushToken } from '../lib/notifications'
+import { requestPushPermission, getPushToken, savePushToken, syncReminders } from '../lib/notifications'
 
 /**
  * Registers this device for notifications when a signed-in user has them enabled:
@@ -32,5 +32,21 @@ export function PushRegistration() {
     })().catch(() => { done.current = null })
   }, [user, enabled])
 
+  return null
+}
+
+/**
+ * Keeps on-device local reminders in sync with the user's notification settings:
+ * re-arms them on launch and reconciles whenever the toggle or any preference changes.
+ * Native-only and never throws (a safe no-op on web / Expo Go / demo). Runs regardless
+ * of auth so reminders work for signed-out and demo users too.
+ */
+export function NotificationsSync() {
+  const { state } = useStore()
+  const enabled = state.settings.notificationsEnabled
+  const prefs = state.settings.notificationPrefs
+  useEffect(() => {
+    void syncReminders(!!enabled, prefs)
+  }, [enabled, prefs])
   return null
 }

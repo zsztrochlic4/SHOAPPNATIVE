@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useReducer, useState, type ReactNode } from 'react'
+import { AppState as RNAppState } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { todayKey } from '../lib/date'
+import { todayKey, setLiveClock, refreshClock } from '../lib/date'
 import { buildSeed, emptyState, SCHEMA_VERSION } from './seed'
 import { coachReply } from '../lib/coachChat'
 import { coachContext, coachOperational, coachPrecheck, guardOutgoing, sharedCoachSession } from '../lib/coachSafety'
@@ -20,6 +21,7 @@ import type {
   Settings,
   UserMeal,
   WorkoutSession,
+  WorkoutTemplate,
 } from './types'
 import type { UserDoc, WorkoutInstanceDoc } from '../backend/schema'
 import type { StoredProgram, ProgramStatus } from '../backend/runtime/activate'
@@ -52,6 +54,8 @@ export type Action =
   | { type: 'MARK_NUTRITION_ASKED' }
   | { type: 'ADD_MY_MEAL'; meal: Omit<UserMeal, 'id' | 'createdAtKey'> }
   | { type: 'REMOVE_MY_MEAL'; id: string }
+  | { type: 'SAVE_TEMPLATE'; template: WorkoutTemplate }
+  | { type: 'REMOVE_TEMPLATE'; id: string }
   | { type: 'SEND_CHAT'; text: string }
   | { type: 'PUSH_CHAT'; role: 'user' | 'coach'; text: string; buttons?: ContactButton[] }
   | { type: 'BUMP_COACH_USAGE' }
@@ -112,6 +116,7 @@ function reducer(state: AppState, action: Action): AppState {
     case 'COMPLETE_ONBOARDING':
       return {
         ...state,
+        demo: false,
         profile: { ...state.profile, ...action.profile, onboarded: true },
         backendUser: action.backendUser ?? state.backendUser,
         generatedProgram: action.generatedProgram ?? null,
@@ -230,6 +235,18 @@ function reducer(state: AppState, action: Action): AppState {
 
     case 'REMOVE_MY_MEAL':
       return { ...state, myMeals: (state.myMeals ?? []).filter((m) => m.id !== action.id) }
+
+    case 'SAVE_TEMPLATE': {
+      const list = state.templates ?? []
+      const exists = list.some((t) => t.id === action.template.id)
+      const templates = exists
+        ? list.map((t) => (t.id === action.template.id ? action.template : t))
+        : [action.template, ...list]
+      return { ...state, templates }
+    }
+
+    case 'REMOVE_TEMPLATE':
+      return { ...state, templates: (state.templates ?? []).filter((t) => t.id !== action.id) }
 
     case 'SEND_CHAT': {
       const text = action.text.trim()
@@ -460,6 +477,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // state (if any) is loaded asynchronously from AsyncStorage right after.
   const [state, dispatch] = useReducer(reducer, undefined, buildSeed)
   const [hydrated, setHydrated] = useState(false)
+  // Forces a re-render when the module-level clock moves (demo↔live, day rollover).
+  const [, setClockTick] = useState(0)
+
+  // Keep the date clock aligned with demo vs. live. The demo runs frozen so its
+  // seeded history lines up; real users track live device time.
+  useEffect(() => {
+    setLiveClock(!state.demo)
+    setClockTick((t) => t + 1)
+  }, [state.demo])
+
+  // Re-derive "today" when the app returns to the foreground (covers reopening
+  // the next morning / across midnight). Only re-renders if the day changed.
+  useEffect(() => {
+    const sub = RNAppState.addEventListener('change', (s) => {
+      if (s === 'active' && refreshClock()) setClockTick((t) => t + 1)
+    })
+    return () => sub.remove()
+  }, [])
 
   useEffect(() => {
     let cancelled = false

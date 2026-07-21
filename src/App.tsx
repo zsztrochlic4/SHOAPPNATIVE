@@ -11,7 +11,7 @@ import { AuthScreen } from './auth/AuthScreen'
 import { WelcomeScreen } from './screens/Welcome'
 import { CloudSync } from './store/CloudSync'
 import { IntegrationsAutoSync } from './components/Integrations'
-import { PushRegistration } from './components/PushRegistration'
+import { PushRegistration, NotificationsSync } from './components/PushRegistration'
 import { ToastProvider } from './components/Toast'
 import { NavProvider, type Overlay } from './nav'
 import { themeVars, useThemeName, brand, cssVars } from './theme'
@@ -48,6 +48,7 @@ import {
   PostDetailSheet,
   ChallengeDetailSheet,
   CustomizeSheet,
+  CreateSessionSheet,
 } from './overlays'
 
 export type TabKey = 'dashboard' | 'workout' | 'nutrition' | 'progress' | 'community'
@@ -170,7 +171,7 @@ function Shell() {
       </View>
 
       {/* Overlays */}
-      <ActiveWorkout open={overlay === 'activeWorkout'} onClose={nav.close} />
+      <ActiveWorkout open={overlay === 'activeWorkout'} onClose={nav.close} params={params} />
       <NotificationsSheet open={overlay === 'notifications'} onClose={nav.close} />
       <SettingsSheet open={overlay === 'settings'} onClose={nav.close} />
       <MenuDrawer open={menuOpen} onClose={nav.closeMenu} />
@@ -194,6 +195,7 @@ function Shell() {
       <PostDetailSheet open={overlay === 'postDetail'} onClose={nav.close} params={params} />
       <ChallengeDetailSheet open={overlay === 'challengeDetail'} onClose={nav.close} params={params} />
       <CustomizeSheet open={overlay === 'customize'} onClose={nav.close} />
+      <CreateSessionSheet open={overlay === 'createSession'} onClose={nav.close} params={params} />
     </NavProvider>
   )
 }
@@ -260,6 +262,7 @@ function AuthGate() {
       <CloudSync />
       <IntegrationsAutoSync />
       <PushRegistration />
+      <NotificationsSync />
       <Shell />
     </>
   )

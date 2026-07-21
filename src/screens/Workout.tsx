@@ -12,6 +12,7 @@ import { EXERCISES } from '../data/catalog'
 import { fmtVolume, fmtWeight } from '../lib/format'
 import { relativeLabel, todayKey } from '../lib/date'
 import { todaySession, sessionProgress, completedSessions, activitiesForDay } from '../store/selectors'
+import { buildCustomSession } from '../store/programSession'
 import { brand, useColors } from '../theme'
 import { useToast } from '../components/Toast'
 import { syncAll } from '../lib/integrations'
@@ -135,6 +136,8 @@ function TodayTab() {
         </View>
       )}
 
+      <MyWorkouts />
+
       <OtherActivities />
 
       {/* Got 15 minutes? Express, no-equipment sessions */}
@@ -203,6 +206,63 @@ function OtherActivities() {
           <Pressable onPress={() => nav.open('logActivity')} className="w-full items-center rounded-2xl border border-dashed border-white/15 py-3 active:opacity-80">
             <Text className="text-sm font-semibold text-white/55">+ Log another activity</Text>
           </Pressable>
+        </View>
+      )}
+    </View>
+  )
+}
+
+/* Build-your-own sessions + saved reusable workouts (#2). */
+function MyWorkouts() {
+  const { state, dispatch } = useStore()
+  const nav = useNav()
+  const toast = useToast()
+  const templates = state.templates ?? []
+
+  function startTemplate(id: string) {
+    const tpl = templates.find((t) => t.id === id)
+    if (!tpl) return
+    const session = buildCustomSession(tpl.name, tpl.exercises, todayKey)
+    dispatch({ type: 'SAVE_SESSION', session })
+    nav.open('activeWorkout', { sessionId: session.id })
+  }
+
+  return (
+    <View className="mt-8">
+      <View className="mb-3">
+        <Text className="section-title">Your workouts</Text>
+        <Text className="text-[12px] text-white/45">Build your own session — your exercises, your way</Text>
+      </View>
+
+      <Pressable onPress={() => nav.open('createSession')} className="w-full flex-row items-center gap-3 rounded-2xl border border-brand-400/25 bg-brand-400/5 p-3.5 active:opacity-90">
+        <View className="h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-400/15"><Plus size={20} color={brand[400]} /></View>
+        <View className="flex-1">
+          <Text className="font-bold leading-tight text-white">New workout</Text>
+          <Text className="text-[12px] text-white/50">Pick exercises, set sets & reps, then start</Text>
+        </View>
+        <ChevronRight size={18} color="rgba(255,255,255,0.3)" />
+      </Pressable>
+
+      {templates.length > 0 && (
+        <View className="mt-2.5 gap-2.5">
+          {templates.map((t) => (
+            <View key={t.id} className="flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-3">
+              <Pressable onPress={() => nav.open('createSession', { templateId: t.id })} className="min-w-0 flex-1 flex-row items-center gap-3 active:opacity-80">
+                <Image source={{ uri: t.exercises[0]?.image ?? '' }} resizeMode="cover" className="h-11 w-11 rounded-xl bg-ink-700" />
+                <View className="min-w-0 flex-1">
+                  <Text numberOfLines={1} className="font-bold leading-tight text-white">{t.name}</Text>
+                  <Text className="text-[12px] text-white/50">{t.exercises.length} exercise{t.exercises.length === 1 ? '' : 's'}</Text>
+                </View>
+              </Pressable>
+              <Pressable onPress={() => startTemplate(t.id)} className="flex-row items-center gap-1 rounded-full bg-brand-400 px-3.5 py-1.5 active:opacity-90">
+                <Play size={13} color="#000" fill="#000" />
+                <Text className="text-sm font-bold text-black">Start</Text>
+              </Pressable>
+              <Pressable onPress={() => { dispatch({ type: 'REMOVE_TEMPLATE', id: t.id }); toast('Workout removed') }} hitSlop={6} className="h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/5 active:opacity-80">
+                <Trash2 size={15} color="rgba(255,255,255,0.4)" />
+              </Pressable>
+            </View>
+          ))}
         </View>
       )}
     </View>

@@ -1,4 +1,4 @@
-import { todayKey, dayKey, fromKey, toKey, TODAY } from '../lib/date'
+import { todayKey, dayKey, fromKey, toKey, now } from '../lib/date'
 import { fmtWeightNum, weightUnit } from '../lib/format'
 import { incrementFor } from '../data/catalog'
 import { completedSessions } from './selectors'
@@ -192,7 +192,7 @@ export function examTrim(session: WorkoutSession, s: AppState): { optionalIds: S
 
 /* A sensible default exam window for the demo: roughly two weeks out. */
 export function defaultExamWindow(): { startKey: string; endKey: string } {
-  const start = new Date(TODAY)
+  const start = new Date(now())
   start.setDate(start.getDate() + 12)
   const end = new Date(start)
   end.setDate(end.getDate() + 14)

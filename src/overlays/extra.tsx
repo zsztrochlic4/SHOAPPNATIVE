@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { View, Text, Pressable, Image, TextInput, Animated, Easing } from 'react-native'
 import {
   Sparkles, Check, CheckCheck, ChevronRight, ChevronDown, Salad, Trophy, Flame,
   GraduationCap, Dumbbell, Lightbulb, ShieldQuestion, Share2, Plus, MapPin, Phone,
   Send, Video, Lock, Crown, Clock, Repeat, Heart, MessageCircle, Award, Swords, Users, X,
+  Search, Minus, Trash2, Play, ArrowLeft,
 } from 'lucide-react-native'
 import { Sheet } from '../components/Sheet'
 import { Avatar } from '../components/Avatar'
@@ -18,7 +19,8 @@ import {
   ACTIVITY_PRESETS, activityPreset, INTENSITY_MULT,
 } from '../data/catalog'
 import { ActivityIcon } from '../components/ActivityIcon'
-import { exerciseView } from '../store/programSession'
+import { exerciseView, imageForMuscle, buildCustomSession } from '../store/programSession'
+import { ACTIVE_EXERCISES, type Exercise } from '../backend/data'
 import { nextSetRecommendation } from '../store/training'
 import { coachThreadView } from '../store/coach'
 import { CHAT_SUGGESTIONS, coachReply } from '../lib/coachChat'
@@ -32,7 +34,7 @@ import { CHART_METRICS, STAT_METRICS, progressMetricId, dashboardStatIds } from 
 import { weightVal, toKg, weightUnit } from '../lib/format'
 import { brand, useColors } from '../theme'
 import type { ReactNode } from 'react'
-import type { CoachKind } from '../store/types'
+import type { CoachKind, TemplateExercise } from '../store/types'
 
 type Props = { open: boolean; onClose: () => void; params?: Record<string, unknown> }
 
@@ -909,5 +911,204 @@ function GoalRow({ label, unit, children }: { label: string; unit: string; child
       </View>
       {children}
     </View>
+  )
+}
+
+/* ===================== Build your own session (#2) =============== */
+const REP_PRESETS = ['5', '6-8', '8-12', '10-15', '15-20']
+
+export function CreateSessionSheet({ open, onClose, params }: Props) {
+  const { state, dispatch } = useStore()
+  const nav = useNav()
+  const toast = useToast()
+  const [name, setName] = useState('')
+  const [items, setItems] = useState<TemplateExercise[]>([])
+  const [saveTpl, setSaveTpl] = useState(false)
+  const [picking, setPicking] = useState(false)
+  const [q, setQ] = useState('')
+
+  // Fresh each open; prefill when started/edited from a saved template.
+  useEffect(() => {
+    if (!open) return
+    const tplId = params?.templateId as string | undefined
+    const tpl = tplId ? (state.templates ?? []).find((t) => t.id === tplId) : undefined
+    setName(tpl?.name ?? '')
+    setItems(tpl ? tpl.exercises.map((e) => ({ ...e })) : [])
+    setSaveTpl(false); setPicking(false); setQ('')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  const results = useMemo(() => {
+    const term = q.trim().toLowerCase()
+    const chosen = new Set(items.map((i) => i.defId))
+    return ACTIVE_EXERCISES.filter((e) => !chosen.has(e.id))
+      .filter((e) =>
+        !term ||
+        e.name.toLowerCase().includes(term) ||
+        e.muscleGroup.toLowerCase().includes(term) ||
+        e.movementPattern.toLowerCase().includes(term),
+      )
+      .slice(0, 60)
+  }, [q, items])
+
+  function addExercise(ex: Exercise) {
+    setItems((prev) => [
+      ...prev,
+      { defId: ex.id, name: ex.name, image: imageForMuscle(ex.muscleGroup), targetSets: 3, targetReps: '8-12' },
+    ])
+    setPicking(false); setQ('')
+  }
+  function removeItem(defId: string) {
+    setItems((prev) => prev.filter((i) => i.defId !== defId))
+  }
+  function patchItem(defId: string, patch: Partial<TemplateExercise>) {
+    setItems((prev) => prev.map((i) => (i.defId === defId ? { ...i, ...patch } : i)))
+  }
+
+  function start() {
+    if (items.length === 0) { toast('Add at least one exercise'); return }
+    const session = buildCustomSession(name, items, todayKey)
+    dispatch({ type: 'SAVE_SESSION', session })
+    if (saveTpl) {
+      dispatch({ type: 'SAVE_TEMPLATE', template: { id: `tpl-${Date.now()}`, name: session.name, createdAtKey: todayKey, exercises: items } })
+    }
+    nav.open('activeWorkout', { sessionId: session.id })
+  }
+
+  function saveForLater() {
+    if (items.length === 0) { toast('Add at least one exercise'); return }
+    dispatch({ type: 'SAVE_TEMPLATE', template: { id: `tpl-${Date.now()}`, name: name.trim() || 'My Workout', createdAtKey: todayKey, exercises: items } })
+    toast('Saved to your workouts')
+    onClose()
+  }
+
+  /* ---- Exercise picker ---- */
+  if (picking) {
+    return (
+      <Sheet open={open} onClose={onClose} title="Add exercise" full>
+        <View className="mb-3 flex-row items-center gap-2">
+          <Pressable onPress={() => { setPicking(false); setQ('') }} hitSlop={8} className="h-10 w-10 items-center justify-center rounded-full bg-white/5 active:opacity-80">
+            <ArrowLeft size={18} color="#fff" />
+          </Pressable>
+          <View className="flex-1 flex-row items-center gap-2 rounded-xl border border-white/8 bg-ink-800 px-3">
+            <Search size={18} color="rgba(255,255,255,0.4)" />
+            <TextInput
+              autoFocus
+              value={q}
+              onChangeText={setQ}
+              placeholder="Search 100+ exercises or muscle…"
+              placeholderTextColor="rgba(148,148,148,0.6)"
+              className="flex-1 bg-transparent py-3 text-sm text-white"
+            />
+          </View>
+        </View>
+        <View className="gap-2">
+          {results.map((e) => (
+            <Pressable key={e.id} onPress={() => addExercise(e)} className="w-full flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-2.5 active:opacity-90">
+              <Image source={{ uri: imageForMuscle(e.muscleGroup) }} resizeMode="cover" className="h-11 w-11 rounded-xl" />
+              <View className="min-w-0 flex-1">
+                <Text numberOfLines={1} className="font-bold leading-tight text-white">{e.name}</Text>
+                <Text numberOfLines={1} className="text-[12px] text-white/45">{e.muscleGroup} · {e.type}</Text>
+              </View>
+              <View className="h-7 w-7 items-center justify-center rounded-full bg-brand-400"><Plus size={16} strokeWidth={3} color="#000" /></View>
+            </Pressable>
+          ))}
+          {results.length === 0 && <Text className="py-8 text-center text-sm text-white/40">No exercises match “{q}”.</Text>}
+        </View>
+      </Sheet>
+    )
+  }
+
+  /* ---- Builder ---- */
+  return (
+    <Sheet open={open} onClose={onClose} title="New workout" full>
+      <TextInput
+        value={name}
+        onChangeText={setName}
+        placeholder="Name it (e.g. Push A, Leg burner)"
+        placeholderTextColor="rgba(255,255,255,0.35)"
+        className="w-full rounded-xl border border-white/8 bg-ink-800 px-4 py-3 text-[15px] font-semibold text-white"
+      />
+
+      <Text className="mb-2 mt-5 text-[12px] font-bold uppercase tracking-wide text-white/40">
+        Exercises{items.length ? ` · ${items.length}` : ''}
+      </Text>
+
+      {items.length === 0 ? (
+        <Pressable onPress={() => setPicking(true)} className="w-full items-center rounded-2xl border border-dashed border-white/15 px-6 py-10 active:opacity-90">
+          <View className="mb-3 h-12 w-12 items-center justify-center rounded-2xl bg-brand-400/15"><Dumbbell size={24} color={brand[400]} /></View>
+          <Text className="font-bold text-white">Build your own session</Text>
+          <Text className="mt-1 max-w-[240px] text-center text-[13px] text-white/45">Add exercises, set your sets and reps, then start. Nothing off-limits.</Text>
+          <View className="mt-4 flex-row items-center gap-1.5 rounded-full bg-brand-400 px-4 py-2"><Plus size={15} strokeWidth={3} color="#000" /><Text className="text-sm font-bold text-black">Add exercise</Text></View>
+        </Pressable>
+      ) : (
+        <View className="gap-2.5">
+          {items.map((it) => (
+            <View key={it.defId} className="rounded-2xl border border-white/5 bg-ink-800 p-3">
+              <View className="flex-row items-center gap-3">
+                <Image source={{ uri: it.image }} resizeMode="cover" className="h-11 w-11 rounded-xl" />
+                <Text numberOfLines={1} className="flex-1 font-bold leading-tight text-white">{it.name}</Text>
+                <Pressable onPress={() => removeItem(it.defId)} hitSlop={6} className="h-8 w-8 items-center justify-center rounded-full bg-white/5 active:opacity-80">
+                  <Trash2 size={15} color="rgba(255,255,255,0.5)" />
+                </Pressable>
+              </View>
+
+              {/* Sets stepper */}
+              <View className="mt-3 flex-row items-center gap-2">
+                <Text className="w-12 text-[12px] font-semibold text-white/50">Sets</Text>
+                <Pressable onPress={() => patchItem(it.defId, { targetSets: Math.max(1, it.targetSets - 1) })} className="h-9 w-9 items-center justify-center rounded-lg bg-ink-700 active:opacity-80"><Minus size={16} color="#fff" /></Pressable>
+                <Text className="w-8 text-center text-[15px] font-extrabold text-white">{it.targetSets}</Text>
+                <Pressable onPress={() => patchItem(it.defId, { targetSets: Math.min(8, it.targetSets + 1) })} className="h-9 w-9 items-center justify-center rounded-lg bg-brand-400/20 active:opacity-80"><Plus size={16} color={brand[400]} /></Pressable>
+              </View>
+
+              {/* Rep target presets */}
+              <View className="mt-2.5 flex-row items-center gap-2">
+                <Text className="w-12 text-[12px] font-semibold text-white/50">Reps</Text>
+                <View className="flex-1 flex-row flex-wrap gap-1.5">
+                  {REP_PRESETS.map((r) => {
+                    const on = it.targetReps === r
+                    return (
+                      <Pressable key={r} onPress={() => patchItem(it.defId, { targetReps: r })} className={`rounded-full px-3 py-1.5 active:opacity-90 ${on ? 'bg-brand-400' : 'bg-ink-700'}`}>
+                        <Text className={`text-[12px] font-bold ${on ? 'text-black' : 'text-white/60'}`}>{r}</Text>
+                      </Pressable>
+                    )
+                  })}
+                </View>
+              </View>
+            </View>
+          ))}
+
+          <Pressable onPress={() => setPicking(true)} className="w-full flex-row items-center justify-center gap-1.5 rounded-2xl border border-dashed border-white/15 py-3 active:opacity-80">
+            <Plus size={15} color={brand[400]} />
+            <Text className="text-sm font-semibold text-white/70">Add another exercise</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {items.length > 0 && (
+        <>
+          {/* Save as reusable workout */}
+          <Pressable onPress={() => setSaveTpl((v) => !v)} className="mt-5 w-full flex-row items-center gap-3 rounded-2xl border border-white/8 bg-ink-800 p-3.5 active:opacity-90">
+            <View className="h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-400/15"><Repeat size={18} color={brand[400]} /></View>
+            <View className="flex-1">
+              <Text className="font-bold leading-tight text-white">Save as a reusable workout</Text>
+              <Text className="text-[12px] text-white/50">Start it again any time from Workout</Text>
+            </View>
+            <View className={`h-7 w-12 shrink-0 justify-center rounded-full ${saveTpl ? 'bg-brand-400' : 'bg-white/15'}`}>
+              <View className="h-6 w-6 rounded-full bg-white" style={{ transform: [{ translateX: saveTpl ? 22 : 2 }] }} />
+            </View>
+          </Pressable>
+
+          <Pressable onPress={start} className="btn-primary mt-4 w-full flex-row items-center justify-center gap-2 active:opacity-90">
+            <Play size={16} color="#000" fill="#000" />
+            <Text className="font-semibold text-black">Start workout</Text>
+          </Pressable>
+          <Pressable onPress={saveForLater} className="mt-2 w-full items-center rounded-full bg-ink-700 py-3 active:opacity-90">
+            <Text className="text-sm font-semibold text-white/70">Save for later</Text>
+          </Pressable>
+        </>
+      )}
+      <View className="h-2" />
+    </Sheet>
   )
 }

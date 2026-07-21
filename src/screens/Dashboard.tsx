@@ -8,7 +8,7 @@ import { Hero } from '../components/Hero'
 import { IndexGauge } from '../components/IndexGauge'
 import { useStore } from '../store/store'
 import { useNav } from '../nav'
-import { currentWeekKeys, todayKey, longDate, shortDate, fromKey, TODAY } from '../lib/date'
+import { currentWeekKeys, todayKey, longDate, shortDate, fromKey, currentHour } from '../lib/date'
 import { fmtFluid, fmtWeightNum, weightUnit, fmtVolume, pct } from '../lib/format'
 import {
   todayHabit, habitForDay, todaySession, sessionForDay, activitiesForDay,
@@ -66,7 +66,7 @@ export default function Dashboard() {
     workoutStartedForDay(state, todayKey) || habit.steps > 0 || habit.waterL > 0 || habit.sleepH > 0 || weightLoggedToday
   const streakAtRisk = streak.current > 0 && !loggedSomethingToday
 
-  const greeting = greetingFor(TODAY.getHours())
+  const greeting = greetingFor(currentHour())
   const weekKeys = currentWeekKeys()
 
   // Tap the readiness gauge to reveal what's driving the number (Whoop/Oura's

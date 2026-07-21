@@ -13,7 +13,7 @@ import { EXERCISE_BY_ID } from '../backend/data'
 import type { WorkoutInstanceDoc } from '../backend/schema'
 import { img, exById, exerciseDetail, type ExerciseDetail } from '../data/catalog'
 import { fromKey } from '../lib/date'
-import type { LoggedExercise, SetLog, WorkoutSession } from './types'
+import type { LoggedExercise, SetLog, TemplateExercise, WorkoutSession } from './types'
 
 /** JS `Date.getDay()` (0=Sun) → the backend full weekday name used in instance ids. */
 const FULL_WEEKDAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -96,6 +96,44 @@ export function sessionFromInstance(
     durationMin: opts.durationMin ?? 45,
     volumeKg: 0,
     calories: Math.round((opts.durationMin ?? 45) * 9),
+    exercises,
+    completed: false,
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Custom (user-built) sessions — #2 record your own workout           */
+/* ------------------------------------------------------------------ */
+
+/** First rep number in a target label ('8-12' → 8, '10' → 10), for seeding sets. */
+function firstRep(targetReps: string): number {
+  const n = targetReps.match(/\d+/)
+  return n ? Number(n[0]) : 8
+}
+
+/**
+ * Build a loggable `WorkoutSession` from a user's chosen exercises. Sets are seeded
+ * empty (0 kg, the low end of the target reps) so the live logger records what they
+ * actually lift. No `instanceId` — these never write back to the generated program.
+ */
+export function buildCustomSession(name: string, exs: TemplateExercise[], dateKey: string): WorkoutSession {
+  const exercises: LoggedExercise[] = exs.map((e) => {
+    const reps = firstRep(e.targetReps)
+    const sets: SetLog[] = Array.from({ length: Math.max(1, e.targetSets) }, () => ({ weightKg: 0, reps, done: false }))
+    return { defId: e.defId, name: e.name, image: e.image, targetSets: e.targetSets, targetReps: e.targetReps, sets }
+  })
+  const muscles = Array.from(new Set(exs.map((e) => exerciseView(e.defId)?.muscle).filter(Boolean) as string[]))
+  const focus = muscles.slice(0, 3).join(' · ') || 'Custom session'
+  const durationMin = Math.max(15, Math.round(exs.length * 8))
+  return {
+    id: `custom-${Date.now()}`,
+    dateKey,
+    name: name.trim() || 'My Workout',
+    focus,
+    image: exercises[0]?.image ?? img.heroWorkout,
+    durationMin,
+    volumeKg: 0,
+    calories: Math.round(durationMin * 9),
     exercises,
     completed: false,
   }

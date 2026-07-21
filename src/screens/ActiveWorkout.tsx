@@ -115,13 +115,16 @@ function usePulse() {
   return v.interpolate({ inputRange: [0, 1], outputRange: [1, 1.035] })
 }
 
-export default function ActiveWorkout({ open, onClose }: { open: boolean; onClose: () => void }) {
+export default function ActiveWorkout({ open, onClose, params }: { open: boolean; onClose: () => void; params?: Record<string, unknown> }) {
   const { state, dispatch } = useStore()
   const toast = useToast()
   const nav = useNav()
   const colors = useColors()
   const units = state.settings.units
-  const session = todaySession(state)
+  // A custom / template-launched session is opened by explicit id; everything else
+  // falls back to today's prescribed session.
+  const sessionId = params?.sessionId as string | undefined
+  const session = (sessionId ? state.sessions.find((s) => s.id === sessionId) : undefined) ?? todaySession(state)
 
   const [mode, setMode] = useState<Mode>('overview')
   const [cursor, setCursor] = useState<Cursor | null>(null)

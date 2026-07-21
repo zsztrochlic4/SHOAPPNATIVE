@@ -24,7 +24,7 @@ import {
 import Svg, { Path, Line, Rect, Circle, Polygon, G, Text as SvgText } from 'react-native-svg'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { useDispatch } from '../store/store'
+import { useDispatch, useStore } from '../store/store'
 import { useAuth } from '../auth/AuthProvider'
 import { cssVars, useThemeName } from '../theme'
 import { tick, thud } from '../lib/haptics'
@@ -2016,9 +2016,11 @@ const LANG_CODE: Record<Language, string> = { en: 'GB', zh: 'CN', hi: 'IN', ar: 
 
 function LanguageSelect() {
   const tok = useTok()
-  const dispatch = useDispatch()
+  const { state, dispatch } = useStore()
   const [open, setOpen] = useState(false)
-  const [code, setCode] = useState<Language>('en')
+  // Single source of truth: the saved setting, so this matches the Settings
+  // picker and reflects any language the user already chose (persists & stays).
+  const code: Language = state.settings.language ?? 'en'
   const cur = LANGUAGES.find((l) => l.code === code) || LANGUAGES[0]
   return (
     <View style={{ position: 'relative', zIndex: open ? 100 : 1 }}>
@@ -2029,7 +2031,7 @@ function LanguageSelect() {
       {open ? (
         <View style={{ position: 'absolute', top: 40, right: 0, minWidth: 158, padding: 6, borderRadius: 14, backgroundColor: tok.rgb('--ink-700'), borderWidth: 1, borderColor: tok.rgb('--fg', 0.1) }}>
           {LANGUAGES.map((l) => (
-            <Pressable key={l.code} onPress={() => { tick(); setCode(l.code); setOpen(false); dispatch({ type: 'SET_SETTINGS', patch: { language: l.code } }) }} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 9, backgroundColor: l.code === code ? tok.rgb('--brand-400', 0.14) : 'transparent' }}>
+            <Pressable key={l.code} onPress={() => { tick(); setOpen(false); dispatch({ type: 'SET_SETTINGS', patch: { language: l.code } }) }} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 9, backgroundColor: l.code === code ? tok.rgb('--brand-400', 0.14) : 'transparent' }}>
               <Flag code={LANG_CODE[l.code]} w={24} />
               <Text style={{ flex: 1, fontSize: 14.5, fontWeight: '600', color: l.code === code ? tok.rgb('--brand-300') : tok.rgb('--fg', 0.85) }}>{l.native}</Text>
               {l.code === code ? <Icon name="check" size={15} stroke={3} color={tok.rgb('--brand-300')} /> : null}

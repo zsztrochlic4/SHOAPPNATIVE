@@ -22,8 +22,8 @@ import { useToast } from '../components/Toast'
 import { useNav } from '../nav'
 import { FOODS, QUICK_WORKOUTS } from '../data/catalog'
 import { pick, makeRng } from '../lib/rng'
-import { requestPushPermission, cancelAllReminders } from '../lib/notifications'
-import { todayKey, relativeLabel, shortDate, fromKey } from '../lib/date'
+import { requestPushPermission, resolveNotifPrefs } from '../lib/notifications'
+import { todayKey, relativeLabel, shortDate, fromKey, toKey, addDays, longDate } from '../lib/date'
 import {
   fmtWeight, fmtWeightNum, toKg, weightUnit, fmtFluid,
   weightVal,
@@ -35,7 +35,8 @@ import {
 import { ActivityIcon } from '../components/ActivityIcon'
 import { examState, dailyTargets, defaultExamWindow } from '../store/training'
 import { translator, LANGUAGES, type Language } from '../lib/i18n'
-import type { MealName, Units, Theme } from '../store/types'
+import { shareText } from '../lib/share'
+import type { MealName, Units, Theme, NotificationPrefs } from '../store/types'
 import { brand, accent } from '../theme'
 
 type Props = { open: boolean; onClose: () => void; params?: Record<string, unknown> }
@@ -103,10 +104,10 @@ export function SettingsSheet({ open, onClose }: Props) {
   function toggleNotifs() {
     const next = !notificationsEnabled
     dispatch({ type: 'SET_SETTINGS', patch: { notificationsEnabled: next } })
-    // Enable → PushRegistration asks permission + registers the token. Disable →
-    // clear any scheduled local reminders so nothing keeps firing on-device.
+    // Enable → ask permission now (the moment it's relevant) + PushRegistration
+    // registers the token. Scheduling/cancelling local reminders is reconciled
+    // centrally by <NotificationsSync/>, which reacts to this settings change.
     if (next) void requestPushPermission()
-    else void cancelAllReminders()
     toast(next ? t('toast.notifsOn') : t('toast.notifsOff'))
   }
 
@@ -184,11 +185,25 @@ export function SettingsSheet({ open, onClose }: Props) {
         <Row icon={<BellRing size={18} color={brand[400]} />} title={t('settings.pushNotifs')} sub={t('settings.pushNotifsSub')}>
           <Toggle on={notificationsEnabled} onPress={toggleNotifs} />
         </Row>
+        {notificationsEnabled && <NotificationPrefsPanel t={t} />}
         <Row icon={<Volume2 size={18} color={brand[400]} />} title={t('settings.sound')} sub={t('settings.soundSub')}>
           <Toggle on={soundEnabled} onPress={toggleSound} />
         </Row>
         <Row icon={<GraduationCap size={18} color={accent.purple} />} title={t('settings.examMode')} sub={t('settings.examModeSub')}>
-          <Toggle on={state.profile.examMode} onPress={() => dispatch({ type: 'SET_PROFILE', patch: { examMode: !state.profile.examMode } })} />
+          <Toggle
+            on={state.profile.examMode}
+            onPress={() => {
+              const next = !state.profile.examMode
+              // Enabling with no window would leave exam mode active forever. Seed a
+              // bounded 2-week window starting today (editable in the Exam sheet) so
+              // "on" always maps to a real, finite exam period.
+              if (next && (!state.profile.examStartKey || !state.profile.examEndKey)) {
+                dispatch({ type: 'SET_EXAM_DATES', startKey: todayKey, endKey: toKey(addDays(fromKey(todayKey), 13)) })
+              } else {
+                dispatch({ type: 'SET_PROFILE', patch: { examMode: next } })
+              }
+            }}
+          />
         </Row>
         <Row icon={<Wallet size={18} color={brand[400]} />} title={t('settings.budget')} sub={t('settings.budgetSub')}>
           <Toggle on={state.profile.budgetMode} onPress={() => dispatch({ type: 'SET_PROFILE', patch: { budgetMode: !state.profile.budgetMode } })} />
@@ -741,8 +756,10 @@ export function WeeklyRecapSheet({ open, onClose }: Props) {
   const top = strengthProgress(state)[0]
   const acts = activitiesInRange(state, 7)
 
-  function share() {
-    toast('Recap copied to share!')
+  async function share() {
+    const msg = `My week on StrengthHub 💪 ${workouts} workouts, a ${streak.current}-day streak, ${Math.round(weightVal(vol, units)).toLocaleString()} ${weightUnit(units)} lifted.`
+    const r = await shareText(msg, 'My week on StrengthHub')
+    toast(r === 'copied' ? 'Recap copied to clipboard' : r === 'shared' ? 'Recap shared' : 'Sharing not available')
   }
 
   return (
@@ -823,7 +840,13 @@ export function LeaderboardSheet({ open, onClose }: Props) {
           </View>
         ))}
       </View>
-      <Pressable onPress={() => toast('Invite link copied!')} className="btn-primary mt-5 w-full flex-row items-center justify-center gap-2 active:opacity-90">
+      <Pressable
+        onPress={async () => {
+          const r = await shareText('Join me on StrengthHub — train together and climb the campus leaderboard.', 'StrengthHub')
+          toast(r === 'copied' ? 'Invite copied to clipboard' : r === 'shared' ? 'Invite shared' : 'Sharing not available')
+        }}
+        className="btn-primary mt-5 w-full flex-row items-center justify-center gap-2 active:opacity-90"
+      >
         <Plus size={16} color="#000" />
         <Text className="font-semibold text-black">Invite friends</Text>
       </Pressable>
@@ -1007,28 +1030,25 @@ export function ExamModeSheet({ open, onClose }: Props) {
         <Text className="mt-1 text-[14px] leading-snug text-white/60">Tell me when your exams are. I will quietly adjust your plan so training supports your studying instead of competing with it.</Text>
       </View>
 
-      <View className="mt-4 flex-row gap-3">
-        <View className="flex-1 rounded-2xl border border-white/8 bg-ink-800 p-3">
-          <Text className="text-[12px] font-semibold text-white/50">Exams start</Text>
-          <TextInput
-            value={start}
-            onChangeText={setStart}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor="rgba(148,148,148,0.6)"
-            className="mt-1 w-full bg-transparent text-[15px] font-semibold text-white"
-          />
-        </View>
-        <View className="flex-1 rounded-2xl border border-white/8 bg-ink-800 p-3">
-          <Text className="text-[12px] font-semibold text-white/50">Exams end</Text>
-          <TextInput
-            value={end}
-            onChangeText={setEnd}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor="rgba(148,148,148,0.6)"
-            className="mt-1 w-full bg-transparent text-[15px] font-semibold text-white"
-          />
-        </View>
+      <View className="mt-4 gap-2.5">
+        <DateStepper
+          label="Exams start"
+          value={start}
+          min={todayKey}
+          onChange={(k) => { setStart(k); if (end < k) setEnd(k) }}
+        />
+        <DateStepper label="Exams end" value={end} min={start} onChange={setEnd} />
       </View>
+      <Text className="mt-2.5 text-center text-[12px] text-white/45">
+        {(() => {
+          const len = Math.round((fromKey(end).getTime() - fromKey(start).getTime()) / 86400000) + 1
+          const until = Math.round((fromKey(start).getTime() - fromKey(todayKey).getTime()) / 86400000)
+          const window = `${len} day${len === 1 ? '' : 's'} of exams`
+          if (until > 0) return `${window} · starts in ${until} day${until === 1 ? '' : 's'}`
+          if (until === 0) return `${window} · starts today`
+          return window
+        })()}
+      </Text>
 
       {on && (
         <Text className="mt-3 text-center text-[13px] font-semibold text-accent-purple">{phaseLabel[ex.phase]}</Text>
@@ -1051,6 +1071,32 @@ export function ExamModeSheet({ open, onClose }: Props) {
         </Pressable>
       )}
     </Sheet>
+  )
+}
+
+/* Tappable date control — no free-text, so an invalid date is impossible. Nudges
+ * the day by ±1 day / ±1 week and never lets a value fall before `min`. */
+function DateStepper({ label, value, min, onChange }: { label: string; value: string; min?: string; onChange: (key: string) => void }) {
+  const shift = (days: number) => {
+    let next = toKey(addDays(fromKey(value), days))
+    if (min && next < min) next = min
+    onChange(next)
+  }
+  const atMin = (days: number) => !!min && toKey(addDays(fromKey(value), days)) < min && value <= min
+  const btn = 'flex-1 items-center rounded-lg py-2 active:opacity-80'
+  return (
+    <View className="rounded-2xl border border-white/8 bg-ink-800 p-3.5">
+      <View className="flex-row items-baseline justify-between">
+        <Text className="text-[12px] font-semibold text-white/50">{label}</Text>
+        <Text className="text-[15px] font-extrabold text-white">{longDate(value)}</Text>
+      </View>
+      <View className="mt-2.5 flex-row gap-2">
+        <Pressable onPress={() => shift(-7)} disabled={atMin(-7)} className={`${btn} bg-ink-700 ${atMin(-7) ? 'opacity-40' : ''}`}><Text className="text-[12px] font-bold text-white/70">−1w</Text></Pressable>
+        <Pressable onPress={() => shift(-1)} disabled={atMin(-1)} className={`${btn} bg-ink-700 ${atMin(-1) ? 'opacity-40' : ''}`}><Text className="text-[12px] font-bold text-white/70">−1d</Text></Pressable>
+        <Pressable onPress={() => shift(1)} className={`${btn} bg-brand-400/20`}><Text className="text-[12px] font-bold text-brand-400">+1d</Text></Pressable>
+        <Pressable onPress={() => shift(7)} className={`${btn} bg-brand-400/20`}><Text className="text-[12px] font-bold text-brand-400">+1w</Text></Pressable>
+      </View>
+    </View>
   )
 }
 
@@ -1105,6 +1151,70 @@ function Toggle({ on, onPress }: { on: boolean; onPress: () => void }) {
     <Pressable onPress={onPress} className={`relative h-7 w-12 rounded-full active:opacity-90 ${on ? 'bg-brand-400' : 'bg-white/15'}`}>
       <View className="absolute top-0.5 h-6 w-6 rounded-full bg-white" style={{ left: on ? 22 : 2 }} />
     </Pressable>
+  )
+}
+
+/* 12-hour label for an hour-of-day (times aren't localised — numerals read fine). */
+function fmtHour(h: number): string {
+  const hr = h % 12 === 0 ? 12 : h % 12
+  return `${hr} ${h < 12 ? 'AM' : 'PM'}`
+}
+
+/** Notification categories, reminder time and quiet hours (#1 Phase 0/1). */
+function NotificationPrefsPanel({ t }: { t: (k: string) => string }) {
+  const { state, dispatch } = useStore()
+  const prefs = resolveNotifPrefs(state.settings.notificationPrefs)
+  const set = (patch: Partial<NotificationPrefs>) =>
+    dispatch({ type: 'SET_SETTINGS', patch: { notificationPrefs: { ...prefs, ...patch } } })
+  const TIME_PRESETS = [7, 12, 17, 20]
+
+  return (
+    <View className="gap-2.5 rounded-2xl border border-white/5 bg-ink-800/60 p-3.5">
+      <Text className="text-[11px] font-bold uppercase tracking-wide text-white/40">{t('notif.deliver')}</Text>
+      <Row icon={<Dumbbell size={18} color={brand[400]} />} title={t('notif.workout')} sub={t('notif.workoutSub')}>
+        <Toggle on={prefs.workoutReminder} onPress={() => set({ workoutReminder: !prefs.workoutReminder })} />
+      </Row>
+      <Row icon={<Flame size={18} color={brand[400]} />} title={t('notif.streak')} sub={t('notif.streakSub')}>
+        <Toggle on={prefs.streakReminder} onPress={() => set({ streakReminder: !prefs.streakReminder })} />
+      </Row>
+
+      <Text className="mt-1 text-[11px] font-bold uppercase tracking-wide text-white/40">{t('notif.time')}</Text>
+      <View className="flex-row gap-2">
+        {TIME_PRESETS.map((h) => {
+          const on = prefs.reminderHour === h
+          return (
+            <Pressable key={h} onPress={() => set({ reminderHour: h })} className={`flex-1 items-center rounded-xl py-2.5 active:opacity-90 ${on ? 'bg-brand-400' : 'bg-ink-700'}`}>
+              <Text className={`text-[13px] font-bold ${on ? 'text-black' : 'text-white/60'}`}>{fmtHour(h)}</Text>
+            </Pressable>
+          )
+        })}
+      </View>
+
+      <View className="mt-1">
+        <Row icon={<Moon size={18} color={accent.purple} />} title={t('notif.quiet')} sub={t('notif.quietSub')}>
+          <Toggle on={prefs.quiet} onPress={() => set({ quiet: !prefs.quiet })} />
+        </Row>
+      </View>
+      {prefs.quiet && (
+        <View className="flex-row gap-2.5">
+          <HourStepper label={t('notif.from')} value={prefs.quietStartHour} onChange={(v) => set({ quietStartHour: v })} />
+          <HourStepper label={t('notif.to')} value={prefs.quietEndHour} onChange={(v) => set({ quietEndHour: v })} />
+        </View>
+      )}
+    </View>
+  )
+}
+
+function HourStepper({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+  return (
+    <View className="flex-1 rounded-xl border border-white/8 bg-ink-900 p-2.5">
+      <Text className="mb-1.5 text-[11px] font-semibold text-white/45">{label}</Text>
+      <View className="flex-row items-center justify-between">
+        <Pressable onPress={() => onChange((value + 23) % 24)} className="h-8 w-8 items-center justify-center rounded-lg bg-ink-700 active:opacity-80"><Minus size={15} color="#fff" /></Pressable>
+        <Text className="text-[14px] font-extrabold text-white">{fmtHour(value)}</Text>
+        <Pressable onPress={() => onChange((value + 1) % 24)} className="h-8 w-8 items-center justify-center rounded-lg bg-brand-400/20 active:opacity-80"><Plus size={15} color={brand[400]} /></Pressable>
+      </View>
+    </View>
   )
 }
 

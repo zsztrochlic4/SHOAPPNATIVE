@@ -85,10 +85,27 @@ export interface ChatMessage {
   buttons?: ContactButton[]
 }
 
+/** Per-category local-notification preferences (see lib/notifications). */
+export interface NotificationPrefs {
+  /** A nudge to train (daily, at `reminderHour`). */
+  workoutReminder: boolean
+  /** An evening reminder to log the day and keep the streak. */
+  streakReminder: boolean
+  /** Preferred hour (0–23, device local) for the workout reminder. */
+  reminderHour: number
+  /** Suppress notifications overnight. */
+  quiet: boolean
+  /** Quiet-hours window start/end (0–23, may wrap midnight). */
+  quietStartHour: number
+  quietEndHour: number
+}
+
 export interface Settings {
   units: Units
   theme: Theme
   notificationsEnabled: boolean
+  /** Per-category notification preferences + quiet hours. Defaults applied when absent. */
+  notificationPrefs?: NotificationPrefs
   /** Play the rest-timer beeps/tick and the workout-complete chime. Defaults on. */
   soundEnabled?: boolean
   /** UI language. Defaults to English when absent (older saves). */
@@ -225,6 +242,24 @@ export interface WorkoutSession {
    *  was built from. Links completed sets back to the prescription for set-log + progression
    *  persistence. Absent on demo/seed sessions and self-built sessions. */
   instanceId?: string
+}
+
+/** One exercise slot in a user-built workout template (no per-set data — that's
+ *  filled in live when the session is started). */
+export interface TemplateExercise {
+  defId: string
+  name: string
+  image: string
+  targetSets: number
+  targetReps: string
+}
+
+/** A reusable workout the user built themselves, saved to start again later. */
+export interface WorkoutTemplate {
+  id: string
+  name: string
+  createdAtKey: string
+  exercises: TemplateExercise[]
 }
 
 export interface ProgramDay {
@@ -455,6 +490,8 @@ export interface AppState {
   coachThread: CoachMessage[]
   /** user-created recipe meals */
   myMeals?: UserMeal[]
+  /** reusable workouts the user built themselves (see #2 custom sessions) */
+  templates?: WorkoutTemplate[]
   /** day keys on which the user started a workout */
   workoutStartedKeys?: string[]
   /** day keys on which the user asked the nutrition coach a question */
@@ -478,6 +515,10 @@ export interface AppState {
   /** Generation-gate status. `{ ok:false, reason }` drives the "program being finalised"
    *  holding screen; `{ ok:true }` means `generatedProgram` is present. */
   programStatus?: ProgramStatus | null
+  /** True only for the seeded "Alex" demo, which runs on a frozen clock so its
+   *  40-day history lines up. Real onboarded users are false and run on live
+   *  device time (see lib/date setLiveClock). */
+  demo?: boolean
   /** schema version for migrations */
   v: number
 }
