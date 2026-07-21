@@ -48,6 +48,16 @@ export function coachOperational(): boolean {
 }
 
 /**
+ * DEV-ONLY DESIGN PREVIEW. Reveals the coach UI so it can be redesigned WITHOUT enabling the coach
+ * for real users. Opt-in via `EXPO_PUBLIC_COACH_PREVIEW=1` (a local .env flag, off by default and
+ * absent from production). It NEVER changes `coachOperational()` / `COACH_ENABLED`, so the real,
+ * unvalidated safety classifier and the Gemini path stay gated — in preview the chat replies come
+ * ONLY from the on-device scripted `coachReply`, never the live AI. This is a design surface, not a
+ * launch. Enabling the actual coach still requires its independent clinical validation to pass.
+ */
+export const COACH_PREVIEW = process.env.EXPO_PUBLIC_COACH_PREVIEW === '1' && !coachOperational()
+
+/**
  * Retained in-memory safety session for non-component coach callers (the reducer `SEND_CHAT` path),
  * so multi-turn persistence + retraction are enforced IDENTICALLY to the 1:1 chat and food coach,
  * which hold their own retained session (spec §2/§7). In-memory ONLY — never persisted or cloud-

@@ -25,7 +25,7 @@ import { nextSetRecommendation } from '../store/training'
 import { coachThreadView } from '../store/coach'
 import { CHAT_SUGGESTIONS, coachReply } from '../lib/coachChat'
 import { askCoach } from '../lib/coachApi'
-import { coachContext, coachOperational, coachPrecheckAsync, guardOutgoing, newSafetySession } from '../lib/coachSafety'
+import { coachContext, coachOperational, COACH_PREVIEW, coachPrecheckAsync, guardOutgoing, newSafetySession } from '../lib/coachSafety'
 import { SafetyContactButtons } from '../components/SafetyContactButtons'
 import { CoachComingSoon } from '../components/CoachComingSoon'
 import { todaySession, leaderboardSorted, youRank } from '../store/selectors'
@@ -52,7 +52,7 @@ export function CoachSheet({ open, onClose }: Props) {
   const nav = useNav()
   const thread = coachThreadView(state)
 
-  if (!coachOperational()) {
+  if (!coachOperational() && !COACH_PREVIEW) {
     return (
       <Sheet open={open} onClose={onClose} title="Your coach">
         <CoachComingSoon />
@@ -407,12 +407,21 @@ export function CoachChatSheet({ open, onClose }: Props) {
   }, [open, messages.length, showBook, booked, typing, dispatch])
 
   async function send(t?: string) {
-    if (!coachOperational()) return // HARD gate + server-side kill switch (spec §20).
+    if (!coachOperational() && !COACH_PREVIEW) return // HARD gate + server-side kill switch (spec §20).
     const msg = (t ?? text).trim()
     if (!msg || typing) return
     setText('')
     // Show the user's message immediately, then a typing indicator.
     dispatch({ type: 'PUSH_CHAT', role: 'user', text: msg })
+    // DEV DESIGN PREVIEW only: the coach is NOT operational, so reply with the on-device scripted
+    // coach ONLY — never the live AI or the safety classifier (both stay gated). This lets the coach
+    // be redesigned without activating the unvalidated crisis detector.
+    if (COACH_PREVIEW && !coachOperational()) {
+      setTyping(true)
+      const scripted = coachReply(state, msg)
+      setTimeout(() => { dispatch({ type: 'PUSH_CHAT', role: 'coach', text: scripted }); setTyping(false) }, 450)
+      return
+    }
     // SAFETY: one shared precheck runs BEFORE any reply — the safety guard first (a crisis is never
     // gated by the daily limit), then the limit — enforcing identically on the live-AI and fallback
     // paths (spec §2/§7/§21). A blocked message reaches neither the model nor the rules engine.
@@ -453,7 +462,7 @@ export function CoachChatSheet({ open, onClose }: Props) {
   for (let i = messages.length - 1; i >= 0; i--) { if (messages[i].role === 'user') { lastUserIdx = i; break } }
   const seen = lastUserIdx >= 0 && messages.slice(lastUserIdx + 1).some((m) => m.role === 'coach')
 
-  if (!coachOperational()) {
+  if (!coachOperational() && !COACH_PREVIEW) {
     return (
       <Sheet open={open} onClose={onClose} title="Coach">
         <CoachComingSoon />
