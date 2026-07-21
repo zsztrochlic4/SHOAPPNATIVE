@@ -1,8 +1,10 @@
-import type { ReactNode } from 'react'
-import { View, Text, Pressable, ScrollView, useWindowDimensions } from 'react-native'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { View, Text, Pressable, ScrollView, Animated, Easing, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { X } from 'lucide-react-native'
+import { X, ChevronLeft } from 'lucide-react-native'
 import { useColors } from '../theme'
+import { useNav } from '../nav'
+import { useHorizontalSwipe } from '../lib/useHorizontalSwipe'
 import { AppModal, IS_WEB, WEB_SCREEN } from './WebFrame'
 
 /** Bottom sheet / modal used for logging flows and the active workout. */
@@ -25,6 +27,23 @@ export function Sheet({
   const height = IS_WEB ? WEB_SCREEN.height : win.height
   const insets = useSafeAreaInsets()
   const colors = useColors()
+  const nav = useNav()
+
+  // Latch the presentation at open time: if the menu pushed this overlay, show
+  // it as a right-sliding detail. Latching (rather than reading `menuStack`
+  // live) keeps the exit animation in detail mode after `close` clears the flag.
+  const [menuMode, setMenuMode] = useState(false)
+  useEffect(() => {
+    if (open) setMenuMode(nav.menuStack)
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (menuMode) {
+    return (
+      <MenuDetailPanel open={open} title={title} onBack={nav.close} onDashboard={nav.closeToDashboard}>
+        {children}
+      </MenuDetailPanel>
+    )
+  }
 
   return (
     <AppModal visible={open} transparent animationType="slide" onRequestClose={onClose}>
@@ -73,6 +92,80 @@ export function Sheet({
           </ScrollView>
         </View>
       </View>
+    </AppModal>
+  )
+}
+
+/**
+ * A menu detail presented as a full-screen pane that slides in from the right
+ * over the still-mounted menu. The top-left chevron returns to the menu
+ * (`onBack`); the top-right ✕ dismisses everything to the dashboard
+ * (`onDashboard`). A rightward swipe-back mirrors the chevron. Kept mounted
+ * through the slide-out so the exit animation plays (no hard cut).
+ */
+function MenuDetailPanel({
+  open,
+  title,
+  children,
+  onBack,
+  onDashboard,
+}: {
+  open: boolean
+  title?: string
+  children: ReactNode
+  onBack: () => void
+  onDashboard: () => void
+}) {
+  const win = useWindowDimensions()
+  const insets = useSafeAreaInsets()
+  const colors = useColors()
+  const width = IS_WEB ? WEB_SCREEN.width : win.width
+  const height = IS_WEB ? WEB_SCREEN.height : win.height
+
+  const [render, setRender] = useState(open)
+  const progress = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    if (open) {
+      setRender(true)
+      Animated.timing(progress, { toValue: 1, duration: 280, easing: Easing.bezier(0.22, 1, 0.36, 1), useNativeDriver: !IS_WEB }).start()
+    } else if (render) {
+      Animated.timing(progress, { toValue: 0, duration: 220, easing: Easing.bezier(0.4, 0, 1, 1), useNativeDriver: !IS_WEB }).start(({ finished }) => {
+        if (finished) setRender(false)
+      })
+    }
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const { panHandlers, dragX } = useHorizontalSwipe({ width, onSwipeRight: onBack })
+  // Base slide (progress) plus the live swipe-back drag, clamped to ≥ 0.
+  const base = progress.interpolate({ inputRange: [0, 1], outputRange: [width, 0] })
+  const translateX = Animated.add(base, dragX)
+
+  return (
+    <AppModal visible={render} animationType="none" onRequestClose={onBack}>
+      <Animated.View
+        {...panHandlers}
+        className="flex-1 bg-ink-900"
+        style={{ paddingTop: insets.top, transform: [{ translateX }], ...(IS_WEB ? { flex: 1, minHeight: 0 } : null) }}
+      >
+        <View className="flex-row items-center gap-1 px-3 py-2.5">
+          <Pressable onPress={onBack} hitSlop={8} accessibilityLabel="Back to menu" className="h-9 w-9 items-center justify-center rounded-full active:opacity-70">
+            <ChevronLeft size={24} color={colors.fg} />
+          </Pressable>
+          <Text numberOfLines={1} className="flex-1 text-[17px] font-bold text-white">{title}</Text>
+          <Pressable onPress={onDashboard} hitSlop={8} accessibilityLabel="Close to dashboard" className="h-9 w-9 items-center justify-center rounded-full bg-white/10 active:opacity-70">
+            <X size={18} color={colors.fg} />
+          </Pressable>
+        </View>
+        <ScrollView
+          className="flex-1 px-5"
+          style={IS_WEB ? { maxHeight: height - 56, minHeight: 0 } : undefined}
+          contentContainerStyle={{ paddingBottom: 32 + insets.bottom }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {children}
+        </ScrollView>
+      </Animated.View>
     </AppModal>
   )
 }

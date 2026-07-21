@@ -5,6 +5,7 @@ import { StatusBar as ExpoStatusBar } from 'expo-status-bar'
 import '../global.css'
 import { WebPreviewFrame, IS_WEB } from './components/WebFrame'
 import { BottomNav } from './components/BottomNav'
+import { SwipeNav } from './components/SwipeNav'
 import { StoreProvider, useStore } from './store/store'
 import { AuthProvider, useAuth } from './auth/AuthProvider'
 import { AuthScreen } from './auth/AuthScreen'
@@ -97,21 +98,43 @@ function Shell() {
   const [overlay, setOverlay] = useState<Overlay | null>(null)
   const [params, setParams] = useState<Record<string, unknown>>({})
   const [menuOpen, setMenuOpen] = useState(false)
+  const [menuStack, setMenuStack] = useState(false)
 
   const nav = {
     open: (o: Overlay, p: Record<string, unknown> = {}) => {
       setParams(p)
+      setMenuStack(false)
       setOverlay(o)
     },
-    close: () => setOverlay(null),
+    // Close the active overlay. When it was a menu detail, `menuStack` clears and
+    // the still-mounted menu is revealed (back navigation).
+    close: () => {
+      setOverlay(null)
+      setMenuStack(false)
+    },
     goTab: (t: TabKey) => {
       setOverlay(null)
+      setMenuStack(false)
       setMenuOpen(false)
       setTab(t)
     },
     menuOpen,
     openMenu: () => setMenuOpen(true),
     closeMenu: () => setMenuOpen(false),
+    menuStack,
+    // Open an overlay as a menu detail: keep the menu mounted underneath so its
+    // sheet slides in from the right and `back` returns to the menu.
+    openInMenu: (o: Overlay, p: Record<string, unknown> = {}) => {
+      setParams(p)
+      setMenuStack(true)
+      setOverlay(o)
+    },
+    // Top-right ✕ on a detail: dismiss the detail AND the menu, back to dashboard.
+    closeToDashboard: () => {
+      setOverlay(null)
+      setMenuStack(false)
+      setMenuOpen(false)
+    },
   }
 
   if (!hydrated) {
@@ -154,18 +177,30 @@ function Shell() {
 
   const Screen = screens[tab]
 
+  const content = (
+    <ScrollView
+      key={tab}
+      className="flex-1"
+      contentContainerStyle={{ paddingBottom: insets.bottom + 112 }}
+      showsVerticalScrollIndicator={false}
+    >
+      <Screen />
+    </ScrollView>
+  )
+
   return (
     <NavProvider value={nav}>
       <View className="flex-1 bg-ink-900" style={{ paddingTop: insets.top }}>
         <ScreenFade tabKey={tab}>
-          <ScrollView
-            key={tab}
-            className="flex-1"
-            contentContainerStyle={{ paddingBottom: insets.bottom + 112 }}
-            showsVerticalScrollIndicator={false}
-          >
-            <Screen />
-          </ScrollView>
+          {/* The dashboard adds edge-swipe → menu (L→R) / coach (R→L). Other
+              tabs render the scroller directly. */}
+          {tab === 'dashboard' ? (
+            <SwipeNav onOpenMenu={nav.openMenu} onOpenCoach={() => nav.open('coachChat')}>
+              {content}
+            </SwipeNav>
+          ) : (
+            content
+          )}
         </ScreenFade>
         <BottomNav active={tab} onChange={setTab} />
       </View>

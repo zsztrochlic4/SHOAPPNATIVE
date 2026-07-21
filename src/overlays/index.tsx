@@ -260,8 +260,9 @@ export function MenuDrawer({ open, onClose }: { open: boolean; onClose: () => vo
   const unread = state.notifications.filter((n) => !n.read).length
   const goalLabel: Record<string, string> = { 'build-muscle': 'Build Muscle', 'lose-fat': 'Lose Fat', 'gain-strength': 'Get Stronger', 'stay-healthy': 'Stay Healthy' }
   const joined = fromKey(p.createdAtKey).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-  // Close the drawer and open the target sheet.
-  const go = (o: Parameters<typeof nav.open>[0]) => () => { onClose(); nav.open(o) }
+  // Push the target as a detail: it slides in from the right over the menu, and
+  // its back arrow returns here (see Sheet's menu-detail mode).
+  const go = (o: Parameters<typeof nav.open>[0]) => () => nav.openInMenu(o)
   // Close the drawer, then sign out — the auth listener swaps back to the
   // welcome/login flow automatically once the session ends.
   const logout = () => { onClose(); void signOut() }
