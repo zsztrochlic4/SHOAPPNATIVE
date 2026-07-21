@@ -11,6 +11,7 @@ import { Avatar } from '../components/Avatar'
 import { Icon } from '../components/Icon'
 import { Chip, ProgressBar } from '../components/ui'
 import { TechniqueClip } from '../components/TechniqueClip'
+import { posterOverrideUrl } from '../lib/media'
 import { useStore } from '../store/store'
 import { useToast } from '../components/Toast'
 import { useNav } from '../nav'
@@ -226,7 +227,7 @@ export function ExerciseDetailSheet({ open, onClose, params }: Props) {
   if (!view) return null
   return (
     <Sheet open={open} onClose={onClose} title={view.name}>
-      <TechniqueClip exerciseId={defId} poster={view.image} label="Form clip coming soon" />
+      <TechniqueClip exerciseId={defId} poster={posterOverrideUrl(defId) ?? view.image} label="Form clip coming soon" />
 
       <View className="mt-3 flex-row items-center gap-2">
         <Chip color="gray">{view.muscle}</Chip>

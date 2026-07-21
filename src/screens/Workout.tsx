@@ -13,6 +13,7 @@ import { fmtVolume, fmtWeight } from '../lib/format'
 import { relativeLabel, todayKey } from '../lib/date'
 import { todaySession, sessionProgress, completedSessions, activitiesForDay } from '../store/selectors'
 import { buildCustomSession, exerciseView, imageForMuscle } from '../store/programSession'
+import { posterOverrideUrl } from '../lib/media'
 import { brand, useColors } from '../theme'
 import { useToast } from '../components/Toast'
 import { syncAll } from '../lib/integrations'
@@ -306,7 +307,8 @@ function ExercisesTab() {
     () =>
       ACTIVE_EXERCISES.map((e) => {
         const v = exerciseView(e.id)
-        return { id: e.id, name: v?.name ?? e.name, muscle: v?.muscle ?? e.muscleGroup, image: v?.image ?? imageForMuscle(e.muscleGroup) }
+        // Prefer a real uploaded photo (e.g. Barbell Back Squat) over the generic muscle placeholder.
+        return { id: e.id, name: v?.name ?? e.name, muscle: v?.muscle ?? e.muscleGroup, image: posterOverrideUrl(e.id) ?? v?.image ?? imageForMuscle(e.muscleGroup) }
       }),
     [],
   )
