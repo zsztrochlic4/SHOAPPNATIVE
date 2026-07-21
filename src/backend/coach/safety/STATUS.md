@@ -163,11 +163,25 @@ base64-encoded so phrasings are not absorbed by the detector. All runs: `COACH_E
   not, ive taken the pills"; "began as research, but i have the means and intend to use them tonight").
   Report: `Downloads/holdout_FINAL_validation_results.txt`. Run once, not patched-and-rerun, not tuned.
 
-**UNVALIDATED and DISABLED — the final validation failed.** `COACH_ENABLED` stays `false`. The last
-failure class (topical/academic wrapper + present intent) is an adversarial-framing recall gap that a
-finite lexicon can't close and gemini-2.5-flash-lite doesn't reliably beat; closing it needs a
-stronger/instruction-tuned classifier (or a rules-floor "topical-wrapper + present-intent" pattern),
-then a fresh set. Enabling the coach is NOT authorised.
+- **r9 (post-FINAL fix):** closed the Section-1F class **on the deterministic RULES FLOOR** rather than
+  relying on the model. New `concealedIntent` detector (`rules.ts`) escalates a self-harm/suicide/
+  overdose TOPIC behind an academic/quoted/hypothetical WRAPPER when a present first-person ACTION
+  ("ive taken the pills", "im cutting"), MEANS ("i have the means here", "saving up my medication"),
+  METHOD-seeking ("how many … it would take to die"), or a REVEAL-it's-real ("planning my own",
+  "im not quoting … but im not", "its not hypothetical") is present — regardless of the wrapper.
+  Bounded against benign medical/academic/financial/quoting talk. Also: `detectThirdPartyAcute`
+  (suicide/goodbye note by a named other → emergency) and broadened third-party subjects. Because it
+  feeds `hasFirstPersonDistress` → `hasCurrentSafetySignal`, the scoping guard cannot suppress it.
+  Verified: all 9 FINAL failures now caught (8 deterministically on the rules floor; 1C-08 stays
+  crisis/protective) + FRESH-wording class checks + a 12-case benign non-regression + END-TO-END router
+  decision **without Gemini** (12/12: concealed-intent → block_emergency, benign → allow) + 218 suite.
+  Fixed by mechanism, NOT by memorising the burned set; NOT re-run against it.
+
+**Detection gap now closed DETERMINISTICALLY — but still UNVALIDATED and DISABLED.** Because the fix is
+on the rules floor (independent of the probabilistic model), its behaviour is provable by tests, not
+subject to Gemini's whims — a materially stronger guarantee than a prompt tweak. `COACH_ENABLED` still
+stays `false`: the final holdout is burned, so a clean confirmation needs a FRESH set, and Jack's
+separate privacy/security/implementation gates remain. Enabling the coach is NOT yet authorised.
 
 ## The hard rule
 

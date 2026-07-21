@@ -60,7 +60,8 @@ const wantsToDie = (n: Norm): boolean => hasRe(n, /\bwants? to die\b/)
 export function isThirdParty(n: Norm): boolean {
   const others = ['my friend', 'my mate', 'my roommate', 'my room mate', 'my flatmate', 'my brother',
     'my sister', 'my mum', 'my mom', 'my dad', 'my partner', 'my girlfriend', 'my boyfriend',
-    'my teammate', 'my colleague', 'someone i know', 'a friend of mine', 'my housemate']
+    'my teammate', 'my colleague', 'someone i know', 'a friend of mine', 'my housemate',
+    'in my group chat', 'someone in my', 'a classmate', 'someone from', 'a guy i know', 'a girl i know']
   const reflexiveOther = has(n, 'himself', 'herself', 'themselves', 'themself', 'theirself')
   const firstPersonReflexive = has(n, 'myself', 'my own life')
   if (firstPersonReflexive && !has(n, 'i meant', 'not me')) return false
@@ -167,6 +168,54 @@ function selfHarmIntent(n: Norm): { hit: boolean; immediate: boolean } {
   return { hit, immediate }
 }
 
+/**
+ * Concealed / wrapped present intent — the Jack FINAL §1F failure class: a self-harm / suicide /
+ * overdose TOPIC presented behind an academic, quoted, or hypothetical WRAPPER, but carrying a genuine
+ * present first-person ACTION, MEANS, METHOD-seeking, or a REVEAL that it is real and about the user
+ * NOW. The benign wrapper is exactly what defeats the probabilistic model; this deterministic floor
+ * escalates regardless of the wrapper. Bounded so ordinary medical / academic / financial talk does
+ * not match. Generalises to the mechanism, not to any specific (now-burned) case.
+ */
+function concealedIntent(n: Norm): { hit: boolean; immediate: boolean } {
+  // Benign medical context that makes "took the pills" ordinary (prescribed / vitamins / feeling better).
+  const benignMed = has(n, 'prescribed', 'as directed', 'my vitamins', 'multivitamin', 'the doctor', 'my doctor',
+    'feeling better', 'morning pills', 'with food', 'my supplement', 'my supplements', 'creatine')
+  // (a) SELF-CONTAINED self-harm ACTION / MEANS / METHOD — unambiguous on their own → immediate.
+  const action = !benignMed && has(n, 'ive taken the pills', 'i took the pills', 'ive taken them all', 'i took them all',
+    'ive taken all the pills', 'ive swallowed them', 'swallowed the pills', 'im cutting myself')
+  const means = has(n, 'the means here', 'means to end my life', 'means to kill myself', 'means to end it',
+    'have the means to end', 'have the means to do it', 'ive got the means to', 'intend to use them', 'ready to use them',
+    'saved up my medication', 'saving up my medication', 'saved up my meds', 'saving up my meds',
+    'saved up my pills', 'saving up my pills', 'stockpiling my medication', 'stockpiling my pills',
+    'stockpiling pills', 'hoarding my medication', 'hoarding my pills')
+  const method = has(n, 'lethal dose', 'painless way to die', 'painless way to go', 'least painful way to',
+    'how to kill myself', 'how to end my life', 'enough pills to overdose', 'enough to overdose', 'best way to kill myself',
+    'ways to kill myself') ||
+    hasRe(n, /\bhow (many|much)\b[a-z0-9 ]{0,25}\b(it would take|would it take|to (die|od|overdose|end (it|my life)))\b/)
+  if (action || means || method) return { hit: true, immediate: true }
+
+  // (b) crisis TOPIC + a present REVEAL/commitment that is otherwise ambiguous, behind a wrapper.
+  const topic = has(n, 'suicidal', 'self harm', 'self-harm', 'selfharm', 'kill myself', 'killing myself', 'end my life',
+    'take my life', 'take my own life', 'overdose', 'hurt myself', 'harm myself', 'cut myself', 'cutting myself') || wantsToDie(n)
+  const revealReal = has(n, 'its not hypothetical', 'it isnt hypothetical', 'not hypothetical anymore', 'wasnt hypothetical',
+    'im not quoting', 'not quoting anymore', 'its about me', 'about me now', 'im the one', 'talking about myself', 'but its me', 'its me now',
+    'not for an assignment', 'not for a class', 'not for homework', 'forget the assignment', 'forget the essay',
+    'forget the class', 'forget it im', 'forget that im') ||
+    hasRe(n, /\bplanning my own\b(?![a-z ]{0,4}\b(workout|program|programme|routine|split|plan|diet|meal|session|training|block|cut|bulk)\b)/) ||
+    hasRe(n, /\b(im|i m|i am)\s+(cutting|doing it|going through with it)\b/)
+  // A QUOTED wrapper explicitly DENIED = revealed as the user's real present intent. Match the split
+  // "quoting … but im not" structure (NOT a bare "im not", which would catch "im not sure about tonight").
+  const quotedRevealed = has(n, 'im not quoting', 'not just a lyric', 'not just a song', 'not just a quote',
+    'more than a lyric', 'not just quoting', 'im not just quoting') ||
+    hasRe(n, /\b(quoting|lyrics?|a song|a quote|a poem)\b[a-z0-9 ]{0,25}\bbut (im|i m|i am|its|it s)\s+not\b/)
+  if ((topic && revealReal) || quotedRevealed) {
+    const imminence = hasRe(n, /\b(tonight|today|right now|this (evening|minute|moment)|after this|now)\b/)
+    const isPlan = hasRe(n, /\bplanning my own\b/) // planning one's own [suicide] IS a plan → immediate
+    return { hit: true, immediate: imminence || isPlan }
+  }
+  return { hit: false, immediate: false }
+}
+
 /** Whole-word first-person distress/intent — used to guard the topical suppressor so it can NEVER
  *  hide a genuine disclosure that merely mentions an academic setting (Jack round-2 §3 critical guard). */
 function hasFirstPersonDistress(n: Norm): boolean {
@@ -174,7 +223,7 @@ function hasFirstPersonDistress(n: Norm): boolean {
     has(n, 'kill myself', 'killing myself', 'take my own life', 'end my life', 'harm myself',
       'hurt myself', 'cut myself', 'cutting myself', 'harming myself', 'self harming', 'i self harm',
       'im suicidal', 'i m suicidal', 'feel suicidal', 'feeling suicidal', 'been suicidal') ||
-    has(n, ...OTHER_HARM) || selfHarmIntent(n).hit
+    has(n, ...OTHER_HARM) || selfHarmIntent(n).hit || concealedIntent(n).hit
 }
 
 /**
@@ -208,6 +257,25 @@ function detectCrisis(n: Norm): DetectorHit[] {
   if (isThirdParty(n)) return [hit('third_party_crisis', 'crisis_term_third_party')]
   if (has(n, ...IMMEDIATE) || shi.immediate) return [hit('immediate_danger', 'self_harm_intent_now')]
   return [hit('crisis_concern', 'crisis_ideation_or_self_harm')]
+}
+
+/** Rules-FLOOR escalator for concealed/wrapped present intent (Jack FINAL §1F). Fires deterministically
+ *  even when the classifier is fooled by the academic/quoted wrapper. Third-party phrasing is left to
+ *  the third-party path. Because `concealedIntent().hit` also feeds `hasFirstPersonDistress`, the
+ *  cross-category scoping guard (`hasCurrentSafetySignal`) will NOT suppress these. */
+function detectConcealedIntent(n: Norm): DetectorHit[] {
+  const ci = concealedIntent(n)
+  if (!ci.hit || isThirdParty(n)) return []
+  return [hit(ci.immediate ? 'immediate_danger' : 'crisis_concern', 'concealed_present_intent')]
+}
+
+/** A third party in ACUTE danger via a note/goodbye (Jack FINAL 1I-10) → route to emergency (000 for
+ *  the other person), not the softer support line. */
+function detectThirdPartyAcute(n: Norm): DetectorHit[] {
+  const acute = has(n, 'suicide note', 'suicidal note', 'goodbye note', 'goodbye message', 'left a note',
+    'posted a note', 'posted a suicide', 'sent a goodbye', 'saying goodbye', 'said goodbye', 'final goodbye')
+  if (acute && isThirdParty(n)) return [hit('medical_emergency', 'third_party_acute_goodbye')]
+  return []
 }
 
 function detectHarmToOthers(n: Norm): DetectorHit[] {
@@ -621,7 +689,7 @@ function scope(n: Norm, raw: DetectorHit[]): RulesResult {
 export function runRules(text: string, _ctx: CoachContext): RulesResult {
   const n = normalize(text)
   const detectors = [
-    detectCrisis, detectHarmToOthers, detectMedicalEmergency, detectOverdose, detectInjuryOverride,
+    detectCrisis, detectConcealedIntent, detectThirdPartyAcute, detectHarmToOthers, detectMedicalEmergency, detectOverdose, detectInjuryOverride,
     detectMedicalUrgent, detectPregnancy, detectMedicalCondition, detectDisorderedEating,
     detectRapidWeightLoss, detectMealPlan, detectSteroidsPED, detectPrescribedMedication,
     detectSupplementDosing, detectUnder18, detectUnsafeTraining, detectAiRelationship,
