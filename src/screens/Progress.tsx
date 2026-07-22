@@ -78,7 +78,7 @@ export default function Progress() {
   return (
     <View className="px-5 pt-2">
       <ScreenHeader
-        title="Progress"
+        title="My Progress"
         trailing={
           <Pressable onPress={() => nav.open('customize')} className="h-10 w-10 items-center justify-center rounded-xl active:opacity-70">
             <SlidersHorizontal size={22} color={brand[400]} />

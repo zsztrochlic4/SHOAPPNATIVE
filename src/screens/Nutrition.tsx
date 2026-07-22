@@ -1,1008 +1,712 @@
-import { useMemo, useState, useRef, useEffect, type ReactNode } from 'react'
-import {
-  View, Text, Pressable, ScrollView, TextInput, Image,
-  KeyboardAvoidingView, Platform, Animated, Easing,
-} from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import * as Clipboard from 'expo-clipboard'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { View, Text, Pressable, ScrollView, Image, TextInput, Animated, Easing, ActivityIndicator } from 'react-native'
+import Svg, { Path, Circle, Text as SvgText } from 'react-native-svg'
 import { LinearGradient } from 'expo-linear-gradient'
-import Svg, { Circle, G } from 'react-native-svg'
+import * as ImagePicker from 'expo-image-picker'
+import * as Clipboard from 'expo-clipboard'
 import {
-  Sparkles, Send, Check, ArrowRight, ChevronDown, ChevronRight, Clock,
-  Droplet, Plus, Trash2, Share2, Search, Lightbulb, Salad, X,
+  Camera, Plus, Search, Clock, ChevronRight, ChevronDown, ChevronLeft, X, Check,
+  Trash2, Pencil, Share2, MessageCircle, CalendarCheck, Upload, ChefHat,
 } from 'lucide-react-native'
-import { Icon } from '../components/Icon'
 import { AppModal } from '../components/WebFrame'
-import { ProgressRing, SegmentedTabs, ScreenHeader } from '../components/ui'
 import { useStore } from '../store/store'
 import { useToast } from '../components/Toast'
-import {
-  PLATE_GUIDE, FOOD_TIERS, PORTION_GUIDE, EATING_PRINCIPLES, NUTRITION_LESSONS, NUTRITION_TAGS, TAG_TONE_VAR,
-} from '../data/nutrition'
-import { BUDGET_MEALS, FOODS } from '../data/catalog'
-import { todayHabit, nutritionTagsForDay } from '../store/selectors'
-import { dailyTargets } from '../store/training'
-import { fmtFluid, pct } from '../lib/format'
-import { coachRespond, STARTER_QUESTIONS, type DayReview } from '../lib/nutritionCoach'
-import { coachContext, coachOperational, coachPrecheckAsync, guardOutgoing, newSafetySession, type ContactButton } from '../lib/coachSafety'
-import { SafetyContactButtons } from '../components/SafetyContactButtons'
-import { todayKey } from '../lib/date'
-import { CoachComingSoon } from '../components/CoachComingSoon'
-import type { MealName, MealCategory, BudgetMeal } from '../store/types'
-import { brand, accent, useColors } from '../theme'
+import { BUDGET_MEALS } from '../data/catalog'
+import { NUTRITION_TAGS, type TagTone } from '../data/nutrition'
+import { nutritionTagsForDay } from '../store/selectors'
+import { useColors } from '../theme'
+import type { MealName, MealCategory, BudgetMeal, UserMeal } from '../store/types'
 
-const PLACEHOLDER = 'rgba(148,148,148,0.6)'
+/* ================================================================== */
+/*  Nutrition — a 4-tab section: Overview (scan + tags), Recipes,      */
+/*  Meal Plan and Guide. Rebuilt from the SHO Nutrition design.        */
+/* ================================================================== */
 
-const TABS = ['Coach', 'Help', 'Eats', 'My Meal Plan']
-const PLAN_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+type TabKey = 'Overview' | 'Recipes' | 'Meal Plan' | 'Guide'
+const TABS: TabKey[] = ['Overview', 'Recipes', 'Meal Plan', 'Guide']
+
+const CATS: (MealCategory | 'All')[] = ['All', 'Breakfast', 'Lunch', 'Dinner', 'Snack', 'Sweet']
 const SLOTS: MealName[] = ['Breakfast', 'Lunch', 'Snack', 'Dinner']
+const PLAN_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-/* ---- Colour helpers: resolve the data files' `rgb(var(--x))` strings ---- */
-type Colors = ReturnType<typeof useColors>
-function resolveColor(colors: Colors, css: string): string {
-  const key = css.match(/--[a-z0-9-]+/i)?.[0]
-  switch (key) {
-    case '--brand-300': return colors.brand300
-    case '--brand-400': return colors.brand400
-    case '--brand-500': return colors.brand500
-    case '--accent-blue': return colors.accentBlue
-    case '--accent-purple': return colors.accentPurple
-    case '--accent-orange': return colors.accentOrange
-    case '--accent-yellow': return colors.accentYellow
-    case '--danger': return colors.danger
-    default: return colors.fg
-  }
-}
 function alpha(hex: string, a: number): string {
   const h = hex.replace('#', '')
-  const r = parseInt(h.slice(0, 2), 16)
-  const g = parseInt(h.slice(2, 4), 16)
-  const b = parseInt(h.slice(4, 6), 16)
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16)
   return `rgba(${r}, ${g}, ${b}, ${a})`
 }
+const todayShort = () => PLAN_DAYS[(new Date().getDay() + 6) % 7]
 
-export default function Nutrition() {
-  const [tab, setTab] = useState('Coach')
-  return (
-    <View className="px-5 pt-2">
-      <ScreenHeader title="Nutrition" />
-      <SegmentedTabs tabs={TABS} active={tab} onChange={setTab} />
-      <View className="mt-5">
-        {tab === 'Coach' && <CoachTab />}
-        {tab === 'Help' && <LearnTab />}
-        {tab === 'Eats' && <BudgetTab />}
-        {tab === 'My Meal Plan' && <PlanTab />}
-      </View>
-    </View>
-  )
+/* ---- Static guide content (educational, not backend) ---- */
+type PlateSlice = { slice: 'veg' | 'protein' | 'carbs' | 'fat'; portion: string; icon: string; title: string; color: string; desc: string; examples: string[] }
+const PLATE: PlateSlice[] = [
+  { slice: 'veg', portion: '½', icon: '🥦', title: 'Vegetables & fruit', color: '#7ED957', desc: 'Broccoli, peppers, salad and berries provide colour, fibre and volume that help fill you up.', examples: ['Broccoli', 'Peppers', 'Leafy salad', 'Carrots', 'Berries', 'Apples'] },
+  { slice: 'protein', portion: '¼', icon: '🍗', title: 'Protein', color: '#3B82F6', desc: 'Chicken, fish, eggs, tofu, beans or Greek yogurt at each meal keeps you full and helps you stay strong.', examples: ['Chicken', 'Fish', 'Eggs', 'Tofu', 'Beans', 'Greek yogurt'] },
+  { slice: 'carbs', portion: '¼', icon: '🍚', title: 'Carbohydrates', color: '#F5A524', desc: 'Oats, rice, potato or wholegrain bread give steady, lasting energy through the day.', examples: ['Oats', 'Rice', 'Potato', 'Wholegrain bread', 'Pasta'] },
+  { slice: 'fat', portion: '', icon: '🥑', title: 'Healthy fats', color: '#8B5CF6', desc: 'A thumb sized amount of olive oil, nuts, avocado or oily fish alongside your plate goes a long way.', examples: ['Olive oil', 'Avocado', 'Nuts', 'Nut butter', 'Oily fish'] },
+]
+const PORTIONS = [
+  { emoji: '✋', hand: 'Palm', title: 'Protein', desc: 'Meat, fish, eggs, tofu', color: '#3B82F6' },
+  { emoji: '✊', hand: 'Fist', title: 'Vegetables', desc: 'Salad, broccoli, carrots', color: '#7ED957' },
+  { emoji: '🤲', hand: 'Cupped hand', title: 'Carbohydrates', desc: 'Rice, pasta, cereal', color: '#F5A524' },
+  { emoji: '👍', hand: 'Thumb', title: 'Healthy fats', desc: 'Oil, nuts, nut butter', color: '#8B5CF6' },
+]
+const TIERS = [
+  { title: 'Build meals around', color: '#7ED957', desc: 'Choose these regularly. They are filling, nutritious and useful for creating balanced meals.', items: ['Vegetables & fruit', 'Lean proteins', 'Beans, lentils & tofu', 'Yoghurt', 'Wholegrain carbs'] },
+  { title: 'Enjoy in balanced portions', color: '#F5A524', desc: 'These foods can fit comfortably into a balanced diet. Portions still matter.', items: ['White rice, pasta & bread', 'Cheese & full fat dairy', 'Nuts & nut butters', 'Lean red meat'] },
+  { title: 'Enjoy occasionally', color: '#f87171', desc: 'No food is banned. Enjoy these sometimes rather than making them the base of your day.', items: ['Fried & fast food', 'Sweets, cake & chocolate', 'Sugary & energy drinks', 'Processed meats'] },
+]
+const PRINCIPLES = [
+  { emoji: '🍽️', title: 'Protein at every meal', text: 'It keeps you full for longer and helps your body repair and stay strong.' },
+  { emoji: '🥬', title: 'Half your plate plants', text: 'Veg and fruit bring fibre, vitamins and volume that fill you up for very few calories.' },
+  { emoji: '💧', title: 'Reach for water first', text: 'Mild thirst often feels like hunger. A glass of water settles it more often than you would think.' },
+  { emoji: '🌱', title: 'Mostly whole foods', text: 'Foods close to how they grow keep you fuller and your energy steadier than processed versions.' },
+  { emoji: '🧠', title: 'Slow down at meals', text: 'Fullness takes a few minutes to land. Eating a little slower helps you stop at just right.' },
+  { emoji: '🎯', title: 'Nothing is off-limits', text: 'Treats fit a healthy diet. It is your everyday pattern, not any single meal, that counts.' },
+]
+const LESSONS = [
+  { id: 'protein', emoji: '🍗', title: 'Protein made simple', summary: 'How much you really need and where to get it', body: ['Protein keeps you full and helps your body repair, whether your goal is building muscle or losing fat.', 'Aim for a palm sized portion at each main meal: chicken, fish, eggs, Greek yoghurt, beans or tofu. Shakes are just a handy backup, not a must.'], takeaway: 'A palm of protein at each meal covers most people. Real food first, supplements only if convenient.' },
+  { id: 'carbs', emoji: '🍞', title: 'Carbs made simple', summary: 'Smart carbs fuel training and focus', body: ['Carbs are your body and brain’s main fuel. Cutting them out can leave you tired, hungry and unfocused.', 'Choose mostly oats, rice, potatoes, wholegrain bread and fruit. Limit highly refined and sugary options more often.'], takeaway: 'Carbs support training and concentration. Focus on the type and portion rather than avoiding them.' },
+  { id: 'moderation', emoji: '🌿', title: 'A balanced approach to food', summary: 'Why "good" and "bad" food is a trap', body: ['There are no forbidden foods, only how often and how much. Chocolate, pizza and a night out can all fit a healthy diet.', 'A simple guide: build around mostly nutritious whole foods, and leave room for the things you enjoy.'], takeaway: 'No single meal makes or breaks your diet. Your everyday pattern is what counts.' },
+  { id: 'budget', emoji: '💸', title: 'Eating well on a budget', summary: 'Great food does not need to be expensive', body: ['Cheap protein heroes: eggs, tinned tuna, beans, lentils, frozen chicken, milk and Greek yoghurt.', 'Frozen veg is as nutritious as fresh and lasts for weeks. Batch cook a big pot and you have lunches sorted for days.'], takeaway: 'Healthy eating can be cheap: lean on frozen veg, tinned staples and cook once, eat twice.' },
+  { id: 'fibre', emoji: '🥦', title: 'Why fibre matters', summary: 'The nutrient most people miss', body: ['Fibre comes from plants like vegetables, fruit, beans, oats and wholegrains, and most people fall short.', 'It supports digestion and keeps you fuller and steadier. Keep skins on, choose wholegrain, and add beans to meals.'], takeaway: 'Aim for more plants each day, an easy way to stay full and feel steadier.' },
+  { id: 'hydration', emoji: '🚰', title: 'Hydration and hunger', summary: 'Why hydration helps your diet', body: ['Mild thirst can feel like hunger. A glass of water before a snack often settles it.', 'Sip through the day, and a reusable bottle is the easiest reminder. Remember juice, fizzy drinks and coffees carry calories too.'], takeaway: 'Reach for water first. It is the free, zero-calorie default that often settles a craving.' },
+]
+
+/* Scripted meal-scan samples (no real ML) — cycle through on each scan. */
+type ScanSample = { name: string; confidence: number; kcal: number; p: number; c: number; f: number; photo: string; items: string[]; rec: 'freely' | 'moderation' | 'occasional'; note: string }
+const px = (id: number) => `https://images.pexels.com/photos/${id}/pexels-photo-${id}.jpeg?auto=compress&cs=tinysrgb&w=600`
+const SCAN_SAMPLES: ScanSample[] = [
+  { name: 'Grilled chicken & rice bowl', confidence: 94, kcal: 645, p: 48, c: 72, f: 18, photo: px(1640777), items: ['Chicken breast', 'White rice', 'Mixed veg'], rec: 'freely', note: 'Lean protein, smart carbs and plenty of veg. A great everyday meal.' },
+  { name: 'Scrambled eggs on toast', confidence: 91, kcal: 380, p: 22, c: 30, f: 18, photo: px(824635), items: ['Eggs', 'White toast', 'Butter'], rec: 'moderation', note: 'Good protein, but white toast and butter add up. Fine a few times a week.' },
+  { name: 'Salmon, potatoes & greens', confidence: 88, kcal: 525, p: 42, c: 46, f: 14, photo: px(3763847), items: ['Salmon fillet', 'Baby potatoes', 'Green beans'], rec: 'freely', note: 'Omega 3s, protein and fibre. One of the best plates you can build.' },
+  { name: 'Greek yogurt & berry bowl', confidence: 90, kcal: 330, p: 24, c: 38, f: 9, photo: px(1099680), items: ['Greek yogurt', 'Granola', 'Mixed berries'], rec: 'freely', note: 'High protein and light on calories. An ideal snack or breakfast.' },
+]
+const REC_INFO: Record<ScanSample['rec'], { label: string; color: string }> = {
+  freely: { label: 'Enjoy freely', color: '#7ED957' },
+  moderation: { label: 'In moderation', color: '#F5A524' },
+  occasional: { label: 'Keep occasional', color: '#f87171' },
 }
 
-/* ============================ Coach tab ============================ */
-interface ChatMsg {
-  id: string
-  role: 'user' | 'coach'
-  text?: string
-  topic?: string
-  review?: DayReview
-  status?: 'sending' | 'sent'
-  /** Tap-to-call / tap-to-text buttons for a fixed safety response (spec §20). */
-  buttons?: ContactButton[]
+const cardScroll = { paddingBottom: 40 }
+
+/* Tab entrance: fade + slight rise (design's shoFade). */
+function FadeIn({ children }: { children: ReactNode }) {
+  const a = useRef(new Animated.Value(0)).current
+  useEffect(() => { Animated.timing(a, { toValue: 1, duration: 250, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start() }, [a])
+  return <Animated.View style={{ flex: 1, opacity: a, transform: [{ translateY: a.interpolate({ inputRange: [0, 1], outputRange: [6, 0] }) }] }}>{children}</Animated.View>
 }
 
-let msgSeq = 0
-const nextId = () => `nc${++msgSeq}`
-
-/* Green gradient coach avatar, optionally with an "online" dot. */
-function CoachAvatar({ size = 36, dot = false, ringColor = '#121214' }: { size?: number; dot?: boolean; ringColor?: string }) {
-  return (
-    <View>
-      <LinearGradient
-        colors={[brand[300], brand[500]]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center' }}
-      >
-        <Salad size={Math.round(size * 0.5)} color="#000" />
-      </LinearGradient>
-      {dot && (
-        <View
-          style={{
-            position: 'absolute', bottom: -2, right: -2,
-            width: 12, height: 12, borderRadius: 6,
-            backgroundColor: brand[400], borderWidth: 2, borderColor: ringColor,
-          }}
-        />
-      )}
-    </View>
-  )
+/* A small pop-in for tick marks (design's tickPop). */
+function TickPop({ children }: { children: ReactNode }) {
+  const a = useRef(new Animated.Value(0)).current
+  useEffect(() => { Animated.spring(a, { toValue: 1, speed: 16, bounciness: 12, useNativeDriver: true }).start() }, [a])
+  return <Animated.View style={{ transform: [{ scale: a }] }}>{children}</Animated.View>
 }
 
-function CoachTab() {
-  const { state, dispatch } = useStore()
-  const goal = state.profile.goal
-  const insets = useSafeAreaInsets()
+/* Dropdown selector — the RN stand-in for the design's styled <select>: a rounded
+ * field showing the current value that opens a bottom-sheet option list. */
+function Dropdown({ value, placeholder, options, onSelect }: { value: string; placeholder?: string; options: { value: string; label: string }[]; onSelect: (v: string) => void }) {
   const [open, setOpen] = useState(false)
-  const [messages, setMessages] = useState<ChatMsg[]>([])
-  const [input, setInput] = useState('')
-  const [typing, setTyping] = useState(false)
-  const scrollRef = useRef<ScrollView>(null)
-  const inputRef = useRef<TextInput>(null)
-  // Per-conversation safety state, shared source with the 1:1 coach (spec §2/§7).
-  const safety = useRef(newSafetySession())
-
-  function handleClose() {
-    setOpen(false)
-  }
-
-  // Focus the input once the open transition has settled.
-  useEffect(() => {
-    if (!open) return
-    const t = setTimeout(() => inputRef.current?.focus(), 340)
-    return () => clearTimeout(t)
-  }, [open])
-
-  async function send(raw?: string) {
-    if (!coachOperational()) return // HARD gate: the food coach does not answer until reviewed.
-    const msg = (raw ?? input).trim()
-    if (!msg || typing) return
-    setInput('')
-
-    // Asking the coach ticks the dashboard "Ask a Q" goal for today.
-    dispatch({ type: 'MARK_NUTRITION_ASKED' })
-
-    const id = nextId()
-    setMessages((m) => [...m, { id, role: 'user', text: msg, status: 'sending' }])
-    // A beat later the message reads as sent, the way a tick lands in WhatsApp.
-    setTimeout(() => {
-      setMessages((m) => m.map((x) => (x.id === id ? { ...x, status: 'sent' } : x)))
-    }, 480)
-
-    // SAFETY: same shared precheck as the 1:1 coach — safety guard first (a crisis is never gated by
-    // the daily limit), then the limit — enforcing identically here (spec §4/§5/§7/§21).
-    const ctx = coachContext(state)
-    // Recent prior turns give the classifier multi-turn context (messages is pre-this-message here).
-    const recent = messages.filter((m) => m.text).slice(-6).map((m) => m.text as string)
-    const pre = await coachPrecheckAsync(msg, ctx, safety.current, state.coachUsage, todayKey, recent)
-    if (pre.kind !== 'allow') {
-      setTyping(true)
-      setTimeout(() => {
-        setTyping(false)
-        setMessages((m) => [...m, { id: nextId(), role: 'coach', text: pre.response.text, buttons: pre.response.buttons }])
-      }, 700)
-      return
-    }
-    dispatch({ type: 'BUMP_COACH_USAGE' })
-    setTyping(true)
-    const reply = coachRespond(msg, goal)
-    // Keep saving day reviews so the dashboard food check-in stays in sync.
-    if (reply.kind === 'review' && !reply.review.empty) {
-      dispatch({ type: 'SAVE_FOOD_REVIEW', text: msg, score: reply.review.score })
-    }
-    const delay = 850 + Math.min(900, msg.length * 11)
-    setTimeout(() => {
-      setTyping(false)
-      setMessages((m) => [
-        ...m,
-        reply.kind === 'review'
-          ? { id: nextId(), role: 'coach', review: reply.review }
-          : { id: nextId(), role: 'coach', text: guardOutgoing(reply.answer.answer, pre.decision, ctx, safety.current), topic: reply.answer.matched ? reply.answer.question : undefined },
-      ])
-    }, delay)
-  }
-
-  function openChat(initial?: string) {
-    if (!coachOperational()) return // Coach gated OFF: the chat cannot be opened.
-    setOpen(true)
-    if (initial) send(initial)
-  }
-
-  const showSuggestions = messages.length === 0 && !typing
-  const canSend = !!input.trim() && !typing
-
+  const current = options.find((o) => o.value === value)
   return (
     <>
-      {/* Quick day tags: fast, tap-only "how did your eating today go" */}
-      <DayTagsCard />
-
-      {/* Unified nutrition coach: one chat for "what I ate" and "ask anything".
-          Gated OFF (with the rest of the coach) until its professional review. */}
-      {coachOperational()
-        ? <NutritionCoachCard onOpen={() => openChat()} onAsk={(q) => openChat(q)} />
-        : <CoachComingSoon />}
-
-      {/* Water quick-log */}
-      <WaterCard />
-      <View className="h-2" />
-
-      {/* Full-screen chat experience */}
-      <AppModal visible={open} animationType="slide" onRequestClose={handleClose}>
-        <View className="flex-1 bg-ink-900" style={{ paddingTop: insets.top }}>
-          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-            {/* Header */}
-            <View className="flex-row items-center gap-2.5 px-3 py-2.5">
-              <Pressable onPress={handleClose} className="h-9 w-9 shrink-0 items-center justify-center rounded-full active:opacity-70">
-                <X size={22} color={brand[400]} />
-              </Pressable>
-              <CoachAvatar size={36} dot ringColor="#0a0a0b" />
-              <View className="min-w-0 flex-1">
-                <Text numberOfLines={1} className="text-[15px] font-bold leading-tight text-white">Nutrition coach</Text>
-                <Text className="text-[12px] leading-tight text-white/45">Active now</Text>
-              </View>
-            </View>
-            <View className="h-px bg-white/[0.06]" />
-
-            {/* Messages */}
-            <ScrollView
-              ref={scrollRef}
-              className="flex-1 px-3"
-              contentContainerStyle={{ paddingTop: 8, paddingBottom: 12 }}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
-            >
-              {/* Thread intro */}
-              <View className="items-center px-6 pb-5 pt-4">
-                <CoachAvatar size={68} dot ringColor="#0a0a0b" />
-                <Text className="mt-3 text-[17px] font-bold text-white">Nutrition coach</Text>
-                <Text className="mt-0.5 max-w-[16rem] text-center text-[13px] leading-snug text-white/45">
-                  Tell me what you ate today for an honest review, or ask me anything about food. No calorie counting.
-                </Text>
-              </View>
-
-              {messages.map((m) => {
-                const isUser = m.role === 'user'
-
-                if (m.review) {
-                  return (
-                    <View key={m.id} className="mt-2.5 flex-row items-end justify-start gap-1.5">
-                      <View className="self-end"><CoachAvatar size={24} /></View>
-                      <View style={{ maxWidth: '92%' }}>
-                        <ReviewBubble review={m.review} />
-                      </View>
-                    </View>
-                  )
-                }
-
+      <Pressable onPress={() => setOpen(true)} className="flex-row items-center justify-between rounded-[13px] bg-ink-700 px-3.5 py-3 active:opacity-80">
+        <Text numberOfLines={1} className={`flex-1 text-[14px] font-semibold ${current ? 'text-white' : 'text-white/45'}`}>{current?.label ?? placeholder}</Text>
+        <ChevronDown size={18} color="rgba(255,255,255,0.5)" />
+      </Pressable>
+      <AppModal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <Pressable onPress={() => setOpen(false)} className="flex-1 justify-end" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
+          <Pressable onPress={() => {}} className="rounded-t-[24px] border-t border-white/10 bg-ink-800 px-4 pb-8 pt-3">
+            <View className="mb-2 h-1 w-10 self-center rounded-full bg-white/20" />
+            <ScrollView style={{ maxHeight: 340 }} showsVerticalScrollIndicator={false}>
+              {options.map((o) => {
+                const on = o.value === value
                 return (
-                  <View key={m.id}>
-                    <View className={`mt-2.5 flex-row items-end gap-1.5 ${isUser ? 'justify-end' : 'justify-start'}`}>
-                      {!isUser && <View className="self-end"><CoachAvatar size={24} /></View>}
-                      <View
-                        style={{ maxWidth: '82%' }}
-                        className={`px-3.5 py-2.5 ${isUser ? 'rounded-[20px] rounded-br-md bg-brand-400' : 'rounded-[20px] rounded-bl-md bg-ink-700'}`}
-                      >
-                        {!isUser && m.topic && <Text className="mb-1 text-[12.5px] font-bold text-brand-400">{m.topic}</Text>}
-                        <Text className={`text-[14.5px] leading-snug ${isUser ? 'text-black' : 'text-white'}`}>{m.text}</Text>
-                        {!isUser && m.buttons && <SafetyContactButtons buttons={m.buttons} />}
-                      </View>
-                    </View>
-                    {isUser && (
-                      <View className="mt-1 flex-row items-center justify-end gap-1 pr-1">
-                        {m.status === 'sending' ? (
-                          <>
-                            <Clock size={11} color="rgba(255,255,255,0.35)" />
-                            <Text className="text-[10.5px] font-medium text-white/35">Sending</Text>
-                          </>
-                        ) : (
-                          <>
-                            <Check size={12} color={brand[400]} />
-                            <Text className="text-[10.5px] font-medium text-white/35">Sent</Text>
-                          </>
-                        )}
-                      </View>
-                    )}
-                  </View>
+                  <Pressable key={o.value} onPress={() => { onSelect(o.value); setOpen(false) }} className="flex-row items-center justify-between rounded-xl px-3.5 py-3 active:opacity-80" style={{ backgroundColor: on ? alpha('#7ED957', 0.12) : 'transparent' }}>
+                    <Text className="text-[15px] font-semibold" style={{ color: on ? '#7ED957' : '#fff' }}>{o.label}</Text>
+                    {on && <Check size={17} color="#7ED957" strokeWidth={3} />}
+                  </Pressable>
                 )
               })}
-
-              {typing && (
-                <View className="mt-2.5 flex-row items-end justify-start gap-1.5">
-                  <View className="self-end"><CoachAvatar size={24} /></View>
-                  <View className="flex-row items-center gap-1 rounded-[20px] rounded-bl-md bg-ink-700 px-4 py-3.5">
-                    <TypingDots />
-                  </View>
-                </View>
-              )}
             </ScrollView>
-
-            {/* Quick-start chips */}
-            {showSuggestions && (
-              <View className="px-3 pb-2">
-                <Text className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-white/35">Try asking</Text>
-                <View className="gap-1.5">
-                  <Pressable
-                    onPress={() => inputRef.current?.focus()}
-                    className="flex-row items-center gap-2.5 rounded-2xl border border-white/[0.08] bg-ink-800 px-3.5 py-2.5 active:opacity-80"
-                  >
-                    <Salad size={15} color={brand[400]} />
-                    <Text className="flex-1 text-[13.5px] font-medium text-white/85">Tell me what I ate today</Text>
-                    <ChevronRight size={15} color="rgba(255,255,255,0.25)" />
-                  </Pressable>
-                  {STARTER_QUESTIONS.slice(0, 4).map((s) => (
-                    <Pressable
-                      key={s}
-                      onPress={() => send(s)}
-                      className="flex-row items-center gap-2.5 rounded-2xl border border-white/[0.08] bg-ink-800 px-3.5 py-2.5 active:opacity-80"
-                    >
-                      <Sparkles size={15} color={brand[400]} />
-                      <Text className="flex-1 text-[13.5px] font-medium text-white/85">{s}</Text>
-                      <ChevronRight size={15} color="rgba(255,255,255,0.25)" />
-                    </Pressable>
-                  ))}
-                </View>
-              </View>
-            )}
-
-            {/* Input */}
-            <View className="flex-row items-end gap-2 px-3 pt-1.5" style={{ paddingBottom: insets.bottom + 12 }}>
-              <View className="flex-1 flex-row items-end rounded-[22px] bg-ink-800 px-1 py-1">
-                <TextInput
-                  ref={inputRef}
-                  value={input}
-                  onChangeText={setInput}
-                  multiline
-                  placeholder="Tell me what you ate, or ask…"
-                  placeholderTextColor="rgba(255,255,255,0.3)"
-                  className="max-h-28 min-h-[40px] flex-1 bg-transparent px-3.5 py-2 text-[15px] text-white"
-                />
-              </View>
-              <Pressable
-                onPress={() => send()}
-                disabled={!canSend}
-                className={`h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-400 active:opacity-90 ${canSend ? '' : 'opacity-50'}`}
-              >
-                <Send size={18} color="#000" />
-              </Pressable>
-            </View>
-          </KeyboardAvoidingView>
-        </View>
+          </Pressable>
+        </Pressable>
       </AppModal>
     </>
   )
 }
 
-/* Entry point in the Coach tab: a compact DM-style preview that opens the
-   full-screen chat when tapped. */
-function NutritionCoachCard({ onOpen, onAsk }: { onOpen: () => void; onAsk: (q: string) => void }) {
+/* ============================ Root ============================ */
+export default function Nutrition() {
+  const [tab, setTab] = useState<TabKey>('Overview')
+  const [recipe, setRecipe] = useState<BudgetMeal | UserMeal | null>(null)
+  const [addOpen, setAddOpen] = useState(false)
+  const [editing, setEditing] = useState<UserMeal | null>(null)
+
+  const openAdd = (m?: UserMeal) => { setEditing(m ?? null); setAddOpen(true) }
+
   return (
-    <View className="mt-4 overflow-hidden rounded-2xl border border-white/[0.08] bg-ink-800 p-4">
-      <View className="flex-row items-center gap-3">
-        <CoachAvatar size={44} dot ringColor="#121214" />
-        <View className="min-w-0 flex-1">
-          <Text className="text-[14.5px] font-semibold leading-snug text-white/90">Tell me what you ate, or ask me anything</Text>
-        </View>
+    <View className="flex-1 px-5">
+      <Text className="mb-3.5 mt-2 text-[26px] font-extrabold tracking-tight text-white">Nutrition</Text>
+
+      <View className="mb-5 flex-row gap-6 border-b border-white/[0.07]">
+        {TABS.map((t) => {
+          const active = tab === t
+          return (
+            <Pressable key={t} onPress={() => setTab(t)} className="relative pb-3">
+              <Text className={`text-[15px] font-semibold ${active ? 'text-brand-400' : 'text-white/50'}`}>{t}</Text>
+              {active && <View className="absolute -bottom-px left-[-2px] right-[-2px] h-[2.5px] rounded-full bg-brand-400" />}
+            </Pressable>
+          )
+        })}
       </View>
 
-      <Pressable
-        onPress={onOpen}
-        className="mt-4 w-full flex-row items-center gap-2 rounded-full border border-white/[0.08] bg-ink-900/60 px-4 py-3 active:opacity-90"
-      >
-        <Text className="flex-1 text-[14.5px] text-white/35">Message your coach…</Text>
-        <View className="h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-400"><Send size={15} color="#000" /></View>
-      </Pressable>
+      {tab === 'Overview' && <FadeIn key="Overview"><OverviewTab /></FadeIn>}
+      {tab === 'Recipes' && <FadeIn key="Recipes"><RecipesTab onOpenRecipe={setRecipe} onAddMeal={() => openAdd()} /></FadeIn>}
+      {tab === 'Meal Plan' && <FadeIn key="Meal Plan"><MealPlanTab /></FadeIn>}
+      {tab === 'Guide' && <FadeIn key="Guide"><GuideTab /></FadeIn>}
 
-      <View className="mt-3 flex-row flex-wrap gap-2">
-        <Pressable onPress={() => onAsk('Are sandwiches healthy?')} className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 active:opacity-80">
-          <Text className="text-[12.5px] font-medium text-white/70">Are sandwiches healthy?</Text>
-        </Pressable>
-        {STARTER_QUESTIONS.slice(0, 3).map((q) => (
-          <Pressable key={q} onPress={() => onAsk(q)} className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 active:opacity-80">
-            <Text className="text-[12.5px] font-medium text-white/70">{q}</Text>
-          </Pressable>
-        ))}
-      </View>
+      <RecipeModal meal={recipe} onClose={() => setRecipe(null)} onEdit={(m) => { setRecipe(null); openAdd(m) }} />
+      <AddMealSheet open={addOpen} editing={editing} onClose={() => setAddOpen(false)} />
     </View>
   )
 }
 
-function DayTagsCard() {
+function toneColor(tone: TagTone, c: ReturnType<typeof useColors>): string {
+  return tone === 'good' ? c.brand400 : tone === 'neutral' ? c.accentBlue : c.accentOrange
+}
+
+/* ============================ Overview ============================ */
+type ScanState = 'idle' | 'analyzing' | 'result' | 'logged'
+function OverviewTab() {
   const { state, dispatch } = useStore()
-  const colors = useColors()
+  const toast = useToast()
+  const c = useColors()
   const selected = nutritionTagsForDay(state)
 
+  const [scan, setScan] = useState<ScanState>('idle')
+  const [img, setImg] = useState<string | null>(null)
+  const [result, setResult] = useState<ScanSample | null>(null)
+  const [servings, setServings] = useState(1)
+  const [nameEdit, setNameEdit] = useState<string | null>(null)
+  const [logPick, setLogPick] = useState(false)
+  const [loggedMsg, setLoggedMsg] = useState({ title: '', sub: '' })
+  const idxRef = useRef(0)
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([])
+  useEffect(() => () => timers.current.forEach(clearTimeout), [])
+
+  function nextSample(): ScanSample {
+    const s = SCAN_SAMPLES[idxRef.current % SCAN_SAMPLES.length]
+    idxRef.current += 1
+    return s
+  }
+  async function pick(from: 'camera' | 'library') {
+    try {
+      const res = from === 'camera'
+        ? await ImagePicker.launchCameraAsync({ quality: 0.6 })
+        : await ImagePicker.launchImageLibraryAsync({ quality: 0.6 })
+      if (res.canceled) return
+      const sample = nextSample()
+      setImg(res.assets[0].uri); setResult(sample); setServings(1); setNameEdit(null); setLogPick(false); setScan('analyzing')
+      timers.current.push(setTimeout(() => setScan('result'), 1900))
+    } catch {
+      toast("Couldn't open the camera")
+    }
+  }
+  function trySample() {
+    const sample = nextSample()
+    setImg(null); setResult(sample); setServings(1); setNameEdit(null); setLogPick(false); setScan('analyzing')
+    timers.current.push(setTimeout(() => setScan('result'), 1500))
+  }
+  function retake() { setScan('idle'); setImg(null); setResult(null); setServings(1); setLogPick(false); setNameEdit(null) }
+  const scanName = () => (nameEdit != null && nameEdit.trim() ? nameEdit.trim() : result?.name ?? '')
+  function logMeal(slot: MealName) {
+    if (!result) return
+    const day = todayShort()
+    dispatch({ type: 'ADD_PLANNED_MEAL', plan: { day, slot, name: scanName(), w: 0 } })
+    setLoggedMsg({ title: `Logged to ${slot}, ${day}`, sub: 'Saved to your meal plan' })
+    setLogPick(false); setScan('logged')
+    toast(`Added to ${slot}, ${day}`)
+    timers.current.push(setTimeout(retake, 1250))
+  }
+  function saveToMeals() {
+    if (!result) return
+    dispatch({ type: 'ADD_MY_MEAL', meal: { name: scanName(), kcal: Math.round(result.kcal * servings), p: Math.round(result.p * servings), c: Math.round(result.c * servings), f: Math.round(result.f * servings), ingredients: result.items.slice(), notes: 'Scanned meal' } })
+    setLoggedMsg({ title: scanName(), sub: 'Saved to My Meals' })
+    setLogPick(false); setScan('logged')
+    toast('Saved to My Meals')
+    timers.current.push(setTimeout(retake, 1250))
+  }
+
+  const kcal = result ? Math.round(result.kcal * servings) : 0
+  const rec = result ? REC_INFO[result.rec] : REC_INFO.freely
+  const macros = result
+    ? (() => {
+        const pk = result.p * 4 * servings, ck = result.c * 4 * servings, fk = result.f * 9 * servings, tot = pk + ck + fk || 1
+        return [
+          { label: 'Protein', g: Math.round(result.p * servings), color: c.accentBlue, pct: Math.round((pk / tot) * 100) },
+          { label: 'Carbs', g: Math.round(result.c * servings), color: c.accentOrange, pct: Math.round((ck / tot) * 100) },
+          { label: 'Fat', g: Math.round(result.f * servings), color: c.accentPurple, pct: Math.round((fk / tot) * 100) },
+        ]
+      })()
+    : []
+  const scanImg = img || (result ? result.photo : '')
+
+  const tagCount = selected.length
+  const tagCountLabel = tagCount === 0 ? 'Tap any that fit your day' : `${tagCount} logged today`
+
   return (
-    <View className="rounded-2xl bg-ink-800 p-5">
-      <Text className="text-center text-[17px] font-bold leading-tight text-white">How did your eating today go?</Text>
-      <View className="mt-4 flex-row flex-wrap justify-between">
-        {NUTRITION_TAGS.map((tag) => {
-          const on = selected.includes(tag.id)
-          const c = resolveColor(colors, TAG_TONE_VAR[tag.tone])
-          return (
-            <Pressable
-              key={tag.id}
-              onPress={() => dispatch({ type: 'TOGGLE_NUTRITION_TAG', tag: tag.id })}
-              className="items-center gap-1 rounded-xl py-3 active:opacity-80"
-              style={{
-                width: '32%',
-                marginBottom: 8,
-                borderWidth: 1,
-                backgroundColor: on ? alpha(c, 0.16) : 'rgba(255,255,255,0.05)',
-                borderColor: on ? alpha(c, 0.35) : 'rgba(255,255,255,0.08)',
-              }}
-            >
-              <Text className="text-[18px] leading-none">{tag.emoji}</Text>
-              <Text className="text-center text-[12px] font-semibold leading-tight" style={{ color: on ? c : alpha(colors.fg, 0.65) }}>{tag.label}</Text>
+    <ScrollView className="flex-1" contentContainerStyle={cardScroll} showsVerticalScrollIndicator={false}>
+      {/* Scanner */}
+      <View className="overflow-hidden rounded-[20px] border border-white/[0.06] bg-ink-800 p-3.5">
+        <View className="flex-row items-center gap-2.5">
+          <View className="h-9 w-9 items-center justify-center rounded-xl" style={{ backgroundColor: alpha('#7ED957', 0.12) }}>
+            <Camera size={18} color={c.brand400} />
+          </View>
+          <View className="min-w-0 flex-1">
+            <Text className="text-[18px] font-extrabold leading-tight text-white">Snap your meal</Text>
+            <Text className="mt-0.5 text-[14px] text-white/60">How healthy is your meal really?</Text>
+          </View>
+        </View>
+
+        {scan === 'idle' && (
+          <>
+            <Pressable onPress={() => pick('camera')} className="mt-3.5 flex-row items-center justify-center gap-2.5 rounded-xl bg-brand-400 py-3.5 active:opacity-90">
+              <Camera size={19} color="#0a0a0b" strokeWidth={2.4} />
+              <Text className="text-[15px] font-extrabold text-black">Take a photo</Text>
             </Pressable>
-          )
-        })}
-      </View>
-    </View>
-  )
-}
+            <View className="mt-3 flex-row items-center justify-center gap-4">
+              <Pressable onPress={() => pick('library')} className="flex-row items-center gap-1.5 active:opacity-70">
+                <Upload size={14} color="rgba(255,255,255,0.6)" />
+                <Text className="text-[14px] font-semibold text-white/70">Upload from library</Text>
+              </Pressable>
+              <View className="h-[3px] w-[3px] rounded-full bg-white/25" />
+              <Pressable onPress={trySample} className="active:opacity-70"><Text className="text-[14px] font-semibold text-brand-400">Try a sample</Text></Pressable>
+            </View>
+          </>
+        )}
 
-/* Compact day-review rendered as a coach chat bubble. */
-function ReviewBubble({ review }: { review: DayReview }) {
-  const colors = useColors()
-  const tierVar: Record<string, string> = { great: '--brand-500', good: '--brand-400', moderate: '--accent-orange', limit: '--danger' }
-  return (
-    <View className="rounded-[20px] rounded-bl-md bg-ink-700 p-3.5">
-      <View className="flex-row items-center gap-3">
-        <ProgressRing value={review.score * 10} size={58} stroke={6} color={review.score >= 5 ? brand[400] : accent.orange}>
-          <Text className="text-lg font-extrabold leading-none text-white">{review.score}</Text>
-        </ProgressRing>
-        <View className="min-w-0 flex-1">
-          <Text className="text-[15px] font-extrabold leading-tight text-white">{review.verdict}</Text>
-          <Text className="mt-0.5 text-[12.5px] leading-snug text-white/60">{review.summary}</Text>
-        </View>
-      </View>
+        {scan === 'analyzing' && <ScanAnalyzing img={scanImg} />}
 
-      {review.found.length > 0 && (
-        <View className="mt-3 flex-row flex-wrap gap-1.5">
-          {review.found.map((f, i) => {
-            const c = resolveColor(colors, tierVar[f.tier])
-            return (
-              <View key={i} className="rounded-full px-2.5 py-1" style={{ backgroundColor: alpha(c, 0.14) }}>
-                <Text className="text-[11px] font-semibold" style={{ color: c }}>{f.label}</Text>
-              </View>
-            )
-          })}
-        </View>
-      )}
-
-      {review.highlights.length > 0 && (
-        <View className="mt-3">
-          <Text className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-white/40">What went well</Text>
-          <View className="gap-1.5">
-            {review.highlights.map((h, i) => (
-              <View key={i} className="flex-row items-start gap-2">
-                <Check size={15} strokeWidth={3} color={brand[400]} style={{ marginTop: 2 }} />
-                <Text className="flex-1 text-[12.5px] leading-snug text-white/75">{h}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      )}
-
-      {review.improvements.length > 0 && (
-        <View className="mt-3">
-          <Text className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-white/40">Try this next</Text>
-          <View className="gap-1.5">
-            {review.improvements.map((h, i) => (
-              <View key={i} className="flex-row items-start gap-2">
-                <ArrowRight size={15} strokeWidth={2.5} color={accent.orange} style={{ marginTop: 2 }} />
-                <Text className="flex-1 text-[12.5px] leading-snug text-white/75">{h}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      )}
-
-      <View className="mt-3 flex-row items-start gap-2 rounded-xl bg-brand-400/10 p-2.5">
-        <Sparkles size={15} color={brand[400]} style={{ marginTop: 2 }} />
-        <Text className="flex-1 text-[12.5px] font-medium leading-snug text-white/80">{review.encouragement}</Text>
-      </View>
-    </View>
-  )
-}
-
-/* ============================ Learn tab ============================ */
-function LearnTab() {
-  const colors = useColors()
-  const [openLesson, setOpenLesson] = useState<string | null>(null)
-
-  return (
-    <View className="gap-9 pb-2">
-
-      {/* The balanced plate: a big, tappable visual that does the explaining */}
-      <View>
-        <SectionLabel>The balanced plate</SectionLabel>
-        <BalancedPlate />
-      </View>
-
-      {/* Portion sizes by hand */}
-      <View>
-        <SectionLabel>Portion sizes, by hand</SectionLabel>
-        <Text className="-mt-1 text-[12.5px] leading-snug text-white/50">No scales needed. Your own hand is a guide that scales with you.</Text>
-        <View className="mt-1">
-          {PORTION_GUIDE.map((p, i) => {
-            const c = resolveColor(colors, p.color)
-            return (
-              <View key={p.title} className={`flex-row items-center gap-3.5 py-3.5 ${i === 0 ? '' : 'border-t border-white/[0.06]'}`}>
-                <View className="h-11 w-11 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: alpha(c, 0.12) }}>
-                  <Text className="text-[24px]">{p.emoji}</Text>
-                </View>
-                <View className="min-w-0 flex-1">
-                  <View className="flex-row items-baseline gap-2">
-                    <Text className="text-[14px] font-bold" style={{ color: c }}>{p.title}</Text>
-                    <Text className="text-[11px] font-semibold uppercase tracking-wide text-white/35">{p.hand}</Text>
-                  </View>
-                  <Text className="mt-0.5 text-[12.5px] leading-snug text-white/60">{p.desc}</Text>
-                </View>
-              </View>
-            )
-          })}
-        </View>
-      </View>
-
-      {/* Eat more / balance / sometimes */}
-      <View>
-        <SectionLabel>What to eat more, and less, of</SectionLabel>
-        <View>
-          {FOOD_TIERS.map((t, i) => {
-            const c = resolveColor(colors, t.color)
-            return (
-              <View key={t.tier} className={`flex-row gap-3 py-4 ${i === 0 ? '' : 'border-t border-white/[0.06]'}`}>
-                <View className="w-1 shrink-0 self-stretch rounded-full" style={{ backgroundColor: c }} />
-                <View className="min-w-0 flex-1">
-                  <Text className="font-bold" style={{ color: c }}>{t.title}</Text>
-                  <Text className="mt-1 text-[12.5px] leading-snug text-white/60">{t.desc}</Text>
-                  <View className="mt-2.5 flex-row flex-wrap gap-1.5">
-                    {t.items.map((it) => (
-                      <View key={it} className="rounded-full bg-white/[0.05] px-2.5 py-1">
-                        <Text className="text-[11px] font-medium text-white/70">{it}</Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-              </View>
-            )
-          })}
-        </View>
-      </View>
-
-      {/* Simple everyday wins */}
-      <View>
-        <SectionLabel>Simple everyday wins</SectionLabel>
-        <View>
-          {EATING_PRINCIPLES.map((p, i) => (
-            <View key={p.title} className={`flex-row items-start gap-3.5 py-3.5 ${i === 0 ? '' : 'border-t border-white/[0.06]'}`}>
-              <View className="h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-400/[0.12]"><Icon name={p.icon} size={18} color={brand[400]} /></View>
+        {scan === 'result' && result && (
+          <View>
+            <View className="mt-3 flex-row items-center gap-3">
+              <Image source={{ uri: scanImg }} resizeMode="cover" className="h-[50px] w-[50px] rounded-xl bg-ink-700" />
               <View className="min-w-0 flex-1">
-                <Text className="text-[14px] font-bold leading-tight text-white">{p.title}</Text>
-                <Text className="mt-0.5 text-[12.5px] leading-snug text-white/60">{p.text}</Text>
+                <View className="flex-row items-center gap-1.5">
+                  <Check size={13} color={c.brand400} strokeWidth={3} />
+                  <Text className="text-[10.5px] font-extrabold text-brand-400">{result.confidence}% match</Text>
+                </View>
+                <View className="mt-0.5 flex-row items-center gap-2">
+                  <TextInput
+                    value={nameEdit != null ? nameEdit : result.name}
+                    onChangeText={setNameEdit}
+                    className="min-w-0 flex-1 p-0 text-[14.5px] font-extrabold text-white"
+                  />
+                  <Pencil size={14} color="rgba(255,255,255,0.35)" />
+                </View>
               </View>
             </View>
-          ))}
-        </View>
+            <Text className="mt-1.5 text-[10px] leading-[1.4] text-white/35">this is our best guess and may not be 100% accurate. tap the name to edit it.</Text>
+
+            <View className="mt-3 flex-row items-end justify-between gap-3">
+              <View>
+                <Text className="text-[10px] font-extrabold uppercase tracking-wider text-white/40">Est. calories</Text>
+                <View className="flex-row items-baseline gap-1.5">
+                  <Text className="text-[30px] font-black leading-none text-brand-400">{kcal}</Text>
+                  <Text className="text-[13px] font-bold text-white/50">kcal</Text>
+                </View>
+              </View>
+              <View className="flex-row items-center overflow-hidden rounded-full border border-white/10 bg-white/[0.04]">
+                <Pressable onPress={() => setServings((s) => Math.max(1, s - 1))} className="h-8 w-8 items-center justify-center active:opacity-70"><Text className="text-[16px] font-extrabold text-white">−</Text></Pressable>
+                <Text className="min-w-[72px] text-center text-[11.5px] font-bold text-white/80">{servings === 1 ? '1 serving' : `${servings} servings`}</Text>
+                <Pressable onPress={() => setServings((s) => Math.min(6, s + 1))} className="h-8 w-8 items-center justify-center active:opacity-70"><Text className="text-[16px] font-extrabold text-brand-400">+</Text></Pressable>
+              </View>
+            </View>
+
+            <View className="mt-3 gap-2">
+              {macros.map((m) => (
+                <View key={m.label} className="flex-row items-center gap-2.5">
+                  <Text className="w-[52px] text-[11.5px] font-bold text-white/70">{m.label}</Text>
+                  <View className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.08]"><View style={{ width: `${m.pct}%`, backgroundColor: m.color }} className="h-full rounded-full" /></View>
+                  <Text className="w-10 text-right text-[12px] font-extrabold text-white">{m.g}g</Text>
+                </View>
+              ))}
+            </View>
+
+            <View className="mt-3 rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2.5">
+              <View className="flex-row items-center gap-2">
+                <View className="h-2 w-2 rounded-full" style={{ backgroundColor: rec.color }} />
+                <Text className="text-[12px] font-extrabold" style={{ color: rec.color }}>{rec.label}</Text>
+              </View>
+              <Text className="mt-1.5 text-[12px] leading-[1.5] text-white/65">{result.note}</Text>
+            </View>
+
+            {logPick ? (
+              <View className="mt-3 rounded-[13px] border p-3" style={{ borderColor: alpha('#7ED957', 0.28), backgroundColor: alpha('#7ED957', 0.06) }}>
+                <Text className="mb-2 text-[11px] font-extrabold uppercase tracking-wide text-white/60">Log to {todayShort()}. Which meal?</Text>
+                <View className="flex-row gap-1.5">
+                  {SLOTS.map((sl) => (
+                    <Pressable key={sl} onPress={() => logMeal(sl)} className="flex-1 items-center rounded-[10px] border border-white/10 bg-ink-700 px-1 py-2.5 active:opacity-80"><Text className="text-[11.5px] font-bold text-white">{sl}</Text></Pressable>
+                  ))}
+                </View>
+                <Pressable onPress={() => setLogPick(false)} className="mt-2 items-center active:opacity-70"><Text className="text-[11.5px] font-bold text-white/45">Cancel</Text></Pressable>
+              </View>
+            ) : (
+              <>
+                <View className="mt-3 flex-row gap-2.5">
+                  <Pressable onPress={() => setLogPick(true)} className="flex-[2] items-center rounded-xl bg-brand-400 py-2.5 active:opacity-90"><Text className="text-[13.5px] font-extrabold text-black">Add to today's log</Text></Pressable>
+                  <Pressable onPress={retake} className="flex-1 items-center rounded-xl bg-white/[0.06] py-2.5 active:opacity-80"><Text className="text-[13.5px] font-bold text-white">Retake</Text></Pressable>
+                </View>
+                <Pressable onPress={saveToMeals} className="mt-2 flex-row items-center justify-center gap-1.5 rounded-xl border py-2.5 active:opacity-80" style={{ borderColor: alpha('#7ED957', 0.28), backgroundColor: alpha('#7ED957', 0.1) }}>
+                  <Plus size={15} color={c.brand400} strokeWidth={2.4} />
+                  <Text className="text-[13px] font-bold text-brand-400">Save to My Meals</Text>
+                </Pressable>
+              </>
+            )}
+          </View>
+        )}
+
+        {scan === 'logged' && (
+          <View className="items-center gap-2.5 px-3 pb-3.5 pt-5">
+            <View className="h-14 w-14 items-center justify-center rounded-full" style={{ backgroundColor: alpha('#7ED957', 0.16) }}><Check size={30} color={c.brand400} strokeWidth={3} /></View>
+            <Text className="text-[14.5px] font-extrabold text-white">{loggedMsg.title}</Text>
+            <Text className="text-[12px] text-white/50">{loggedMsg.sub}</Text>
+          </View>
+        )}
       </View>
 
-      {/* Go deeper: short reads */}
-      <View>
-        <SectionLabel>Go deeper</SectionLabel>
-        <View>
-          {NUTRITION_LESSONS.map((l, i) => {
-            const open = openLesson === l.id
+      {/* Day tags */}
+      <View className="mt-4 rounded-[22px] border border-white/5 bg-ink-800 px-[18px] py-5">
+        <View className="items-center">
+          <Text className="text-[18px] font-extrabold tracking-tight text-white">How did your eating today go?</Text>
+          <Text className="mt-1 text-[13px] font-semibold" style={{ color: alpha('#7ED957', 0.9) }}>{tagCountLabel}</Text>
+        </View>
+        <View className="mt-4 flex-row flex-wrap gap-2.5">
+          {NUTRITION_TAGS.map((t) => {
+            const on = selected.includes(t.id)
+            const tint = toneColor(t.tone, c)
             return (
-              <View key={l.id} className={i === 0 ? '' : 'border-t border-white/[0.06]'}>
-                <Pressable onPress={() => setOpenLesson(open ? null : l.id)} className="flex-row items-center gap-3 py-3.5 active:opacity-80">
-                  <View className="h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-400/[0.12]"><Icon name={l.icon} size={19} color={brand[400]} /></View>
-                  <View className="min-w-0 flex-1">
-                    <Text className="font-bold leading-tight text-white">{l.title}</Text>
-                    <Text numberOfLines={1} className="text-[12px] text-white/50">{l.summary} · {l.minutes} min</Text>
-                  </View>
-                  <ChevronDown size={18} color="rgba(255,255,255,0.3)" style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
-                </Pressable>
-                {open && (
-                  <View className="gap-2.5 pb-4 pr-1" style={{ paddingLeft: 52 }}>
-                    {l.body.map((para, j) => (
-                      <Text key={j} className="text-[13px] leading-relaxed text-white/70">{para}</Text>
-                    ))}
-                  </View>
-                )}
-              </View>
+              <Pressable
+                key={t.id}
+                onPress={() => dispatch({ type: 'TOGGLE_NUTRITION_TAG', tag: t.id })}
+                style={{ width: '47.5%', backgroundColor: on ? alpha(tint, 0.16) : 'rgba(255,255,255,0.05)', borderWidth: 1.5, borderColor: on ? alpha(tint, 0.55) : 'transparent' }}
+                className="flex-row items-center gap-2.5 rounded-[14px] px-3 py-3 active:opacity-80"
+              >
+                <Text className="text-[19px] leading-none">{t.emoji}</Text>
+                <Text numberOfLines={2} className="min-w-0 flex-1 text-[13.5px] font-semibold leading-tight" style={{ color: on ? tint : 'rgba(255,255,255,0.75)' }}>{t.label}</Text>
+                {on && <TickPop><View className="h-[17px] w-[17px] items-center justify-center rounded-full bg-brand-400"><Check size={10} color="#0a0a0b" strokeWidth={3.6} /></View></TickPop>}
+              </Pressable>
             )
           })}
         </View>
-      </View>
-    </View>
-  )
-}
-
-/* The big, tappable balanced-plate donut. Tap a colour (or a legend chip) to
-   see how much of that food group to aim for, plus what counts. */
-const PLATE_SEGMENTS = [
-  { len: 50, start: 0 },  // veg
-  { len: 25, start: 50 }, // protein
-  { len: 25, start: 75 }, // carbs
-]
-
-function BalancedPlate() {
-  const colors = useColors()
-  const [sel, setSel] = useState(0)
-
-  const active = PLATE_GUIDE[sel]
-  const activeColor = resolveColor(colors, active.color)
-
-  return (
-    <View>
-      {/* Donut */}
-      <View style={{ width: 230, height: 230, alignSelf: 'center', marginTop: 4 }}>
-        <Svg viewBox="0 0 42 42" width={230} height={230}>
-          <G rotation={-90} originX={21} originY={21}>
-            <Circle cx={21} cy={21} r={15.915} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={5} />
-            {PLATE_SEGMENTS.map((s, i) => {
-              const isSel = sel === i
-              return (
-                <Circle
-                  key={i}
-                  cx={21} cy={21} r={15.915} fill="none"
-                  stroke={resolveColor(colors, PLATE_GUIDE[i].color)}
-                  strokeWidth={isSel ? 6.6 : 4.6}
-                  strokeDasharray={`${s.len} ${100 - s.len}`}
-                  strokeDashoffset={-s.start}
-                  onPress={() => setSel(i)}
-                />
-              )
-            })}
-          </G>
-        </Svg>
-        {/* Centre read-out */}
-        <View pointerEvents="none" style={{ position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center' }}>
-          <Text className="text-[52px] font-black leading-none" style={{ color: activeColor }}>{active.portion}</Text>
-          <Text className="mt-1.5 max-w-[8rem] text-center text-[13px] font-bold leading-tight text-white/85">{active.title}</Text>
+        <View className="mt-3.5 flex-row items-center justify-center gap-1.5">
+          <CalendarCheck size={13} color="rgba(255,255,255,0.38)" />
+          <Text className="text-[11.5px] text-white/40">These show on the Dashboard.</Text>
         </View>
       </View>
+    </ScrollView>
+  )
+}
 
-      {/* Tappable legend */}
-      <View className="mt-5 flex-row flex-wrap justify-between">
-        {PLATE_GUIDE.map((s, i) => {
-          const on = sel === i
-          const c = resolveColor(colors, s.color)
-          return (
-            <Pressable
-              key={s.title}
-              onPress={() => setSel(i)}
-              className="mb-2 flex-row items-center gap-2 rounded-full px-3 py-2 active:opacity-80"
-              style={{
-                width: '49%',
-                borderWidth: 1,
-                borderColor: on ? alpha(c, 0.45) : 'transparent',
-                backgroundColor: on ? alpha(c, 0.14) : 'rgba(255,255,255,0.045)',
-              }}
-            >
-              <Text className="text-[13px] font-black" style={{ color: c }}>{s.portion}</Text>
-              <Text numberOfLines={1} className="flex-1 text-[12.5px] font-semibold" style={{ color: on ? c : alpha(colors.fg, 0.7) }}>{s.title}</Text>
-            </Pressable>
-          )
-        })}
+function ScanAnalyzing({ img }: { img: string }) {
+  const scan = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(scan, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(scan, { toValue: 0, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]))
+    loop.start()
+    return () => loop.stop()
+  }, [scan])
+  const translateY = scan.interpolate({ inputRange: [0, 1], outputRange: [8, 130] })
+  return (
+    <View className="relative mt-3 h-[150px] overflow-hidden rounded-[15px] bg-ink-900">
+      {!!img && <Image source={{ uri: img }} resizeMode="cover" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />}
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(10,10,11,0.45)' }} />
+      <Animated.View style={{ position: 'absolute', left: '6%', right: '6%', height: 2, transform: [{ translateY }] }}>
+        <LinearGradient colors={['transparent', '#7ED957', 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ flex: 1, borderRadius: 2 }} />
+      </Animated.View>
+      <View className="absolute inset-0 items-center justify-center gap-2.5">
+        <ActivityIndicator color="#7ED957" />
+        <Text className="text-[12.5px] font-bold text-white">Analyzing your plate…</Text>
       </View>
-
-      {/* Examples for the selected group */}
-      <Text className="mt-3 text-[12.5px] leading-snug text-white/60">{active.examples}</Text>
-      <Text className="mt-2.5 text-[11.5px] leading-snug text-white/35">Tap a colour to see what goes where. Not every meal needs to be perfect, it is just a rough aim.</Text>
     </View>
   )
 }
 
-/* ============================ Eats tab ============================ */
-const MEAL_CATEGORIES: (MealCategory | 'All')[] = ['All', 'Breakfast', 'Lunch', 'Dinner', 'Snack', 'Sweet']
+/* ============================ Recipes ============================ */
+function RecipesTab({ onOpenRecipe, onAddMeal }: { onOpenRecipe: (m: BudgetMeal | UserMeal) => void; onAddMeal: () => void }) {
+  const { state } = useStore()
+  const c = useColors()
+  const myMeals = state.myMeals ?? []
+  const [cat, setCat] = useState<(typeof CATS)[number]>('All')
+  const [query, setQuery] = useState('')
+  const [loading, setLoading] = useState(false)
+  const loadT = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
-function BudgetTab() {
-  const [cat, setCat] = useState<MealCategory | 'All'>('All')
-  const [q, setQ] = useState('')
-  const [openId, setOpenId] = useState<string | null>(null)
+  const bump = () => { setLoading(true); clearTimeout(loadT.current); loadT.current = setTimeout(() => setLoading(false), 340) }
+  useEffect(() => () => clearTimeout(loadT.current), [])
 
-  const meals = useMemo(() => {
-    return BUDGET_MEALS.filter((m) => {
-      const catOk = cat === 'All' || m.category === cat
-      const qOk = !q || m.name.toLowerCase().includes(q.toLowerCase()) || (m.flavour ?? '').toLowerCase().includes(q.toLowerCase())
-      return catOk && qOk
-    })
-  }, [cat, q])
-
-  const openMeal = BUDGET_MEALS.find((m) => m.id === openId) ?? null
+  const q = query.trim().toLowerCase()
+  const filtered = BUDGET_MEALS.filter((m) => (cat === 'All' || m.category === cat) && (!q || m.name.toLowerCase().includes(q) || (m.flavour ?? '').toLowerCase().includes(q)))
+  const countLabel = loading ? 'Finding recipes…' : `${filtered.length} ${filtered.length === 1 ? 'recipe' : 'recipes'}`
 
   return (
-    <>
-      <MyMealsTab />
+    <ScrollView className="flex-1" contentContainerStyle={cardScroll} showsVerticalScrollIndicator={false}>
+      {/* My meals */}
+      <View className="mb-2.5 flex-row items-center justify-between">
+        <Text className="text-[12px] font-extrabold uppercase tracking-[1.4px] text-white/40">My meals</Text>
+        <Pressable onPress={onAddMeal} className="flex-row items-center gap-1.5 rounded-full px-3 py-1.5 active:opacity-80" style={{ backgroundColor: alpha('#7ED957', 0.14) }}>
+          <Plus size={13} color={c.brand400} strokeWidth={2.6} />
+          <Text className="text-[12px] font-bold text-brand-400">Add a meal</Text>
+        </Pressable>
+      </View>
+      {myMeals.length === 0 ? (
+        <Pressable onPress={onAddMeal} className="mb-1 items-center rounded-2xl border border-dashed border-white/12 px-5 py-6 active:opacity-80">
+          <Text className="text-center text-[13px] text-white/45">Save meals you cook often for quick planning.</Text>
+        </Pressable>
+      ) : (
+        <View className="gap-2.5">
+          {myMeals.map((m) => (
+            <Pressable key={m.id} onPress={() => onOpenRecipe(m)} className="flex-row items-center gap-3 rounded-2xl border border-white/[0.06] bg-ink-800 px-3.5 py-3 active:opacity-80">
+              <View className="min-w-0 flex-1">
+                <Text numberOfLines={1} className="text-[14px] font-bold text-white">{m.name}</Text>
+                <Text numberOfLines={1} className="mt-0.5 text-[11.5px] text-white/50">{m.ingredients.slice(0, 4).join(', ') || m.notes || 'My recipe'}</Text>
+              </View>
+              <Text className="text-[11px] font-bold text-brand-400">{m.kcal} kcal · {m.p}g protein</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
 
-      <View className="mt-6">
-        <Salad size={22} color={brand[400]} />
-        <Text className="mt-2 text-xl font-extrabold tracking-tight text-white">Easy recipes worth cooking</Text>
+      {/* Recipes header */}
+      <View className="mt-7">
+        <ChefHat size={22} color={c.brand400} />
+        <Text className="mt-2 text-[20px] font-extrabold tracking-tight text-white">Easy recipes worth cooking</Text>
       </View>
 
-      {/* Category filter */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-5 mt-4 px-5" contentContainerStyle={{ flexDirection: 'row', gap: 8 }}>
-        {MEAL_CATEGORIES.map((c) => {
-          const activeCat = cat === c
+      {/* Category chips */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-5 mt-4" contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}>
+        {CATS.map((cc) => {
+          const active = cat === cc
           return (
-            <Pressable key={c} onPress={() => setCat(c)} className={`shrink-0 rounded-full px-3.5 py-2 active:opacity-80 ${activeCat ? 'bg-brand-400' : 'border border-white/10 bg-white/[0.04]'}`}>
-              <Text className={`text-[13px] font-semibold ${activeCat ? 'text-black' : 'text-white/70'}`}>{c}</Text>
+            <Pressable key={cc} onPress={() => { setCat(cc); bump() }} className={`rounded-full px-4 py-2 active:opacity-80 ${active ? 'bg-brand-400' : 'bg-white/[0.06]'}`}>
+              <Text className={`text-[13px] font-semibold ${active ? 'text-black' : 'text-white/75'}`}>{cc}</Text>
             </Pressable>
           )
         })}
       </ScrollView>
 
       {/* Search */}
-      <View className="mt-3 flex-row items-center gap-2 rounded-xl border border-white/[0.08] bg-ink-800 px-3">
+      <View className="mt-3 flex-row items-center gap-2.5 rounded-[14px] border border-white/[0.08] bg-ink-800 px-3.5">
         <Search size={16} color="rgba(255,255,255,0.35)" />
-        <TextInput
-          value={q}
-          onChangeText={setQ}
-          placeholder="Search recipes…"
-          placeholderTextColor={PLACEHOLDER}
-          className="w-full flex-1 bg-transparent py-2.5 text-sm text-white"
-        />
+        <TextInput value={query} onChangeText={(t) => { setQuery(t); bump() }} placeholder="Search recipes…" placeholderTextColor="rgba(255,255,255,0.3)" className="flex-1 py-2.5 text-[14px] text-white" />
       </View>
 
-      {/* Recipe cards */}
-      <Text className="mt-4 text-[12px] font-bold uppercase tracking-[0.14em] text-white/35">{meals.length} {meals.length === 1 ? 'recipe' : 'recipes'}</Text>
-      <View className="mt-2 gap-2.5">
-        {meals.map((m) => (
-          <Pressable key={m.id} onPress={() => setOpenId(m.id)} className="w-full flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-3 active:opacity-90">
-            <Image source={{ uri: m.image }} resizeMode="cover" className="h-16 w-16 rounded-xl" />
-            <View className="min-w-0 flex-1">
-              <Text className="font-bold leading-tight text-white">{m.name}</Text>
-              {m.flavour && <Text numberOfLines={2} className="mt-0.5 text-[12px] leading-snug text-white/55">{m.flavour}</Text>}
-              <View className="mt-1 flex-row items-center gap-1">
-                <Clock size={12} color={brand[400]} />
-                <Text className="text-[12px] font-semibold text-brand-400">{m.minutes} min</Text>
+      <Text className="mt-4 text-[12px] font-extrabold uppercase tracking-[1.6px] text-white/35">{countLabel}</Text>
+
+      {loading ? (
+        <View className="mt-2.5 gap-2.5">{[0, 1, 2].map((i) => <RecipeSkeleton key={i} />)}</View>
+      ) : filtered.length > 0 ? (
+        <View className="mt-2.5 gap-2.5">
+          {filtered.map((m) => (
+            <Pressable key={m.id} onPress={() => onOpenRecipe(m)} className="flex-row items-center gap-3 rounded-[18px] border border-white/[0.06] bg-ink-800 p-[11px] active:opacity-80">
+              <Image source={{ uri: m.image }} resizeMode="cover" className="h-16 w-16 rounded-[13px] bg-ink-700" />
+              <View className="min-w-0 flex-1">
+                <Text numberOfLines={1} className="text-[14.5px] font-bold leading-tight text-white">{m.name}</Text>
+                {!!m.flavour && <Text numberOfLines={2} className="mt-0.5 text-[12px] leading-[1.35] text-white/55">{m.flavour}</Text>}
+                <View className="mt-1.5 flex-row items-center gap-1.5">
+                  <Clock size={12} color={c.brand400} />
+                  <Text className="text-[12px] font-bold text-brand-400">{m.minutes} min</Text>
+                </View>
               </View>
-            </View>
-            <ChevronRight size={18} color="rgba(255,255,255,0.3)" />
-          </Pressable>
-        ))}
-        {meals.length === 0 && (
-          <View className="items-center rounded-2xl border border-dashed border-white/[0.12] px-6 py-10" style={{ borderStyle: 'dashed' }}>
-            <Salad size={26} color="rgba(255,255,255,0.3)" />
-            <Text className="mt-2 text-sm font-semibold text-white/60">No recipes match that</Text>
-            <Text className="mt-1 text-center text-[12px] text-white/40">Try another category or clear your search.</Text>
+              <ChevronRight size={18} color="rgba(255,255,255,0.3)" />
+            </Pressable>
+          ))}
+        </View>
+      ) : (
+        <View className="mt-3 items-center rounded-[18px] border border-dashed border-white/14 px-6 py-9">
+          <Text className="text-[26px]">🍽️</Text>
+          <Text className="mt-2 text-[14px] font-bold text-white/65">No recipes match that</Text>
+          <Text className="mt-1 text-[12px] text-white/40">Try another category or clear your search.</Text>
+        </View>
+      )}
+    </ScrollView>
+  )
+}
+
+function RecipeSkeleton() {
+  const shimmer = useRef(new Animated.Value(0.4)).current
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(shimmer, { toValue: 1, duration: 700, useNativeDriver: true }),
+      Animated.timing(shimmer, { toValue: 0.4, duration: 700, useNativeDriver: true }),
+    ]))
+    loop.start()
+    return () => loop.stop()
+  }, [shimmer])
+  return (
+    <Animated.View style={{ opacity: shimmer }} className="flex-row items-center gap-3 rounded-[18px] border border-white/[0.06] bg-ink-800 p-[11px]">
+      <View className="h-16 w-16 rounded-[13px] bg-ink-600" />
+      <View className="flex-1 gap-2">
+        <View className="h-3 w-[68%] rounded-md bg-ink-600" />
+        <View className="h-2.5 w-[88%] rounded-md bg-ink-600" />
+        <View className="h-2.5 w-[34%] rounded-md bg-ink-600" />
+      </View>
+    </Animated.View>
+  )
+}
+
+/* ============================ Meal Plan ============================ */
+type RepeatScope = 'everyday' | 'weekdays' | 'weekends' | string
+function MealPlanTab() {
+  const { state, dispatch } = useStore()
+  const toast = useToast()
+  const c = useColors()
+  const plan = state.mealPlan ?? []
+  const myMeals = state.myMeals ?? []
+
+  const [meal, setMeal] = useState('')
+  const [slot, setSlot] = useState<MealName>('Breakfast')
+  const [when, setWhen] = useState<RepeatScope>('everyday')
+  const [planSearch, setPlanSearch] = useState('')
+  const [weekOffset, setWeekOffset] = useState(0)
+  const myMealNames = myMeals.map((m) => m.name)
+
+  const wItems = plan.filter((p) => (p.w ?? 0) === weekOffset)
+  const plannedCount = wItems.length
+
+  const pq = planSearch.trim().toLowerCase()
+  const wordStart = (name: string) => name.toLowerCase().split(/[^a-z0-9]+/).some((w) => w.startsWith(pq))
+  const suggested = pq ? BUDGET_MEALS.filter((m) => wordStart(m.name)).slice(0, 6) : []
+
+  const daysFor = (w: RepeatScope): string[] =>
+    w === 'everyday' ? PLAN_DAYS.slice() : w === 'weekdays' ? PLAN_DAYS.slice(0, 5) : w === 'weekends' ? PLAN_DAYS.slice(5) : [w]
+  const scopeLabel = when === 'everyday' ? 'every day' : when === 'weekdays' ? 'Mon to Fri' : when === 'weekends' ? 'Sat & Sun' : when
+  const whenHint = meal ? `Adds ${meal} at ${slot.toLowerCase()} to ${scopeLabel}.` : 'Pick a meal, then add it across the days you want.'
+
+  function addToPlan() {
+    if (!meal) { toast('Pick a meal first'); return }
+    let added = 0
+    daysFor(when).forEach((d) => {
+      if (!wItems.some((p) => p.day === d && p.slot === slot && p.name === meal)) {
+        dispatch({ type: 'ADD_PLANNED_MEAL', plan: { day: d, slot, name: meal, w: weekOffset } })
+        added++
+      }
+    })
+    setPlanSearch('')
+    toast(added ? `Added to ${scopeLabel}` : 'Already planned')
+  }
+  function clearWeek() {
+    wItems.forEach((p) => dispatch({ type: 'REMOVE_PLANNED_MEAL', id: p.id }))
+    toast('Week cleared')
+  }
+
+  const now = new Date()
+  const mon = new Date(now); mon.setDate(now.getDate() - ((now.getDay() + 6) % 7) + weekOffset * 7)
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6)
+  const fmt = (d: Date) => `${d.getDate()} ${MONTHS[d.getMonth()]}`
+  const weekLabel = weekOffset === 0 ? 'This week' : weekOffset === -1 ? 'Last week' : weekOffset === 1 ? 'Next week' : weekOffset < 0 ? `${-weekOffset} weeks ago` : `In ${weekOffset} weeks`
+
+  const whenOpts: { value: RepeatScope; label: string }[] = [
+    { value: 'everyday', label: 'Every day' }, { value: 'weekdays', label: 'Weekdays' }, { value: 'weekends', label: 'Weekends' },
+    ...PLAN_DAYS.map((d) => ({ value: d, label: d })),
+  ]
+
+  return (
+    <ScrollView className="flex-1" contentContainerStyle={cardScroll} showsVerticalScrollIndicator={false}>
+      {/* Builder */}
+      <View className="rounded-[22px] border border-white/[0.08] bg-ink-800 p-[18px]">
+        <View className="flex-row items-center justify-between gap-2.5">
+          <Text className="text-[18px] font-extrabold tracking-tight text-white">Plan your week</Text>
+          <View className="flex-row items-center gap-2.5">
+            <Text className="text-[11px] font-bold text-brand-400">{plannedCount} planned</Text>
+            {plannedCount > 0 && <Pressable onPress={clearWeek} className="active:opacity-70"><Text className="text-[11px] font-bold text-white/45">Clear</Text></Pressable>}
+          </View>
+        </View>
+        <Text className="mt-1.5 text-[13px] leading-[1.5] text-white/60">Pick a meal once and repeat it across the days you want. Same lunch every day is a single tap.</Text>
+
+        <PlanLabel>My meals</PlanLabel>
+        <Dropdown
+          value={myMealNames.includes(meal) ? meal : ''}
+          placeholder="Choose a saved meal…"
+          options={myMeals.map((m) => ({ value: m.name, label: m.name }))}
+          onSelect={setMeal}
+        />
+
+        <PlanLabel>Suggested meals</PlanLabel>
+        <View className="flex-row items-center gap-2.5 rounded-[13px] bg-ink-700 px-3.5">
+          <Search size={16} color="rgba(255,255,255,0.35)" />
+          <TextInput value={planSearch} onChangeText={setPlanSearch} placeholder="Search easy recipes worth cooking…" placeholderTextColor="rgba(255,255,255,0.3)" className="flex-1 py-2.5 text-[14px] text-white" />
+        </View>
+        {suggested.length > 0 && (
+          <View className="mt-2 gap-1.5">
+            {suggested.map((m) => {
+              const on = meal === m.name
+              return (
+                <Pressable key={m.id} onPress={() => setMeal(m.name)} className="flex-row items-center justify-between gap-2 rounded-[11px] px-3 py-2.5 active:opacity-80" style={{ backgroundColor: on ? alpha('#7ED957', 0.14) : 'rgba(255,255,255,0.03)', borderWidth: 1, borderColor: on ? alpha('#7ED957', 0.5) : 'rgba(255,255,255,0.08)' }}>
+                  <Text className="text-[13px] font-semibold" style={{ color: on ? c.brand400 : 'rgba(255,255,255,0.82)' }}>{m.name}</Text>
+                  {on && <Check size={16} color={c.brand400} strokeWidth={3} />}
+                </Pressable>
+              )
+            })}
           </View>
         )}
-      </View>
-      <View className="h-2" />
 
-      <RecipeModal meal={openMeal} onClose={() => setOpenId(null)} />
-    </>
-  )
-}
-
-/* A floating recipe card that pops over the screen, dimming what's behind it. */
-function RecipeModal({ meal, onClose }: { meal: BudgetMeal | null; onClose: () => void }) {
-  const toast = useToast()
-  const insets = useSafeAreaInsets()
-
-  async function copyRecipe() {
-    if (!meal) return
-    // Copy a cleanly-formatted recipe to the clipboard (works on native + web), then confirm.
-    const txt = [
-      meal.name,
-      `${meal.category} · ${meal.minutes} min · serves ${meal.serves}`,
-      `${meal.kcal} kcal · ${meal.p}g protein · ${meal.c}g carbs · ${meal.f}g fat`,
-      '',
-      'INGREDIENTS',
-      ...meal.ingredients.map((i) => `• ${i}`),
-      '',
-      'METHOD',
-      ...meal.steps.map((s, i) => `${i + 1}. ${s}`),
-      ...(meal.cookOnce ? ['', `Tip: ${meal.cookOnce}`] : []),
-      '',
-      '— via StrengthHub',
-    ].join('\n')
-    try {
-      await Clipboard.setStringAsync(txt)
-      toast('Recipe copied to clipboard')
-    } catch {
-      toast("Couldn't copy — try again")
-    }
-  }
-
-  return (
-    <AppModal visible={!!meal} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable onPress={onClose} className="flex-1 items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.62)' }}>
-        {meal && (
-          <Pressable onPress={() => {}} className="w-full max-w-[400px] overflow-hidden rounded-3xl border border-white/10 bg-ink-800" style={{ maxHeight: '86%' }}>
-            {/* Hero */}
-            <View className="h-40">
-              <Image source={{ uri: meal.image }} resizeMode="cover" className="h-full w-full" />
-              <LinearGradient
-                colors={['transparent', 'rgba(18,18,20,0.3)', '#121214']}
-                style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}
-              />
-              <Pressable onPress={onClose} className="absolute right-3 top-3 h-9 w-9 items-center justify-center rounded-full active:opacity-80" style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}>
-                <X size={18} color="#fff" />
-              </Pressable>
-              <View className="absolute inset-x-4 bottom-3">
-                <Text className="text-[19px] font-extrabold leading-tight text-white">{meal.name}</Text>
-                <View className="mt-1 flex-row items-center gap-1">
-                  <Clock size={13} color={brand[300]} />
-                  <Text className="text-[12.5px] font-semibold text-brand-300">{meal.minutes} min</Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Scrollable detail */}
-            <ScrollView className="px-4 py-4" contentContainerStyle={{ gap: 16 }} showsVerticalScrollIndicator={false}>
-              {meal.flavour && <Text className="text-[13.5px] leading-snug text-white/65">{meal.flavour}</Text>}
-
-              <View className="flex-row flex-wrap gap-1.5">
-                {meal.tags.map((t) => (
-                  <View key={t} className="rounded-full bg-brand-400/15 px-2.5 py-1"><Text className="text-[11px] font-semibold text-brand-300">{t}</Text></View>
-                ))}
-              </View>
-
-              <View>
-                <Text className="mb-1.5 text-[12px] font-bold uppercase tracking-wide text-white/40">Ingredients</Text>
-                <View className="gap-1">
-                  {meal.ingredients.map((ing) => (
-                    <View key={ing} className="flex-row items-start gap-2">
-                      <View className="mt-1.5 h-1 w-1 rounded-full bg-brand-400" />
-                      <Text className="flex-1 text-[14px] text-white/75">{ing}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-
-              <View>
-                <Text className="mb-1.5 text-[12px] font-bold uppercase tracking-wide text-white/40">Method</Text>
-                <View className="gap-2.5">
-                  {meal.steps.map((s, i) => (
-                    <View key={i} className="flex-row items-start gap-2.5">
-                      <View className="h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-400/15"><Text className="text-[12px] font-bold text-brand-400">{i + 1}</Text></View>
-                      <Text className="flex-1 text-[14px] leading-snug text-white/80">{s}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-
-              {meal.cookOnce && (
-                <View className="flex-row gap-2 rounded-xl bg-brand-400/10 p-3">
-                  <Lightbulb size={16} color={brand[400]} style={{ marginTop: 1 }} />
-                  <Text className="flex-1 text-[13px] text-white/70">{meal.cookOnce}</Text>
-                </View>
-              )}
-            </ScrollView>
-
-            {/* Footer */}
-            <View className="p-3" style={{ paddingBottom: insets.bottom + 12 }}>
-              <Pressable onPress={copyRecipe} className="w-full flex-row items-center justify-center gap-2 rounded-xl bg-brand-400/15 py-3 active:opacity-80">
-                <Share2 size={15} color={brand[400]} />
-                <Text className="text-sm font-semibold text-brand-400">Copy recipe</Text>
-              </Pressable>
-            </View>
-          </Pressable>
-        )}
-      </Pressable>
-    </AppModal>
-  )
-}
-
-/* ============================ Water quick-log ============================ */
-function WaterCard() {
-  const { state, dispatch } = useStore()
-  const units = state.settings.units
-  const h = todayHabit(state)
-  const t = dailyTargets(state)
-  const step = units === 'imperial' ? 8 / 33.814 : 0.25
-  const filled = pct(h.waterL, t.waterL)
-  const done = h.waterL >= t.waterL
-  return (
-    <View className="mt-4 rounded-2xl border border-white/5 bg-ink-800 p-4">
-      <View className="flex-row items-center gap-4">
-        {/* Ring visual instead of a flat bar — glanceable progress at a glance. */}
-        <ProgressRing value={filled} size={72} stroke={7} color={brand[400]}>
-          <Droplet size={20} color={brand[400]} fill={done ? brand[400] : 'none'} />
-        </ProgressRing>
-        <View className="min-w-0 flex-1">
-          <Text className="font-bold text-white">Water</Text>
-          <Text className="mt-0.5">
-            <Text className="text-[22px] font-extrabold text-white">{fmtFluid(h.waterL, units)}</Text>
-            <Text className="text-[13px] font-medium text-white/40"> / {fmtFluid(t.waterL, units)}</Text>
-          </Text>
-          <Text className="mt-0.5 text-[12px] font-semibold" style={{ color: done ? brand[400] : 'rgba(255,255,255,0.4)' }}>
-            {done ? 'Goal hit — nice.' : `${Math.round(filled)}% of today's goal`}
-          </Text>
-        </View>
-      </View>
-      <View className="mt-3 flex-row gap-2">
-        <Pressable onPress={() => dispatch({ type: 'ADJUST_WATER', deltaL: -step })} className="flex-1 items-center rounded-xl bg-ink-700 py-2.5 active:opacity-80">
-          <Text className="font-bold text-white">−</Text>
-        </Pressable>
-        <Pressable onPress={() => dispatch({ type: 'ADJUST_WATER', deltaL: step })} className="flex-[2] items-center rounded-xl bg-brand-400/20 py-2.5 active:opacity-80">
-          <Text className="font-bold text-brand-400">+ {units === 'imperial' ? '8 oz' : '250 ml'}</Text>
-        </Pressable>
-      </View>
-    </View>
-  )
-}
-
-/* ============================ Meal planner ============================ */
-function PlanTab() {
-  const { state, dispatch } = useStore()
-  const toast = useToast()
-  const plan = state.mealPlan ?? []
-  const mealNames = useMemo(() => [
-    ...BUDGET_MEALS.map((m) => m.name),
-    ...FOODS.map((f) => f.name),
-    ...(state.myMeals ?? []).map((m) => m.name),
-  ], [state.myMeals])
-  const [day, setDay] = useState('Mon')
-  const [slot, setSlot] = useState<MealName>('Breakfast')
-  const [meal, setMeal] = useState(mealNames[0])
-
-  function add() {
-    dispatch({ type: 'ADD_PLANNED_MEAL', plan: { day, slot, name: meal } })
-    toast(`Added to ${day}`)
-  }
-
-  return (
-    <>
-      <View className="rounded-2xl border border-white/[0.08] bg-ink-800 p-4">
-        <Text className="text-lg font-extrabold tracking-tight text-white">Plan your week</Text>
-        <Text className="mt-1 text-[13px] leading-snug text-white/60">Map meals to days so shopping and cooking are sorted ahead of time.</Text>
-
-        <Text className="mb-2 mt-3 text-[11px] font-bold uppercase tracking-wide text-white/40">Day</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', gap: 8 }}>
-          {PLAN_DAYS.map((d) => {
-            const activeDay = day === d
-            return (
-              <Pressable key={d} onPress={() => setDay(d)} className={`shrink-0 rounded-full px-3.5 py-2 active:opacity-80 ${activeDay ? 'bg-brand-400' : 'border border-white/10 bg-white/[0.04]'}`}>
-                <Text className={`text-[13px] font-semibold ${activeDay ? 'text-black' : 'text-white/70'}`}>{d}</Text>
-              </Pressable>
-            )
-          })}
-        </ScrollView>
-
-        <Text className="mb-2 mt-3 text-[11px] font-bold uppercase tracking-wide text-white/40">Meal slot</Text>
-        <View className="flex-row gap-2">
-          {SLOTS.map((s) => {
-            const activeSlot = slot === s
-            return (
-              <Pressable key={s} onPress={() => setSlot(s)} className={`flex-1 items-center rounded-xl px-2 py-2 active:opacity-80 ${activeSlot ? 'bg-brand-400' : 'border border-white/10 bg-white/[0.04]'}`}>
-                <Text className={`text-[12px] font-semibold ${activeSlot ? 'text-black' : 'text-white/70'}`}>{s}</Text>
-              </Pressable>
-            )
-          })}
+        {/* Slot + Repeat — two-up */}
+        <View className="mt-3.5 flex-row gap-2.5">
+          <View className="min-w-0 flex-1">
+            <PlanLabel tight>Meal slot</PlanLabel>
+            <Dropdown value={slot} options={SLOTS.map((s) => ({ value: s, label: s }))} onSelect={(v) => setSlot(v as MealName)} />
+          </View>
+          <View className="min-w-0 flex-1">
+            <PlanLabel tight>Repeat on</PlanLabel>
+            <Dropdown value={when} options={whenOpts.map((o) => ({ value: o.value, label: o.label }))} onSelect={setWhen} />
+          </View>
         </View>
 
-        <Text className="mb-2 mt-3 text-[11px] font-bold uppercase tracking-wide text-white/40">Meal</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', gap: 8 }}>
-          {mealNames.map((n) => {
-            const activeMeal = meal === n
-            return (
-              <Pressable key={n} onPress={() => setMeal(n)} className={`shrink-0 rounded-full px-3.5 py-2 active:opacity-80 ${activeMeal ? 'bg-brand-400' : 'border border-white/10 bg-white/[0.04]'}`}>
-                <Text className={`text-[13px] font-semibold ${activeMeal ? 'text-black' : 'text-white/70'}`}>{n}</Text>
-              </Pressable>
-            )
-          })}
-        </ScrollView>
+        <View className="mt-2.5 flex-row items-start gap-1.5">
+          <CalendarCheck size={14} color={c.brand400} style={{ marginTop: 1 }} />
+          <Text className="flex-1 text-[11.5px] leading-[1.45] text-white/50">{whenHint}</Text>
+        </View>
 
-        <Pressable onPress={add} className="btn-primary mt-4 w-full active:opacity-90">
-          <Plus size={16} color="#000" />
-          <Text className="ml-2 font-semibold text-black">Add to plan</Text>
+        <Pressable onPress={addToPlan} className="mt-4 flex-row items-center justify-center gap-2 rounded-[14px] bg-brand-400 py-3.5 active:opacity-90">
+          <Plus size={16} color="#000" strokeWidth={2.6} />
+          <Text className="text-[14.5px] font-extrabold text-black">Add to plan</Text>
         </Pressable>
       </View>
 
-      <View className="mt-4 gap-2.5">
+      {/* Week navigator */}
+      <View className="mt-[18px] flex-row items-center justify-between gap-2.5">
+        <Pressable onPress={() => setWeekOffset((w) => Math.max(-12, w - 1))} className="h-[42px] w-[42px] items-center justify-center rounded-full border border-white/[0.08] bg-ink-800 active:opacity-70" style={{ opacity: weekOffset <= -12 ? 0.3 : 1 }}><ChevronLeft size={20} color={c.brand400} strokeWidth={2.6} /></Pressable>
+        <View className="min-w-0 flex-1 items-center">
+          <Text className="text-[16px] font-extrabold tracking-tight text-white">{weekLabel}</Text>
+          <Text className="mt-px text-[11.5px] font-semibold text-white/45">{fmt(mon)} to {fmt(sun)} · {plannedCount} planned</Text>
+        </View>
+        <Pressable onPress={() => setWeekOffset((w) => Math.min(6, w + 1))} className="h-[42px] w-[42px] items-center justify-center rounded-full border border-white/[0.08] bg-ink-800 active:opacity-70" style={{ opacity: weekOffset >= 6 ? 0.3 : 1 }}><ChevronRight size={20} color={c.brand400} strokeWidth={2.6} /></Pressable>
+      </View>
+
+      {/* Week */}
+      <View className="mt-3 gap-2.5">
         {PLAN_DAYS.map((d) => {
-          const items = plan.filter((p) => p.day === d)
+          const items = wItems.filter((p) => p.day === d)
           return (
-            <View key={d} className="rounded-2xl border border-white/5 bg-ink-800 p-3.5">
-              <View className="mb-1.5 flex-row items-center justify-between">
-                <Text className="font-bold text-white">{d}</Text>
-                <Text className="text-[11px] text-white/35">{items.length ? `${items.length} planned` : '-'}</Text>
+            <View key={d} className="rounded-[18px] border border-white/[0.06] bg-ink-800 px-4 py-3.5">
+              <View className="mb-2 flex-row items-center justify-between">
+                <Text className="text-[15px] font-extrabold text-white">{d}</Text>
+                <Text className="text-[11px] font-semibold text-white/35">{items.length ? `${items.length} planned` : 'None'}</Text>
               </View>
               {items.length === 0 ? (
-                <Text className="text-[12px] text-white/35">Nothing planned</Text>
+                <Text className="text-[12.5px] text-white/30">Nothing planned</Text>
               ) : (
-                <View className="gap-1.5">
+                <View className="gap-2.5">
                   {items.map((it) => (
-                    <View key={it.id} className="flex-row items-center gap-2.5">
-                      <Text className="w-16 shrink-0 text-[11px] font-semibold uppercase tracking-wide text-brand-400">{it.slot}</Text>
+                    <View key={it.id} className="flex-row items-center gap-3">
+                      <Text className="w-[66px] text-[10.5px] font-extrabold uppercase tracking-wide text-brand-400">{it.slot}</Text>
                       <Text numberOfLines={1} className="min-w-0 flex-1 text-[13px] text-white/80">{it.name}</Text>
-                      <Pressable onPress={() => dispatch({ type: 'REMOVE_PLANNED_MEAL', id: it.id })} className="h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/5 active:opacity-80">
-                        <Trash2 size={13} color="rgba(255,255,255,0.4)" />
-                      </Pressable>
+                      <Pressable onPress={() => dispatch({ type: 'REMOVE_PLANNED_MEAL', id: it.id })} className="h-7 w-7 items-center justify-center rounded-full bg-white/5 active:opacity-70"><Trash2 size={13} color="rgba(255,255,255,0.45)" /></Pressable>
                     </View>
                   ))}
                 </View>
@@ -1011,162 +715,338 @@ function PlanTab() {
           )
         })}
       </View>
-      <View className="h-2" />
-    </>
+
+      {/* Coach note */}
+      <View className="mt-4 flex-row items-center gap-2.5 rounded-[16px] px-4 py-3.5" style={{ backgroundColor: alpha('#7ED957', 0.06) }}>
+        <View className="h-[34px] w-[34px] items-center justify-center rounded-xl" style={{ backgroundColor: alpha('#7ED957', 0.14) }}><MessageCircle size={17} color={c.brand400} /></View>
+        <Text className="flex-1 text-[13px] leading-[1.45] text-white/70">Ask your coach to review your meal plan from the Dashboard.</Text>
+      </View>
+    </ScrollView>
   )
 }
 
-/* ============================ My Meals tab ============================ */
-function MyMealsTab() {
-  const { state, dispatch } = useStore()
-  const toast = useToast()
-  const meals = state.myMeals ?? []
-  const [open, setOpen] = useState(false)
-  const [creating, setCreating] = useState(false)
-  const [name, setName] = useState('')
-  const [notes, setNotes] = useState('')
-  const [ingLine, setIngLine] = useState('')
+function PlanLabel({ children, tight }: { children: ReactNode; tight?: boolean }) {
+  return <Text className={`text-[11px] font-extrabold uppercase tracking-wide text-white/40 ${tight ? 'mb-1.5' : 'mb-1.5 mt-3.5'}`}>{children}</Text>
+}
 
-  function resetForm() {
-    setName(''); setNotes(''); setIngLine('')
-    setCreating(false)
-  }
-
-  function save() {
-    const n = name.trim()
-    if (!n) return
-    dispatch({
-      type: 'ADD_MY_MEAL',
-      meal: {
-        name: n,
-        notes: notes.trim() || undefined,
-        kcal: 0,
-        p: 0,
-        c: 0,
-        f: 0,
-        ingredients: ingLine.split('\n').map((s) => s.trim()).filter(Boolean),
-      },
-    })
-    toast(`"${n}" added`)
-    resetForm()
-  }
-
-  const inputCls = 'w-full rounded-xl border border-white/[0.08] bg-ink-900/60 px-3 py-2.5 text-sm text-white'
+/* ============================ Guide ============================ */
+function GuideTab() {
+  const c = useColors()
+  const [plate, setPlate] = useState(0)
+  const [plateEx, setPlateEx] = useState(false)
+  const [lesson, setLesson] = useState<string | null>(null)
+  const active = PLATE[plate]
 
   return (
-    <View className="overflow-hidden rounded-2xl border border-white/[0.08] bg-ink-800">
-      {/* Clickable header */}
-      <Pressable
-        onPress={() => { setOpen((v) => !v); if (open) resetForm() }}
-        className="w-full flex-row items-center gap-3 p-4 active:opacity-90"
-      >
+    <ScrollView className="flex-1" contentContainerStyle={cardScroll} showsVerticalScrollIndicator={false}>
+      {/* Coach header — rounded card, design's darker #111113 */}
+      <View className="mb-6 flex-row items-center gap-[11px] rounded-2xl px-3.5 py-2.5" style={{ backgroundColor: '#111113', borderWidth: 1, borderColor: '#222225' }}>
+        <View className="h-8 w-8 items-center justify-center rounded-[11px]" style={{ backgroundColor: alpha('#7ED957', 0.14) }}><MessageCircle size={16} color={c.brand400} /></View>
         <View className="min-w-0 flex-1">
-          <Text className="text-[15px] font-extrabold tracking-tight text-white">My Recipes</Text>
-          <Text className="mt-0.5 text-[13px] leading-snug text-white/60">
-            {meals.length === 0 ? 'Save your own recipes and use them in the meal planner.' : `${meals.length} saved recipe${meals.length === 1 ? '' : 's'} · tap to manage`}
-          </Text>
+          <Text className="text-[13.5px] font-extrabold leading-tight text-white">Got a question?</Text>
+          <Text className="mt-px text-[12px] text-white/72">Ask your coach from the Dashboard</Text>
         </View>
-        <ChevronDown size={18} color="rgba(255,255,255,0.3)" style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
-      </Pressable>
+      </View>
 
-      {open && (
-        <View className="border-t border-white/5">
-          {/* Saved meals list */}
-          {meals.length === 0 ? (
-            <View className="items-center px-6 py-8">
-              <Salad size={26} color="rgba(255,255,255,0.25)" />
-              <Text className="mt-2 text-[14px] font-semibold text-white/50">No saved meals yet</Text>
-              <Text className="mt-1 text-center text-[12px] leading-snug text-white/35">Add a recipe below and it shows up in the Plan tab too.</Text>
-            </View>
-          ) : (
-            <View>
-              {meals.map((m, i) => (
-                <View key={m.id} className={`flex-row items-start gap-3 px-4 py-3.5 ${i === 0 ? '' : 'border-t border-white/5'}`}>
-                  <View className="min-w-0 flex-1">
-                    <Text className="font-bold leading-tight text-white">{m.name}</Text>
-                    {m.notes && <Text className="mt-0.5 text-[12px] leading-snug text-white/50">{m.notes}</Text>}
-                    {m.ingredients.length > 0 && (
-                      <View className="mt-1.5 flex-row flex-wrap gap-1">
-                        {m.ingredients.map((ing, j) => (
-                          <View key={j} className="rounded-full bg-white/[0.05] px-2.5 py-1"><Text className="text-[11px] text-white/55">{ing}</Text></View>
-                        ))}
-                      </View>
-                    )}
-                  </View>
-                  <Pressable onPress={() => dispatch({ type: 'REMOVE_MY_MEAL', id: m.id })} className="h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/5 active:opacity-80">
-                    <Trash2 size={14} color="rgba(255,255,255,0.4)" />
-                  </Pressable>
-                </View>
-              ))}
-            </View>
-          )}
+      {/* Balanced plate */}
+      <View className="mb-1 flex-row items-center gap-2.5"><Text className="text-[19px]">🍽️</Text><Text className="text-[19px] font-extrabold tracking-tight text-white">The balanced plate</Text></View>
+      <Text className="mb-4 text-[13px] leading-[1.5] text-white/55">Tap a section of the plate to see what goes where.</Text>
 
-          {/* Add meal form */}
-          {creating ? (
-            <View className="gap-2.5 border-t border-white/5 p-4">
-              <Text className="text-[12px] font-bold uppercase tracking-wide text-white/40">New recipe</Text>
-              <TextInput value={name} onChangeText={setName} placeholder="Meal name *" placeholderTextColor={PLACEHOLDER} className={inputCls} />
-              <TextInput value={notes} onChangeText={setNotes} placeholder="Description (optional)" placeholderTextColor={PLACEHOLDER} multiline numberOfLines={2} textAlignVertical="top" className={inputCls} />
-              <TextInput value={ingLine} onChangeText={setIngLine} placeholder={'Ingredients (one per line)\ne.g. 2 eggs\n100g oats'} placeholderTextColor={PLACEHOLDER} multiline numberOfLines={4} textAlignVertical="top" className={inputCls} />
-              <View className="flex-row gap-2">
-                <Pressable onPress={save} disabled={!name.trim()} className={`btn-primary flex-1 active:opacity-90 ${!name.trim() ? 'opacity-40' : ''}`}>
-                  <Plus size={15} color="#000" />
-                  <Text className="ml-2 font-semibold text-black">Save meal</Text>
-                </Pressable>
-                <Pressable onPress={resetForm} className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 active:opacity-80">
-                  <Text className="text-sm font-semibold text-white/60">Cancel</Text>
-                </Pressable>
-              </View>
-            </View>
-          ) : (
-            <View className="border-t border-white/5 p-3">
-              <Pressable onPress={() => setCreating(true)} className="w-full flex-row items-center justify-center gap-2 rounded-xl bg-brand-400/15 py-2.5 active:opacity-80">
-                <Plus size={15} color={brand[400]} />
-                <Text className="text-[13px] font-semibold text-brand-400">Add a meal</Text>
+      <BalancedPlate selected={active.slice} onSelect={(i) => { setPlate(i); setPlateEx(false) }} />
+
+      <View className="mt-3.5 flex-row items-center justify-center gap-2.5">
+        <Text className="text-[20px]">🥑</Text>
+        <Text className="text-[13px] font-semibold text-white/60">Add a small amount of <Text onPress={() => { setPlate(3); setPlateEx(false) }} className="font-bold" style={{ color: active.slice === 'fat' ? '#a98bf5' : '#8B5CF6' }}>healthy fat</Text> on the side</Text>
+      </View>
+
+      <View className="mt-6 flex-row flex-wrap gap-2.5">
+        {PLATE.map((p, i) => {
+          const on = plate === i
+          return (
+            <Pressable key={p.slice} onPress={() => { setPlate(i); setPlateEx(false) }} style={{ width: '47.5%', backgroundColor: on ? alpha(p.color, 0.16) : 'rgba(255,255,255,0.05)', borderWidth: 1.5, borderColor: on ? alpha(p.color, 0.42) : 'transparent' }} className="flex-row items-center gap-2.5 rounded-[14px] px-3 py-3 active:opacity-80">
+              <Text className="min-w-[18px] text-center text-[15px] font-black" style={{ color: p.color }}>{p.portion || p.icon}</Text>
+              <Text className="min-w-0 flex-1 text-[12.5px] font-semibold leading-tight" style={{ color: on ? p.color : 'rgba(255,255,255,0.82)' }}>{p.title}</Text>
+              {on && <Check size={15} color={p.color} strokeWidth={3.2} />}
+            </Pressable>
+          )
+        })}
+      </View>
+
+      {/* Feature card */}
+      <View className="mt-3.5 rounded-2xl bg-white/[0.035] px-4 py-4">
+        <View className="flex-row items-center gap-2"><View className="h-[9px] w-[9px] rounded-full" style={{ backgroundColor: active.color }} /><Text className="text-[15px] font-extrabold text-white">{active.title}</Text></View>
+        <Text className="mt-1.5 text-[13px] leading-[1.55] text-white/68">{active.desc}</Text>
+        <Pressable onPress={() => setPlateEx((v) => !v)} className="mt-2.5 flex-row items-center gap-1 active:opacity-70">
+          <Text className="text-[11.5px] font-bold" style={{ color: active.color }}>See examples</Text>
+          <ChevronRight size={13} color={active.color} strokeWidth={2.6} style={{ transform: [{ rotate: plateEx ? '90deg' : '0deg' }] }} />
+        </Pressable>
+        {plateEx && (
+          <View className="mt-2.5 flex-row flex-wrap gap-1.5">
+            {active.examples.map((ex) => <View key={ex} className="rounded-full bg-white/[0.06] px-3 py-1.5"><Text className="text-[12px] text-white/80">{ex}</Text></View>)}
+          </View>
+        )}
+      </View>
+
+      {/* Portions by hand */}
+      <View className="mb-1 mt-8 flex-row items-center gap-2.5"><Text className="text-[19px]">🖐️</Text><Text className="text-[19px] font-extrabold tracking-tight text-white">Portion sizes, by hand</Text></View>
+      <Text className="mb-4 text-[13px] leading-[1.5] text-white/55">No scales needed. Your own hand scales with you.</Text>
+      <View className="flex-row flex-wrap gap-2.5">
+        {PORTIONS.map((p) => (
+          <View key={p.hand} style={{ width: '47.5%' }} className="rounded-2xl border border-white/[0.06] bg-ink-800 p-3.5">
+            <View className="h-11 w-11 items-center justify-center rounded-full" style={{ backgroundColor: alpha(p.color, 0.16) }}><Text className="text-[24px]">{p.emoji}</Text></View>
+            <View className="mt-2.5 flex-row items-center gap-1.5"><Text className="text-[14.5px] font-extrabold text-white">{p.hand}</Text><Text className="text-[12px] font-bold" style={{ color: p.color }}>· {p.title}</Text></View>
+            <Text className="mt-1 text-[12.5px] leading-[1.4] text-white/55">{p.desc}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Tiers */}
+      <View className="mb-2.5 mt-8 flex-row items-center gap-2.5"><Text className="text-[19px]">🥗</Text><Text className="text-[19px] font-extrabold tracking-tight text-white">Eat more, and less, of</Text></View>
+      <View className="gap-2.5">
+        {TIERS.map((t) => (
+          <View key={t.title} className="rounded-2xl bg-ink-800 px-4 py-3.5" style={{ borderLeftWidth: 3, borderLeftColor: t.color }}>
+            <Text className="text-[15px] font-extrabold" style={{ color: t.color }}>{t.title}</Text>
+            <Text className="mt-1 text-[12.5px] leading-[1.5] text-white/60">{t.desc}</Text>
+            <View className="mt-2.5 flex-row flex-wrap gap-1.5">{t.items.map((it) => <View key={it} className="rounded-full bg-white/5 px-3 py-1.5"><Text className="text-[11px] text-white/72">{it}</Text></View>)}</View>
+          </View>
+        ))}
+      </View>
+
+      {/* Everyday wins */}
+      <View className="mt-8 flex-row items-center gap-2.5"><Text className="text-[19px]">✨</Text><Text className="text-[19px] font-extrabold tracking-tight text-white">Simple everyday wins</Text></View>
+      <Text className="mb-3 mt-1 text-[13px] leading-[1.5] text-white/55">Small habits that make healthy eating easier.</Text>
+      {PRINCIPLES.map((p) => (
+        <View key={p.title} className="flex-row items-start gap-3.5 border-t border-white/[0.06] py-3.5">
+          <View className="h-[38px] w-[38px] items-center justify-center rounded-full" style={{ backgroundColor: alpha('#7ED957', 0.12) }}><Text className="text-[18px]">{p.emoji}</Text></View>
+          <View className="min-w-0 flex-1"><Text className="text-[14px] font-extrabold text-white">{p.title}</Text><Text className="mt-0.5 text-[12.5px] leading-[1.5] text-white/60">{p.text}</Text></View>
+        </View>
+      ))}
+
+      {/* Go deeper */}
+      <View className="mb-2.5 mt-8 flex-row items-center gap-2.5"><Text className="text-[19px]">📚</Text><Text className="text-[19px] font-extrabold tracking-tight text-white">Go deeper</Text></View>
+      <View className="gap-1">
+        {LESSONS.map((l) => {
+          const open = lesson === l.id
+          return (
+            <View key={l.id} className="rounded-[14px]" style={{ backgroundColor: open ? alpha('#7ED957', 0.05) : 'transparent', borderLeftWidth: open ? 3 : 0, borderLeftColor: c.brand400 }}>
+              <Pressable onPress={() => setLesson(open ? null : l.id)} className="flex-row items-center gap-3 px-3 py-3.5 active:opacity-80">
+                <View className="h-10 w-10 items-center justify-center rounded-full" style={{ backgroundColor: alpha('#7ED957', 0.12) }}><Text className="text-[19px]">{l.emoji}</Text></View>
+                <View className="min-w-0 flex-1"><Text className="text-[14.5px] font-extrabold text-white">{l.title}</Text><Text numberOfLines={1} className="mt-px text-[12px] text-white/62">{l.summary}</Text></View>
+                <ChevronDown size={18} color={open ? c.brand400 : 'rgba(255,255,255,0.35)'} style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
               </Pressable>
+              {open && (
+                <View className="gap-2.5 pb-4 pl-[54px] pr-3.5">
+                  {l.body.map((para, i) => <Text key={i} className="text-[13px] leading-[1.65] text-white/72">{para}</Text>)}
+                  <View className="mt-0.5 rounded-xl px-3.5 py-3" style={{ backgroundColor: alpha('#7ED957', 0.1) }}>
+                    <Text className="mb-1 text-[11px] font-extrabold uppercase tracking-wide text-brand-400">Key takeaway</Text>
+                    <Text className="text-[13px] leading-[1.55] text-white/85">{l.takeaway}</Text>
+                  </View>
+                </View>
+              )}
             </View>
-          )}
-        </View>
-      )}
+          )
+        })}
+      </View>
+    </ScrollView>
+  )
+}
+
+function BalancedPlate({ selected, onSelect }: { selected: PlateSlice['slice']; onSelect: (i: number) => void }) {
+  const fill = (key: string) => (selected === key ? 1 : 0.4)
+  const stroke = (key: string) => (selected === key ? 'rgba(255,255,255,0.75)' : '#131316')
+  const sw = (key: string) => (selected === key ? 3 : 2.5)
+  return (
+    <View style={{ width: 236, height: 236, alignSelf: 'center' }}>
+      <Svg viewBox="0 0 200 200" width={236} height={236}>
+        <Path onPress={() => onSelect(0)} d="M100,100 L100,188 A88,88 0 0 1 100,12 Z" fill="#7ED957" fillOpacity={fill('veg')} stroke={stroke('veg')} strokeWidth={sw('veg')} />
+        <Path onPress={() => onSelect(1)} d="M100,100 L100,12 A88,88 0 0 1 188,100 Z" fill="#3B82F6" fillOpacity={fill('protein')} stroke={stroke('protein')} strokeWidth={sw('protein')} />
+        <Path onPress={() => onSelect(2)} d="M100,100 L188,100 A88,88 0 0 1 100,188 Z" fill="#F5A524" fillOpacity={fill('carbs')} stroke={stroke('carbs')} strokeWidth={sw('carbs')} />
+        <Circle cx="100" cy="100" r="96" fill="none" stroke="rgba(255,255,255,0.16)" strokeWidth="1.5" />
+        <SvgText x="50" y="107" textAnchor="middle" fontSize="27" fontWeight="800" fill="#fff">½</SvgText>
+        <SvgText x="140" y="64" textAnchor="middle" fontSize="19" fontWeight="800" fill="#fff">¼</SvgText>
+        <SvgText x="140" y="150" textAnchor="middle" fontSize="19" fontWeight="800" fill="#fff">¼</SvgText>
+        <Circle cx="100" cy="100" r="27" fill="#131316" />
+      </Svg>
     </View>
   )
 }
 
-function SectionLabel({ children }: { children: ReactNode }) {
-  return <Text className="mb-2.5 text-[12px] font-bold uppercase tracking-[0.14em] text-white/40">{children}</Text>
+/* ============================ Recipe modal ============================ */
+function isUserMeal(m: BudgetMeal | UserMeal): m is UserMeal {
+  return !('image' in m)
+}
+function RecipeModal({ meal, onClose, onEdit }: { meal: BudgetMeal | UserMeal | null; onClose: () => void; onEdit: (m: UserMeal) => void }) {
+  const { dispatch } = useStore()
+  const toast = useToast()
+  const c = useColors()
+  if (!meal) return null
+  const budget = isUserMeal(meal) ? null : (meal as BudgetMeal)
+  const um = isUserMeal(meal) ? meal : null
+  const macroBits = [`${meal.kcal} kcal`, `${meal.p}g P`, meal.c ? `${meal.c}g C` : '', meal.f ? `${meal.f}g F` : ''].filter(Boolean)
+  const macros = macroBits.join(' · ')
+
+  async function copyRecipe() {
+    if (!meal) return
+    const lines = [meal.name, macros, '']
+    if (meal.ingredients.length) { lines.push('INGREDIENTS', ...meal.ingredients.map((i) => `• ${i}`), '') }
+    if (budget?.steps.length) { lines.push('METHOD', ...budget.steps.map((s, i) => `${i + 1}. ${s}`), '') }
+    if (um?.notes) { lines.push('NOTES', um.notes, '') }
+    lines.push('— via StrengthHub')
+    try { await Clipboard.setStringAsync(lines.join('\n')); toast('Recipe copied to clipboard') } catch { toast("Couldn't copy") }
+  }
+
+  return (
+    <AppModal visible={!!meal} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable onPress={onClose} className="flex-1 items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.65)' }}>
+        <Pressable onPress={() => {}} className="w-full max-w-[360px] overflow-hidden rounded-[26px] border border-white/10 bg-ink-800" style={{ maxHeight: '88%' }}>
+          {budget ? (
+            <View className="h-[158px]">
+              <Image source={{ uri: budget.image }} resizeMode="cover" className="h-full w-full bg-ink-700" />
+              <LinearGradient colors={['transparent', 'rgba(19,19,22,0.4)', '#131316']} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
+              <Pressable onPress={onClose} className="absolute right-3 top-3 h-[34px] w-[34px] items-center justify-center rounded-full active:opacity-80" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}><X size={17} color="#fff" /></Pressable>
+              <View className="absolute inset-x-4 bottom-3">
+                <Text className="text-[19px] font-extrabold leading-tight text-white">{budget.name}</Text>
+                <View className="mt-1 flex-row items-center gap-1.5"><Clock size={13} color="#9fe264" /><Text className="text-[12.5px] font-bold text-brand-300">{budget.minutes} min · {budget.category} · serves {budget.serves}</Text></View>
+              </View>
+            </View>
+          ) : (
+            <View className="flex-row items-start justify-between gap-3 px-[18px] pb-1 pt-[18px]">
+              <View className="min-w-0 flex-1"><Text className="text-[19px] font-extrabold leading-tight text-white">{meal.name}</Text><Text className="mt-1.5 text-[13px] font-bold text-brand-300">{macros}</Text></View>
+              <Pressable onPress={onClose} className="h-8 w-8 items-center justify-center rounded-full bg-white/[0.06] active:opacity-80"><X size={16} color="#fff" /></Pressable>
+            </View>
+          )}
+
+          <ScrollView className="px-4 py-4" contentContainerStyle={{ gap: 16 }} showsVerticalScrollIndicator={false}>
+            {budget && !!budget.flavour && <Text className="text-[13.5px] leading-[1.5] text-white/65">{budget.flavour}</Text>}
+            {budget && (
+              <View className="flex-row flex-wrap gap-1.5">
+                {budget.tags.map((t) => <View key={t} className="rounded-full px-3 py-1" style={{ backgroundColor: alpha('#7ED957', 0.15) }}><Text className="text-[11px] font-bold text-brand-300">{t}</Text></View>)}
+                <View className="rounded-full bg-white/[0.06] px-3 py-1"><Text className="text-[11px] font-bold text-white/60">{macros}</Text></View>
+              </View>
+            )}
+            {meal.ingredients.length > 0 && (
+              <View>
+                <SectionHead>Ingredients</SectionHead>
+                <View className="gap-1.5">{meal.ingredients.map((ing, i) => <View key={i} className="flex-row items-start gap-2.5"><View className="mt-[7px] h-[5px] w-[5px] rounded-full bg-brand-400" /><Text className="flex-1 text-[14px] leading-[1.4] text-white/78">{ing}</Text></View>)}</View>
+              </View>
+            )}
+            {um?.notes && um.notes.trim() ? (
+              <View><SectionHead>Notes</SectionHead><Text className="text-[14px] leading-[1.5] text-white/78">{um.notes}</Text></View>
+            ) : null}
+            {budget && budget.steps.length > 0 && (
+              <View>
+                <SectionHead>Method</SectionHead>
+                <View className="gap-2.5">{budget.steps.map((st, i) => <View key={i} className="flex-row items-start gap-2.5"><View className="h-6 w-6 items-center justify-center rounded-full" style={{ backgroundColor: alpha('#7ED957', 0.15) }}><Text className="text-[12px] font-extrabold text-brand-400">{i + 1}</Text></View><Text className="flex-1 text-[14px] leading-[1.5] text-white/82">{st}</Text></View>)}</View>
+              </View>
+            )}
+            {budget?.cookOnce ? (
+              <View className="rounded-xl px-3.5 py-3" style={{ backgroundColor: alpha('#7ED957', 0.08) }}><Text className="text-[13px] leading-[1.5] text-white/75">💡 {budget.cookOnce}</Text></View>
+            ) : null}
+          </ScrollView>
+
+          <View className="flex-row gap-2.5 border-t border-white/[0.06] p-3">
+            {um && (
+              <>
+                <Pressable onPress={() => { dispatch({ type: 'REMOVE_MY_MEAL', id: um.id }); onClose(); toast('Meal deleted') }} className="items-center justify-center rounded-[13px] px-4 py-3 active:opacity-80" style={{ backgroundColor: alpha('#f87171', 0.12), borderWidth: 1, borderColor: alpha('#f87171', 0.3) }}><Trash2 size={15} color="#f87171" /></Pressable>
+                <Pressable onPress={() => onEdit(um)} className="flex-1 flex-row items-center justify-center gap-1.5 rounded-[13px] bg-white/[0.06] py-3 active:opacity-80"><Pencil size={15} color="#fff" /><Text className="text-[14px] font-bold text-white">Edit</Text></Pressable>
+              </>
+            )}
+            <Pressable onPress={copyRecipe} className="flex-1 flex-row items-center justify-center gap-2 rounded-[13px] py-3 active:opacity-80" style={{ backgroundColor: alpha('#7ED957', 0.15) }}><Share2 size={15} color={c.brand400} /><Text className="text-[14px] font-bold text-brand-400">Copy recipe</Text></Pressable>
+          </View>
+        </Pressable>
+      </Pressable>
+    </AppModal>
+  )
 }
 
-/* Three dots that rise in sequence — the small "someone's replying" cue that
- * makes the coach feel present rather than canned. */
-function TypingDots() {
-  const dots = [useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current]
+function SectionHead({ children }: { children: ReactNode }) {
+  return <Text className="mb-2 text-[12px] font-extrabold uppercase tracking-wide text-white/40">{children}</Text>
+}
+
+/* ============================ Add / edit meal sheet ============================ */
+function AddMealSheet({ open, editing, onClose }: { open: boolean; editing: UserMeal | null; onClose: () => void }) {
+  const { dispatch } = useStore()
+  const toast = useToast()
+  const [name, setName] = useState('')
+  const [ing, setIng] = useState('')
+  const [notes, setNotes] = useState('')
+  const [kcal, setKcal] = useState('')
+  const [pro, setPro] = useState('')
+
   useEffect(() => {
-    const loops = dots.map((d, i) =>
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(i * 160),
-          Animated.timing(d, { toValue: 1, duration: 320, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-          Animated.timing(d, { toValue: 0, duration: 320, easing: Easing.in(Easing.quad), useNativeDriver: true }),
-          Animated.delay((2 - i) * 160),
-        ]),
-      ),
-    )
-    loops.forEach((l) => l.start())
-    return () => loops.forEach((l) => l.stop())
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    if (!open) return
+    setName(editing?.name ?? '')
+    setIng((editing?.ingredients ?? []).join('\n'))
+    setNotes(editing?.notes ?? '')
+    setKcal(editing?.kcal != null ? String(editing.kcal) : '')
+    setPro(editing?.p != null ? String(editing.p) : '')
+  }, [open, editing])
+
+  function save() {
+    if (!name.trim()) return
+    const fields = {
+      name: name.trim(),
+      kcal: kcal ? parseInt(kcal) || 0 : 0,
+      p: pro ? parseInt(pro) || 0 : 0,
+      c: editing?.c ?? 0,
+      f: editing?.f ?? 0,
+      ingredients: ing.split('\n').map((x) => x.trim()).filter(Boolean),
+      notes: notes.trim(),
+    }
+    if (editing) {
+      dispatch({ type: 'REMOVE_MY_MEAL', id: editing.id })
+      dispatch({ type: 'ADD_MY_MEAL', meal: fields })
+      toast('Meal updated')
+    } else {
+      dispatch({ type: 'ADD_MY_MEAL', meal: fields })
+      toast('Meal saved')
+    }
+    onClose()
+  }
+
+  const canSave = !!name.trim()
   return (
-    <>
-      {dots.map((d, i) => (
-        <Animated.View
-          key={i}
-          style={{
-            width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.55)',
-            opacity: d.interpolate({ inputRange: [0, 1], outputRange: [0.35, 1] }),
-            transform: [{ translateY: d.interpolate({ inputRange: [0, 1], outputRange: [0, -3] }) }],
-          }}
-        />
-      ))}
-    </>
+    <AppModal visible={open} transparent animationType="slide" onRequestClose={onClose}>
+      <View className="flex-1 justify-end" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
+        <Pressable onPress={onClose} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
+        <View className="rounded-t-[26px] border-t border-white/10 bg-ink-800" style={{ maxHeight: '92%' }}>
+          <View className="flex-row items-center justify-between px-[18px] pb-2 pt-[18px]">
+            <View>
+              <Text className="text-[18px] font-extrabold text-white">{editing ? 'Edit your meal' : 'Add your meal'}</Text>
+              <Text className="mt-px text-[12px] text-white/50">{editing ? 'Update the details below.' : 'Save a recipe you cook often.'}</Text>
+            </View>
+            <Pressable onPress={onClose} className="h-8 w-8 items-center justify-center rounded-full bg-white/[0.06] active:opacity-80"><X size={16} color="#fff" /></Pressable>
+          </View>
+          <ScrollView className="px-[18px]" contentContainerStyle={{ paddingBottom: 40, paddingTop: 12, gap: 14 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <Field label="Meal name">
+              <TextInput value={name} onChangeText={setName} placeholder="e.g. My chicken rice bowl" placeholderTextColor="rgba(255,255,255,0.3)" className="rounded-xl bg-ink-700 px-3.5 py-3 text-[14px] text-white" />
+            </Field>
+            <Field label="Ingredients" optional>
+              <TextInput value={ing} onChangeText={setIng} multiline placeholder={'2 chicken breasts\n1 cup rice\nHandful of veg'} placeholderTextColor="rgba(255,255,255,0.3)" style={{ minHeight: 84, textAlignVertical: 'top' }} className="rounded-xl bg-ink-700 px-3.5 py-3 text-[14px] leading-[1.5] text-white" />
+            </Field>
+            <Field label="Notes" optional>
+              <TextInput value={notes} onChangeText={setNotes} multiline placeholder="Anything worth remembering about this meal" placeholderTextColor="rgba(255,255,255,0.3)" style={{ minHeight: 64, textAlignVertical: 'top' }} className="rounded-xl bg-ink-700 px-3.5 py-3 text-[14px] leading-[1.5] text-white" />
+            </Field>
+            <View className="flex-row gap-2.5">
+              <View className="flex-1"><Field label="Calories" optional><TextInput value={kcal} onChangeText={setKcal} keyboardType="numeric" placeholder="645" placeholderTextColor="rgba(255,255,255,0.3)" className="rounded-xl bg-ink-700 px-3.5 py-3 text-[14px] text-white" /></Field></View>
+              <View className="flex-1"><Field label="Protein g" optional><TextInput value={pro} onChangeText={setPro} keyboardType="numeric" placeholder="48" placeholderTextColor="rgba(255,255,255,0.3)" className="rounded-xl bg-ink-700 px-3.5 py-3 text-[14px] text-white" /></Field></View>
+            </View>
+          </ScrollView>
+          <View className="flex-row gap-2.5 border-t border-white/[0.06] px-[18px] pb-6 pt-3">
+            <Pressable onPress={onClose} className="flex-1 items-center rounded-[13px] bg-white/[0.06] py-3.5 active:opacity-80"><Text className="text-[14px] font-bold text-white">Cancel</Text></Pressable>
+            <Pressable onPress={save} disabled={!canSave} className="flex-[2] items-center rounded-[13px] py-3.5 active:opacity-90" style={{ backgroundColor: canSave ? '#7ED957' : alpha('#7ED957', 0.35) }}><Text className="text-[14px] font-extrabold text-black">{editing ? 'Save changes' : 'Save meal'}</Text></Pressable>
+          </View>
+        </View>
+      </View>
+    </AppModal>
+  )
+}
+
+function Field({ label, optional, children }: { label: string; optional?: boolean; children: ReactNode }) {
+  return (
+    <View>
+      <Text className="mb-1.5 text-[11px] font-extrabold uppercase tracking-wide text-white/40">{label}{optional && <Text className="font-semibold normal-case tracking-normal text-white/35"> · optional</Text>}</Text>
+      {children}
+    </View>
   )
 }

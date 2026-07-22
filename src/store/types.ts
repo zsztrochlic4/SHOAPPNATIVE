@@ -65,6 +65,8 @@ export interface PlannedMeal {
   day: string // 'Mon'..'Sun'
   slot: MealName
   name: string
+  /** Week offset from the current week (0 = this week, -1 = last, 1 = next). */
+  w?: number
 }
 
 /** A comment on a community post. */
