@@ -1,19 +1,21 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { View, Text, Pressable, Image, Animated, Easing } from 'react-native'
-import { Menu, MessageCircle, Clock, Play, GraduationCap, ChevronRight, Leaf, Check, Flame, ChevronDown, Info } from 'lucide-react-native'
+import { View, Text, Pressable, Image, Animated, Easing, Platform } from 'react-native'
+import { Menu, MessageCircle, Clock, Play, GraduationCap, ChevronRight, Leaf, Check, Flame, ChevronDown, Info, Plus, Minus, ArrowRight } from 'lucide-react-native'
 import { Icon } from '../components/Icon'
 import { ActivityIcon } from '../components/ActivityIcon'
-import { Card, ProgressRing } from '../components/ui'
+import { Card } from '../components/ui'
+import { Sheet } from '../components/Sheet'
+import { PressableScale } from '../components/PressableScale'
 import { Hero } from '../components/Hero'
 import { IndexGauge } from '../components/IndexGauge'
 import { useStore } from '../store/store'
 import { useNav } from '../nav'
 import { currentWeekKeys, todayKey, longDate, shortDate, fromKey, currentHour } from '../lib/date'
-import { fmtFluid, fmtWeightNum, weightUnit, fmtVolume, pct } from '../lib/format'
+import { fmtFluid, fmtWeightNum, weightUnit, fmtVolume } from '../lib/format'
 import {
   todayHabit, habitForDay, todaySession, sessionForDay, activitiesForDay,
   unreadChat, streakStats, foodReviewForDay, weeklyIndex, nutritionTagsForDay,
-  nutritionAskedForDay, workoutStartedForDay,
+  workoutStartedForDay,
 } from '../store/selectors'
 import { tagById, type TagTone } from '../data/nutrition'
 import { dashboardStatIds, statById } from '../lib/metrics'
@@ -37,17 +39,26 @@ function toneColor(tone: TagTone, c: ReturnType<typeof useColors>): string {
   return c.danger
 }
 
-type Task = {
+/**
+ * A single row in the merged "Today's progress" checklist. Measurable goals
+ * (water, steps) carry a target + a store patch so the update sheet can nudge
+ * them with a stepper; action goals (workout, food, weigh) jump to their own
+ * logging surface instead.
+ */
+type Goal = {
   id: string
   icon: string
+  tile: string // tint colour for the icon tile (and its 15% background)
   label: string
-  hint: string
+  sub: string
   done: boolean
-  onPress: () => void
-}
+} & (
+  | { kind: 'measure'; value: number; target: number; step: number; fmt: (v: number) => string; patch: (v: number) => void }
+  | { kind: 'action'; cta: string; onOpen: () => void }
+)
 
 export default function Dashboard() {
-  const { state } = useStore()
+  const { state, dispatch } = useStore()
   const nav = useNav()
   const colors = useColors()
   const units = state.settings.units
@@ -57,7 +68,6 @@ export default function Dashboard() {
   const t = dailyTargets(state)
   const exam = examState(state)
   const streak = streakStats(state)
-  const foodReview = foodReviewForDay(state)
   const idx = weeklyIndex(state)
   const weightLoggedToday = state.weights.some((x) => x.dateKey === todayKey)
   // The streak is "at risk" until the user logs something today — the nudge that
@@ -83,33 +93,28 @@ export default function Dashboard() {
   const selWeekday = FULL_WD[fromKey(selDate).getDay()]
   const selTitle = isToday ? "Today's progress" : `${selWeekday}'s progress`
 
-  // Two of the goals are simple done/not-done ticks rather than progress rings.
-  const asked = nutritionAskedForDay(state, selDate)
-  const isRestDay = !selSession
-  const workoutDone = isRestDay || workoutStartedForDay(state, selDate) || (selSession?.completed ?? false)
+  // The five rings and the old "To-do today" list were two views of the same day,
+  // stacked. They're now one checklist, built for whichever day the week strip has
+  // selected. Today's is live (rows open the update sheet); past days render the
+  // same rows read-only, since there's nothing left to log against them.
+  const selFoodReview = foodReviewForDay(state, selDate)
+  const selWeightLogged = state.weights.some((w) => w.dateKey === selDate)
+  const selWorkoutDone = workoutStartedForDay(state, selDate) || (selSession?.completed ?? false)
 
-  type Ring =
-    | { kind: 'progress'; icon: string; label: string; value: string; pct: number; onPress: () => void }
-    | { kind: 'tick'; icon: string; label: string; value: string; done: boolean; onPress: () => void }
-  const habitRings: Ring[] = [
-    { kind: 'progress', icon: 'footprints', label: 'Steps', value: selHabit.steps.toLocaleString(), pct: pct(selHabit.steps, t.steps), onPress: () => nav.open('logHabit') },
-    { kind: 'progress', icon: 'bed', label: 'Sleep', value: `${selHabit.sleepH} hrs`, pct: pct(selHabit.sleepH, t.sleepH), onPress: () => nav.open('logHabit') },
-    { kind: 'progress', icon: 'droplet', label: 'Water', value: fmtFluid(selHabit.waterL, units), pct: pct(selHabit.waterL, t.waterL), onPress: () => nav.open('logHabit') },
-    { kind: 'tick', icon: 'utensils', label: 'Ask a Q', value: asked ? 'Asked' : 'Ask', done: asked, onPress: () => nav.goTab('nutrition') },
-    { kind: 'tick', icon: 'dumbbell', label: 'Workout', value: workoutDone ? (isRestDay && !workoutStartedForDay(state, selDate) ? 'Rest' : 'Done') : 'Start', done: workoutDone, onPress: () => (selSession ? nav.open('activeWorkout') : nav.goTab('workout')) },
-  ]
-  const ringsOnTrack = habitRings.filter((h) => (h.kind === 'tick' ? h.done : h.pct >= 100)).length
-
-  const tasks: Task[] = []
-  if (session) {
-    tasks.push({ id: 'workout', icon: 'dumbbell', label: session.completed ? 'Workout complete' : "Today's workout", hint: session.name, done: session.completed, onPress: () => nav.open('activeWorkout') })
+  const goalsBase: Goal[] = []
+  if (selSession) {
+    goalsBase.push({ id: 'workout', kind: 'action', icon: 'dumbbell', tile: colors.brand400, label: selWorkoutDone ? 'Workout complete' : isToday ? "Today's workout" : 'Workout not logged', sub: selSession.name, done: selWorkoutDone, cta: selWorkoutDone ? 'View' : 'Start', onOpen: () => nav.open('activeWorkout') })
   }
-  tasks.push({ id: 'water', icon: 'droplet', label: `Drink ${fmtFluid(t.waterL, units)} of water`, hint: `${fmtFluid(habit.waterL, units)} so far`, done: habit.waterL >= t.waterL, onPress: () => nav.open('logHabit') })
-  tasks.push({ id: 'weight', icon: 'scale', label: 'Weigh yourself', hint: weightLoggedToday ? 'Logged today' : 'Keep your trend honest', done: weightLoggedToday, onPress: () => nav.open('logWeight') })
-  tasks.push({ id: 'meals', icon: 'utensils', label: 'Review your food', hint: foodReview ? `Reviewed · ${foodReview.score}/10` : 'Get coach feedback on today', done: !!foodReview, onPress: () => nav.goTab('nutrition') })
-  tasks.push({ id: 'steps', icon: 'footprints', label: `Reach ${t.steps.toLocaleString()} steps`, hint: `${habit.steps.toLocaleString()} today`, done: habit.steps >= t.steps, onPress: () => nav.open('logHabit') })
-  const sortedTasks = [...tasks].sort((a, b) => Number(a.done) - Number(b.done))
-  const remaining = tasks.filter((x) => !x.done).length
+  goalsBase.push({ id: 'water', kind: 'measure', icon: 'droplet', tile: colors.accentBlue, label: `Drink ${fmtFluid(t.waterL, units)} of water`, sub: `${fmtFluid(selHabit.waterL, units)} ${isToday ? 'so far' : 'logged'}`, done: selHabit.waterL >= t.waterL, value: selHabit.waterL, target: t.waterL, step: 0.2, fmt: (v) => fmtFluid(v, units), patch: (v) => dispatch({ type: 'PATCH_TODAY_HABIT', patch: { waterL: v } }) })
+  goalsBase.push({ id: 'meals', kind: 'action', icon: 'utensils', tile: colors.accentOrange, label: 'Review your food', sub: selFoodReview ? `Reviewed · ${selFoodReview.score}/10` : isToday ? 'Get coach feedback on today' : 'No review logged', done: !!selFoodReview, cta: 'Open', onOpen: () => nav.goTab('nutrition') })
+  goalsBase.push({ id: 'steps', kind: 'measure', icon: 'footprints', tile: colors.brand400, label: `Reach ${t.steps.toLocaleString()} steps`, sub: `${selHabit.steps.toLocaleString()} ${isToday ? 'today' : 'logged'}`, done: selHabit.steps >= t.steps, value: selHabit.steps, target: t.steps, step: 500, fmt: (v) => Math.round(v).toLocaleString(), patch: (v) => dispatch({ type: 'PATCH_TODAY_HABIT', patch: { steps: v } }) })
+  goalsBase.push({ id: 'weight', kind: 'action', icon: 'scale', tile: colors.accentYellow, label: 'Weigh yourself', sub: selWeightLogged ? (isToday ? 'Logged today' : 'Logged') : isToday ? 'Keep your trend honest' : 'Not logged', done: selWeightLogged, cta: 'Log', onOpen: () => nav.open('logWeight') })
+  // Finished goals settle to the bottom of the card (the sheet keeps a stable order).
+  const goals = [...goalsBase].sort((a, b) => Number(a.done) - Number(b.done))
+  const goalsDone = goalsBase.filter((g) => g.done).length
+
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const openSheet = () => setSheetOpen(true)
 
   const chevron = 'rgba(148,148,148,0.55)'
 
@@ -286,67 +291,19 @@ export default function Dashboard() {
         <Text className="mt-3 rounded-2xl border border-dashed border-white/15 py-4 text-center text-[13px] text-white/40">No workout or activity logged on {shortDate(selDate)}.</Text>
       )}
 
-      {/* Per-day progress */}
+      {/* Progress — the merged checklist for whichever day is selected. Today's
+       *  rows open the update sheet; past days are a read-only record. */}
       <Section title={selTitle} tight />
       {isToday && t.adjusted && <Text className="-mt-1 mb-3 text-[12px] text-accent-purple">Targets eased for exam season</Text>}
-      <Card className="p-4">
-        <View className="mb-4 flex-row items-center gap-2">
-          <Text className="text-[13px] font-semibold text-white/55">{ringsOnTrack} of {habitRings.length} goals on track</Text>
-          <Text className="ml-auto text-[13px] text-white/30">{isToday ? 'Tap to update' : shortDate(selDate)}</Text>
-        </View>
-        <View className="flex-row justify-between">
-          {habitRings.map((h) => {
-            const filled = h.kind === 'tick' ? (h.done ? 100 : 0) : h.pct
-            const showTick = h.kind === 'tick' && h.done
-            return (
-              <Pressable key={h.label} onPress={isToday ? h.onPress : undefined} className={`items-center gap-1.5 ${isToday ? 'active:opacity-80' : ''}`}>
-                <ProgressRing value={filled} size={54} stroke={4} color={brand[400]}>
-                  {showTick
-                    ? <Check size={20} strokeWidth={3} color={brand[400]} />
-                    : <Icon name={h.icon} size={19} color={h.kind === 'tick' ? 'rgba(148,148,148,0.5)' : brand[400]} />}
-                </ProgressRing>
-                <Text className="text-[11px] font-semibold text-white/80">{h.label}</Text>
-                <Text className={`text-[11px] font-bold ${showTick ? 'text-brand-400' : 'text-white'}`}>{h.value}</Text>
-              </Pressable>
-            )
-          })}
-        </View>
-
-        {/* Nutrition day tags */}
-        <View className="mt-4 border-t border-white/5 pt-3.5">
-          <View className="mb-2 flex-row items-center gap-2">
-            <Leaf size={14} color={brand[400]} />
-            <Text className="text-[12px] font-bold uppercase tracking-wide text-white/40">Food check-in</Text>
-          </View>
-          {selTags.length > 0 ? (
-            <View className="flex-row flex-wrap gap-1.5">
-              {selTags.map((id) => {
-                const tag = tagById(id)
-                if (!tag) return null
-                const col = toneColor(tag.tone, colors)
-                return (
-                  <View key={id} className="flex-row items-center gap-1 rounded-full px-2.5 py-1" style={{ backgroundColor: `${col}24` }}>
-                    <Text style={{ color: col }}>{tag.emoji}</Text>
-                    <Text className="text-[12px] font-semibold" style={{ color: col }}>{tag.label}</Text>
-                  </View>
-                )
-              })}
-            </View>
-          ) : isToday ? (
-            <Pressable onPress={() => nav.goTab('nutrition')} className="active:opacity-70">
-              <Text className="text-[13px] font-semibold text-brand-400">Tag how your eating went →</Text>
-            </Pressable>
-          ) : (
-            <Text className="text-[13px] text-white/35">No food tags for this day</Text>
-          )}
-        </View>
-      </Card>
-
-      {/* To-do today */}
-      <Section title="To-do today" right={<Text className={`text-sm font-semibold ${remaining === 0 ? 'text-brand-400' : 'text-white/45'}`}>{remaining === 0 ? 'All done 🎉' : `${remaining} left`}</Text>} />
-      <Card className="px-4">
-        {sortedTasks.map((task, i) => <TaskRow key={task.id} task={task} first={i === 0} chevron={chevron} />)}
-      </Card>
+      <DayProgressCard
+        goals={goals}
+        doneCount={goalsDone}
+        total={goalsBase.length}
+        onUpdate={isToday ? openSheet : undefined}
+        stamp={isToday ? undefined : shortDate(selDate)}
+        colors={colors}
+      />
+      <FoodCheckIn tags={selTags} colors={colors} onTag={isToday ? () => nav.goTab('nutrition') : undefined} />
 
       {/* Progress overview */}
       <Section title="Progress overview" right={<Pressable onPress={() => nav.open('customize')} hitSlop={8}><Text className="see-all">Customise</Text></Pressable>} />
@@ -393,6 +350,10 @@ export default function Dashboard() {
         </Pressable>
       </View>
       <View className="h-2" />
+
+      {isToday && (
+        <UpdateTodaySheet open={sheetOpen} onClose={() => setSheetOpen(false)} goals={goalsBase} doneCount={goalsDone} total={goalsBase.length} colors={colors} />
+      )}
     </View>
   )
 }
@@ -424,18 +385,209 @@ function StreakChip({ days, atRisk, onPress }: { days: number; atRisk: boolean; 
   )
 }
 
-function TaskRow({ task, first, chevron }: { task: Task; first: boolean; chevron: string }) {
+/* ---- Today's progress: the merged goal checklist (design "Goals Card" 8B) ---- */
+
+type ThemeColors = ReturnType<typeof useColors>
+
+/**
+ * The tinted icon tile shared by the checklist rows and the update sheet. Once a
+ * goal is done it grows a small green check badge in the corner (design 8B — the
+ * goal keeps its identity rather than being struck through).
+ */
+function GoalTile({ goal, colors, size = 44 }: { goal: Goal; colors: ThemeColors; size?: number }) {
+  const badge = Math.round(size * 0.46)
   return (
-    <Pressable onPress={task.onPress} className={`flex-row items-center gap-3 py-3 active:opacity-80 ${first ? '' : 'border-t border-white/5'}`}>
-      <View className={`h-9 w-9 shrink-0 items-center justify-center rounded-xl ${task.done ? 'bg-brand-400' : 'bg-brand-400/15'}`}>
-        {task.done ? <Check size={18} strokeWidth={3} color="#000" /> : <Icon name={task.icon} size={17} color={brand[400]} />}
+    <View style={{ position: 'relative' }}>
+      <View style={{ width: size, height: size, borderRadius: size * 0.32, backgroundColor: `${goal.tile}26`, alignItems: 'center', justifyContent: 'center' }}>
+        <Icon name={goal.icon} size={Math.round(size * 0.45)} color={goal.tile} />
       </View>
+      {goal.done && (
+        <View style={{ position: 'absolute', right: -4, bottom: -4, width: badge, height: badge, borderRadius: badge / 2, backgroundColor: colors.brand400, borderWidth: 2.5, borderColor: colors.ink800, alignItems: 'center', justifyContent: 'center' }}>
+          <Check size={Math.round(badge * 0.55)} strokeWidth={4} color="#000" />
+        </View>
+      )}
+    </View>
+  )
+}
+
+// One checklist row, with the design's "soft pop" entrance — each row fades and
+// springs up from 0.92 with a short back-eased overshoot, staggered by index.
+// Without `onPress` the row is a read-only record of a past day.
+function GoalRow({ goal, index, onPress, colors }: { goal: Goal; index: number; onPress?: () => void; colors: ThemeColors }) {
+  const enter = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    Animated.timing(enter, {
+      toValue: 1,
+      duration: 460,
+      delay: index * 70,
+      easing: Easing.bezier(0.34, 1.56, 0.64, 1),
+      useNativeDriver: Platform.OS !== 'web',
+    }).start()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  const scale = enter.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1] })
+  const body = (
+    <>
+      <GoalTile goal={goal} colors={colors} />
       <View className="min-w-0 flex-1">
-        <Text numberOfLines={1} className={`text-[14px] font-semibold ${task.done ? 'text-white/40 line-through' : 'text-white'}`}>{task.label}</Text>
-        <Text numberOfLines={1} className="text-[12px] text-white/45">{task.hint}</Text>
+        <Text numberOfLines={1} className={`text-[15px] font-bold ${onPress || goal.done ? 'text-white' : 'text-white/70'}`}>{goal.label}</Text>
+        <Text numberOfLines={1} className="mt-0.5 text-[12.5px] text-white/45">{goal.sub}</Text>
       </View>
-      {!task.done && <ChevronRight size={18} color={chevron} />}
-    </Pressable>
+      {goal.done ? (
+        <View className="rounded-full px-2.5 py-1" style={{ backgroundColor: `${colors.brand400}26` }}>
+          <Text className="text-[12px] font-bold" style={{ color: colors.brand400 }}>Done</Text>
+        </View>
+      ) : onPress ? (
+        <ChevronRight size={18} color="rgba(148,148,148,0.45)" />
+      ) : null}
+    </>
+  )
+  return (
+    <Animated.View style={{ opacity: enter, transform: [{ scale }] }}>
+      {onPress ? (
+        <Pressable onPress={onPress} className="flex-row items-center gap-3.5 border-t border-white/5 py-3.5 active:opacity-70">{body}</Pressable>
+      ) : (
+        <View className="flex-row items-center gap-3.5 border-t border-white/5 py-3.5">{body}</View>
+      )}
+    </Animated.View>
+  )
+}
+
+/**
+ * The merged goal checklist. `onUpdate` makes it live (today); pass `stamp`
+ * instead for a past day, which renders the same rows as a read-only record.
+ */
+function DayProgressCard({ goals, doneCount, total, onUpdate, stamp, colors }: { goals: Goal[]; doneCount: number; total: number; onUpdate?: () => void; stamp?: string; colors: ThemeColors }) {
+  const target = total ? (doneCount / total) * 100 : 0
+  // Bar eases to the new fraction whenever a goal flips done — a small reward.
+  const w = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    Animated.timing(w, { toValue: target, duration: 640, delay: 120, easing: Easing.bezier(0.22, 1, 0.36, 1), useNativeDriver: false }).start()
+  }, [target, w])
+  const width = w.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] })
+  return (
+    <Card className="px-4 pb-1.5 pt-4">
+      <View className="flex-row items-baseline gap-1.5 px-0.5">
+        <Text className="text-[16px] font-extrabold" style={{ color: colors.brand400 }}>{doneCount}</Text>
+        <Text className="text-[13px] font-semibold text-white/55">of {total} done</Text>
+        {onUpdate ? (
+          <Pressable onPress={onUpdate} hitSlop={8} className="ml-auto active:opacity-60">
+            <Text className="text-[12.5px] font-bold" style={{ color: colors.brand400 }}>Update →</Text>
+          </Pressable>
+        ) : (
+          <Text className="ml-auto text-[12.5px] text-white/30">{stamp}</Text>
+        )}
+      </View>
+      <View className="mx-0.5 mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
+        <Animated.View style={{ height: '100%', borderRadius: 999, width, backgroundColor: colors.brand400 }} />
+      </View>
+      {goals.map((g, i) => (
+        <GoalRow key={g.id} goal={g} index={i} onPress={onUpdate} colors={colors} />
+      ))}
+    </Card>
+  )
+}
+
+function FoodCheckIn({ tags, colors, onTag }: { tags: string[]; colors: ThemeColors; onTag?: () => void }) {
+  return (
+    <View className="mt-5">
+      <View className="mb-3 flex-row items-center gap-2">
+        <Leaf size={14} color={colors.brand400} />
+        <Text className="text-[12px] font-bold uppercase tracking-wide text-white/40">Food check-in</Text>
+        <Text className="ml-auto text-[11px] text-white/30">from your nutrition log</Text>
+      </View>
+      {tags.length > 0 ? (
+        <View className="flex-row flex-wrap gap-2">
+          {tags.map((id) => {
+            const tag = tagById(id)
+            if (!tag) return null
+            const col = toneColor(tag.tone, colors)
+            return (
+              <View key={id} className="flex-row items-center gap-1.5 rounded-full px-3 py-1.5" style={{ backgroundColor: `${col}1f`, borderWidth: 1, borderColor: `${col}4d` }}>
+                <Text style={{ color: col }}>{tag.emoji}</Text>
+                <Text className="text-[12.5px] font-semibold" style={{ color: col }}>{tag.label}</Text>
+              </View>
+            )
+          })}
+        </View>
+      ) : onTag ? (
+        <Pressable onPress={onTag} className="active:opacity-70">
+          <Text className="text-[13px] font-semibold" style={{ color: colors.brand400 }}>Tag how your eating went →</Text>
+        </Pressable>
+      ) : (
+        <Text className="text-[13px] text-white/35">No food tags for this day</Text>
+      )}
+    </View>
+  )
+}
+
+/* ---- The "Update today" sheet: steppers for measurable goals, quick jumps
+   for the rest. Everything writes straight to today's habit store. ---- */
+
+function StepButton({ variant, onPress, colors }: { variant: 'plus' | 'minus'; onPress: () => void; colors: ThemeColors }) {
+  const plus = variant === 'plus'
+  return (
+    <PressableScale onPress={onPress} scaleTo={0.9}>
+      <View style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: plus ? `${colors.brand400}2e` : 'rgba(255,255,255,0.06)' }}>
+        {plus ? <Plus size={18} strokeWidth={2.6} color={colors.brand400} /> : <Minus size={18} strokeWidth={2.6} color={colors.fg} />}
+      </View>
+    </PressableScale>
+  )
+}
+
+function SheetGoalRow({ goal, first, colors, onClose }: { goal: Goal; first: boolean; colors: ThemeColors; onClose: () => void }) {
+  const subLine = goal.kind === 'measure' ? `${goal.fmt(goal.value)} / ${goal.fmt(goal.target)}` : goal.sub
+  const bump = (dir: 1 | -1) => {
+    if (goal.kind !== 'measure') return
+    let v = goal.value + dir * goal.step
+    v = Math.max(0, Math.min(goal.target * 1.5, Math.round(v * 100) / 100))
+    goal.patch(v)
+  }
+  return (
+    <View className={`py-3.5 ${first ? '' : 'border-t border-white/5'}`}>
+      <View className="flex-row items-center gap-3">
+        <GoalTile goal={goal} colors={colors} size={40} />
+        <View className="min-w-0 flex-1">
+          <Text numberOfLines={1} className="text-[14px] font-semibold text-white">{goal.label}</Text>
+          <Text numberOfLines={1} className="mt-0.5 text-[12px]" style={{ color: goal.done ? colors.brand400 : 'rgba(255,255,255,0.45)' }}>{subLine}</Text>
+        </View>
+        {goal.kind === 'measure' ? (
+          <View className="flex-row items-center gap-2.5">
+            <StepButton variant="minus" onPress={() => bump(-1)} colors={colors} />
+            <StepButton variant="plus" onPress={() => bump(1)} colors={colors} />
+          </View>
+        ) : goal.done ? (
+          <View className="flex-row items-center gap-1.5 rounded-full px-3 py-2" style={{ backgroundColor: `${colors.brand400}26` }}>
+            <Check size={14} strokeWidth={3} color={colors.brand400} />
+            <Text className="text-[13px] font-bold" style={{ color: colors.brand400 }}>Done</Text>
+          </View>
+        ) : (
+          <PressableScale onPress={() => { onClose(); goal.onOpen() }} scaleTo={0.96}>
+            <View className="flex-row items-center gap-1 rounded-full px-3.5 py-2" style={{ backgroundColor: colors.brand400 }}>
+              <Text className="text-[13px] font-extrabold text-black">{goal.cta}</Text>
+              <ArrowRight size={14} strokeWidth={2.6} color="#000" />
+            </View>
+          </PressableScale>
+        )}
+      </View>
+    </View>
+  )
+}
+
+function UpdateTodaySheet({ open, onClose, goals, doneCount, total, colors }: { open: boolean; onClose: () => void; goals: Goal[]; doneCount: number; total: number; colors: ThemeColors }) {
+  return (
+    <Sheet open={open} onClose={onClose} title="Update today">
+      <Text className="-mt-1 text-[13px] text-white/50">{doneCount} of {total} on track</Text>
+      <View className="mt-3">
+        {goals.map((g, i) => (
+          <SheetGoalRow key={g.id} goal={g} first={i === 0} colors={colors} onClose={onClose} />
+        ))}
+      </View>
+      <PressableScale onPress={onClose} containerStyle={{ marginTop: 22 }} scaleTo={0.98}>
+        <View className="items-center rounded-full py-3.5" style={{ backgroundColor: colors.brand400 }}>
+          <Text className="text-[15px] font-extrabold text-black">Done</Text>
+        </View>
+      </PressableScale>
+    </Sheet>
   )
 }
 
