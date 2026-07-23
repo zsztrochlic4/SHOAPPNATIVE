@@ -40,22 +40,27 @@ function toneColor(tone: TagTone, c: ReturnType<typeof useColors>): string {
 }
 
 /**
- * A single row in the merged "Today's progress" checklist. Measurable goals
- * (water, steps) carry a target + a store patch so the update sheet can nudge
- * them with a stepper; action goals (workout, food, weigh) jump to their own
- * logging surface instead.
+ * A single row in the "Today's progress" checklist. `measure` goals (steps,
+ * sleep, water) carry a target + a store patch, so the update sheet can nudge
+ * them with a stepper and the row can read "7,632 / 10,000". `auto` goals
+ * (nutrition check-in, workout) are derived from what the user did elsewhere in
+ * the app — they can't be ticked here, only jumped to.
  */
 type Goal = {
   id: string
   icon: string
   tile: string // tint colour for the icon tile (and its 15% background)
   label: string
-  sub: string
   done: boolean
 } & (
   | { kind: 'measure'; value: number; target: number; step: number; fmt: (v: number) => string; patch: (v: number) => void }
-  | { kind: 'action'; cta: string; onOpen: () => void }
+  | { kind: 'auto'; sub: string; cta: string; onOpen: () => void }
 )
+
+/** Row subtitle: measurable goals read "value / target", auto goals carry theirs. */
+function goalSub(g: Goal): string {
+  return g.kind === 'measure' ? `${g.fmt(g.value)} / ${g.fmt(g.target)}` : g.sub
+}
 
 export default function Dashboard() {
   const { state, dispatch } = useStore()
@@ -97,21 +102,22 @@ export default function Dashboard() {
   // stacked. They're now one checklist, built for whichever day the week strip has
   // selected. Today's is live (rows open the update sheet); past days render the
   // same rows read-only, since there's nothing left to log against them.
+  // The nutrition check-in and the workout are "auto": they tick themselves off
+  // when the user logs elsewhere in the app, so the row can't be ticked here.
   const selFoodReview = foodReviewForDay(state, selDate)
-  const selWeightLogged = state.weights.some((w) => w.dateKey === selDate)
-  const selWorkoutDone = workoutStartedForDay(state, selDate) || (selSession?.completed ?? false)
+  const selCheckedIn = selTags.length > 0 || !!selFoodReview
+  const isRestDay = !selSession
+  const selWorkoutDone = isRestDay || workoutStartedForDay(state, selDate) || (selSession?.completed ?? false)
 
-  const goalsBase: Goal[] = []
-  if (selSession) {
-    goalsBase.push({ id: 'workout', kind: 'action', icon: 'dumbbell', tile: colors.brand400, label: selWorkoutDone ? 'Workout complete' : isToday ? "Today's workout" : 'Workout not logged', sub: selSession.name, done: selWorkoutDone, cta: selWorkoutDone ? 'View' : 'Start', onOpen: () => nav.open('activeWorkout') })
-  }
-  goalsBase.push({ id: 'water', kind: 'measure', icon: 'droplet', tile: colors.accentBlue, label: `Drink ${fmtFluid(t.waterL, units)} of water`, sub: `${fmtFluid(selHabit.waterL, units)} ${isToday ? 'so far' : 'logged'}`, done: selHabit.waterL >= t.waterL, value: selHabit.waterL, target: t.waterL, step: 0.2, fmt: (v) => fmtFluid(v, units), patch: (v) => dispatch({ type: 'PATCH_TODAY_HABIT', patch: { waterL: v } }) })
-  goalsBase.push({ id: 'meals', kind: 'action', icon: 'utensils', tile: colors.accentOrange, label: 'Review your food', sub: selFoodReview ? `Reviewed · ${selFoodReview.score}/10` : isToday ? 'Get coach feedback on today' : 'No review logged', done: !!selFoodReview, cta: 'Open', onOpen: () => nav.goTab('nutrition') })
-  goalsBase.push({ id: 'steps', kind: 'measure', icon: 'footprints', tile: colors.brand400, label: `Reach ${t.steps.toLocaleString()} steps`, sub: `${selHabit.steps.toLocaleString()} ${isToday ? 'today' : 'logged'}`, done: selHabit.steps >= t.steps, value: selHabit.steps, target: t.steps, step: 500, fmt: (v) => Math.round(v).toLocaleString(), patch: (v) => dispatch({ type: 'PATCH_TODAY_HABIT', patch: { steps: v } }) })
-  goalsBase.push({ id: 'weight', kind: 'action', icon: 'scale', tile: colors.accentYellow, label: 'Weigh yourself', sub: selWeightLogged ? (isToday ? 'Logged today' : 'Logged') : isToday ? 'Keep your trend honest' : 'Not logged', done: selWeightLogged, cta: 'Log', onOpen: () => nav.open('logWeight') })
-  // Finished goals settle to the bottom of the card (the sheet keeps a stable order).
-  const goals = [...goalsBase].sort((a, b) => Number(a.done) - Number(b.done))
-  const goalsDone = goalsBase.filter((g) => g.done).length
+  // Fixed order, matching the design — done rows stay in place, struck through.
+  const goals: Goal[] = [
+    { id: 'steps', kind: 'measure', icon: 'footprints', tile: colors.brand400, label: 'Steps', done: selHabit.steps >= t.steps, value: selHabit.steps, target: t.steps, step: 500, fmt: (v) => Math.round(v).toLocaleString(), patch: (v) => dispatch({ type: 'PATCH_TODAY_HABIT', patch: { steps: v } }) },
+    { id: 'sleep', kind: 'measure', icon: 'moon', tile: colors.accentPurple, label: 'Sleep', done: selHabit.sleepH >= t.sleepH, value: selHabit.sleepH, target: t.sleepH, step: 0.5, fmt: (v) => `${Math.round(v * 10) / 10} hrs`, patch: (v) => dispatch({ type: 'PATCH_TODAY_HABIT', patch: { sleepH: v } }) },
+    { id: 'water', kind: 'measure', icon: 'droplet', tile: colors.accentBlue, label: 'Water', done: selHabit.waterL >= t.waterL, value: selHabit.waterL, target: t.waterL, step: 0.2, fmt: (v) => fmtFluid(v, units), patch: (v) => dispatch({ type: 'PATCH_TODAY_HABIT', patch: { waterL: v } }) },
+    { id: 'nutrition', kind: 'auto', icon: 'leaf', tile: colors.accentOrange, label: isToday ? "Today's nutrition choices" : 'Nutrition choices', done: selCheckedIn, sub: selCheckedIn ? 'Checked in · auto' : isToday ? 'Not checked in yet' : 'No check-in', cta: 'Log', onOpen: () => nav.goTab('nutrition') },
+    { id: 'workout', kind: 'auto', icon: 'dumbbell', tile: colors.brand400, label: 'Workout', done: selWorkoutDone, sub: isRestDay ? 'Rest day · auto' : `${selSession.name} · ${selWorkoutDone ? 'auto' : 'not started'}`, cta: 'Start', onOpen: () => (selSession ? nav.open('activeWorkout') : nav.goTab('workout')) },
+  ]
+  const goalsDone = goals.filter((g) => g.done).length
 
   const [sheetOpen, setSheetOpen] = useState(false)
   const openSheet = () => setSheetOpen(true)
@@ -298,12 +304,13 @@ export default function Dashboard() {
       <DayProgressCard
         goals={goals}
         doneCount={goalsDone}
-        total={goalsBase.length}
+        total={goals.length}
         onUpdate={isToday ? openSheet : undefined}
         stamp={isToday ? undefined : shortDate(selDate)}
+        tags={selTags}
+        onTag={isToday ? () => nav.goTab('nutrition') : undefined}
         colors={colors}
       />
-      <FoodCheckIn tags={selTags} colors={colors} onTag={isToday ? () => nav.goTab('nutrition') : undefined} />
 
       {/* Progress overview */}
       <Section title="Progress overview" right={<Pressable onPress={() => nav.open('customize')} hitSlop={8}><Text className="see-all">Customise</Text></Pressable>} />
@@ -352,7 +359,7 @@ export default function Dashboard() {
       <View className="h-2" />
 
       {isToday && (
-        <UpdateTodaySheet open={sheetOpen} onClose={() => setSheetOpen(false)} goals={goalsBase} doneCount={goalsDone} total={goalsBase.length} colors={colors} />
+        <UpdateTodaySheet open={sheetOpen} onClose={() => setSheetOpen(false)} goals={goals} doneCount={goalsDone} total={goals.length} colors={colors} />
       )}
     </View>
   )
@@ -390,21 +397,33 @@ function StreakChip({ days, atRisk, onPress }: { days: number; atRisk: boolean; 
 type ThemeColors = ReturnType<typeof useColors>
 
 /**
- * The tinted icon tile shared by the checklist rows and the update sheet. Once a
- * goal is done it grows a small green check badge in the corner (design 8B — the
- * goal keeps its identity rather than being struck through).
+ * The tinted icon tile shared by the checklist rows and the update sheet. The
+ * goal keeps its own icon and colour once done; a green check badge pops into
+ * the corner to mark it off (and pops again whenever the goal flips to done).
  */
-function GoalTile({ goal, colors, size = 44 }: { goal: Goal; colors: ThemeColors; size?: number }) {
+function GoalTile({ goal, colors, size = 44, badgeDelay = 0 }: { goal: Goal; colors: ThemeColors; size?: number; badgeDelay?: number }) {
   const badge = Math.round(size * 0.46)
+  const pop = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    if (!goal.done) return
+    pop.setValue(0)
+    Animated.timing(pop, {
+      toValue: 1,
+      duration: 340,
+      delay: badgeDelay,
+      easing: Easing.bezier(0.34, 1.56, 0.64, 1),
+      useNativeDriver: Platform.OS !== 'web',
+    }).start()
+  }, [goal.done]) // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <View style={{ position: 'relative' }}>
       <View style={{ width: size, height: size, borderRadius: size * 0.32, backgroundColor: `${goal.tile}26`, alignItems: 'center', justifyContent: 'center' }}>
         <Icon name={goal.icon} size={Math.round(size * 0.45)} color={goal.tile} />
       </View>
       {goal.done && (
-        <View style={{ position: 'absolute', right: -4, bottom: -4, width: badge, height: badge, borderRadius: badge / 2, backgroundColor: colors.brand400, borderWidth: 2.5, borderColor: colors.ink800, alignItems: 'center', justifyContent: 'center' }}>
+        <Animated.View style={{ position: 'absolute', right: -4, bottom: -4, width: badge, height: badge, borderRadius: badge / 2, backgroundColor: colors.brand400, borderWidth: 2.5, borderColor: colors.ink800, alignItems: 'center', justifyContent: 'center', transform: [{ scale: pop }] }}>
           <Check size={Math.round(badge * 0.55)} strokeWidth={4} color="#000" />
-        </View>
+        </Animated.View>
       )}
     </View>
   )
@@ -425,20 +444,17 @@ function GoalRow({ goal, index, onPress, colors }: { goal: Goal; index: number; 
     }).start()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const scale = enter.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1] })
+  // The badge lands just after its row has settled.
   const body = (
     <>
-      <GoalTile goal={goal} colors={colors} />
+      <GoalTile goal={goal} colors={colors} badgeDelay={index * 70 + 250} />
       <View className="min-w-0 flex-1">
-        <Text numberOfLines={1} className={`text-[15px] font-bold ${onPress || goal.done ? 'text-white' : 'text-white/70'}`}>{goal.label}</Text>
-        <Text numberOfLines={1} className="mt-0.5 text-[12.5px] text-white/45">{goal.sub}</Text>
+        {/* textDecorationLine via style — the NativeWind `line-through` class
+            doesn't make it through to RN's Text on every platform. */}
+        <Text numberOfLines={1} className={`text-[15px] font-bold ${goal.done ? 'text-white/40' : 'text-white'}`} style={{ textDecorationLine: goal.done ? 'line-through' : 'none' }}>{goal.label}</Text>
+        <Text numberOfLines={1} className={`mt-0.5 text-[12.5px] ${goal.done ? 'text-white/35' : 'text-white/45'}`}>{goalSub(goal)}</Text>
       </View>
-      {goal.done ? (
-        <View className="rounded-full px-2.5 py-1" style={{ backgroundColor: `${colors.brand400}26` }}>
-          <Text className="text-[12px] font-bold" style={{ color: colors.brand400 }}>Done</Text>
-        </View>
-      ) : onPress ? (
-        <ChevronRight size={18} color="rgba(148,148,148,0.45)" />
-      ) : null}
+      {!goal.done && onPress && <ChevronRight size={18} color="rgba(148,148,148,0.45)" />}
     </>
   )
   return (
@@ -456,7 +472,7 @@ function GoalRow({ goal, index, onPress, colors }: { goal: Goal; index: number; 
  * The merged goal checklist. `onUpdate` makes it live (today); pass `stamp`
  * instead for a past day, which renders the same rows as a read-only record.
  */
-function DayProgressCard({ goals, doneCount, total, onUpdate, stamp, colors }: { goals: Goal[]; doneCount: number; total: number; onUpdate?: () => void; stamp?: string; colors: ThemeColors }) {
+function DayProgressCard({ goals, doneCount, total, onUpdate, stamp, tags, onTag, colors }: { goals: Goal[]; doneCount: number; total: number; onUpdate?: () => void; stamp?: string; tags: string[]; onTag?: () => void; colors: ThemeColors }) {
   const target = total ? (doneCount / total) * 100 : 0
   // Bar eases to the new fraction whenever a goal flips done — a small reward.
   const w = useRef(new Animated.Value(0)).current
@@ -483,13 +499,17 @@ function DayProgressCard({ goals, doneCount, total, onUpdate, stamp, colors }: {
       {goals.map((g, i) => (
         <GoalRow key={g.id} goal={g} index={i} onPress={onUpdate} colors={colors} />
       ))}
+      {/* Food check-in lives inside the card, behind a full-bleed divider. */}
+      <View className="-mx-4 mt-1.5 border-t border-white/[0.08] px-4 pb-1 pt-4">
+        <FoodCheckIn tags={tags} colors={colors} onTag={onTag} />
+      </View>
     </Card>
   )
 }
 
 function FoodCheckIn({ tags, colors, onTag }: { tags: string[]; colors: ThemeColors; onTag?: () => void }) {
   return (
-    <View className="mt-5">
+    <View>
       <View className="mb-3 flex-row items-center gap-2">
         <Leaf size={14} color={colors.brand400} />
         <Text className="text-[12px] font-bold uppercase tracking-wide text-white/40">Food check-in</Text>
@@ -535,7 +555,6 @@ function StepButton({ variant, onPress, colors }: { variant: 'plus' | 'minus'; o
 }
 
 function SheetGoalRow({ goal, first, colors, onClose }: { goal: Goal; first: boolean; colors: ThemeColors; onClose: () => void }) {
-  const subLine = goal.kind === 'measure' ? `${goal.fmt(goal.value)} / ${goal.fmt(goal.target)}` : goal.sub
   const bump = (dir: 1 | -1) => {
     if (goal.kind !== 'measure') return
     let v = goal.value + dir * goal.step
@@ -548,7 +567,7 @@ function SheetGoalRow({ goal, first, colors, onClose }: { goal: Goal; first: boo
         <GoalTile goal={goal} colors={colors} size={40} />
         <View className="min-w-0 flex-1">
           <Text numberOfLines={1} className="text-[14px] font-semibold text-white">{goal.label}</Text>
-          <Text numberOfLines={1} className="mt-0.5 text-[12px]" style={{ color: goal.done ? colors.brand400 : 'rgba(255,255,255,0.45)' }}>{subLine}</Text>
+          <Text numberOfLines={1} className="mt-0.5 text-[12px]" style={{ color: goal.done ? colors.brand400 : 'rgba(255,255,255,0.45)' }}>{goalSub(goal)}</Text>
         </View>
         {goal.kind === 'measure' ? (
           <View className="flex-row items-center gap-2.5">

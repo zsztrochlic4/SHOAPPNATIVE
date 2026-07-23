@@ -11,6 +11,7 @@ import {
   Flame,
   Target,
   Brain,
+  Moon,
   type LucideIcon,
 } from 'lucide-react-native'
 
@@ -20,6 +21,7 @@ const map: Record<string, LucideIcon> = {
   scale: Scale,
   footprints: Footprints,
   bed: BedDouble,
+  moon: Moon,
   droplet: Droplet,
   utensils: Utensils,
   leaf: Leaf,
