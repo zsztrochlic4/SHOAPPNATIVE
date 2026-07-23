@@ -33,7 +33,6 @@ import { CoachComingSoon } from '../components/CoachComingSoon'
 import { todaySession, leaderboardSorted, youRank } from '../store/selectors'
 import { relativeLabel, todayKey } from '../lib/date'
 import { CHART_METRICS, STAT_METRICS, progressMetricId, dashboardStatIds } from '../lib/metrics'
-import { weightVal, toKg, weightUnit } from '../lib/format'
 import { brand, useColors } from '../theme'
 import { IS_WEB } from '../components/WebFrame'
 import { thud } from '../lib/haptics'
@@ -923,35 +922,12 @@ export function ChallengeDetailSheet({ open, onClose, params }: Props) {
   )
 }
 
-/* ===================== Customise dashboard / goals ================ */
+/* ===================== Customise dashboard ======================== */
 export function CustomizeSheet({ open, onClose }: Props) {
   const { state, dispatch } = useStore()
-  const toast = useToast()
-  const units = state.settings.units
-  const p = state.profile
 
   const metric = progressMetricId(state)
   const stats = dashboardStatIds(state)
-
-  const [goalW, setGoalW] = useState(() => String(Math.round(weightVal(p.goalWeightKg, units) * 10) / 10))
-  const [steps, setSteps] = useState(() => String(p.stepTarget))
-  const [sleep, setSleep] = useState(() => String(p.sleepTargetH))
-  const [water, setWater] = useState(() => String(p.waterTargetL))
-  const [days, setDays] = useState(() => String(p.daysPerWeek))
-
-  function saveGoals() {
-    dispatch({
-      type: 'SET_PROFILE',
-      patch: {
-        goalWeightKg: Math.round(toKg(parseFloat(goalW) || weightVal(p.goalWeightKg, units), units) * 10) / 10,
-        stepTarget: Math.max(0, Math.round(Number(steps) || 0)),
-        sleepTargetH: Math.max(0, Math.min(14, Number(sleep) || 0)),
-        waterTargetL: Math.max(0, Number(water) || 0),
-        daysPerWeek: Math.max(1, Math.min(7, Math.round(Number(days) || 1))),
-      },
-    })
-    toast('Goals updated')
-  }
 
   function pickMetric(id: string) {
     dispatch({ type: 'SET_SETTINGS', patch: { progressMetric: id } })
@@ -970,35 +946,10 @@ export function CustomizeSheet({ open, onClose }: Props) {
     dispatch({ type: 'SET_SETTINGS', patch: { dashboardStats: next } })
   }
 
-  const inputCls = 'w-24 rounded-xl border border-white/8 bg-ink-900 px-3 py-2 text-right text-[15px] font-bold text-white'
-
   return (
     <Sheet open={open} onClose={onClose} title="Customise">
-      {/* Goals */}
-      <Text className="mb-2 text-[12px] font-bold uppercase tracking-wide text-white/40">Your goals</Text>
-      <View className="gap-2 rounded-2xl border border-white/8 bg-ink-800 p-3">
-        <GoalRow label="Goal weight" unit={weightUnit(units)}>
-          <TextInput value={goalW} onChangeText={(v) => setGoalW(v.replace(/[^\d.]/g, ''))} keyboardType="decimal-pad" placeholderTextColor="rgba(148,148,148,0.6)" className={inputCls} />
-        </GoalRow>
-        <GoalRow label="Daily steps" unit="steps">
-          <TextInput value={steps} onChangeText={(v) => setSteps(v.replace(/\D/g, ''))} keyboardType="number-pad" placeholderTextColor="rgba(148,148,148,0.6)" className={inputCls} />
-        </GoalRow>
-        <GoalRow label="Sleep" unit="hours">
-          <TextInput value={sleep} onChangeText={(v) => setSleep(v.replace(/[^\d.]/g, ''))} keyboardType="decimal-pad" placeholderTextColor="rgba(148,148,148,0.6)" className={inputCls} />
-        </GoalRow>
-        <GoalRow label="Water" unit="litres">
-          <TextInput value={water} onChangeText={(v) => setWater(v.replace(/[^\d.]/g, ''))} keyboardType="decimal-pad" placeholderTextColor="rgba(148,148,148,0.6)" className={inputCls} />
-        </GoalRow>
-        <GoalRow label="Workouts / week" unit="days">
-          <TextInput value={days} onChangeText={(v) => setDays(v.replace(/\D/g, '').slice(0, 1))} keyboardType="number-pad" placeholderTextColor="rgba(148,148,148,0.6)" className={inputCls} />
-        </GoalRow>
-        <Pressable onPress={saveGoals} className="btn-primary mt-1 w-full py-2.5 active:opacity-90">
-          <Text className="text-sm font-semibold text-black">Save goals</Text>
-        </Pressable>
-      </View>
-
-      {/* Main chart metric */}
-      <Text className="mb-2 mt-6 text-[12px] font-bold uppercase tracking-wide text-white/40">Top progress chart</Text>
+      {/* Main chart metric — your goals themselves now live in Settings. */}
+      <Text className="mb-2 text-[12px] font-bold uppercase tracking-wide text-white/40">Top progress chart</Text>
       <View className="flex-row flex-wrap gap-2.5">
         {CHART_METRICS.map((m) => {
           const on = metric === m.id
@@ -1031,18 +982,6 @@ export function CustomizeSheet({ open, onClose }: Props) {
       </View>
       <View className="h-2" />
     </Sheet>
-  )
-}
-
-function GoalRow({ label, unit, children }: { label: string; unit: string; children: ReactNode }) {
-  return (
-    <View className="flex-row items-center justify-between">
-      <View className="flex-1">
-        <Text className="text-[14px] font-semibold text-white">{label}</Text>
-        <Text className="text-[11px] text-white/40">{unit}</Text>
-      </View>
-      {children}
-    </View>
   )
 }
 

@@ -88,6 +88,81 @@ export function NotificationsSheet({ open, onClose }: Props) {
 
 /* ============================ Settings ============================ */
 /**
+ * The daily targets everything else measures against — the dashboard's goal
+ * checklist, the readiness index and the nutrition screen all read these. It
+ * lives in Settings, next to the units toggle that decides how weight reads.
+ */
+export function GoalsSettings() {
+  const { state, dispatch } = useStore()
+  const toast = useToast()
+  const units = state.settings.units
+  const p = state.profile
+
+  const [goalW, setGoalW] = useState(() => String(Math.round(weightVal(p.goalWeightKg, units) * 10) / 10))
+  const [steps, setSteps] = useState(() => String(p.stepTarget))
+  const [sleep, setSleep] = useState(() => String(p.sleepTargetH))
+  const [water, setWater] = useState(() => String(p.waterTargetL))
+  const [days, setDays] = useState(() => String(p.daysPerWeek))
+
+  // The units toggle sits directly above this, so re-read the weight whenever it
+  // (or the saved goal) changes — otherwise the field would keep showing kg
+  // after a switch to lb and "save" would write the wrong number back.
+  useEffect(() => {
+    setGoalW(String(Math.round(weightVal(p.goalWeightKg, units) * 10) / 10))
+  }, [units, p.goalWeightKg])
+
+  function saveGoals() {
+    dispatch({
+      type: 'SET_PROFILE',
+      patch: {
+        goalWeightKg: Math.round(toKg(parseFloat(goalW) || weightVal(p.goalWeightKg, units), units) * 10) / 10,
+        stepTarget: Math.max(0, Math.round(Number(steps) || 0)),
+        sleepTargetH: Math.max(0, Math.min(14, Number(sleep) || 0)),
+        waterTargetL: Math.max(0, Number(water) || 0),
+        daysPerWeek: Math.max(1, Math.min(7, Math.round(Number(days) || 1))),
+      },
+    })
+    toast('Goals updated')
+  }
+
+  const inputCls = 'w-24 rounded-xl border border-white/8 bg-ink-900 px-3 py-2 text-right text-[15px] font-bold text-white'
+  return (
+    <View className="gap-3 rounded-2xl border border-white/5 bg-ink-800 p-4">
+      <GoalRow label="Goal weight" unit={weightUnit(units)}>
+        <TextInput value={goalW} onChangeText={(v) => setGoalW(v.replace(/[^\d.]/g, ''))} keyboardType="decimal-pad" placeholderTextColor="rgba(148,148,148,0.6)" className={inputCls} />
+      </GoalRow>
+      <GoalRow label="Daily steps" unit="steps">
+        <TextInput value={steps} onChangeText={(v) => setSteps(v.replace(/\D/g, ''))} keyboardType="number-pad" placeholderTextColor="rgba(148,148,148,0.6)" className={inputCls} />
+      </GoalRow>
+      <GoalRow label="Sleep" unit="hours">
+        <TextInput value={sleep} onChangeText={(v) => setSleep(v.replace(/[^\d.]/g, ''))} keyboardType="decimal-pad" placeholderTextColor="rgba(148,148,148,0.6)" className={inputCls} />
+      </GoalRow>
+      <GoalRow label="Water" unit="litres">
+        <TextInput value={water} onChangeText={(v) => setWater(v.replace(/[^\d.]/g, ''))} keyboardType="decimal-pad" placeholderTextColor="rgba(148,148,148,0.6)" className={inputCls} />
+      </GoalRow>
+      <GoalRow label="Workouts / week" unit="days">
+        <TextInput value={days} onChangeText={(v) => setDays(v.replace(/\D/g, '').slice(0, 1))} keyboardType="number-pad" placeholderTextColor="rgba(148,148,148,0.6)" className={inputCls} />
+      </GoalRow>
+      <Pressable onPress={saveGoals} className="btn-primary mt-1 w-full py-2.5 active:opacity-90">
+        <Text className="text-sm font-semibold text-black">Save goals</Text>
+      </Pressable>
+    </View>
+  )
+}
+
+function GoalRow({ label, unit, children }: { label: string; unit: string; children: ReactNode }) {
+  return (
+    <View className="flex-row items-center justify-between">
+      <View className="flex-1">
+        <Text className="text-[14px] font-semibold text-white">{label}</Text>
+        <Text className="text-[11px] text-white/40">{unit}</Text>
+      </View>
+      {children}
+    </View>
+  )
+}
+
+/**
  * Every Settings control, with no surface of its own — rendered both inside the
  * SettingsSheet modal and inline in the side menu, so the settings are reachable
  * straight from the menu without a second tap. `visible` drives the
@@ -131,6 +206,10 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
 
   return (
     <>
+      <Group label={t('settings.goals')}>
+        <GoalsSettings />
+      </Group>
+
       <Group label={t('settings.language')}>
         {/* Collapsed disclosure row (iOS Settings pattern) — opens the full
          *  picker on tap instead of a long always-open grid. */}
