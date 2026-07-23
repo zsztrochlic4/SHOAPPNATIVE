@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { View, Text, Pressable, Image, Animated, Easing, Platform } from 'react-native'
-import { Menu, MessageCircle, Clock, Play, GraduationCap, ChevronRight, Leaf, Check, Flame, ChevronDown, Info, Plus, Minus, ArrowRight } from 'lucide-react-native'
+import { View, Text, Pressable, Image, Animated, Easing, Platform, ScrollView, useWindowDimensions } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Menu, MessageCircle, Clock, Play, GraduationCap, ChevronRight, Leaf, Check, Flame, ChevronDown, Info, ArrowRight, X } from 'lucide-react-native'
 import { Icon } from '../components/Icon'
 import { ActivityIcon } from '../components/ActivityIcon'
-import { Card } from '../components/ui'
-import { Sheet } from '../components/Sheet'
+import { Card, ProgressRing } from '../components/ui'
+import { AppModal, IS_WEB, WEB_SCREEN } from '../components/WebFrame'
 import { PressableScale } from '../components/PressableScale'
 import { Hero } from '../components/Hero'
 import { IndexGauge } from '../components/IndexGauge'
@@ -54,12 +55,22 @@ type Goal = {
   done: boolean
 } & (
   | { kind: 'measure'; value: number; target: number; step: number; fmt: (v: number) => string; patch: (v: number) => void }
-  | { kind: 'auto'; sub: string; cta: string; onOpen: () => void }
+  | { kind: 'auto'; sub: string; sheetValue: string; cta: string; onOpen: () => void }
 )
 
-/** Row subtitle: measurable goals read "value / target", auto goals carry theirs. */
+/** Card row subtitle: measurable goals read "value / target", auto goals carry theirs. */
 function goalSub(g: Goal): string {
   return g.kind === 'measure' ? `${g.fmt(g.value)} / ${g.fmt(g.target)}` : g.sub
+}
+
+/** How far a measurable goal has come, 0-100. */
+function goalPct(g: Extract<Goal, { kind: 'measure' }>): number {
+  return g.target > 0 ? Math.min(100, (g.value / g.target) * 100) : 0
+}
+
+/** Sheet row value line: "7,632 · 76%" for measurables, a status word for auto goals. */
+function goalSheetValue(g: Goal): string {
+  return g.kind === 'measure' ? `${g.fmt(g.value)} · ${Math.round(goalPct(g))}%` : g.sheetValue
 }
 
 export default function Dashboard() {
@@ -114,8 +125,8 @@ export default function Dashboard() {
     { id: 'steps', kind: 'measure', icon: 'footprints', tile: colors.brand400, label: 'Steps', done: selHabit.steps >= t.steps, value: selHabit.steps, target: t.steps, step: 500, fmt: (v) => Math.round(v).toLocaleString(), patch: (v) => dispatch({ type: 'PATCH_TODAY_HABIT', patch: { steps: v } }) },
     { id: 'sleep', kind: 'measure', icon: 'moon', tile: colors.accentPurple, label: 'Sleep', done: selHabit.sleepH >= t.sleepH, value: selHabit.sleepH, target: t.sleepH, step: 0.5, fmt: (v) => `${Math.round(v * 10) / 10} hrs`, patch: (v) => dispatch({ type: 'PATCH_TODAY_HABIT', patch: { sleepH: v } }) },
     { id: 'water', kind: 'measure', icon: 'droplet', tile: colors.accentBlue, label: 'Water', done: selHabit.waterL >= t.waterL, value: selHabit.waterL, target: t.waterL, step: 0.2, fmt: (v) => fmtFluid(v, units), patch: (v) => dispatch({ type: 'PATCH_TODAY_HABIT', patch: { waterL: v } }) },
-    { id: 'nutrition', kind: 'auto', icon: 'leaf', tile: colors.accentOrange, label: isToday ? "Today's nutrition choices" : 'Nutrition choices', done: selCheckedIn, sub: selCheckedIn ? 'Checked in · auto' : isToday ? 'Not checked in yet' : 'No check-in', cta: 'Log', onOpen: () => nav.goTab('nutrition') },
-    { id: 'workout', kind: 'auto', icon: 'dumbbell', tile: colors.brand400, label: 'Workout', done: selWorkoutDone, sub: isRestDay ? 'Rest day · auto' : `${selSession.name} · ${selWorkoutDone ? 'auto' : 'not started'}`, cta: 'Start', onOpen: () => (selSession ? nav.open('activeWorkout') : nav.goTab('workout')) },
+    { id: 'nutrition', kind: 'auto', icon: 'leaf', tile: colors.accentOrange, label: isToday ? "Today's nutrition choices" : 'Nutrition choices', done: selCheckedIn, sub: selCheckedIn ? 'Checked in · auto' : isToday ? 'Not checked in yet' : 'No check-in', sheetValue: selCheckedIn ? 'Checked in' : 'Not checked in yet', cta: 'Log', onOpen: () => nav.goTab('nutrition') },
+    { id: 'workout', kind: 'auto', icon: 'dumbbell', tile: colors.brand400, label: 'Workout', done: selWorkoutDone, sub: isRestDay ? 'Rest day · auto' : `${selSession.name} · ${selWorkoutDone ? 'auto' : 'not started'}`, sheetValue: isRestDay ? 'Rest day' : selWorkoutDone ? 'Completed' : 'Not yet', cta: 'Start', onOpen: () => (selSession ? nav.open('activeWorkout') : nav.goTab('workout')) },
   ]
   const goalsDone = goals.filter((g) => g.done).length
 
@@ -540,73 +551,212 @@ function FoodCheckIn({ tags, colors, onTag }: { tags: string[]; colors: ThemeCol
   )
 }
 
-/* ---- The "Update today" sheet: steppers for measurable goals, quick jumps
-   for the rest. Everything writes straight to today's habit store. ---- */
+/* ---- The "Update today" sheet, 1:1 with the design ------------------------
+   A goal reads as a progress ring + "value · pct%". Measurable goals get a
+   "+" that expands a stepper and a "Mark done" that jumps straight to target;
+   once done the pill flips to "Done" and tapping it undoes. The nutrition and
+   workout rows are locked — they're owned by other screens. ---------------- */
 
-function StepButton({ variant, onPress, colors }: { variant: 'plus' | 'minus'; onPress: () => void; colors: ThemeColors }) {
-  const plus = variant === 'plus'
-  return (
-    <PressableScale onPress={onPress} scaleTo={0.9}>
-      <View style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: plus ? `${colors.brand400}2e` : 'rgba(255,255,255,0.06)' }}>
-        {plus ? <Plus size={18} strokeWidth={2.6} color={colors.brand400} /> : <Minus size={18} strokeWidth={2.6} color={colors.fg} />}
-      </View>
-    </PressableScale>
-  )
-}
+const SHEET_EASE = Easing.bezier(0.22, 1, 0.36, 1)
+const STEPPER_H = 56 // 14px top padding + the 42px control row
 
-function SheetGoalRow({ goal, first, colors, onClose }: { goal: Goal; first: boolean; colors: ThemeColors; onClose: () => void }) {
+/** The expanding −/value/+ row under a measurable goal. */
+function GoalStepper({ goal, open, colors }: { goal: Extract<Goal, { kind: 'measure' }>; open: boolean; colors: ThemeColors }) {
+  const grow = useRef(new Animated.Value(open ? 1 : 0)).current
+  useEffect(() => {
+    Animated.timing(grow, { toValue: open ? 1 : 0, duration: 340, easing: SHEET_EASE, useNativeDriver: false }).start()
+  }, [open, grow])
   const bump = (dir: 1 | -1) => {
-    if (goal.kind !== 'measure') return
     let v = goal.value + dir * goal.step
     v = Math.max(0, Math.min(goal.target * 1.5, Math.round(v * 100) / 100))
     goal.patch(v)
   }
   return (
-    <View className={`py-3.5 ${first ? '' : 'border-t border-white/5'}`}>
+    <Animated.View style={{ height: grow.interpolate({ inputRange: [0, 1], outputRange: [0, STEPPER_H] }), opacity: grow, overflow: 'hidden' }}>
+      <View className="flex-row items-center justify-center gap-5 pt-3.5">
+        <PressableScale onPress={() => bump(-1)} scaleTo={0.9}>
+          <View className="h-[42px] w-[42px] items-center justify-center rounded-full bg-white/[0.06]">
+            <Text className="text-[24px] leading-[26px]" style={{ color: colors.fg }}>−</Text>
+          </View>
+        </PressableScale>
+        <Text className="min-w-[90px] text-center text-[19px] font-extrabold text-white">{goal.fmt(goal.value)} / {goal.fmt(goal.target)}</Text>
+        <PressableScale onPress={() => bump(1)} scaleTo={0.9}>
+          <View className="h-[42px] w-[42px] items-center justify-center rounded-full" style={{ backgroundColor: `${colors.brand400}2e` }}>
+            <Text className="text-[24px] leading-[26px]" style={{ color: colors.brand400 }}>+</Text>
+          </View>
+        </PressableScale>
+      </View>
+    </Animated.View>
+  )
+}
+
+function SheetGoalRow({ goal, colors, expanded, onExpand, onMarkDone, onUndo, onClose }: {
+  goal: Goal
+  colors: ThemeColors
+  expanded: boolean
+  onExpand: () => void
+  onMarkDone: () => void
+  onUndo: () => void
+  onClose: () => void
+}) {
+  // The ring keeps the goal's own icon rather than swapping to a tick, so a row
+  // stays recognisable at a glance once it's complete.
+  const ringPct = goal.kind === 'measure' ? goalPct(goal) : goal.done ? 100 : 0
+  const iconColor = goal.done ? colors.brand400 : goal.kind === 'auto' ? 'rgba(255,255,255,0.4)' : colors.brand400
+  return (
+    <View className="border-t border-white/[0.06] py-3">
       <View className="flex-row items-center gap-3">
-        <GoalTile goal={goal} colors={colors} size={40} />
+        <ProgressRing value={ringPct} size={38} stroke={4} color={colors.brand400}>
+          <Icon name={goal.icon} size={14} color={iconColor} />
+        </ProgressRing>
         <View className="min-w-0 flex-1">
           <Text numberOfLines={1} className="text-[14px] font-semibold text-white">{goal.label}</Text>
-          <Text numberOfLines={1} className="mt-0.5 text-[12px]" style={{ color: goal.done ? colors.brand400 : 'rgba(255,255,255,0.45)' }}>{goalSub(goal)}</Text>
+          <Text numberOfLines={1} className="mt-px text-[12px] text-white/45">{goalSheetValue(goal)}</Text>
         </View>
+
         {goal.kind === 'measure' ? (
-          <View className="flex-row items-center gap-2.5">
-            <StepButton variant="minus" onPress={() => bump(-1)} colors={colors} />
-            <StepButton variant="plus" onPress={() => bump(1)} colors={colors} />
-          </View>
+          goal.done ? (
+            // A measurable goal can be taken back; the auto rows are locked.
+            <DonePill colors={colors} onPress={onUndo} />
+          ) : (
+            <View className="flex-row items-center gap-2">
+              <PressableScale onPress={onExpand} scaleTo={0.9}>
+                <View className="h-[34px] w-[34px] items-center justify-center rounded-full bg-white/[0.06]">
+                  <Text className="text-[19px] leading-[21px] text-white/70">+</Text>
+                </View>
+              </PressableScale>
+              <PressableScale onPress={onMarkDone} scaleTo={0.96}>
+                <View className="rounded-full px-[15px] py-[9px]" style={{ backgroundColor: colors.brand400 }}>
+                  <Text className="text-[13px] font-bold text-black">Mark done</Text>
+                </View>
+              </PressableScale>
+            </View>
+          )
         ) : goal.done ? (
-          <View className="flex-row items-center gap-1.5 rounded-full px-3 py-2" style={{ backgroundColor: `${colors.brand400}26` }}>
-            <Check size={14} strokeWidth={3} color={colors.brand400} />
-            <Text className="text-[13px] font-bold" style={{ color: colors.brand400 }}>Done</Text>
-          </View>
+          <DonePill colors={colors} />
         ) : (
           <PressableScale onPress={() => { onClose(); goal.onOpen() }} scaleTo={0.96}>
-            <View className="flex-row items-center gap-1 rounded-full px-3.5 py-2" style={{ backgroundColor: colors.brand400 }}>
-              <Text className="text-[13px] font-extrabold text-black">{goal.cta}</Text>
-              <ArrowRight size={14} strokeWidth={2.6} color="#000" />
+            <View className="flex-row items-center gap-1 rounded-full px-3.5 py-2" style={{ backgroundColor: `${colors.brand400}26` }}>
+              <Text className="text-[13px] font-bold" style={{ color: colors.brand400 }}>{goal.cta}</Text>
+              <ArrowRight size={14} strokeWidth={2.6} color={colors.brand400} />
             </View>
           </PressableScale>
         )}
       </View>
+
+      {goal.kind === 'measure' && !goal.done && <GoalStepper goal={goal} open={expanded} colors={colors} />}
     </View>
   )
 }
 
+function DonePill({ colors, onPress }: { colors: ThemeColors; onPress?: () => void }) {
+  const body = (
+    <View className="flex-row items-center gap-1.5 rounded-full px-3 py-2" style={{ backgroundColor: `${colors.brand400}26` }}>
+      <Check size={14} strokeWidth={3} color={colors.brand400} />
+      <Text className="text-[13px] font-bold" style={{ color: colors.brand400 }}>Done</Text>
+    </View>
+  )
+  if (!onPress) return body
+  return <PressableScale onPress={onPress} scaleTo={0.96} accessibilityLabel="Tap to undo">{body}</PressableScale>
+}
+
 function UpdateTodaySheet({ open, onClose, goals, doneCount, total, colors }: { open: boolean; onClose: () => void; goals: Goal[]; doneCount: number; total: number; colors: ThemeColors }) {
+  const win = useWindowDimensions()
+  const screenH = IS_WEB ? WEB_SCREEN.height : win.height
+  const insets = useSafeAreaInsets()
+  const [render, setRender] = useState(open)
+  const [panelH, setPanelH] = useState(520)
+  const [expanded, setExpanded] = useState<string | null>(null)
+  // Remembers where a goal was before "Mark done", so undo can put it back.
+  const prev = useRef<Record<string, number>>({})
+  const progress = useRef(new Animated.Value(0)).current
+
+  useEffect(() => {
+    if (open) {
+      setRender(true)
+      Animated.timing(progress, { toValue: 1, duration: 440, easing: SHEET_EASE, useNativeDriver: Platform.OS !== 'web' }).start()
+    } else if (render) {
+      Animated.timing(progress, { toValue: 0, duration: 320, easing: SHEET_EASE, useNativeDriver: Platform.OS !== 'web' }).start(({ finished }) => {
+        if (finished) { setRender(false); setExpanded(null) }
+      })
+    }
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const markDone = (g: Goal) => {
+    if (g.kind !== 'measure') return
+    if (g.value < g.target) prev.current[g.id] = g.value
+    g.patch(g.target)
+    setExpanded(null)
+  }
+  const undo = (g: Goal) => {
+    if (g.kind !== 'measure') return
+    let v = prev.current[g.id]
+    if (v === undefined || v >= g.target) v = Math.max(0, Math.round((g.target * 0.75) / g.step) * g.step)
+    g.patch(Math.round(v * 100) / 100)
+    setExpanded(null)
+  }
+
   return (
-    <Sheet open={open} onClose={onClose} title="Update today">
-      <Text className="-mt-1 text-[13px] text-white/50">{doneCount} of {total} on track</Text>
-      <View className="mt-3">
-        {goals.map((g, i) => (
-          <SheetGoalRow key={g.id} goal={g} first={i === 0} colors={colors} onClose={onClose} />
-        ))}
+    <AppModal visible={render} transparent animationType="none" onRequestClose={onClose}>
+      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+        {/* Dim backdrop — the dashboard stays visible behind the sheet. */}
+        <Animated.View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.55)', opacity: progress }}>
+          <Pressable accessibilityLabel="Close" onPress={onClose} style={{ flex: 1 }} />
+        </Animated.View>
+
+        <Animated.View
+          onLayout={(e) => setPanelH(e.nativeEvent.layout.height)}
+          style={{
+            maxHeight: screenH * 0.84,
+            backgroundColor: colors.ink800,
+            borderTopLeftRadius: 28,
+            borderTopRightRadius: 28,
+            shadowColor: '#000',
+            shadowOpacity: 0.55,
+            shadowRadius: 40,
+            shadowOffset: { width: 0, height: -12 },
+            elevation: 24,
+            transform: [{ translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [panelH, 0] }) }],
+          }}
+        >
+          <View className="px-5 pb-1.5 pt-3">
+            <View className="mb-3 h-1 w-[38px] self-center rounded-full bg-white/20" />
+            <View className="flex-row items-center justify-between">
+              <View>
+                <Text className="text-[18px] font-extrabold text-white">Update today</Text>
+                <Text className="mt-0.5 text-[12px] text-white/50">{doneCount} of {total} on track</Text>
+              </View>
+              <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Close" className="h-[30px] w-[30px] items-center justify-center rounded-full bg-white/[0.06] active:opacity-70">
+                <X size={14} color="rgba(255,255,255,0.5)" strokeWidth={2.5} />
+              </Pressable>
+            </View>
+          </View>
+
+          <ScrollView className="px-5" contentContainerStyle={{ paddingTop: 2, paddingBottom: 8 }} showsVerticalScrollIndicator={false}>
+            {goals.map((g) => (
+              <SheetGoalRow
+                key={g.id}
+                goal={g}
+                colors={colors}
+                expanded={expanded === g.id}
+                onExpand={() => setExpanded((cur) => (cur === g.id ? null : g.id))}
+                onMarkDone={() => markDone(g)}
+                onUndo={() => undo(g)}
+                onClose={onClose}
+              />
+            ))}
+          </ScrollView>
+
+          <View className="border-t border-white/[0.07] px-5 pt-3.5" style={{ paddingBottom: 22 + insets.bottom }}>
+            <PressableScale onPress={onClose} scaleTo={0.98}>
+              <View className="items-center rounded-full py-3.5" style={{ backgroundColor: colors.brand400 }}>
+                <Text className="text-[15px] font-extrabold text-black">Done</Text>
+              </View>
+            </PressableScale>
+          </View>
+        </Animated.View>
       </View>
-      <PressableScale onPress={onClose} containerStyle={{ marginTop: 22 }} scaleTo={0.98}>
-        <View className="items-center rounded-full py-3.5" style={{ backgroundColor: colors.brand400 }}>
-          <Text className="text-[15px] font-extrabold text-black">Done</Text>
-        </View>
-      </PressableScale>
-    </Sheet>
+    </AppModal>
   )
 }
 
