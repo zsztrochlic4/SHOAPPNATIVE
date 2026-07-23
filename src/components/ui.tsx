@@ -56,7 +56,10 @@ export function ProgressRing({
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
       <Svg width={size} height={size}>
-        <G rotation={-90} originX={size / 2} originY={size / 2}>
+        {/* Standard SVG rotate(angle cx cy) rather than rotation/originX/originY —
+         *  those props reach the DOM as `transform-origin` on web and React warns.
+         *  Same result: the ring starts at 12 o'clock and fills clockwise. */}
+        <G transform={`rotate(-90 ${size / 2} ${size / 2})`}>
           <Circle
             cx={size / 2}
             cy={size / 2}
