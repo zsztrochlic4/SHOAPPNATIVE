@@ -14,18 +14,22 @@ export interface DayTag {
 }
 
 export const NUTRITION_TAGS: DayTag[] = [
-  { id: 'champ', label: 'Ate like a champ', emoji: '🥇', tone: 'good' },
   { id: 'solid', label: 'Solid day', emoji: '✅', tone: 'good' },
-  { id: 'protein', label: 'Smashed my protein', emoji: '💪', tone: 'good' },
+  { id: 'goodchoices', label: 'Made good choices', emoji: '👍', tone: 'good' },
+  { id: 'protein', label: 'Had protein with my meals', emoji: '💪', tone: 'good' },
   { id: 'hydrated', label: 'Stayed hydrated', emoji: '💧', tone: 'good' },
-  { id: 'veg', label: 'Veg loaded', emoji: '🥗', tone: 'good' },
+  { id: 'veg', label: 'Got my veggies in', emoji: '🥗', tone: 'good' },
+  { id: 'regular', label: 'Had regular meals', emoji: '🍽️', tone: 'good' },
+  { id: 'homecook', label: 'Cooked at home', emoji: '🍳', tone: 'good' },
+  { id: 'mindful', label: 'Ate without rushing', emoji: '🧘', tone: 'good' },
+  { id: 'takeout', label: 'Takeout day', emoji: '🍕', tone: 'neutral' },
   { id: 'treat', label: 'Treated myself', emoji: '🍫', tone: 'neutral' },
-  { id: 'takeout', label: 'Takeout kinda day', emoji: '🍕', tone: 'neutral' },
-  { id: 'coffee', label: 'Running on coffee', emoji: '☕', tone: 'neutral' },
-  { id: 'meh', label: 'Meh, been better', emoji: '😐', tone: 'neutral' },
-  { id: 'latenight', label: 'Late-night snacks', emoji: '🌙', tone: 'soft' },
+  { id: 'sweet', label: 'Sweet tooth', emoji: '🍩', tone: 'neutral' },
+  { id: 'latenight', label: 'Late night snacks', emoji: '🌙', tone: 'soft' },
+  { id: 'coffee', label: 'Running on coffee', emoji: '☕', tone: 'soft' },
+  { id: 'drinks', label: 'Had a few too many', emoji: '🍻', tone: 'soft' },
   { id: 'skipped', label: 'Skipped meals', emoji: '🥲', tone: 'soft' },
-  { id: 'drinks', label: 'Few too many drinks', emoji: '🍻', tone: 'soft' },
+  { id: 'overate', label: 'Ate more than planned', emoji: '😅', tone: 'soft' },
 ]
 
 export const tagById = (id: string): DayTag | undefined => NUTRITION_TAGS.find((t) => t.id === id)

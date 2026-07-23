@@ -383,9 +383,15 @@ export function buildSeed(): AppState {
     activities,
     mealPlan,
     postComments,
+    myMeals: [
+      { id: 'um-shake', name: 'Post gym shake bowl', kcal: 520, p: 42, c: 0, f: 0, notes: '', createdAtKey: todayKey,
+        ingredients: ['1 scoop whey protein', '1 banana', '1/2 cup oats', '1 tbsp peanut butter', 'Splash of milk'] },
+      { id: 'um-stirfry', name: 'Big veggie stir fry', kcal: 610, p: 28, c: 0, f: 0, notes: '', createdAtKey: todayKey,
+        ingredients: ['1 block tofu, cubed', 'Bag of stir fry veg', '2 portions of rice', '3 tbsp soy sauce', '1 clove garlic'] },
+    ],
     nutritionTags: {
-      [dayKey(6)]: ['champ', 'protein', 'hydrated'], // Mon, strong start
-      [dayKey(4)]: ['meh', 'skipped', 'coffee'], // Wed, rough day
+      [dayKey(6)]: ['goodchoices', 'protein', 'hydrated'], // Mon, strong start
+      [dayKey(4)]: ['skipped', 'coffee', 'overate'], // Wed, rough day
       [dayKey(2)]: ['takeout', 'treat'], // Fri, busy
       [todayKey]: ['solid', 'protein', 'hydrated'],
     },

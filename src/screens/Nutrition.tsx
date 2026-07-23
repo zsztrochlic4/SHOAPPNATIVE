@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { View, Text, Pressable, ScrollView, Image, TextInput, Animated, Easing, ActivityIndicator } from 'react-native'
+import { View, Text, Pressable, ScrollView, Image, TextInput, Animated, Easing, ActivityIndicator, Platform, KeyboardAvoidingView, LayoutAnimation, UIManager } from 'react-native'
 import Svg, { Path, Circle, Text as SvgText } from 'react-native-svg'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
 import * as ImagePicker from 'expo-image-picker'
 import * as Clipboard from 'expo-clipboard'
 import {
   Camera, Plus, Search, Clock, ChevronRight, ChevronDown, ChevronLeft, X, Check,
-  Trash2, Pencil, Share2, MessageCircle, CalendarCheck, Upload, ChefHat,
+  Trash2, Pencil, Share2, MessageCircle, CalendarCheck, Upload, ChefHat, LayoutGrid,
 } from 'lucide-react-native'
 import { AppModal } from '../components/WebFrame'
 import { useStore } from '../store/store'
@@ -88,13 +89,55 @@ const REC_INFO: Record<ScanSample['rec'], { label: string; color: string }> = {
   occasional: { label: 'Keep occasional', color: '#f87171' },
 }
 
-const cardScroll = { paddingBottom: 40 }
+/* Nutrition owns its scrolling now (the app shell no longer wraps it in an outer
+ * ScrollView), so each tab's scroller must leave room for the floating bottom nav. */
+function useScrollPad() {
+  const insets = useSafeAreaInsets()
+  return { paddingBottom: insets.bottom + 96 }
+}
+
+/* The Guide's coach header pins differently per platform: native uses the ScrollView's
+ * stickyHeaderIndices; web uses CSS position:sticky. The web path matters because
+ * RN-Web's stickyHeader *JS* scroll handler cancels smooth programmatic scrolls — CSS
+ * sticky has no such handler, so smooth "scroll the opened lesson into view" works. */
+const IS_WEB = typeof document !== 'undefined'
+const WEB_STICKY = IS_WEB ? ({ position: 'sticky', top: 0, zIndex: 30 } as any) : null
+
+// Android needs LayoutAnimation turned on explicitly (iOS/web are on by default).
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true)
+}
+// A gentle accordion open/close for the Go deeper lessons — animates the height
+// change and fades the revealed copy, so it slides open instead of popping.
+const LESSON_ANIM = { duration: 260, update: { type: 'easeInEaseOut' as const }, create: { type: 'easeInEaseOut' as const, property: 'opacity' as const }, delete: { type: 'easeInEaseOut' as const, property: 'opacity' as const } }
 
 /* Tab entrance: fade + slight rise (design's shoFade). */
 function FadeIn({ children }: { children: ReactNode }) {
   const a = useRef(new Animated.Value(0)).current
   useEffect(() => { Animated.timing(a, { toValue: 1, duration: 250, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start() }, [a])
   return <Animated.View style={{ flex: 1, opacity: a, transform: [{ translateY: a.interpolate({ inputRange: [0, 1], outputRange: [6, 0] }) }] }}>{children}</Animated.View>
+}
+
+/* Expand reveal: fade + rise on mount (design's shoRise) — used when a
+ * Go deeper lesson or a plate's examples open. Enter-only, matching the design. */
+function Rise({ children }: { children: ReactNode }) {
+  const a = useRef(new Animated.Value(0)).current
+  useEffect(() => { Animated.timing(a, { toValue: 1, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start() }, [a])
+  return <Animated.View style={{ opacity: a, transform: [{ translateY: a.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] }}>{children}</Animated.View>
+}
+
+/* Opacity-only cross-fade — used to fade the plate's feature card content when the
+ * selected slice changes (the design cross-fades the copy rather than snapping it). */
+function Fade({ children }: { children: ReactNode }) {
+  const a = useRef(new Animated.Value(0)).current
+  useEffect(() => { a.setValue(0); Animated.timing(a, { toValue: 1, duration: 180, easing: Easing.out(Easing.ease), useNativeDriver: true }).start() }, [a])
+  return <Animated.View style={{ opacity: a }}>{children}</Animated.View>
+}
+
+/* Native smooths the lesson accordion with LayoutAnimation (height); RN-Web ignores
+ * LayoutAnimation, so on web we fade+rise the revealed body instead. */
+function LessonReveal({ children }: { children: ReactNode }) {
+  return IS_WEB ? <Rise>{children}</Rise> : <>{children}</>
 }
 
 /* A small pop-in for tick marks (design's tickPop). */
@@ -104,26 +147,37 @@ function TickPop({ children }: { children: ReactNode }) {
   return <Animated.View style={{ transform: [{ scale: a }] }}>{children}</Animated.View>
 }
 
-/* Dropdown selector — the RN stand-in for the design's styled <select>: a rounded
- * field showing the current value that opens a bottom-sheet option list. */
+/* Dropdown selector — the RN stand-in for the design's styled <select>. Taps the
+ * field to open a bottom-sheet option list. The sheet sits over a full-screen
+ * backdrop, so tapping anywhere outside the sheet dismisses it. A short guard
+ * ignores the opening tap so the sheet can't immediately re-close. */
 function Dropdown({ value, placeholder, options, onSelect }: { value: string; placeholder?: string; options: { value: string; label: string }[]; onSelect: (v: string) => void }) {
   const [open, setOpen] = useState(false)
+  const guard = useRef(0)
   const current = options.find((o) => o.value === value)
+  const openMenu = () => { guard.current = Date.now(); setOpen(true) }
+  const dismiss = () => { if (Date.now() - guard.current > 180) setOpen(false) }
   return (
-    <>
-      <Pressable onPress={() => setOpen(true)} className="flex-row items-center justify-between rounded-[13px] bg-ink-700 px-3.5 py-3 active:opacity-80">
+    <View>
+      <Pressable onPress={openMenu} className="flex-row items-center justify-between rounded-[13px] bg-ink-700 px-3.5 py-3 active:opacity-80">
         <Text numberOfLines={1} className={`flex-1 text-[14px] font-semibold ${current ? 'text-white' : 'text-white/45'}`}>{current?.label ?? placeholder}</Text>
-        <ChevronDown size={18} color="rgba(255,255,255,0.5)" />
+        <ChevronDown size={18} color="rgba(255,255,255,0.5)" style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
       </Pressable>
-      <AppModal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-        <Pressable onPress={() => setOpen(false)} className="flex-1 justify-end" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
-          <Pressable onPress={() => {}} className="rounded-t-[24px] border-t border-white/10 bg-ink-800 px-4 pb-8 pt-3">
-            <View className="mb-2 h-1 w-10 self-center rounded-full bg-white/20" />
-            <ScrollView style={{ maxHeight: 340 }} showsVerticalScrollIndicator={false}>
-              {options.map((o) => {
+      <AppModal visible={open} transparent animationType="none" onRequestClose={() => setOpen(false)}>
+        <Pressable onPress={dismiss} className="flex-1 justify-end" style={{ backgroundColor: 'rgba(0,0,0,0.55)' }}>
+          <Pressable onPress={() => {}} className="rounded-t-[24px] border-t border-white/10 bg-ink-800 px-4 pb-8 pt-3" style={{ maxHeight: '70%' }}>
+            <View className="mb-2.5 h-1 w-10 self-center rounded-full bg-white/20" />
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              {options.length === 0 && <Text className="px-2 py-6 text-center text-[14px] text-white/45">Nothing to choose from yet.</Text>}
+              {options.map((o, i) => {
                 const on = o.value === value
                 return (
-                  <Pressable key={o.value} onPress={() => { onSelect(o.value); setOpen(false) }} className="flex-row items-center justify-between rounded-xl px-3.5 py-3 active:opacity-80" style={{ backgroundColor: on ? alpha('#7ED957', 0.12) : 'transparent' }}>
+                  <Pressable
+                    key={o.value}
+                    onPress={() => { onSelect(o.value); setOpen(false) }}
+                    className="flex-row items-center justify-between rounded-xl px-3.5 py-3 active:opacity-80"
+                    style={{ backgroundColor: on ? alpha('#7ED957', 0.12) : 'transparent', marginTop: i === 0 ? 0 : 2 }}
+                  >
                     <Text className="text-[15px] font-semibold" style={{ color: on ? '#7ED957' : '#fff' }}>{o.label}</Text>
                     {on && <Check size={17} color="#7ED957" strokeWidth={3} />}
                   </Pressable>
@@ -133,7 +187,7 @@ function Dropdown({ value, placeholder, options, onSelect }: { value: string; pl
           </Pressable>
         </Pressable>
       </AppModal>
-    </>
+    </View>
   )
 }
 
@@ -183,6 +237,7 @@ function OverviewTab() {
   const { state, dispatch } = useStore()
   const toast = useToast()
   const c = useColors()
+  const scrollPad = useScrollPad()
   const selected = nutritionTagsForDay(state)
 
   const [scan, setScan] = useState<ScanState>('idle')
@@ -257,7 +312,8 @@ function OverviewTab() {
   const tagCountLabel = tagCount === 0 ? 'Tap any that fit your day' : `${tagCount} logged today`
 
   return (
-    <ScrollView className="flex-1" contentContainerStyle={cardScroll} showsVerticalScrollIndicator={false}>
+    <ScrollView className="flex-1" contentContainerStyle={scrollPad} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets>
+
       {/* Scanner */}
       <View className="overflow-hidden rounded-[20px] border border-white/[0.06] bg-ink-800 p-3.5">
         <View className="flex-row items-center gap-2.5">
@@ -383,7 +439,7 @@ function OverviewTab() {
           <Text className="text-[18px] font-extrabold tracking-tight text-white">How did your eating today go?</Text>
           <Text className="mt-1 text-[13px] font-semibold" style={{ color: alpha('#7ED957', 0.9) }}>{tagCountLabel}</Text>
         </View>
-        <View className="mt-4 flex-row flex-wrap gap-2.5">
+        <View className="mt-4 flex-row flex-wrap" style={{ gap: 9 }}>
           {NUTRITION_TAGS.map((t) => {
             const on = selected.includes(t.id)
             const tint = toneColor(t.tone, c)
@@ -391,18 +447,18 @@ function OverviewTab() {
               <Pressable
                 key={t.id}
                 onPress={() => dispatch({ type: 'TOGGLE_NUTRITION_TAG', tag: t.id })}
-                style={{ width: '47.5%', backgroundColor: on ? alpha(tint, 0.16) : 'rgba(255,255,255,0.05)', borderWidth: 1.5, borderColor: on ? alpha(tint, 0.55) : 'transparent' }}
-                className="flex-row items-center gap-2.5 rounded-[14px] px-3 py-3 active:opacity-80"
+                style={{ width: '48%', paddingVertical: 13, paddingHorizontal: 12, gap: 9, backgroundColor: on ? alpha(tint, 0.16) : 'rgba(255,255,255,0.05)', boxShadow: on ? `inset 0 0 0 1.5px ${alpha(tint, 0.55)}` : undefined }}
+                className="flex-row items-center rounded-[14px] active:opacity-80"
               >
                 <Text className="text-[19px] leading-none">{t.emoji}</Text>
-                <Text numberOfLines={2} className="min-w-0 flex-1 text-[13.5px] font-semibold leading-tight" style={{ color: on ? tint : 'rgba(255,255,255,0.75)' }}>{t.label}</Text>
+                <Text className="min-w-0 flex-1 text-[13px] font-semibold leading-[1.15]" style={{ color: on ? tint : 'rgba(255,255,255,0.75)' }}>{t.label}</Text>
                 {on && <TickPop><View className="h-[17px] w-[17px] items-center justify-center rounded-full bg-brand-400"><Check size={10} color="#0a0a0b" strokeWidth={3.6} /></View></TickPop>}
               </Pressable>
             )
           })}
         </View>
         <View className="mt-3.5 flex-row items-center justify-center gap-1.5">
-          <CalendarCheck size={13} color="rgba(255,255,255,0.38)" />
+          <LayoutGrid size={13} color="rgba(255,255,255,0.38)" />
           <Text className="text-[11.5px] text-white/40">These show on the Dashboard.</Text>
         </View>
       </View>
@@ -440,6 +496,7 @@ function ScanAnalyzing({ img }: { img: string }) {
 function RecipesTab({ onOpenRecipe, onAddMeal }: { onOpenRecipe: (m: BudgetMeal | UserMeal) => void; onAddMeal: () => void }) {
   const { state } = useStore()
   const c = useColors()
+  const scrollPad = useScrollPad()
   const myMeals = state.myMeals ?? []
   const [cat, setCat] = useState<(typeof CATS)[number]>('All')
   const [query, setQuery] = useState('')
@@ -454,7 +511,8 @@ function RecipesTab({ onOpenRecipe, onAddMeal }: { onOpenRecipe: (m: BudgetMeal 
   const countLabel = loading ? 'Finding recipes…' : `${filtered.length} ${filtered.length === 1 ? 'recipe' : 'recipes'}`
 
   return (
-    <ScrollView className="flex-1" contentContainerStyle={cardScroll} showsVerticalScrollIndicator={false}>
+    <ScrollView className="flex-1" contentContainerStyle={scrollPad} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets>
+
       {/* My meals */}
       <View className="mb-2.5 flex-row items-center justify-between">
         <Text className="text-[12px] font-extrabold uppercase tracking-[1.4px] text-white/40">My meals</Text>
@@ -464,7 +522,7 @@ function RecipesTab({ onOpenRecipe, onAddMeal }: { onOpenRecipe: (m: BudgetMeal 
         </Pressable>
       </View>
       {myMeals.length === 0 ? (
-        <Pressable onPress={onAddMeal} className="mb-1 items-center rounded-2xl border border-dashed border-white/12 px-5 py-6 active:opacity-80">
+        <Pressable onPress={onAddMeal} className="mb-1 items-center rounded-2xl border border-dashed border-white/[0.12] px-5 py-6 active:opacity-80">
           <Text className="text-center text-[13px] text-white/45">Save meals you cook often for quick planning.</Text>
         </Pressable>
       ) : (
@@ -527,7 +585,7 @@ function RecipesTab({ onOpenRecipe, onAddMeal }: { onOpenRecipe: (m: BudgetMeal 
           ))}
         </View>
       ) : (
-        <View className="mt-3 items-center rounded-[18px] border border-dashed border-white/14 px-6 py-9">
+        <View className="mt-3 items-center rounded-[18px] border border-dashed border-white/15 px-6 py-9">
           <Text className="text-[26px]">🍽️</Text>
           <Text className="mt-2 text-[14px] font-bold text-white/65">No recipes match that</Text>
           <Text className="mt-1 text-[12px] text-white/40">Try another category or clear your search.</Text>
@@ -560,17 +618,17 @@ function RecipeSkeleton() {
 }
 
 /* ============================ Meal Plan ============================ */
-type RepeatScope = 'everyday' | 'weekdays' | 'weekends' | string
 function MealPlanTab() {
   const { state, dispatch } = useStore()
+  const scrollPad = useScrollPad()
   const toast = useToast()
   const c = useColors()
   const plan = state.mealPlan ?? []
   const myMeals = state.myMeals ?? []
 
-  const [meal, setMeal] = useState('')
+  const [meal, setMeal] = useState('Overnight Oats')
   const [slot, setSlot] = useState<MealName>('Breakfast')
-  const [when, setWhen] = useState<RepeatScope>('everyday')
+  const [days, setDays] = useState<string[]>(PLAN_DAYS.slice())  // repeat-on: multi-select
   const [planSearch, setPlanSearch] = useState('')
   const [weekOffset, setWeekOffset] = useState(0)
   const myMealNames = myMeals.map((m) => m.name)
@@ -582,15 +640,28 @@ function MealPlanTab() {
   const wordStart = (name: string) => name.toLowerCase().split(/[^a-z0-9]+/).some((w) => w.startsWith(pq))
   const suggested = pq ? BUDGET_MEALS.filter((m) => wordStart(m.name)).slice(0, 6) : []
 
-  const daysFor = (w: RepeatScope): string[] =>
-    w === 'everyday' ? PLAN_DAYS.slice() : w === 'weekdays' ? PLAN_DAYS.slice(0, 5) : w === 'weekends' ? PLAN_DAYS.slice(5) : [w]
-  const scopeLabel = when === 'everyday' ? 'every day' : when === 'weekdays' ? 'Mon to Fri' : when === 'weekends' ? 'Sat & Sun' : when
-  const whenHint = meal ? `Adds ${meal} at ${slot.toLowerCase()} to ${scopeLabel}.` : 'Pick a meal, then add it across the days you want.'
+  // Days chosen, kept in week order for stable labels.
+  const chosen = PLAN_DAYS.filter((d) => days.includes(d))
+  const sameSet = (a: string[], b: string[]) => a.length === b.length && b.every((x) => a.includes(x))
+  const scopeLabel =
+    chosen.length === 0 ? '' :
+    chosen.length === 7 ? 'every day' :
+    sameSet(chosen, PLAN_DAYS.slice(0, 5)) ? 'Mon to Fri' :
+    sameSet(chosen, PLAN_DAYS.slice(5)) ? 'the weekend' :
+    chosen.length === 1 ? chosen[0] :
+    `${chosen.slice(0, -1).join(', ')} & ${chosen[chosen.length - 1]}`
+  const whenHint =
+    !meal ? 'Pick a meal, then choose the days to repeat it on.' :
+    chosen.length === 0 ? 'Pick at least one day to repeat on.' :
+    `Adds ${meal} at ${slot.toLowerCase()} to ${scopeLabel}.`
+
+  const toggleDay = (d: string) => setDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]))
 
   function addToPlan() {
     if (!meal) { toast('Pick a meal first'); return }
+    if (chosen.length === 0) { toast('Pick at least one day'); return }
     let added = 0
-    daysFor(when).forEach((d) => {
+    chosen.forEach((d) => {
       if (!wItems.some((p) => p.day === d && p.slot === slot && p.name === meal)) {
         dispatch({ type: 'ADD_PLANNED_MEAL', plan: { day: d, slot, name: meal, w: weekOffset } })
         added++
@@ -610,13 +681,15 @@ function MealPlanTab() {
   const fmt = (d: Date) => `${d.getDate()} ${MONTHS[d.getMonth()]}`
   const weekLabel = weekOffset === 0 ? 'This week' : weekOffset === -1 ? 'Last week' : weekOffset === 1 ? 'Next week' : weekOffset < 0 ? `${-weekOffset} weeks ago` : `In ${weekOffset} weeks`
 
-  const whenOpts: { value: RepeatScope; label: string }[] = [
-    { value: 'everyday', label: 'Every day' }, { value: 'weekdays', label: 'Weekdays' }, { value: 'weekends', label: 'Weekends' },
-    ...PLAN_DAYS.map((d) => ({ value: d, label: d })),
+  const QUICK: { label: string; set: string[] }[] = [
+    { label: 'Every day', set: PLAN_DAYS.slice() },
+    { label: 'Weekdays', set: PLAN_DAYS.slice(0, 5) },
+    { label: 'Weekends', set: PLAN_DAYS.slice(5) },
   ]
 
   return (
-    <ScrollView className="flex-1" contentContainerStyle={cardScroll} showsVerticalScrollIndicator={false}>
+    <ScrollView className="flex-1" contentContainerStyle={scrollPad} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets>
+
       {/* Builder */}
       <View className="rounded-[22px] border border-white/[0.08] bg-ink-800 p-[18px]">
         <View className="flex-row items-center justify-between gap-2.5">
@@ -655,19 +728,35 @@ function MealPlanTab() {
           </View>
         )}
 
-        {/* Slot + Repeat — two-up */}
-        <View className="mt-3.5 flex-row gap-2.5">
-          <View className="min-w-0 flex-1">
-            <PlanLabel tight>Meal slot</PlanLabel>
-            <Dropdown value={slot} options={SLOTS.map((s) => ({ value: s, label: s }))} onSelect={(v) => setSlot(v as MealName)} />
-          </View>
-          <View className="min-w-0 flex-1">
-            <PlanLabel tight>Repeat on</PlanLabel>
-            <Dropdown value={when} options={whenOpts.map((o) => ({ value: o.value, label: o.label }))} onSelect={setWhen} />
-          </View>
+        {/* Meal slot */}
+        <PlanLabel>Meal slot</PlanLabel>
+        <Dropdown value={slot} options={SLOTS.map((s) => ({ value: s, label: s }))} onSelect={(v) => setSlot(v as MealName)} />
+
+        {/* Repeat on — tap day blocks to pick as many as you like */}
+        <PlanLabel>Repeat on</PlanLabel>
+        <View className="flex-row gap-2">
+          {QUICK.map((q) => {
+            const on = sameSet(chosen, q.set)
+            return (
+              <Pressable key={q.label} onPress={() => setDays(on ? [] : q.set.slice())} className="flex-1 items-center rounded-[11px] py-2.5 active:opacity-80" style={{ backgroundColor: on ? alpha('#7ED957', 0.16) : 'rgba(255,255,255,0.05)', boxShadow: on ? `inset 0 0 0 1.5px ${alpha('#7ED957', 0.55)}` : undefined }}>
+                <Text className="text-[12.5px] font-bold" style={{ color: on ? c.brand400 : 'rgba(255,255,255,0.78)' }}>{q.label}</Text>
+              </Pressable>
+            )
+          })}
+        </View>
+        <View className="mt-2 flex-row flex-wrap gap-2">
+          {PLAN_DAYS.map((d) => {
+            const on = days.includes(d)
+            return (
+              <Pressable key={d} onPress={() => toggleDay(d)} className="flex-row items-center gap-1.5 rounded-[11px] px-3.5 py-2 active:opacity-80" style={{ minWidth: 62, justifyContent: 'center', backgroundColor: on ? alpha('#7ED957', 0.16) : 'rgba(255,255,255,0.05)', boxShadow: on ? `inset 0 0 0 1.5px ${alpha('#7ED957', 0.55)}` : undefined }}>
+                <Text className="text-[13px] font-bold" style={{ color: on ? c.brand400 : 'rgba(255,255,255,0.78)' }}>{d}</Text>
+                {on && <Check size={13} color={c.brand400} strokeWidth={3.2} />}
+              </Pressable>
+            )
+          })}
         </View>
 
-        <View className="mt-2.5 flex-row items-start gap-1.5">
+        <View className="mt-3 flex-row items-start gap-1.5">
           <CalendarCheck size={14} color={c.brand400} style={{ marginTop: 1 }} />
           <Text className="flex-1 text-[11.5px] leading-[1.45] text-white/50">{whenHint}</Text>
         </View>
@@ -719,7 +808,7 @@ function MealPlanTab() {
       {/* Coach note */}
       <View className="mt-4 flex-row items-center gap-2.5 rounded-[16px] px-4 py-3.5" style={{ backgroundColor: alpha('#7ED957', 0.06) }}>
         <View className="h-[34px] w-[34px] items-center justify-center rounded-xl" style={{ backgroundColor: alpha('#7ED957', 0.14) }}><MessageCircle size={17} color={c.brand400} /></View>
-        <Text className="flex-1 text-[13px] leading-[1.45] text-white/70">Ask your coach to review your meal plan from the Dashboard.</Text>
+        <Text className="flex-1 text-[13px] leading-[1.45] text-white/70">Ask your coach to review your meal plan.</Text>
       </View>
     </ScrollView>
   )
@@ -732,22 +821,60 @@ function PlanLabel({ children, tight }: { children: ReactNode; tight?: boolean }
 /* ============================ Guide ============================ */
 function GuideTab() {
   const c = useColors()
+  const scrollPad = useScrollPad()
   const [plate, setPlate] = useState(0)
   const [plateEx, setPlateEx] = useState(false)
   const [lesson, setLesson] = useState<string | null>(null)
   const active = PLATE[plate]
 
+  const scrollRef = useRef<ScrollView>(null)
+  const goDeeperY = useRef(0)                       // Go deeper list offset within the scroll content
+  const rowY = useRef<Record<string, number>>({})   // each lesson row's offset within that list
+
+  /* Open/close a lesson and, on open, glide it into view just below the pinned
+   * coach header (design scrolls the opened row toward the top on expand). On web
+   * we animate the scroller directly (the design's approach); on native we scroll
+   * to the row's captured offset. */
+  function toggleLesson(id: string) {
+    const willOpen = lesson !== id
+    LayoutAnimation.configureNext(LESSON_ANIM)
+    setLesson(willOpen ? id : null)
+    if (!willOpen) return
+    setTimeout(() => {
+      if (IS_WEB && document.querySelector) {
+        // Web: smooth browser-native scroll (works now that the header pins via CSS
+        // sticky rather than RN-Web's stickyHeader JS handler, which cancelled it).
+        const row = document.querySelector(`[data-lesson-id="${id}"]`) as HTMLElement | null
+        if (!row) return
+        row.style.scrollMarginTop = '58px'
+        row.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      } else {
+        // Native: smooth scroll to the row's captured offset within the guide scroller.
+        const y = goDeeperY.current + (rowY.current[id] ?? 0)
+        scrollRef.current?.scrollTo({ y: Math.max(0, y), animated: true })
+      }
+    }, 140)
+  }
+
   return (
-    <ScrollView className="flex-1" contentContainerStyle={cardScroll} showsVerticalScrollIndicator={false}>
-      {/* Coach header — rounded card, design's darker #111113 */}
-      <View className="mb-6 flex-row items-center gap-[11px] rounded-2xl px-3.5 py-2.5" style={{ backgroundColor: '#111113', borderWidth: 1, borderColor: '#222225' }}>
+    <ScrollView
+      ref={scrollRef}
+      className="flex-1"
+      contentContainerStyle={scrollPad}
+      showsVerticalScrollIndicator={false}
+      stickyHeaderIndices={IS_WEB ? undefined : [0]}
+    >
+      {/* Coach header — pins to the top of the guide while it scrolls (design's sticky
+          bar). Native: stickyHeaderIndices above. Web: CSS position:sticky (WEB_STICKY). */}
+      <View className="flex-row items-center gap-[11px]" style={[{ marginHorizontal: -20, paddingHorizontal: 18, paddingVertical: 8, backgroundColor: '#111113', borderBottomWidth: 1, borderBottomColor: '#222225' }, WEB_STICKY]}>
         <View className="h-8 w-8 items-center justify-center rounded-[11px]" style={{ backgroundColor: alpha('#7ED957', 0.14) }}><MessageCircle size={16} color={c.brand400} /></View>
         <View className="min-w-0 flex-1">
-          <Text className="text-[13.5px] font-extrabold leading-tight text-white">Got a question?</Text>
-          <Text className="mt-px text-[12px] text-white/72">Ask your coach from the Dashboard</Text>
+          <Text className="text-[13.5px] font-extrabold leading-[1.1] text-white">Got a question?</Text>
+          <Text className="mt-px text-[12px] text-white/70">Ask your coach from the Dashboard</Text>
         </View>
       </View>
 
+      <View className="mt-6">
       {/* Balanced plate */}
       <View className="mb-1 flex-row items-center gap-2.5"><Text className="text-[19px]">🍽️</Text><Text className="text-[19px] font-extrabold tracking-tight text-white">The balanced plate</Text></View>
       <Text className="mb-4 text-[13px] leading-[1.5] text-white/55">Tap a section of the plate to see what goes where.</Text>
@@ -759,13 +886,13 @@ function GuideTab() {
         <Text className="text-[13px] font-semibold text-white/60">Add a small amount of <Text onPress={() => { setPlate(3); setPlateEx(false) }} className="font-bold" style={{ color: active.slice === 'fat' ? '#a98bf5' : '#8B5CF6' }}>healthy fat</Text> on the side</Text>
       </View>
 
-      <View className="mt-6 flex-row flex-wrap gap-2.5">
+      <View className="mt-6 flex-row flex-wrap" style={{ gap: 9 }}>
         {PLATE.map((p, i) => {
           const on = plate === i
           return (
-            <Pressable key={p.slice} onPress={() => { setPlate(i); setPlateEx(false) }} style={{ width: '47.5%', backgroundColor: on ? alpha(p.color, 0.16) : 'rgba(255,255,255,0.05)', borderWidth: 1.5, borderColor: on ? alpha(p.color, 0.42) : 'transparent' }} className="flex-row items-center gap-2.5 rounded-[14px] px-3 py-3 active:opacity-80">
+            <Pressable key={p.slice} onPress={() => { setPlate(i); setPlateEx(false) }} style={{ width: '48%', paddingVertical: 11, paddingHorizontal: 12, gap: 9, backgroundColor: on ? alpha(p.color, 0.16) : 'rgba(255,255,255,0.05)', boxShadow: on ? `inset 0 0 0 1.5px ${alpha(p.color, 0.42)}` : undefined }} className="flex-row items-center rounded-[14px] active:opacity-80">
               <Text className="min-w-[18px] text-center text-[15px] font-black" style={{ color: p.color }}>{p.portion || p.icon}</Text>
-              <Text className="min-w-0 flex-1 text-[12.5px] font-semibold leading-tight" style={{ color: on ? p.color : 'rgba(255,255,255,0.82)' }}>{p.title}</Text>
+              <Text className="min-w-0 flex-1 text-[12.5px] font-semibold leading-[1.15]" style={{ color: on ? p.color : 'rgba(255,255,255,0.82)' }}>{p.title}</Text>
               {on && <Check size={15} color={p.color} strokeWidth={3.2} />}
             </Pressable>
           )
@@ -774,16 +901,20 @@ function GuideTab() {
 
       {/* Feature card */}
       <View className="mt-3.5 rounded-2xl bg-white/[0.035] px-4 py-4">
-        <View className="flex-row items-center gap-2"><View className="h-[9px] w-[9px] rounded-full" style={{ backgroundColor: active.color }} /><Text className="text-[15px] font-extrabold text-white">{active.title}</Text></View>
-        <Text className="mt-1.5 text-[13px] leading-[1.55] text-white/68">{active.desc}</Text>
+        <Fade key={active.slice}>
+          <View className="flex-row items-center gap-2"><View className="h-[9px] w-[9px] rounded-full" style={{ backgroundColor: active.color }} /><Text className="text-[15px] font-extrabold text-white">{active.title}</Text></View>
+          <Text className="mt-1.5 text-[13px] leading-[1.55] text-white/70">{active.desc}</Text>
+        </Fade>
         <Pressable onPress={() => setPlateEx((v) => !v)} className="mt-2.5 flex-row items-center gap-1 active:opacity-70">
           <Text className="text-[11.5px] font-bold" style={{ color: active.color }}>See examples</Text>
           <ChevronRight size={13} color={active.color} strokeWidth={2.6} style={{ transform: [{ rotate: plateEx ? '90deg' : '0deg' }] }} />
         </Pressable>
         {plateEx && (
-          <View className="mt-2.5 flex-row flex-wrap gap-1.5">
-            {active.examples.map((ex) => <View key={ex} className="rounded-full bg-white/[0.06] px-3 py-1.5"><Text className="text-[12px] text-white/80">{ex}</Text></View>)}
-          </View>
+          <Rise>
+            <View className="mt-2.5 flex-row flex-wrap gap-1.5">
+              {active.examples.map((ex) => <View key={ex} className="rounded-full bg-white/[0.06] px-3 py-1.5"><Text className="text-[12px] text-white/80">{ex}</Text></View>)}
+            </View>
+          </Rise>
         )}
       </View>
 
@@ -807,7 +938,7 @@ function GuideTab() {
           <View key={t.title} className="rounded-2xl bg-ink-800 px-4 py-3.5" style={{ borderLeftWidth: 3, borderLeftColor: t.color }}>
             <Text className="text-[15px] font-extrabold" style={{ color: t.color }}>{t.title}</Text>
             <Text className="mt-1 text-[12.5px] leading-[1.5] text-white/60">{t.desc}</Text>
-            <View className="mt-2.5 flex-row flex-wrap gap-1.5">{t.items.map((it) => <View key={it} className="rounded-full bg-white/5 px-3 py-1.5"><Text className="text-[11px] text-white/72">{it}</Text></View>)}</View>
+            <View className="mt-2.5 flex-row flex-wrap gap-1.5">{t.items.map((it) => <View key={it} className="rounded-full bg-white/5 px-3 py-1.5"><Text className="text-[11px] text-white/70">{it}</Text></View>)}</View>
           </View>
         ))}
       </View>
@@ -824,32 +955,42 @@ function GuideTab() {
 
       {/* Go deeper */}
       <View className="mb-2.5 mt-8 flex-row items-center gap-2.5"><Text className="text-[19px]">📚</Text><Text className="text-[19px] font-extrabold tracking-tight text-white">Go deeper</Text></View>
-      <View className="gap-1">
+      <View className="gap-1" onLayout={(e) => { goDeeperY.current = e.nativeEvent.layout.y }}>
         {LESSONS.map((l) => {
           const open = lesson === l.id
           return (
-            <View key={l.id} className="rounded-[14px]" style={{ backgroundColor: open ? alpha('#7ED957', 0.05) : 'transparent', borderLeftWidth: open ? 3 : 0, borderLeftColor: c.brand400 }}>
-              <Pressable onPress={() => setLesson(open ? null : l.id)} className="flex-row items-center gap-3 px-3 py-3.5 active:opacity-80">
+            <View key={l.id} {...({ dataSet: { lessonId: l.id } } as any)} onLayout={(e) => { rowY.current[l.id] = e.nativeEvent.layout.y }} className="overflow-hidden rounded-[14px]" style={{ backgroundColor: open ? alpha('#7ED957', 0.05) : 'transparent', borderLeftWidth: open ? 3 : 0, borderLeftColor: c.brand400 }}>
+              <Pressable onPress={() => toggleLesson(l.id)} className="flex-row items-center gap-3 px-3 py-3.5 active:opacity-80">
                 <View className="h-10 w-10 items-center justify-center rounded-full" style={{ backgroundColor: alpha('#7ED957', 0.12) }}><Text className="text-[19px]">{l.emoji}</Text></View>
-                <View className="min-w-0 flex-1"><Text className="text-[14.5px] font-extrabold text-white">{l.title}</Text><Text numberOfLines={1} className="mt-px text-[12px] text-white/62">{l.summary}</Text></View>
+                <View className="min-w-0 flex-1"><Text className="text-[14.5px] font-extrabold text-white">{l.title}</Text><Text numberOfLines={1} className="mt-px text-[12px] text-white/60">{l.summary}</Text></View>
                 <ChevronDown size={18} color={open ? c.brand400 : 'rgba(255,255,255,0.35)'} style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
               </Pressable>
               {open && (
-                <View className="gap-2.5 pb-4 pl-[54px] pr-3.5">
-                  {l.body.map((para, i) => <Text key={i} className="text-[13px] leading-[1.65] text-white/72">{para}</Text>)}
-                  <View className="mt-0.5 rounded-xl px-3.5 py-3" style={{ backgroundColor: alpha('#7ED957', 0.1) }}>
-                    <Text className="mb-1 text-[11px] font-extrabold uppercase tracking-wide text-brand-400">Key takeaway</Text>
-                    <Text className="text-[13px] leading-[1.55] text-white/85">{l.takeaway}</Text>
+                <LessonReveal>
+                  <View className="gap-2.5 pb-4 pl-[54px] pr-3.5">
+                    {l.body.map((para, i) => <Text key={i} className="text-[13px] leading-[1.65] text-white/70">{para}</Text>)}
+                    <View className="mt-0.5 rounded-xl px-3.5 py-3" style={{ backgroundColor: alpha('#7ED957', 0.1) }}>
+                      <Text className="mb-1 text-[11px] font-extrabold uppercase tracking-wide text-brand-400">Key takeaway</Text>
+                      <Text className="text-[13px] leading-[1.55] text-white/85">{l.takeaway}</Text>
+                    </View>
                   </View>
-                </View>
+                </LessonReveal>
               )}
             </View>
           )
         })}
       </View>
+      </View>
     </ScrollView>
   )
 }
+
+/* Smoothly transition the plate segments on selection. On web the design does this
+ * with a CSS transition on the SVG paths (fill-opacity/stroke), which we mirror via a
+ * style prop; on native react-native-svg snaps (no CSS), which is acceptable. */
+const PATH_TRANSITION = (typeof document !== 'undefined'
+  ? { style: { transition: 'fill-opacity .22s ease, stroke .22s ease, stroke-width .22s ease' } }
+  : {}) as any
 
 function BalancedPlate({ selected, onSelect }: { selected: PlateSlice['slice']; onSelect: (i: number) => void }) {
   const fill = (key: string) => (selected === key ? 1 : 0.4)
@@ -858,9 +999,9 @@ function BalancedPlate({ selected, onSelect }: { selected: PlateSlice['slice']; 
   return (
     <View style={{ width: 236, height: 236, alignSelf: 'center' }}>
       <Svg viewBox="0 0 200 200" width={236} height={236}>
-        <Path onPress={() => onSelect(0)} d="M100,100 L100,188 A88,88 0 0 1 100,12 Z" fill="#7ED957" fillOpacity={fill('veg')} stroke={stroke('veg')} strokeWidth={sw('veg')} />
-        <Path onPress={() => onSelect(1)} d="M100,100 L100,12 A88,88 0 0 1 188,100 Z" fill="#3B82F6" fillOpacity={fill('protein')} stroke={stroke('protein')} strokeWidth={sw('protein')} />
-        <Path onPress={() => onSelect(2)} d="M100,100 L188,100 A88,88 0 0 1 100,188 Z" fill="#F5A524" fillOpacity={fill('carbs')} stroke={stroke('carbs')} strokeWidth={sw('carbs')} />
+        <Path onPress={() => onSelect(0)} {...PATH_TRANSITION} d="M100,100 L100,188 A88,88 0 0 1 100,12 Z" fill="#7ED957" fillOpacity={fill('veg')} stroke={stroke('veg')} strokeWidth={sw('veg')} />
+        <Path onPress={() => onSelect(1)} {...PATH_TRANSITION} d="M100,100 L100,12 A88,88 0 0 1 188,100 Z" fill="#3B82F6" fillOpacity={fill('protein')} stroke={stroke('protein')} strokeWidth={sw('protein')} />
+        <Path onPress={() => onSelect(2)} {...PATH_TRANSITION} d="M100,100 L188,100 A88,88 0 0 1 100,188 Z" fill="#F5A524" fillOpacity={fill('carbs')} stroke={stroke('carbs')} strokeWidth={sw('carbs')} />
         <Circle cx="100" cy="100" r="96" fill="none" stroke="rgba(255,255,255,0.16)" strokeWidth="1.5" />
         <SvgText x="50" y="107" textAnchor="middle" fontSize="27" fontWeight="800" fill="#fff">½</SvgText>
         <SvgText x="140" y="64" textAnchor="middle" fontSize="19" fontWeight="800" fill="#fff">¼</SvgText>
@@ -927,16 +1068,16 @@ function RecipeModal({ meal, onClose, onEdit }: { meal: BudgetMeal | UserMeal | 
             {meal.ingredients.length > 0 && (
               <View>
                 <SectionHead>Ingredients</SectionHead>
-                <View className="gap-1.5">{meal.ingredients.map((ing, i) => <View key={i} className="flex-row items-start gap-2.5"><View className="mt-[7px] h-[5px] w-[5px] rounded-full bg-brand-400" /><Text className="flex-1 text-[14px] leading-[1.4] text-white/78">{ing}</Text></View>)}</View>
+                <View className="gap-1.5">{meal.ingredients.map((ing, i) => <View key={i} className="flex-row items-start gap-2.5"><View className="mt-[7px] h-[5px] w-[5px] rounded-full bg-brand-400" /><Text className="flex-1 text-[14px] leading-[1.4] text-white/80">{ing}</Text></View>)}</View>
               </View>
             )}
             {um?.notes && um.notes.trim() ? (
-              <View><SectionHead>Notes</SectionHead><Text className="text-[14px] leading-[1.5] text-white/78">{um.notes}</Text></View>
+              <View><SectionHead>Notes</SectionHead><Text className="text-[14px] leading-[1.5] text-white/80">{um.notes}</Text></View>
             ) : null}
             {budget && budget.steps.length > 0 && (
               <View>
                 <SectionHead>Method</SectionHead>
-                <View className="gap-2.5">{budget.steps.map((st, i) => <View key={i} className="flex-row items-start gap-2.5"><View className="h-6 w-6 items-center justify-center rounded-full" style={{ backgroundColor: alpha('#7ED957', 0.15) }}><Text className="text-[12px] font-extrabold text-brand-400">{i + 1}</Text></View><Text className="flex-1 text-[14px] leading-[1.5] text-white/82">{st}</Text></View>)}</View>
+                <View className="gap-2.5">{budget.steps.map((st, i) => <View key={i} className="flex-row items-start gap-2.5"><View className="h-6 w-6 items-center justify-center rounded-full" style={{ backgroundColor: alpha('#7ED957', 0.15) }}><Text className="text-[12px] font-extrabold text-brand-400">{i + 1}</Text></View><Text className="flex-1 text-[14px] leading-[1.5] text-white/80">{st}</Text></View>)}</View>
               </View>
             )}
             {budget?.cookOnce ? (
@@ -1007,9 +1148,9 @@ function AddMealSheet({ open, editing, onClose }: { open: boolean; editing: User
   const canSave = !!name.trim()
   return (
     <AppModal visible={open} transparent animationType="slide" onRequestClose={onClose}>
-      <View className="flex-1 justify-end" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1 justify-end" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
         <Pressable onPress={onClose} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
-        <View className="rounded-t-[26px] border-t border-white/10 bg-ink-800" style={{ maxHeight: '92%' }}>
+        <View className="rounded-t-[26px] border-t border-white/10 bg-ink-800" style={{ maxHeight: '94%' }}>
           <View className="flex-row items-center justify-between px-[18px] pb-2 pt-[18px]">
             <View>
               <Text className="text-[18px] font-extrabold text-white">{editing ? 'Edit your meal' : 'Add your meal'}</Text>
@@ -1017,27 +1158,27 @@ function AddMealSheet({ open, editing, onClose }: { open: boolean; editing: User
             </View>
             <Pressable onPress={onClose} className="h-8 w-8 items-center justify-center rounded-full bg-white/[0.06] active:opacity-80"><X size={16} color="#fff" /></Pressable>
           </View>
-          <ScrollView className="px-[18px]" contentContainerStyle={{ paddingBottom: 40, paddingTop: 12, gap: 14 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <ScrollView className="px-[18px]" contentContainerStyle={{ paddingBottom: 40, paddingTop: 12, gap: 14 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
             <Field label="Meal name">
-              <TextInput value={name} onChangeText={setName} placeholder="e.g. My chicken rice bowl" placeholderTextColor="rgba(255,255,255,0.3)" className="rounded-xl bg-ink-700 px-3.5 py-3 text-[14px] text-white" />
+              <TextInput value={name} onChangeText={setName} placeholder="e.g. My chicken rice bowl" placeholderTextColor="rgba(255,255,255,0.3)" className="rounded-[12px] bg-ink-700 px-[13px] py-3 text-[14px] text-white" />
             </Field>
             <Field label="Ingredients" optional>
-              <TextInput value={ing} onChangeText={setIng} multiline placeholder={'2 chicken breasts\n1 cup rice\nHandful of veg'} placeholderTextColor="rgba(255,255,255,0.3)" style={{ minHeight: 84, textAlignVertical: 'top' }} className="rounded-xl bg-ink-700 px-3.5 py-3 text-[14px] leading-[1.5] text-white" />
+              <TextInput value={ing} onChangeText={setIng} multiline placeholder={'2 chicken breasts\n1 cup rice\nHandful of veg'} placeholderTextColor="rgba(255,255,255,0.3)" style={{ minHeight: 84, textAlignVertical: 'top' }} className="rounded-[12px] bg-ink-700 px-[13px] py-3 text-[14px] leading-[1.5] text-white" />
             </Field>
             <Field label="Notes" optional>
-              <TextInput value={notes} onChangeText={setNotes} multiline placeholder="Anything worth remembering about this meal" placeholderTextColor="rgba(255,255,255,0.3)" style={{ minHeight: 64, textAlignVertical: 'top' }} className="rounded-xl bg-ink-700 px-3.5 py-3 text-[14px] leading-[1.5] text-white" />
+              <TextInput value={notes} onChangeText={setNotes} multiline placeholder="Anything worth remembering about this meal" placeholderTextColor="rgba(255,255,255,0.3)" style={{ minHeight: 64, textAlignVertical: 'top' }} className="rounded-[12px] bg-ink-700 px-[13px] py-3 text-[14px] leading-[1.5] text-white" />
             </Field>
             <View className="flex-row gap-2.5">
-              <View className="flex-1"><Field label="Calories" optional><TextInput value={kcal} onChangeText={setKcal} keyboardType="numeric" placeholder="645" placeholderTextColor="rgba(255,255,255,0.3)" className="rounded-xl bg-ink-700 px-3.5 py-3 text-[14px] text-white" /></Field></View>
-              <View className="flex-1"><Field label="Protein g" optional><TextInput value={pro} onChangeText={setPro} keyboardType="numeric" placeholder="48" placeholderTextColor="rgba(255,255,255,0.3)" className="rounded-xl bg-ink-700 px-3.5 py-3 text-[14px] text-white" /></Field></View>
+              <View className="flex-1"><Field label="Calories" optional><TextInput value={kcal} onChangeText={setKcal} keyboardType="numeric" placeholder="645" placeholderTextColor="rgba(255,255,255,0.3)" className="rounded-[12px] bg-ink-700 px-[13px] py-3 text-[14px] text-white" /></Field></View>
+              <View className="flex-1"><Field label="Protein g" optional><TextInput value={pro} onChangeText={setPro} keyboardType="numeric" placeholder="48" placeholderTextColor="rgba(255,255,255,0.3)" className="rounded-[12px] bg-ink-700 px-[13px] py-3 text-[14px] text-white" /></Field></View>
             </View>
           </ScrollView>
-          <View className="flex-row gap-2.5 border-t border-white/[0.06] px-[18px] pb-6 pt-3">
+          <View className="flex-row gap-2.5 border-t border-white/[0.06] px-[18px] pb-5 pt-3">
             <Pressable onPress={onClose} className="flex-1 items-center rounded-[13px] bg-white/[0.06] py-3.5 active:opacity-80"><Text className="text-[14px] font-bold text-white">Cancel</Text></Pressable>
             <Pressable onPress={save} disabled={!canSave} className="flex-[2] items-center rounded-[13px] py-3.5 active:opacity-90" style={{ backgroundColor: canSave ? '#7ED957' : alpha('#7ED957', 0.35) }}><Text className="text-[14px] font-extrabold text-black">{editing ? 'Save changes' : 'Save meal'}</Text></Pressable>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </AppModal>
   )
 }

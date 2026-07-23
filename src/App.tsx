@@ -177,7 +177,12 @@ function Shell() {
 
   const Screen = screens[tab]
 
-  const content = (
+  // Screens that own their scrolling (per-section scrollers, sticky headers)
+  // render directly; the rest ride this shared outer scroller.
+  const selfScroll = tab === 'nutrition'
+  const content = selfScroll ? (
+    <Screen />
+  ) : (
     <ScrollView
       key={tab}
       className="flex-1"
