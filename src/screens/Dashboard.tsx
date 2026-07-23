@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { View, Text, Pressable, Image, Animated, Easing, Platform, ScrollView, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import Svg, { Circle, G } from 'react-native-svg'
 import { Menu, MessageCircle, Clock, Play, GraduationCap, ChevronRight, Leaf, Check, Flame, ChevronDown, Info, ArrowRight, X } from 'lucide-react-native'
 import { Icon } from '../components/Icon'
 import { ActivityIcon } from '../components/ActivityIcon'
@@ -491,10 +492,24 @@ function DayProgressCard({ goals, doneCount, total, onUpdate, stamp, tags, onTag
     Animated.timing(w, { toValue: target, duration: 640, delay: 120, easing: Easing.bezier(0.22, 1, 0.36, 1), useNativeDriver: false }).start()
   }, [target, w])
   const width = w.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] })
+  // The count pops whenever it changes — the design's `bumpEl`.
+  const bump = useRef(new Animated.Value(1)).current
+  const prevCount = useRef(doneCount)
+  useEffect(() => {
+    if (prevCount.current !== doneCount) {
+      Animated.sequence([
+        Animated.timing(bump, { toValue: 1.2, duration: 130, easing: Easing.out(Easing.quad), useNativeDriver: Platform.OS !== 'web' }),
+        Animated.timing(bump, { toValue: 1, duration: 190, easing: Easing.bezier(0.34, 1.56, 0.64, 1), useNativeDriver: Platform.OS !== 'web' }),
+      ]).start()
+    }
+    prevCount.current = doneCount
+  }, [doneCount, bump])
   return (
     <Card className="px-4 pb-1.5 pt-4">
       <View className="flex-row items-baseline gap-1.5 px-0.5">
-        <Text className="text-[16px] font-extrabold" style={{ color: colors.brand400 }}>{doneCount}</Text>
+        <Animated.View style={{ transform: [{ scale: bump }] }}>
+          <Text className="text-[16px] font-extrabold" style={{ color: colors.brand400 }}>{doneCount}</Text>
+        </Animated.View>
         <Text className="text-[13px] font-semibold text-white/55">of {total} done</Text>
         {onUpdate ? (
           <Pressable onPress={onUpdate} hitSlop={8} className="ml-auto active:opacity-60">
@@ -558,7 +573,101 @@ function FoodCheckIn({ tags, colors, onTag }: { tags: string[]; colors: ThemeCol
    workout rows are locked — they're owned by other screens. ---------------- */
 
 const SHEET_EASE = Easing.bezier(0.22, 1, 0.36, 1)
+const BACK_EASE = Easing.bezier(0.34, 1.56, 0.64, 1)
 const STEPPER_H = 56 // 14px top padding + the 42px control row
+const USE_NATIVE = Platform.OS !== 'web'
+
+// Exact values come from the design as inline styles: NativeWind's arbitrary
+// utilities (px-[15px] and friends) silently compile to nothing here.
+const S = {
+  row: { paddingVertical: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)' },
+  rowMain: { flexDirection: 'row', alignItems: 'center', gap: 13 },
+  label: { fontSize: 14, fontWeight: '600', color: '#fff' },
+  value: { fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 1 },
+  expandBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.06)' },
+  markDone: { paddingHorizontal: 15, paddingVertical: 9, borderRadius: 999 },
+  markDoneText: { fontSize: 13, fontWeight: '700', color: '#000' },
+  pill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999 },
+  pillText: { fontSize: 13, fontWeight: '700' },
+  stepRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20, paddingTop: 14 },
+  stepBtn: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
+  stepGlyph: { fontSize: 24, lineHeight: 28 },
+  stepValue: { minWidth: 90, textAlign: 'center', fontSize: 19, fontWeight: '800', color: '#fff' },
+} as const
+
+/** A ring whose fill eases to its new value, as the design's rings do. */
+const AnimCircle = Animated.createAnimatedComponent(Circle)
+function AnimatedRing({ pct, size, stroke, color, track, children }: { pct: number; size: number; stroke: number; color: string; track: string; children?: ReactNode }) {
+  const r = (size - stroke) / 2
+  const circ = 2 * Math.PI * r
+  const v = useRef(new Animated.Value(pct)).current
+  useEffect(() => {
+    Animated.timing(v, { toValue: pct, duration: 750, easing: SHEET_EASE, useNativeDriver: false }).start()
+  }, [pct, v])
+  const offset = v.interpolate({ inputRange: [0, 100], outputRange: [circ, 0], extrapolate: 'clamp' })
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={size} height={size}>
+        <G transform={`rotate(-90 ${size / 2} ${size / 2})`}>
+          <Circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={track} strokeWidth={stroke} />
+          <AnimCircle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={offset} />
+        </G>
+      </Svg>
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>{children}</View>
+    </View>
+  )
+}
+
+/** The design's completion burst: a glow ring pushing outward plus confetti. */
+function Celebrate({ burst, colors, size }: { burst: number; colors: ThemeColors; size: number }) {
+  const p = useRef(new Animated.Value(0)).current
+  const [dots] = useState(() =>
+    Array.from({ length: 16 }, (_, k) => {
+      const ang = Math.random() * Math.PI * 2
+      const dist = 26 + Math.random() * 32
+      return { k, x: Math.cos(ang) * dist, y: Math.sin(ang) * dist, rot: Math.floor(Math.random() * 360) }
+    }),
+  )
+  // Dots are torn down once they've flown out, rather than lingering invisibly.
+  const [alive, setAlive] = useState(false)
+  useEffect(() => {
+    if (!burst) return
+    setAlive(true)
+    p.setValue(0)
+    Animated.timing(p, { toValue: 1, duration: 760, easing: Easing.bezier(0.2, 0.7, 0.3, 1), useNativeDriver: USE_NATIVE }).start(({ finished }) => {
+      if (finished) setAlive(false)
+    })
+  }, [burst, p])
+  if (!alive) return null
+  const cols = [colors.brand400, colors.accentOrange, colors.accentBlue, colors.accentPurple, colors.accentYellow]
+  return (
+    <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
+      <Animated.View
+        style={{
+          position: 'absolute', left: -3, top: -3, right: -3, bottom: -3,
+          borderRadius: (size + 6) / 2, borderWidth: 3, borderColor: colors.brand400,
+          opacity: p.interpolate({ inputRange: [0, 1], outputRange: [0.85, 0] }),
+          transform: [{ scale: p.interpolate({ inputRange: [0, 1], outputRange: [1, 1.85] }) }],
+        }}
+      />
+      {dots.map((d) => (
+        <Animated.View
+          key={d.k}
+          style={{
+            position: 'absolute', width: 7, height: 7, borderRadius: 2, backgroundColor: cols[d.k % cols.length],
+            opacity: p.interpolate({ inputRange: [0, 0.75, 1], outputRange: [1, 0.5, 0] }),
+            transform: [
+              { translateX: p.interpolate({ inputRange: [0, 1], outputRange: [0, d.x] }) },
+              { translateY: p.interpolate({ inputRange: [0, 1], outputRange: [0, d.y] }) },
+              { rotate: p.interpolate({ inputRange: [0, 1], outputRange: ['0deg', `${d.rot}deg`] }) },
+              { scale: p.interpolate({ inputRange: [0, 1], outputRange: [1, 0.4] }) },
+            ],
+          }}
+        />
+      ))}
+    </View>
+  )
+}
 
 /** The expanding −/value/+ row under a measurable goal. */
 function GoalStepper({ goal, open, colors }: { goal: Extract<Goal, { kind: 'measure' }>; open: boolean; colors: ThemeColors }) {
@@ -573,16 +682,16 @@ function GoalStepper({ goal, open, colors }: { goal: Extract<Goal, { kind: 'meas
   }
   return (
     <Animated.View style={{ height: grow.interpolate({ inputRange: [0, 1], outputRange: [0, STEPPER_H] }), opacity: grow, overflow: 'hidden' }}>
-      <View className="flex-row items-center justify-center gap-5 pt-3.5">
+      <View style={S.stepRow}>
         <PressableScale onPress={() => bump(-1)} scaleTo={0.9}>
-          <View className="h-[42px] w-[42px] items-center justify-center rounded-full bg-white/[0.06]">
-            <Text className="text-[24px] leading-[26px]" style={{ color: colors.fg }}>−</Text>
+          <View style={[S.stepBtn, { backgroundColor: 'rgba(255,255,255,0.06)' }]}>
+            <Text style={[S.stepGlyph, { color: colors.fg }]}>−</Text>
           </View>
         </PressableScale>
-        <Text className="min-w-[90px] text-center text-[19px] font-extrabold text-white">{goal.fmt(goal.value)} / {goal.fmt(goal.target)}</Text>
+        <Text style={S.stepValue}>{goal.fmt(goal.value)} / {goal.fmt(goal.target)}</Text>
         <PressableScale onPress={() => bump(1)} scaleTo={0.9}>
-          <View className="h-[42px] w-[42px] items-center justify-center rounded-full" style={{ backgroundColor: `${colors.brand400}2e` }}>
-            <Text className="text-[24px] leading-[26px]" style={{ color: colors.brand400 }}>+</Text>
+          <View style={[S.stepBtn, { backgroundColor: `${colors.brand400}2e` }]}>
+            <Text style={[S.stepGlyph, { color: colors.brand400 }]}>+</Text>
           </View>
         </PressableScale>
       </View>
@@ -603,15 +712,35 @@ function SheetGoalRow({ goal, colors, expanded, onExpand, onMarkDone, onUndo, on
   // stays recognisable at a glance once it's complete.
   const ringPct = goal.kind === 'measure' ? goalPct(goal) : goal.done ? 100 : 0
   const iconColor = goal.done ? colors.brand400 : goal.kind === 'auto' ? 'rgba(255,255,255,0.4)' : colors.brand400
+
+  // Completing a goal pops the ring and throws confetti — the design's celebrate.
+  const [burst, setBurst] = useState(0)
+  const pop = useRef(new Animated.Value(1)).current
+  const wasDone = useRef(goal.done)
+  useEffect(() => {
+    if (goal.done && !wasDone.current) {
+      setBurst((b) => b + 1)
+      Animated.sequence([
+        Animated.timing(pop, { toValue: 1.22, duration: 200, easing: Easing.out(Easing.quad), useNativeDriver: USE_NATIVE }),
+        Animated.timing(pop, { toValue: 1, duration: 320, easing: BACK_EASE, useNativeDriver: USE_NATIVE }),
+      ]).start()
+    }
+    wasDone.current = goal.done
+  }, [goal.done, pop])
+
   return (
-    <View className="border-t border-white/[0.06] py-3">
-      <View className="flex-row items-center gap-3">
-        <ProgressRing value={ringPct} size={38} stroke={4} color={colors.brand400}>
-          <Icon name={goal.icon} size={14} color={iconColor} />
-        </ProgressRing>
-        <View className="min-w-0 flex-1">
-          <Text numberOfLines={1} className="text-[14px] font-semibold text-white">{goal.label}</Text>
-          <Text numberOfLines={1} className="mt-px text-[12px] text-white/45">{goalSheetValue(goal)}</Text>
+    <View style={S.row}>
+      <View style={S.rowMain}>
+        <Animated.View style={{ transform: [{ scale: pop }] }}>
+          <AnimatedRing pct={ringPct} size={38} stroke={4} color={colors.brand400} track={colors.ringTrack}>
+            <Icon name={goal.icon} size={14} color={iconColor} />
+          </AnimatedRing>
+          <Celebrate burst={burst} colors={colors} size={38} />
+        </Animated.View>
+
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text numberOfLines={1} style={S.label}>{goal.label}</Text>
+          <Text numberOfLines={1} style={S.value}>{goalSheetValue(goal)}</Text>
         </View>
 
         {goal.kind === 'measure' ? (
@@ -619,15 +748,15 @@ function SheetGoalRow({ goal, colors, expanded, onExpand, onMarkDone, onUndo, on
             // A measurable goal can be taken back; the auto rows are locked.
             <DonePill colors={colors} onPress={onUndo} />
           ) : (
-            <View className="flex-row items-center gap-2">
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <PressableScale onPress={onExpand} scaleTo={0.9}>
-                <View className="h-[34px] w-[34px] items-center justify-center rounded-full bg-white/[0.06]">
-                  <Text className="text-[19px] leading-[21px] text-white/70">+</Text>
+                <View style={S.expandBtn}>
+                  <Text style={{ fontSize: 19, lineHeight: 22, color: 'rgba(255,255,255,0.7)' }}>+</Text>
                 </View>
               </PressableScale>
               <PressableScale onPress={onMarkDone} scaleTo={0.96}>
-                <View className="rounded-full px-[15px] py-[9px]" style={{ backgroundColor: colors.brand400 }}>
-                  <Text className="text-[13px] font-bold text-black">Mark done</Text>
+                <View style={[S.markDone, { backgroundColor: colors.brand400 }]}>
+                  <Text style={S.markDoneText}>Mark done</Text>
                 </View>
               </PressableScale>
             </View>
@@ -636,8 +765,8 @@ function SheetGoalRow({ goal, colors, expanded, onExpand, onMarkDone, onUndo, on
           <DonePill colors={colors} />
         ) : (
           <PressableScale onPress={() => { onClose(); goal.onOpen() }} scaleTo={0.96}>
-            <View className="flex-row items-center gap-1 rounded-full px-3.5 py-2" style={{ backgroundColor: `${colors.brand400}26` }}>
-              <Text className="text-[13px] font-bold" style={{ color: colors.brand400 }}>{goal.cta}</Text>
+            <View style={[S.pill, { backgroundColor: `${colors.brand400}26` }]}>
+              <Text style={[S.pillText, { color: colors.brand400 }]}>{goal.cta}</Text>
               <ArrowRight size={14} strokeWidth={2.6} color={colors.brand400} />
             </View>
           </PressableScale>
@@ -651,9 +780,9 @@ function SheetGoalRow({ goal, colors, expanded, onExpand, onMarkDone, onUndo, on
 
 function DonePill({ colors, onPress }: { colors: ThemeColors; onPress?: () => void }) {
   const body = (
-    <View className="flex-row items-center gap-1.5 rounded-full px-3 py-2" style={{ backgroundColor: `${colors.brand400}26` }}>
+    <View style={[S.pill, { backgroundColor: `${colors.brand400}26` }]}>
       <Check size={14} strokeWidth={3} color={colors.brand400} />
-      <Text className="text-[13px] font-bold" style={{ color: colors.brand400 }}>Done</Text>
+      <Text style={[S.pillText, { color: colors.brand400 }]}>Done</Text>
     </View>
   )
   if (!onPress) return body
@@ -719,20 +848,20 @@ function UpdateTodaySheet({ open, onClose, goals, doneCount, total, colors }: { 
             transform: [{ translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [panelH, 0] }) }],
           }}
         >
-          <View className="px-5 pb-1.5 pt-3">
-            <View className="mb-3 h-1 w-[38px] self-center rounded-full bg-white/20" />
-            <View className="flex-row items-center justify-between">
+          <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 6 }}>
+            <View style={{ width: 38, height: 4, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'center', marginBottom: 12 }} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
               <View>
-                <Text className="text-[18px] font-extrabold text-white">Update today</Text>
-                <Text className="mt-0.5 text-[12px] text-white/50">{doneCount} of {total} on track</Text>
+                <Text style={{ fontSize: 18, fontWeight: '800', color: '#fff' }}>Update today</Text>
+                <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>{doneCount} of {total} on track</Text>
               </View>
-              <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Close" className="h-[30px] w-[30px] items-center justify-center rounded-full bg-white/[0.06] active:opacity-70">
+              <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Close" style={{ width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.06)' }}>
                 <X size={14} color="rgba(255,255,255,0.5)" strokeWidth={2.5} />
               </Pressable>
             </View>
           </View>
 
-          <ScrollView className="px-5" contentContainerStyle={{ paddingTop: 2, paddingBottom: 8 }} showsVerticalScrollIndicator={false}>
+          <ScrollView style={{ paddingHorizontal: 20 }} contentContainerStyle={{ paddingTop: 2, paddingBottom: 8 }} showsVerticalScrollIndicator={false}>
             {goals.map((g) => (
               <SheetGoalRow
                 key={g.id}
@@ -747,10 +876,10 @@ function UpdateTodaySheet({ open, onClose, goals, doneCount, total, colors }: { 
             ))}
           </ScrollView>
 
-          <View className="border-t border-white/[0.07] px-5 pt-3.5" style={{ paddingBottom: 22 + insets.bottom }}>
+          <View style={{ borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.07)', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 22 + insets.bottom }}>
             <PressableScale onPress={onClose} scaleTo={0.98}>
-              <View className="items-center rounded-full py-3.5" style={{ backgroundColor: colors.brand400 }}>
-                <Text className="text-[15px] font-extrabold text-black">Done</Text>
+              <View style={{ alignItems: 'center', borderRadius: 999, paddingVertical: 14, backgroundColor: colors.brand400 }}>
+                <Text style={{ fontSize: 15, fontWeight: '800', color: '#000' }}>Done</Text>
               </View>
             </PressableScale>
           </View>

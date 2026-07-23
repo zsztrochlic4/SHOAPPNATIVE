@@ -83,9 +83,12 @@ export function AppModal({ visible, onRequestClose, animationType = 'slide', tra
 
   // Web: always render transparent so the surrounding "desk" (the real
   // WebPreviewFrame directly behind, at the identical position) shows through.
+  // For transparent overlays the page must NOT repaint the desk colour, or it
+  // would cover the app and the sheet's own dim backdrop would have nothing to
+  // dim — the screen behind has to stay visible.
   return (
     <Modal visible={visible} transparent animationType={animationType} onRequestClose={onRequestClose}>
-      <View style={frameStyles.page} pointerEvents="box-none">
+      <View style={[frameStyles.page, transparent && { backgroundColor: 'transparent' }]} pointerEvents="box-none">
         {transparent ? (
           // Clip the overlay's own dim/card to the rounded screen rectangle.
           <View style={frameStyles.screenClip}>{children}</View>
