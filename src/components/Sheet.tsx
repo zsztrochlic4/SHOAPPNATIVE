@@ -206,6 +206,7 @@ function MenuDetailPanel({
  */
 function BarePanel({ open, onClose, children }: { open: boolean; onClose: () => void; children: ReactNode }) {
   const win = useWindowDimensions()
+  const colors = useColors()
   const width = IS_WEB ? WEB_SCREEN.width : win.width
   const [render, setRender] = useState(open)
   const progress = useRef(new Animated.Value(0)).current
@@ -228,7 +229,10 @@ function BarePanel({ open, onClose, children }: { open: boolean; onClose: () => 
   return (
     <AppModal visible={render} transparent animationType="none" onRequestClose={onClose}>
       <View style={{ flex: 1 }}>
-        <Animated.View className="bg-ink-900" style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, opacity, transform: [{ translateX }] }}>
+        {/* Opaque surface set inline, not just via `bg-ink-900`: on web the class
+         *  doesn't paint a background on an Animated.View, leaving the panel
+         *  see-through over the dashboard. */}
+        <Animated.View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: colors.ink900, opacity, transform: [{ translateX }] }}>
           {children}
         </Animated.View>
       </View>

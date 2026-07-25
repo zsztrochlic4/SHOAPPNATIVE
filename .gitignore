@@ -43,3 +43,6 @@ yarn-error.*
 
 # profile-sweep build output
 /.sweep-out
+
+# domain-check build output
+/.check-out

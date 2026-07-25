@@ -2,6 +2,7 @@ import { todayKey, dayKey, fromKey, toKey, now } from '../lib/date'
 import { fmtWeightNum, weightUnit } from '../lib/format'
 import { incrementFor } from '../data/catalog'
 import { completedSessions } from './selectors'
+import { activePeriod, plannedPeriods, upcomingPeriods } from './periods'
 import type { AppState, Goal, WorkoutSession } from './types'
 
 /* ----------------------- rep range parsing ----------------------- */
@@ -109,29 +110,42 @@ function daysBetween(aKey: string, bKey: string) {
   return Math.round((fromKey(bKey).getTime() - fromKey(aKey).getTime()) / 86400000)
 }
 
+/**
+ * Where the user sits relative to their declared busy periods (Plan Around Your
+ * Life). `active` is deliberately true only *inside* a period and only when the
+ * chosen mode actually changes training — "Keep it as is" is a promise that
+ * nothing moves, so it must not quietly ease targets or trim sessions.
+ */
 export function examState(s: AppState): ExamState {
-  const { examMode, examStartKey, examEndKey } = s.profile
-  if (!examMode) return { enabled: false, active: false, phase: 'none', daysUntil: null, daysLeft: null }
-  if (!examStartKey || !examEndKey) {
-    // opted in without dates: treat as actively in the window
-    return { enabled: true, active: true, phase: 'during', daysUntil: null, daysLeft: null, startKey: examStartKey, endKey: examEndKey }
+  const periods = plannedPeriods(s)
+  if (periods.length === 0) return { enabled: false, active: false, phase: 'none', daysUntil: null, daysLeft: null }
+
+  const current = activePeriod(s)
+  if (current) {
+    return {
+      enabled: true,
+      active: current.mode !== 'asis',
+      phase: 'during',
+      daysUntil: null,
+      daysLeft: Math.max(0, daysBetween(todayKey, current.end)),
+      startKey: current.start,
+      endKey: current.end,
+    }
   }
-  const toStart = daysBetween(todayKey, examStartKey)
-  const toEnd = daysBetween(todayKey, examEndKey)
-  let phase: ExamPhase = 'none'
-  if (toStart > 0 && toStart <= 7) phase = 'approaching'
-  else if (toStart <= 0 && toEnd >= 0) phase = 'during'
-  else if (toEnd < 0 && toEnd >= -4) phase = 'recovering'
-  const active = phase === 'during' || phase === 'approaching'
-  return {
-    enabled: true,
-    active,
-    phase,
-    daysUntil: toStart > 0 ? toStart : null,
-    daysLeft: phase === 'during' ? Math.max(0, toEnd) : null,
-    startKey: examStartKey,
-    endKey: examEndKey,
+
+  const next = upcomingPeriods(s)[0]
+  const toStart = next ? daysBetween(todayKey, next.start) : null
+  if (next && toStart !== null && toStart <= 7) {
+    return { enabled: true, active: false, phase: 'approaching', daysUntil: toStart, daysLeft: null, startKey: next.start, endKey: next.end }
   }
+
+  // Just come out the other side: keep the "ramping back up" copy for a few days.
+  const past = periods.filter((p) => p.end < todayKey).sort((a, b) => b.end.localeCompare(a.end))[0]
+  if (past && daysBetween(past.end, todayKey) <= 4) {
+    return { enabled: true, active: false, phase: 'recovering', daysUntil: toStart, daysLeft: null, startKey: past.start, endKey: past.end }
+  }
+
+  return { enabled: true, active: false, phase: 'none', daysUntil: toStart, daysLeft: null, startKey: next?.start, endKey: next?.end }
 }
 
 export type DailyTargets = {

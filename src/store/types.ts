@@ -59,6 +59,38 @@ export interface Profile {
   motivation?: string
 }
 
+/* ------------------------- Plan Around Your Life ------------------------- */
+
+/** How training bends during a declared busy period. See store/periods.ts. */
+export type PeriodMode = 'pause' | 'maintenance' | 'moving' | 'fewer' | 'deload' | 'asis'
+
+/** What "just keep moving" means for this user. */
+export type MovingType = 'walking' | 'mobility' | 'both'
+
+/**
+ * One busy period the user declared in advance — exams, travel, moving house.
+ * Maps onto the backend's `PlannedAbsence`; the extra fields here are the
+ * per-mode follow-up answers the friendly flow collects.
+ */
+export interface PlannedPeriod {
+  id: string
+  /** inclusive range, 'YYYY-MM-DD' */
+  start: string
+  end: string
+  /** null only while a draft is still being built */
+  mode: PeriodMode | null
+  /** maintenance: the 1–2 days they can still train ('Mon'..'Sun') */
+  maintDays: string[]
+  /** fewer days: sessions per week */
+  fewerCount: 1 | 2
+  /** fewer days: which days those sessions land on */
+  fewerDays: string[]
+  /** just keep moving: what to be nudged to do */
+  movingType: MovingType
+  /** what the user calls this period, e.g. 'Final exams' */
+  note?: string
+}
+
 /** A planned meal slot in the weekly meal planner. */
 export interface PlannedMeal {
   id: string
@@ -123,7 +155,12 @@ export interface Settings {
   progressMetric?: string
   /** The three stat ids shown in the dashboard Progress overview. */
   dashboardStats?: string[]
+  /** The window those stats are measured over. Defaults to '7 days'. */
+  dashboardTimeframe?: StatTimeframe
 }
+
+/** The Progress overview time window (see lib/metrics). */
+export type StatTimeframe = '7 days' | '4 weeks' | '3 months'
 
 export interface WeightEntry {
   dateKey: string
@@ -509,6 +546,10 @@ export interface AppState {
   coachUsage?: { dateKey: string; count: number }
   /** connected health platforms (Strava, Whoop, ...) and their sync state */
   integrations?: Record<string, IntegrationState>
+  /** Busy periods declared in advance (Plan Around Your Life). Absent on saves
+   *  written before the feature existed — store/periods.ts reads legacy exam
+   *  dates as a single period until the user edits something. */
+  plannedPeriods?: PlannedPeriod[]
   /** Canonical backend `users` document (workout backend source of truth). Written
    *  only by the onboarding mapping module; the local Profile above is derived from it. */
   backendUser?: UserDoc

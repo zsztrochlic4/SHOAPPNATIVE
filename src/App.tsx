@@ -37,7 +37,6 @@ import {
   PhotosSheet,
   QuickWorkoutsSheet,
   BadgesSheet,
-  ExamModeSheet,
   CoachSheet,
   CoachChatSheet,
   BeginnerSheet,
@@ -51,6 +50,7 @@ import {
   CustomizeSheet,
   CreateSessionSheet,
 } from './overlays'
+import { PlanAroundLifeSheet } from './overlays/planAroundLife'
 
 export type TabKey = 'dashboard' | 'workout' | 'nutrition' | 'progress' | 'community'
 
@@ -223,7 +223,7 @@ function Shell() {
       <PhotosSheet open={overlay === 'photos'} onClose={nav.close} />
       <QuickWorkoutsSheet open={overlay === 'quick'} onClose={nav.close} />
       <BadgesSheet open={overlay === 'badges'} onClose={nav.close} />
-      <ExamModeSheet open={overlay === 'examMode'} onClose={nav.close} />
+      <PlanAroundLifeSheet open={overlay === 'examMode'} onClose={nav.close} />
       <CoachSheet open={overlay === 'coach'} onClose={nav.close} />
       <CoachChatSheet open={overlay === 'coachChat'} onClose={nav.close} />
       <BeginnerSheet open={overlay === 'beginner'} onClose={nav.close} />
@@ -234,7 +234,7 @@ function Shell() {
       <LogActivitySheet open={overlay === 'logActivity'} onClose={nav.close} />
       <PostDetailSheet open={overlay === 'postDetail'} onClose={nav.close} params={params} />
       <ChallengeDetailSheet open={overlay === 'challengeDetail'} onClose={nav.close} params={params} />
-      <CustomizeSheet open={overlay === 'customize'} onClose={nav.close} />
+      <CustomizeSheet open={overlay === 'customize'} onClose={nav.close} params={params} />
       <CreateSessionSheet open={overlay === 'createSession'} onClose={nav.close} params={params} />
     </NavProvider>
   )

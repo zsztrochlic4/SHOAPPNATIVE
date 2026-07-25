@@ -5,7 +5,7 @@ import * as ImagePicker from 'expo-image-picker'
 import { LinearGradient } from 'expo-linear-gradient'
 import {
   Bell, Moon, Sun, GraduationCap, Wallet, RotateCcw, Trash2, Camera, Trophy,
-  Flame, Search, ScanLine, Plus, Check, Share2, ChevronRight, ChevronLeft, User, Sparkles, Dumbbell,
+  Flame, Search, ScanLine, Plus, Check, Share2, ChevronRight, User, Sparkles, Dumbbell,
   Droplet, Footprints, BedDouble, Leaf, Clock, Play, Award, BellRing,
   HeartPulse, Activity, Zap, Minus, X, LogOut, Volume2,
 } from 'lucide-react-native'
@@ -23,7 +23,7 @@ import { useNav } from '../nav'
 import { FOODS, QUICK_WORKOUTS } from '../data/catalog'
 import { pick, makeRng } from '../lib/rng'
 import { requestPushPermission, resolveNotifPrefs } from '../lib/notifications'
-import { todayKey, relativeLabel, shortDate, fromKey, toKey, addDays, longDate } from '../lib/date'
+import { todayKey, relativeLabel, shortDate, fromKey } from '../lib/date'
 import {
   fmtWeight, fmtWeightNum, toKg, weightUnit, fmtFluid,
   weightVal,
@@ -33,7 +33,7 @@ import {
   habitConsistencyWeek, leaderboardSorted, strengthProgress, activitiesInRange,
 } from '../store/selectors'
 import { ActivityIcon } from '../components/ActivityIcon'
-import { examState, dailyTargets } from '../store/training'
+import { activePeriod, upcomingPeriods } from '../store/periods'
 import { translator, LANGUAGES, type Language } from '../lib/i18n'
 import { shareText } from '../lib/share'
 import type { MealName, Units, Theme, NotificationPrefs } from '../store/types'
@@ -491,6 +491,12 @@ export function ProfileSheet({ open, onClose }: Props) {
   const totalWorkouts = state.sessions.filter((s) => s.completed).length
   const earned = state.badges.filter((b) => b.earned).length
   const goalLabel: Record<string, string> = { 'build-muscle': 'Build Muscle', 'lose-fat': 'Lose Fat', 'gain-strength': 'Get Stronger', 'stay-healthy': 'Stay Healthy' }
+  const upcomingCount = upcomingPeriods(state).length
+  const planSub = activePeriod(state)
+    ? 'Active now'
+    : upcomingCount > 0
+      ? `${upcomingCount} period${upcomingCount > 1 ? 's' : ''} scheduled`
+      : 'Exams, travel or busy weeks'
 
   return (
     <Sheet open={open} onClose={onClose} title="Profile">
@@ -520,7 +526,7 @@ export function ProfileSheet({ open, onClose }: Props) {
         <LinkRow icon={<Camera size={18} color={brand[400]} />} title="Progress photos" sub={`${state.photos.length} photos`} onPress={() => nav.open('photos')} />
         <LinkRow icon={<Trophy size={18} color={brand[400]} />} title="Campus leaderboard" sub={state.profile.university} onPress={() => nav.open('leaderboard')} />
         <LinkRow icon={<Sparkles size={18} color={brand[400]} />} title="Weekly recap" sub="Your week in numbers" onPress={() => nav.open('recap')} />
-        <LinkRow icon={<GraduationCap size={18} color={brand[400]} />} title="Exam Survival Protocol" sub={state.profile.examMode ? 'On' : 'Off'} onPress={() => nav.open('examMode')} />
+        <LinkRow icon={<GraduationCap size={18} color={brand[400]} />} title="Plan Around Your Life" sub={planSub} onPress={() => nav.open('examMode')} />
         {state.profile.newToGym && <LinkRow icon={<Leaf size={18} color={brand[400]} />} title="New to the gym" sub="Your first 90 days" onPress={() => nav.open('beginner')} />}
         <LinkRow icon={<User size={18} color="rgba(255,255,255,0.7)" />} title="Settings" sub="Units, theme and data" onPress={() => nav.open('settings')} />
       </View>
@@ -1078,171 +1084,6 @@ export function BadgesSheet({ open, onClose }: Props) {
         ))}
       </View>
     </Sheet>
-  )
-}
-
-/* ============================ Exam Mode ============================ */
-export function ExamModeSheet({ open, onClose }: Props) {
-  const { state, dispatch } = useStore()
-  const t = dailyTargets(state)
-  const p = state.profile
-  const ex = examState(state)
-
-  // Live, sorted list of exam dates. Legacy single-window users are expanded to
-  // individual days once, so nothing is lost the first time they edit.
-  const dates = useMemo(() => {
-    if (p.examDates && p.examDates.length) return [...p.examDates].sort()
-    if (p.examStartKey && p.examEndKey) return rangeKeys(p.examStartKey, p.examEndKey)
-    return []
-  }, [p.examDates, p.examStartKey, p.examEndKey])
-  const on = dates.length > 0
-
-  // Every edit persists immediately (SET_EXAM_DATES_LIST keeps start/end in sync).
-  const commit = (next: string[]) => dispatch({ type: 'SET_EXAM_DATES_LIST', dateKeys: next })
-  const toggle = (key: string) => commit(dates.includes(key) ? dates.filter((k) => k !== key) : [...dates, key])
-  const remove = (key: string) => commit(dates.filter((k) => k !== key))
-
-  const phaseLabel: Record<string, string> = {
-    none: 'Not in your exam window yet',
-    approaching: ex.daysUntil ? `Exams start in ${ex.daysUntil} days` : 'Exams approaching',
-    during: ex.daysLeft != null ? `${ex.daysLeft} days of exams left` : 'In your exam window',
-    recovering: 'Exams done, ramping back up',
-  }
-
-  return (
-    <Sheet open={open} onClose={onClose} title="Exam Survival Protocol">
-      <View className="rounded-3xl border border-accent-purple/25 bg-accent-purple/10 p-5">
-        <GraduationCap size={30} color={accent.purple} />
-        <Text className="mt-2 text-xl font-extrabold tracking-tight text-white">Train through exam season</Text>
-        <Text className="mt-1 text-[14px] leading-snug text-white/60">Tap the days you have exams. I'll quietly adjust your plan so training supports your studying instead of competing with it.</Text>
-      </View>
-
-      <Text className="mb-2 mt-5 text-[12px] font-bold uppercase tracking-wide text-white/40">Pick your exam dates</Text>
-      <MonthCalendar selected={dates} onToggle={toggle} minKey={todayKey} />
-
-      <Text className="mb-2 mt-5 text-[12px] font-bold uppercase tracking-wide text-white/40">
-        {on ? `Your exam dates · ${dates.length}` : 'Your exam dates'}
-      </Text>
-      {on ? (
-        <View className="gap-2">
-          {dates.map((k) => {
-            const until = Math.round((fromKey(k).getTime() - fromKey(todayKey).getTime()) / 86400000)
-            const when = until <= 0 ? 'Today' : until === 1 ? 'Tomorrow' : `in ${until} days`
-            return (
-              <View key={k} className="flex-row items-center gap-3 rounded-2xl border border-white/8 bg-ink-800 p-3.5">
-                <View className="h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-purple/15"><GraduationCap size={17} color={accent.purple} /></View>
-                <View className="flex-1">
-                  <Text className="font-semibold text-white">{longDate(k)}</Text>
-                  <Text className="text-[12px] text-white/45">{when}</Text>
-                </View>
-                <Pressable onPress={() => remove(k)} hitSlop={8} accessibilityLabel={`Remove ${longDate(k)}`} className="h-8 w-8 items-center justify-center rounded-full bg-white/8 active:opacity-70">
-                  <X size={16} color="rgba(255,255,255,0.6)" />
-                </Pressable>
-              </View>
-            )
-          })}
-        </View>
-      ) : (
-        <View className="items-center rounded-2xl border border-dashed border-white/12 px-5 py-6">
-          <Text className="text-center text-[13px] text-white/45">No exam dates yet. Tap the days above to add them.</Text>
-        </View>
-      )}
-
-      {on && <Text className="mt-3 text-center text-[13px] font-semibold text-accent-purple">{phaseLabel[ex.phase]}</Text>}
-
-      <Text className="mb-2 mt-5 text-[12px] font-bold uppercase tracking-wide text-white/40">While exams are on</Text>
-      <View className="gap-2.5">
-        <AdaptRow label="Sessions" value="Trimmed to your 3 key lifts" />
-        <AdaptRow label="Calories" value={`${t.adjusted ? t.calorie.toLocaleString() : (p.calorieTarget + (p.goal === 'build-muscle' ? -250 : 0)).toLocaleString()} kcal, toward maintenance`} />
-        <AdaptRow label="Sleep target" value={`${Math.min(9, p.sleepTargetH + 0.5)} hours, prioritised`} />
-        <AdaptRow label="Step target" value={`${Math.round(p.stepTarget * 0.7).toLocaleString()}, eased off`} />
-      </View>
-
-      {on && (
-        <Pressable onPress={() => { commit([]); onClose() }} className="mt-5 w-full flex-row items-center justify-center gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 py-3.5 active:opacity-80">
-          <Trash2 size={17} color="#f87171" />
-          <Text className="text-sm font-semibold text-red-400">Clear all exam dates</Text>
-        </Pressable>
-      )}
-    </Sheet>
-  )
-}
-
-/** All date keys from start to end inclusive (used to migrate a legacy window). */
-function rangeKeys(startKey: string, endKey: string): string[] {
-  const out: string[] = []
-  let d = fromKey(startKey)
-  const end = fromKey(endKey)
-  while (d.getTime() <= end.getTime()) { out.push(toKey(d)); d = addDays(d, 1) }
-  return out
-}
-
-const CAL_WD = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
-
-/** A tap-to-toggle month calendar. Past days are disabled; selected days fill purple. */
-function MonthCalendar({ selected, onToggle, minKey }: { selected: string[]; onToggle: (key: string) => void; minKey: string }) {
-  const today = fromKey(todayKey)
-  const [ym, setYm] = useState({ y: today.getFullYear(), m: today.getMonth() })
-  const sel = new Set(selected)
-  const first = new Date(ym.y, ym.m, 1)
-  const startDow = (first.getDay() + 6) % 7 // Monday = 0
-  const daysInMonth = new Date(ym.y, ym.m + 1, 0).getDate()
-  const cells: (string | null)[] = []
-  for (let i = 0; i < startDow; i++) cells.push(null)
-  for (let d = 1; d <= daysInMonth; d++) cells.push(toKey(new Date(ym.y, ym.m, d)))
-  while (cells.length % 7 !== 0) cells.push(null)
-  const monthLabel = first.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-  // Don't let the user page back before the current month (all past days anyway).
-  const atFirst = ym.y === today.getFullYear() && ym.m === today.getMonth()
-  const prev = () => { if (!atFirst) setYm((a) => (a.m === 0 ? { y: a.y - 1, m: 11 } : { y: a.y, m: a.m - 1 })) }
-  const next = () => setYm((a) => (a.m === 11 ? { y: a.y + 1, m: 0 } : { y: a.y, m: a.m + 1 }))
-
-  return (
-    <View className="rounded-2xl border border-white/8 bg-ink-800 p-3">
-      <View className="mb-2 flex-row items-center justify-between px-1">
-        <Pressable onPress={prev} disabled={atFirst} hitSlop={8} className={`h-8 w-8 items-center justify-center rounded-full ${atFirst ? 'opacity-25' : 'active:opacity-60'}`}>
-          <ChevronLeft size={20} color="rgba(255,255,255,0.7)" />
-        </Pressable>
-        <Text className="text-[15px] font-bold text-white">{monthLabel}</Text>
-        <Pressable onPress={next} hitSlop={8} className="h-8 w-8 items-center justify-center rounded-full active:opacity-60">
-          <ChevronRight size={20} color="rgba(255,255,255,0.7)" />
-        </Pressable>
-      </View>
-      <View className="flex-row">
-        {CAL_WD.map((w) => (
-          <View key={w} style={{ width: `${100 / 7}%` }} className="items-center py-1"><Text className="text-[11px] font-bold text-white/35">{w}</Text></View>
-        ))}
-      </View>
-      <View className="flex-row flex-wrap">
-        {cells.map((key, i) => {
-          if (!key) return <View key={i} style={{ width: `${100 / 7}%`, height: 42 }} />
-          const past = key < minKey
-          const isSel = sel.has(key)
-          const isToday = key === todayKey
-          return (
-            <View key={i} style={{ width: `${100 / 7}%`, height: 42, padding: 3 }}>
-              <Pressable
-                onPress={() => onToggle(key)}
-                disabled={past}
-                className={`flex-1 items-center justify-center rounded-xl ${isSel ? 'bg-accent-purple' : isToday ? 'border border-accent-purple/50' : ''} ${past ? 'opacity-20' : 'active:opacity-60'}`}
-              >
-                <Text className={`text-[13px] ${isSel ? 'font-bold text-white' : 'font-semibold text-white/80'}`}>{fromKey(key).getDate()}</Text>
-              </Pressable>
-            </View>
-          )
-        })}
-      </View>
-    </View>
-  )
-}
-
-function AdaptRow({ label, value }: { label: string; value: string }) {
-  return (
-    <View className="flex-row items-center gap-2.5 rounded-xl border border-white/5 bg-ink-800 p-3">
-      <Check size={16} color={brand[400]} />
-      <Text className="text-[14px] text-white/55">{label}</Text>
-      <Text className="ml-auto text-right text-[14px] font-semibold text-white">{value}</Text>
-    </View>
   )
 }
 

@@ -25,5 +25,7 @@ jobs:
       - run: npm ci
       - name: Typecheck
         run: npm run typecheck
+      - name: App domain checks (planned periods + dashboard stats)
+        run: npm run check
       - name: Profile sweep (safety-floor + required-slot gate)
         run: npm run sweep

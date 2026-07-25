@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "outDir": ".check-out",
+    "module": "commonjs",
+    "target": "es2022",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "ignoreDeprecations": "6.0",
+    "types": ["node"],
+    "rootDir": "src"
+  },
+  "include": [
+    "src/store/periods.check.ts",
+    "src/store/periods.ts",
+    "src/store/training.ts",
+    "src/store/selectors.ts",
+    "src/store/types.ts",
+    "src/lib/metrics.ts",
+    "src/lib/date.ts",
+    "src/lib/format.ts",
+    "src/data/catalog.ts",
+    "src/backend/schema.ts"
+  ]
+}

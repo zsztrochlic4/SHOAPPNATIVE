@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { View, Text, Pressable, Image, TextInput, Animated, Easing, ScrollView, KeyboardAvoidingView, Platform, PanResponder } from 'react-native'
+import { View, Text, Pressable, Image, TextInput, Animated, Easing, ScrollView, KeyboardAvoidingView, Platform, PanResponder, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
   Sparkles, Check, CheckCheck, ChevronRight, ChevronDown, ChevronLeft, Salad, Trophy, Flame,
@@ -18,7 +18,7 @@ import { useToast } from '../components/Toast'
 import { useNav } from '../nav'
 import {
   BUDGET_MEALS, BEGINNER_LESSONS, exerciseDetail, REP_TARGETS, BASE_WEIGHTS,
-  ACTIVITY_PRESETS, activityPreset, INTENSITY_MULT,
+  ACTIVITY_PRESETS, activityPreset, INTENSITY_MULT, EXERCISES, exById,
 } from '../data/catalog'
 import { ActivityIcon } from '../components/ActivityIcon'
 import { exerciseView, imageForMuscle, buildCustomSession } from '../store/programSession'
@@ -32,9 +32,9 @@ import { SafetyContactButtons } from '../components/SafetyContactButtons'
 import { CoachComingSoon } from '../components/CoachComingSoon'
 import { todaySession, leaderboardSorted, youRank } from '../store/selectors'
 import { relativeLabel, todayKey } from '../lib/date'
-import { CHART_METRICS, STAT_METRICS, progressMetricId, dashboardStatIds } from '../lib/metrics'
-import { brand, useColors } from '../theme'
-import { IS_WEB } from '../components/WebFrame'
+import { CHART_METRICS, MAX_DASHBOARD_STATS, STAT_METRICS, STAT_TIMEFRAMES, dashboardStatIds, dashboardTimeframe, progressMetricId } from '../lib/metrics'
+import { brand, useColors, accentFor, type AccentKey } from '../theme'
+import { AppModal, IS_WEB, WEB_SCREEN } from '../components/WebFrame'
 import { thud } from '../lib/haptics'
 import type { ReactNode } from 'react'
 import type { CoachKind, TemplateExercise, ChatMessage } from '../store/types'
@@ -923,65 +923,260 @@ export function ChallengeDetailSheet({ open, onClose, params }: Props) {
 }
 
 /* ===================== Customise dashboard ======================== */
-export function CustomizeSheet({ open, onClose }: Props) {
-  const { state, dispatch } = useStore()
 
+const CUST_EASE = Easing.bezier(0.22, 1, 0.36, 1)
+
+/** The design's stat toggle: a spring-eased knob in a pill track. */
+function StatSwitch({ on, colors, big = false }: { on: boolean; colors: ReturnType<typeof useColors>; big?: boolean }) {
+  const p = useRef(new Animated.Value(on ? 1 : 0)).current
+  useEffect(() => {
+    Animated.timing(p, { toValue: on ? 1 : 0, duration: 200, easing: CUST_EASE, useNativeDriver: !IS_WEB }).start()
+  }, [on, p])
+  const w = big ? 50 : 46
+  const h = big ? 30 : 28
+  const knob = big ? 24 : 22
+  return (
+    <View style={{ width: w, height: h, borderRadius: 999, padding: 3, justifyContent: 'center', backgroundColor: on ? colors.brand400 : `${colors.fg}26` }}>
+      <Animated.View
+        style={{
+          width: knob, height: knob, borderRadius: knob / 2, backgroundColor: '#fff',
+          shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 3, shadowOffset: { width: 0, height: 1 },
+          transform: [{ translateX: p.interpolate({ inputRange: [0, 1], outputRange: [0, w - knob - 6] }) }],
+        }}
+      />
+    </View>
+  )
+}
+
+/** The Progress tab's "Top stat" presets — one drives the featured chart. */
+const TOP_STATS: { id: string; label: string; icon: string; accent: AccentKey }[] = [
+  { id: 'weight', label: 'Body weight', icon: 'scale', accent: 'blue' },
+  { id: 'water', label: 'Water', icon: 'droplet', accent: 'blue' },
+  { id: 'steps', label: 'Daily steps', icon: 'footprints', accent: 'orange' },
+  { id: 'sleep', label: 'Sleep', icon: 'bed', accent: 'yellow' },
+  { id: 'bench', label: 'Bench press', icon: 'dumbbell', accent: 'brand' },
+  { id: 'squat', label: 'Squat', icon: 'dumbbell', accent: 'brand' },
+]
+
+/**
+ * The "Customise" bottom sheet, 1:1 with the Claude design. From the dashboard
+ * it's a "Your stats" list of toggle switches (pick up to three). From the
+ * Progress tab (`context: 'progress'`) it's the "My Progress" design: a single
+ * "Top stat" to feature in the chart, plus a search to pin any exercise.
+ */
+export function CustomizeSheet({ open, onClose, params }: Props) {
+  const { state, dispatch } = useStore()
+  const colors = useColors()
+  const insets = useSafeAreaInsets()
+  const win = useWindowDimensions()
+  const screenH = IS_WEB ? WEB_SCREEN.height : win.height
+
+  const isProgress = params?.context === 'progress'
   const metric = progressMetricId(state)
   const stats = dashboardStatIds(state)
+  const timeframe = dashboardTimeframe(state)
+  const atMax = stats.length >= MAX_DASHBOARD_STATS
+
+  // Progress tab: the featured metric, and any exercise pinned via search.
+  const [query, setQuery] = useState('')
+  const pinnedEx = exById(metric)
+  const q = query.trim().toLowerCase()
+  const results = q ? EXERCISES.filter((e) => e.name.toLowerCase().includes(q)).slice(0, 7) : []
 
   function pickMetric(id: string) {
     dispatch({ type: 'SET_SETTINGS', patch: { progressMetric: id } })
   }
 
+  // Design behaviour: enabling is blocked once three are on (the row dims);
+  // turn one off first. Disabling stops at one so the grid never goes empty.
   function toggleStat(id: string) {
     const has = stats.includes(id)
-    let next: string[]
     if (has) {
-      if (stats.length <= 1) return // keep at least one
-      next = stats.filter((x) => x !== id)
+      if (stats.length <= 1) return
+      dispatch({ type: 'SET_SETTINGS', patch: { dashboardStats: stats.filter((x) => x !== id) } })
     } else {
-      // Always keep exactly three: adding a fourth swaps out the oldest pick.
-      next = stats.length >= 3 ? [...stats.slice(1), id] : [...stats, id]
+      if (stats.length >= MAX_DASHBOARD_STATS) return
+      dispatch({ type: 'SET_SETTINGS', patch: { dashboardStats: [...stats, id] } })
     }
-    dispatch({ type: 'SET_SETTINGS', patch: { dashboardStats: next } })
   }
 
-  return (
-    <Sheet open={open} onClose={onClose} title="Customise">
-      {/* Main chart metric — your goals themselves now live in Settings. */}
-      <Text className="mb-2 text-[12px] font-bold uppercase tracking-wide text-white/40">Top progress chart</Text>
-      <View className="flex-row flex-wrap gap-2.5">
-        {CHART_METRICS.map((m) => {
-          const on = metric === m.id
-          return (
-            <Pressable key={m.id} onPress={() => pickMetric(m.id)} style={{ width: '47.5%' }} className={`items-center gap-2 rounded-2xl border p-3 active:opacity-90 ${on ? 'border-brand-400 bg-brand-400/10' : 'border-white/8 bg-ink-800'}`}>
-              {on && <View className="absolute right-2 top-2"><Check size={15} strokeWidth={3} color={brand[400]} /></View>}
-              <View className="h-9 w-9 items-center justify-center rounded-xl bg-brand-400/15"><Icon name={m.icon} size={18} color={brand[400]} /></View>
-              <Text className="text-[12.5px] font-semibold text-white">{m.label}</Text>
-            </Pressable>
-          )
-        })}
-      </View>
+  // Bottom-sheet slide (the design's `cs_up`), kept mounted through the exit.
+  const [render, setRender] = useState(open)
+  const [panelH, setPanelH] = useState(560)
+  const progress = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    if (open) {
+      setRender(true)
+      setQuery('')
+      Animated.timing(progress, { toValue: 1, duration: 360, easing: CUST_EASE, useNativeDriver: !IS_WEB }).start()
+    } else if (render) {
+      Animated.timing(progress, { toValue: 0, duration: 260, easing: CUST_EASE, useNativeDriver: !IS_WEB }).start(({ finished }) => {
+        if (finished) setRender(false)
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
 
-      {/* Dashboard stats */}
-      <View className="mb-2 mt-6 flex-row items-center justify-between">
-        <Text className="text-[12px] font-bold uppercase tracking-wide text-white/40">Dashboard stats</Text>
-        <Text className="text-[11px] text-white/35">Pick 3</Text>
-      </View>
-      <View className="flex-row flex-wrap gap-2.5">
-        {STAT_METRICS.map((m) => {
-          const on = stats.includes(m.id)
-          return (
-            <Pressable key={m.id} onPress={() => toggleStat(m.id)} style={{ width: '47.5%' }} className={`items-center gap-2 rounded-2xl border p-3 active:opacity-90 ${on ? 'border-brand-400 bg-brand-400/10' : 'border-white/8 bg-ink-800'}`}>
-              <View className={`absolute right-2 top-2 h-[18px] w-[18px] items-center justify-center rounded-md border ${on ? 'border-brand-400 bg-brand-400' : 'border-white/20'}`}>{on && <Check size={11} strokeWidth={3.5} color="#000" />}</View>
-              <View className="h-9 w-9 items-center justify-center rounded-xl bg-brand-400/15"><Icon name={m.icon} size={18} color={brand[400]} /></View>
-              <Text className="text-[12.5px] font-semibold text-white">{m.label}</Text>
+  const tabStyle = (on: boolean) => ({
+    flex: 1, alignItems: 'center' as const, paddingVertical: isProgress ? 10 : 9, borderRadius: 10,
+    backgroundColor: on ? colors.brand400 : 'transparent',
+  })
+
+  return (
+    <AppModal visible={render} transparent animationType="none" onRequestClose={onClose}>
+      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <Animated.View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.55)', opacity: progress }}>
+          <Pressable accessibilityLabel="Close" onPress={onClose} style={{ flex: 1 }} />
+        </Animated.View>
+
+        <Animated.View
+          onLayout={(e) => setPanelH(e.nativeEvent.layout.height)}
+          style={{
+            maxHeight: screenH * 0.92,
+            backgroundColor: colors.ink800,
+            borderTopLeftRadius: 28, borderTopRightRadius: 28,
+            paddingHorizontal: isProgress ? 20 : 18, paddingTop: 10, paddingBottom: 22 + insets.bottom,
+            shadowColor: '#000', shadowOpacity: 0.55, shadowRadius: 60, shadowOffset: { width: 0, height: -24 }, elevation: 24,
+            transform: [{ translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [panelH, 0] }) }],
+          }}
+        >
+          <View style={{ width: 38, height: 5, borderRadius: 3, backgroundColor: `${colors.fg}33`, alignSelf: 'center', marginTop: 0, marginBottom: 16 }} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text style={{ fontSize: isProgress ? 22 : 19, fontWeight: '800', letterSpacing: -0.22, color: colors.fg }}>Customise</Text>
+            <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Done">
+              <Text style={{ fontSize: isProgress ? 16 : 15, fontWeight: '700', color: colors.brand400 }}>Done</Text>
             </Pressable>
-          )
-        })}
+          </View>
+          <Text style={{ marginTop: isProgress ? 4 : 3, fontSize: isProgress ? 13 : 12.5, color: `${colors.fg}80` }}>
+            {isProgress ? 'Choose the time window, then pick one stat to feature.' : 'Choose the time window, then pick up to three stats.'}
+          </Text>
+
+          {/* Time window */}
+          <View style={{ flexDirection: 'row', gap: 4, marginTop: isProgress ? 18 : 16, padding: 4, borderRadius: 13, backgroundColor: colors.ink700 }}>
+            {STAT_TIMEFRAMES.map((t) => {
+              const on = timeframe === t
+              return (
+                <Pressable key={t} onPress={() => dispatch({ type: 'SET_SETTINGS', patch: { dashboardTimeframe: t } })} style={tabStyle(on)}>
+                  <Text style={{ fontSize: isProgress ? 13.5 : 13, fontWeight: '700', color: on ? '#0a0a0b' : `${colors.fg}8c` }}>{t}</Text>
+                </Pressable>
+              )
+            })}
+          </View>
+
+          <ScrollView
+            style={IS_WEB ? { maxHeight: screenH * 0.92 - (isProgress ? 200 : 190) } : undefined}
+            contentContainerStyle={{ paddingBottom: 4 }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {isProgress ? (
+              <>
+                {/* Top stat — a single featured metric drives the chart. */}
+                <Text style={{ marginTop: 22, marginBottom: 4, fontSize: 12, fontWeight: '700', letterSpacing: 0.72, textTransform: 'uppercase', color: `${colors.fg}73` }}>Top stat</Text>
+                {TOP_STATS.map((m) => {
+                  const on = metric === m.id
+                  const accent = accentFor(m.accent, colors)
+                  return (
+                    <Pressable key={m.id} onPress={() => pickMetric(m.id)} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 2, borderBottomWidth: 1, borderBottomColor: `${colors.fg}0f` }}>
+                      <View style={{ width: 38, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: `${accent}26` }}>
+                        <Icon name={m.icon} size={17} color={accent} />
+                      </View>
+                      <Text style={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: '700', color: colors.fg }}>{m.label}</Text>
+                      <StatSwitch on={on} colors={colors} big />
+                    </Pressable>
+                  )
+                })}
+
+                <View style={{ height: 1, backgroundColor: `${colors.fg}0f`, marginTop: 22 }} />
+
+                {/* Feature an exercise — search the library and pin one. */}
+                <Text style={{ marginTop: 22, fontSize: 12, fontWeight: '700', letterSpacing: 0.72, textTransform: 'uppercase', color: `${colors.fg}73` }}>Feature an exercise</Text>
+                <Text style={{ marginTop: 5, fontSize: 13, color: `${colors.fg}80` }}>Search the exercise library and feature one on your top progress chart.</Text>
+
+                {pinnedEx && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 13, marginTop: 14, paddingVertical: 13, paddingHorizontal: 14, borderRadius: 16, backgroundColor: `${colors.brand400}1f`, borderWidth: 1, borderColor: `${colors.brand400}73` }}>
+                    <View style={{ width: 38, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: `${colors.brand400}33` }}>
+                      <Icon name="dumbbell" size={20} color={colors.brand400} />
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text numberOfLines={1} style={{ fontSize: 15, fontWeight: '700', color: colors.fg }}>{pinnedEx.name}</Text>
+                      <Text style={{ marginTop: 1, fontSize: 12, fontWeight: '600', color: colors.brand300 }}>Featured on your progress chart</Text>
+                    </View>
+                    <Pressable onPress={() => pickMetric('weight')} hitSlop={6} accessibilityLabel="Unpin" style={{ width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.ink700 }}>
+                      <X size={15} color={`${colors.fg}99`} />
+                    </Pressable>
+                  </View>
+                )}
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 14, backgroundColor: colors.ink700, borderWidth: 1, borderColor: `${colors.fg}14` }}>
+                  <Search size={18} color={`${colors.fg}66`} />
+                  <TextInput
+                    value={query}
+                    onChangeText={setQuery}
+                    placeholder="Search exercises"
+                    placeholderTextColor={`${colors.fg}59`}
+                    style={{ flex: 1, minWidth: 0, fontSize: 15, color: colors.fg, paddingVertical: 0 }}
+                  />
+                  {query.length > 0 && (
+                    <Pressable onPress={() => setQuery('')} hitSlop={8} accessibilityLabel="Clear search">
+                      <X size={15} color={`${colors.fg}73`} />
+                    </Pressable>
+                  )}
+                </View>
+
+                {results.length > 0 && (
+                  <View style={{ marginTop: 10, borderRadius: 14, overflow: 'hidden', backgroundColor: colors.ink700, borderWidth: 1, borderColor: `${colors.fg}0f` }}>
+                    {results.map((e, i) => {
+                      const on = e.id === metric
+                      return (
+                        <Pressable key={e.id} onPress={() => { pickMetric(e.id); setQuery('') }} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 13, paddingHorizontal: 14, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: `${colors.fg}0f` }}>
+                          <Text style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: '600', color: colors.fg }}>{e.name}</Text>
+                          {on ? <Check size={18} strokeWidth={2.4} color={colors.brand400} /> : <Plus size={18} color={`${colors.fg}59`} />}
+                        </Pressable>
+                      )
+                    })}
+                  </View>
+                )}
+
+                {q.length > 0 && results.length === 0 && (
+                  <Text style={{ marginTop: 12, textAlign: 'center', fontSize: 13, color: `${colors.fg}73`, padding: 8 }}>No exercises match your search.</Text>
+                )}
+              </>
+            ) : (
+              <>
+                {/* Your stats */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 20, marginBottom: 2 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', letterSpacing: 0.72, textTransform: 'uppercase', color: `${colors.fg}73` }}>Your stats</Text>
+                  <View style={{ paddingHorizontal: 10, paddingVertical: 2, borderRadius: 999, backgroundColor: atMax ? `${colors.brand400}26` : `${colors.fg}14` }}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: atMax ? colors.brand300 : `${colors.fg}80` }}>{stats.length} of {MAX_DASHBOARD_STATS}</Text>
+                  </View>
+                </View>
+
+                {STAT_METRICS.map((m) => {
+                  const on = stats.includes(m.id)
+                  const disabled = !on && atMax
+                  const accent = accentFor(m.accent, colors)
+                  return (
+                    <Pressable
+                      key={m.id}
+                      onPress={() => toggleStat(m.id)}
+                      disabled={disabled}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 2, borderBottomWidth: 1, borderBottomColor: `${colors.fg}0d`, opacity: disabled ? 0.4 : 1 }}
+                    >
+                      <View style={{ width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: `${accent}26` }}>
+                        <Icon name={m.icon} size={15} color={accent} />
+                      </View>
+                      <Text style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: '700', color: colors.fg }}>{m.label}</Text>
+                      <StatSwitch on={on} colors={colors} />
+                    </Pressable>
+                  )
+                })}
+              </>
+            )}
+          </ScrollView>
+        </Animated.View>
       </View>
-      <View className="h-2" />
-    </Sheet>
+    </AppModal>
   )
 }
 

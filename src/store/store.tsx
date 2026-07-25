@@ -15,6 +15,7 @@ import type {
   LoggedExercise,
   LoggedMeal,
   PlannedMeal,
+  PlannedPeriod,
   Post,
   PostComment,
   Profile,
@@ -27,6 +28,7 @@ import type { UserDoc, WorkoutInstanceDoc } from '../backend/schema'
 import type { StoredProgram, ProgramStatus } from '../backend/runtime/activate'
 import { sessionFromInstance, fullWeekday } from './programSession'
 import { sessionForDay } from './selectors'
+import { plannedPeriods, toPlannedAbsence } from './periods'
 
 const STORAGE_KEY = 'sho.state.v1'
 
@@ -83,8 +85,8 @@ export type Action =
   | { type: 'ADD_NOTIFICATION'; notif: Omit<AppNotification, 'id' | 'dateKey' | 'time' | 'read'> }
   | { type: 'ADD_PHOTO'; dataUrl: string; note?: string }
   | { type: 'REMOVE_PHOTO'; id: string }
-  | { type: 'SET_EXAM_DATES'; startKey: string; endKey: string }
-  | { type: 'SET_EXAM_DATES_LIST'; dateKeys: string[] }
+  | { type: 'SAVE_PERIOD'; period: PlannedPeriod }
+  | { type: 'CANCEL_PERIOD'; id: string }
   | { type: 'COMPLETE_LESSON'; id: string }
   | { type: 'GIVE_KUDOS'; postId: string }
   | { type: 'CONNECT_PARTNER'; id: string }
@@ -100,6 +102,32 @@ function recalc(s: WorkoutSession): WorkoutSession {
     s.exercises.reduce((a, ex) => a + ex.sets.reduce((b, set) => b + (set.done ? set.weightKg * set.reps : 0), 0), 0),
   )
   return { ...s, volumeKg }
+}
+
+/**
+ * Commit a new set of busy periods, keeping the canonical backend document in
+ * step: `planned_absences` is what the generator's Exam Survival Protocol reads
+ * (backend/generator/exam.ts), so it must never drift from what the user sees.
+ * The legacy `examDates` window is retired at the same time — from here on the
+ * periods array is the only source of truth.
+ */
+function withPeriods(state: AppState, periods: PlannedPeriod[]): AppState {
+  const sorted = [...periods].sort((a, b) => a.start.localeCompare(b.start))
+  const active = sorted.find((p) => p.start <= todayKey && p.end >= todayKey)
+  return {
+    ...state,
+    plannedPeriods: sorted,
+    profile: {
+      ...state.profile,
+      examMode: sorted.length > 0,
+      examStartKey: active?.start,
+      examEndKey: active?.end,
+      examDates: undefined,
+    },
+    backendUser: state.backendUser
+      ? { ...state.backendUser, planned_absences: sorted.map(toPlannedAbsence) }
+      : state.backendUser,
+  }
 }
 
 /* ------------------------------ Reducer ------------------------------ */
@@ -440,18 +468,18 @@ function reducer(state: AppState, action: Action): AppState {
     case 'REMOVE_PHOTO':
       return { ...state, photos: state.photos.filter((p) => p.id !== action.id) }
 
-    case 'SET_EXAM_DATES':
-      return { ...state, profile: { ...state.profile, examMode: true, examStartKey: action.startKey, examEndKey: action.endKey } }
-
-    case 'SET_EXAM_DATES_LIST': {
-      // Dedupe + sort the picked dates. Empty list = protocol off. Otherwise keep
-      // start/end in sync with the min/max so the phase logic (examState) is unchanged.
-      const dates = Array.from(new Set(action.dateKeys)).sort()
-      if (dates.length === 0) {
-        return { ...state, profile: { ...state.profile, examMode: false, examDates: undefined, examStartKey: undefined, examEndKey: undefined } }
-      }
-      return { ...state, profile: { ...state.profile, examMode: true, examDates: dates, examStartKey: dates[0], examEndKey: dates[dates.length - 1] } }
+    case 'SAVE_PERIOD': {
+      // Upsert by id. Reading through `plannedPeriods` first means a legacy
+      // exam-dates save is migrated into the real array on the user's first edit
+      // instead of being dropped.
+      const current = plannedPeriods(state)
+      const exists = current.some((p) => p.id === action.period.id)
+      const next = exists ? current.map((p) => (p.id === action.period.id ? action.period : p)) : [...current, action.period]
+      return withPeriods(state, next)
     }
+
+    case 'CANCEL_PERIOD':
+      return withPeriods(state, plannedPeriods(state).filter((p) => p.id !== action.id))
 
     case 'COMPLETE_LESSON':
       return state.beginnerProgress.includes(action.id)

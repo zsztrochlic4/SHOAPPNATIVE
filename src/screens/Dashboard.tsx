@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { View, Text, Pressable, Image, Animated, Easing, Platform, ScrollView, useWindowDimensions } from 'react-native'
+import { View, Text, Pressable, Image, Animated, Easing, Platform, ScrollView, StyleSheet, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import Svg, { Circle, G } from 'react-native-svg'
-import { Menu, MessageCircle, Clock, Play, GraduationCap, ChevronRight, Leaf, Check, Flame, ChevronDown, Info, ArrowRight, X } from 'lucide-react-native'
+import Svg, { Circle, G, Defs, RadialGradient, Stop, Rect } from 'react-native-svg'
+import { LinearGradient } from 'expo-linear-gradient'
+import { Menu, MessageCircle, Clock, Play, GraduationCap, ChevronRight, Leaf, Check, Flame, ChevronDown, Info, ArrowRight, X, SlidersHorizontal } from 'lucide-react-native'
 import { Icon } from '../components/Icon'
 import { ActivityIcon } from '../components/ActivityIcon'
 import { Card } from '../components/ui'
@@ -20,10 +21,11 @@ import {
   workoutStartedForDay,
 } from '../store/selectors'
 import { tagById, type TagTone } from '../data/nutrition'
-import { dashboardStatIds, statById } from '../lib/metrics'
+import { dashboardStatIds, dashboardTimeframe, statById, timeframeLabel, type StatResult } from '../lib/metrics'
 import { dailyTargets, examState } from '../store/training'
+import { activePeriod, upcomingPeriods, daysLabel, daysUntil, fmtPeriodDate, nextDayKey } from '../store/periods'
 import { Wordmark } from '../components/Logo'
-import { brand, accent, useColors } from '../theme'
+import { brand, accent, accentFor, useColors, type AccentKey } from '../theme'
 
 const WD = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const FULL_WD = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -133,6 +135,15 @@ export default function Dashboard() {
 
   const [sheetOpen, setSheetOpen] = useState(false)
   const openSheet = () => setSheetOpen(true)
+
+  // Progress overview: the picked stats, computed over the picked window.
+  const timeframe = dashboardTimeframe(state)
+  const overviewStats = dashboardStatIds(state)
+    .map((id) => {
+      const metric = statById(id)
+      return metric ? { id, metric, result: metric.compute(state, units, timeframe) } : null
+    })
+    .filter(Boolean) as { id: string; metric: NonNullable<ReturnType<typeof statById>>; result: StatResult }[]
 
   const chevron = 'rgba(148,148,148,0.55)'
 
@@ -324,21 +335,32 @@ export default function Dashboard() {
         colors={colors}
       />
 
-      {/* Progress overview */}
-      <Section title="Progress overview" right={<Pressable onPress={() => nav.open('customize')} hitSlop={8}><Text className="see-all">Customise</Text></Pressable>} />
-      <View className="flex-row gap-3">
-        {dashboardStatIds(state).map((id, i) => {
-          const m = statById(id)
-          if (!m) return null
-          const r = m.compute(state, units)
-          return <OverviewCard key={`${id}-${i}`} icon={r.icon} label={r.label} value={r.value} unit={r.unit} sub={r.sub} delta={r.delta} />
-        })}
+      {/* Progress overview — the stats and the window they're measured over both
+       *  live behind "Customise". */}
+      <View className="mt-7 flex-row items-end justify-between" style={{ marginBottom: 12 }}>
+        <View className="min-w-0 flex-1">
+          <Text className="text-[19px] font-extrabold text-white" style={{ letterSpacing: -0.19 }}>Progress overview</Text>
+          <Text className="mt-[3px] text-[12px] font-semibold text-white/45">{timeframeLabel(timeframe)}</Text>
+        </View>
+        <Pressable onPress={() => nav.open('customize')} hitSlop={8} className="ml-3 flex-row items-center gap-[5px] active:opacity-70">
+          <SlidersHorizontal size={16} color={colors.brand400} strokeWidth={1.8} />
+          <Text className="text-[14px] font-bold" style={{ color: colors.brand400 }}>Customise</Text>
+        </Pressable>
+      </View>
+      <View className="flex-row" style={{ gap: 10 }}>
+        {overviewStats.map(({ id, metric, result }) => (
+          <OverviewCard key={id} accent={accentFor(metric.accent, colors)} result={result} colors={colors} single={overviewStats.length === 1} />
+        ))}
       </View>
 
+      {/* When is your busy period? — exams, travel, moving house. */}
+      <Text className="text-[19px] font-extrabold text-white" style={{ marginTop: 26, marginBottom: 17 }}>When is your busy period?</Text>
+      <BusyPeriodCard colors={colors} onPress={() => nav.open('examMode')} />
+
       {/* More tools */}
-      <Section title="More" tight />
-      <View className="gap-3">
-        {state.profile.newToGym && (
+      {state.profile.newToGym && (
+        <>
+          <Section title="More" tight />
           <Pressable onPress={() => nav.open('beginner')} className="flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-3.5 active:opacity-90">
             <View className="h-10 w-10 items-center justify-center rounded-xl bg-brand-400/15"><Leaf size={20} color={brand[400]} /></View>
             <View className="flex-1">
@@ -347,27 +369,8 @@ export default function Dashboard() {
             </View>
             <ChevronRight size={18} color={chevron} />
           </Pressable>
-        )}
-        <Pressable onPress={() => nav.open('examMode')} className="flex-row items-center gap-3 rounded-2xl border border-accent-purple/30 bg-accent-purple/10 p-4 active:opacity-90">
-          <View className="h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent-purple/20"><GraduationCap size={22} color={accent.purple} /></View>
-          <View className="flex-1">
-            <Text className="font-bold text-white">Exam Survival Protocol</Text>
-            <Text className="text-[13px] text-white/55">
-              {(() => {
-                if (!state.profile.examMode) return 'Add your exam dates and I will adapt your plan.'
-                const ds = state.profile.examDates ?? []
-                if (ds.length === 0) return 'On. Shorter sessions, more recovery.'
-                const upcoming = ds.filter((k) => k >= todayKey)
-                if (upcoming.length === 0) return `${ds.length} exam date${ds.length === 1 ? '' : 's'} · all done`
-                const until = Math.round((fromKey(upcoming[0]).getTime() - fromKey(todayKey).getTime()) / 86400000)
-                const nextLabel = until === 0 ? 'today' : until === 1 ? 'tomorrow' : `in ${until} days`
-                return `${ds.length} date${ds.length === 1 ? '' : 's'} set · next ${nextLabel}`
-              })()}
-            </Text>
-          </View>
-          <ChevronRight size={20} color={accent.purple} />
-        </Pressable>
-      </View>
+        </>
+      )}
       <View className="h-2" />
 
       {isToday && (
@@ -898,21 +901,147 @@ function Section({ title, right, tight }: { title: string; right?: ReactNode; ti
   )
 }
 
-function OverviewCard({ icon, label, value, unit, sub, delta }: { icon: string; label: string; value: string; unit?: string; sub: string; delta: string }) {
+/* ---- Progress overview + "When is your busy period?" (design 1:1) -------- */
+
+/**
+ * One stat tile. The delta pill is the whole point of the card: it's green when
+ * the number moved the way this metric wants (which for body weight is *down*),
+ * red when it moved against, and neutral grey when nothing changed.
+ */
+function OverviewCard({ accent, result, colors, single = false }: { accent: string; result: StatResult; colors: ThemeColors; single?: boolean }) {
+  const flat = result.dir === 'flat'
+  const pillColor = flat ? `${colors.fg}66` : result.good ? colors.brand400 : colors.danger
+  const pillBg = flat ? `${colors.fg}12` : `${result.good ? colors.brand400 : colors.danger}24`
+  const arrow = result.dir === 'down' ? '↓' : '↑'
+  const pill = (
+    <View style={{ borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: pillBg }}>
+      <Text numberOfLines={1} style={{ fontSize: single ? 12 : 11, fontWeight: '700', color: pillColor }}>
+        {result.arrow ? `${arrow} ${result.delta}` : result.delta}
+      </Text>
+    </View>
+  )
+  const cardShadow = { shadowColor: '#000', shadowOpacity: 0.28, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 3 } as const
+
+  // A lone stat has the whole row to itself — centre it as a small hero rather
+  // than leaving the number stranded in the top-left of a wide, empty card.
+  if (single) {
+    return (
+      <LinearGradient
+        colors={[colors.ink700, colors.ink800]}
+        style={{ flex: 1, minWidth: 0, borderRadius: 18, paddingVertical: 22, paddingHorizontal: 16, alignItems: 'center', borderWidth: 1, borderColor: `${colors.fg}0f`, ...cardShadow }}
+      >
+        <View style={{ width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: `${accent}26` }}>
+          <Icon name={result.icon} size={20} color={accent} />
+        </View>
+        <Text numberOfLines={1} className="mt-3 text-[12.5px] font-semibold text-white/50" style={{ textAlign: 'center' }}>{result.label}</Text>
+        <View className="mt-1.5 flex-row items-baseline justify-center" style={{ gap: 3 }}>
+          <Text className="font-extrabold text-white" style={{ fontSize: 34, letterSpacing: -1 }}>{result.value}</Text>
+          {!!result.unit && <Text className="text-[14px] text-white/45">{result.unit}</Text>}
+        </View>
+        <View className="mt-2.5">{pill}</View>
+      </LinearGradient>
+    )
+  }
+
   return (
-    <Card className="flex-1 p-3.5">
-      <View className="mb-2 flex-row items-center gap-1.5">
-        <Icon name={icon} size={15} color="rgba(148,148,148,0.7)" />
-        <Text numberOfLines={1} className="text-xs font-medium text-white/55">{label}</Text>
+    <LinearGradient
+      colors={[colors.ink700, colors.ink800]}
+      style={{
+        flex: 1, minWidth: 0, borderRadius: 18, paddingHorizontal: 13, paddingTop: 13, paddingBottom: 12,
+        borderWidth: 1, borderColor: `${colors.fg}0f`, ...cardShadow,
+      }}
+    >
+      <View style={{ width: 28, height: 28, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: `${accent}26` }}>
+        <Icon name={result.icon} size={15} color={accent} />
       </View>
-      <View className="flex-row items-baseline gap-1">
-        <Text className="text-2xl font-extrabold tracking-tight text-white">{value}</Text>
-        {unit && <Text className="text-xs text-white/50">{unit}</Text>}
+      <Text numberOfLines={1} className="mt-2.5 text-[11.5px] font-semibold text-white/50">{result.label}</Text>
+      <View className="mt-[5px] flex-row items-baseline" style={{ gap: 2 }}>
+        <Text className="text-[24px] font-extrabold text-white" style={{ letterSpacing: -0.7 }}>{result.value}</Text>
+        {!!result.unit && <Text className="text-[12px] text-white/45">{result.unit}</Text>}
       </View>
-      <View className="mt-1.5 flex-row items-center justify-between">
-        {sub ? <Text className="text-[11px] text-white/40">{sub}</Text> : <View />}
-        <Text className="text-[11px] font-semibold text-brand-400">{delta}</Text>
+      <View className="mt-[9px] flex-row">{pill}</View>
+    </LinearGradient>
+  )
+}
+
+/**
+ * The entry point to Plan Around Your Life. Its chip and subtitle are the whole
+ * status at a glance: mid-period it says when normal training returns, with
+ * something scheduled it counts down to the next one, and with nothing set it
+ * explains what the feature is for rather than showing an empty state.
+ */
+function BusyPeriodCard({ colors, onPress }: { colors: ThemeColors; onPress: () => void }) {
+  const { state } = useStore()
+  const active = activePeriod(state)
+  const upcoming = upcomingPeriods(state)
+
+  let chipLabel: string
+  let chipAccent: AccentKey
+  let subtitle: string
+  if (active) {
+    chipLabel = 'Active now'
+    chipAccent = 'brand'
+    subtitle = `Active now · returns ${fmtPeriodDate(nextDayKey(active.end))}`
+  } else if (upcoming.length === 0) {
+    chipLabel = 'Set up'
+    chipAccent = 'fg'
+    subtitle = "Add exams, travel or other busy dates and we'll adapt your training."
+  } else {
+    chipLabel = 'Scheduled'
+    chipAccent = 'purple'
+    const next = Math.min(...upcoming.map((p) => daysUntil(p.start)))
+    subtitle = `${upcoming.length} period${upcoming.length > 1 ? 's' : ''} set · next ${daysLabel(next)}`
+  }
+  const chipCol = accentFor(chipAccent, colors)
+  const neutralChip = chipAccent === 'fg'
+
+  return (
+    <PressableScale onPress={onPress} scaleTo={0.99} accessibilityLabel="Plan Around Your Life">
+      {/* The design's radial purple wash: a glow anchored at the left-middle
+       *  (behind the icon, at 0% 45%) that fades out to the page colour. An SVG
+       *  radial gives the real thing on web and native alike — expo-linear-gradient
+       *  can only ramp in a straight line. The shadow sits on the outer view so the
+       *  inner overflow:hidden can clip the gradient to the rounded corners. */}
+      <View
+        style={{
+          borderRadius: 22, backgroundColor: colors.ink900,
+          shadowColor: '#000', shadowOpacity: 0.32, shadowRadius: 22, shadowOffset: { width: 0, height: 8 }, elevation: 4,
+        }}
+      >
+        <View style={{ borderRadius: 22, overflow: 'hidden', borderWidth: 1, borderColor: `${colors.accentPurple}33`, padding: 16 }}>
+          <Svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style={StyleSheet.absoluteFill}>
+            <Defs>
+              <RadialGradient id="busyGlow" cx="0" cy="45" r="130" gradientUnits="userSpaceOnUse">
+                <Stop offset="0" stopColor={colors.accentPurple} stopOpacity={0.32} />
+                <Stop offset="0.42" stopColor={colors.accentPurple} stopOpacity={0.1} />
+                <Stop offset="0.8" stopColor={colors.ink900} stopOpacity={1} />
+              </RadialGradient>
+            </Defs>
+            <Rect x="0" y="0" width="100" height="100" fill="url(#busyGlow)" />
+          </Svg>
+          <View className="flex-row items-center" style={{ gap: 14 }}>
+            <View
+              style={{
+                width: 48, height: 48, borderRadius: 15, alignItems: 'center', justifyContent: 'center',
+                backgroundColor: `${colors.accentPurple}52`,
+                shadowColor: colors.accentPurple, shadowOpacity: 0.25, shadowRadius: 16, shadowOffset: { width: 0, height: 6 },
+              }}
+            >
+              <GraduationCap size={22} color={colors.accentPurple} strokeWidth={1.8} />
+            </View>
+            <View className="min-w-0 flex-1">
+              <View className="flex-row items-start" style={{ gap: 8 }}>
+                <Text className="text-[16px] font-bold text-white">Plan Around Your Life</Text>
+                <View style={{ borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3, backgroundColor: `${chipCol}${neutralChip ? '1a' : '26'}` }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: neutralChip ? `${colors.fg}b3` : chipCol }}>{chipLabel}</Text>
+                </View>
+              </View>
+              <Text className="mt-[3px] text-[13px] text-white/60">{subtitle}</Text>
+            </View>
+            <ChevronRight size={20} color={`${colors.fg}66`} />
+          </View>
+        </View>
       </View>
-    </Card>
+    </PressableScale>
   )
 }

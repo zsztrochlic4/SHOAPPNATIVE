@@ -1,5 +1,6 @@
 import type { AppState } from '../store/types'
 import { streakStats, workoutsThisWeek, weightStats } from '../store/selectors'
+import { activePeriod, modeMeta, periodTitle } from '../store/periods'
 
 /**
  * Turns a user's profile + key stats into a compact plain-text summary that we
@@ -54,7 +55,14 @@ export function buildUserContext(s: AppState): string {
   if (diet.length) add('Diet', diet.join(', '))
   add('Daily targets', `${p.calorieTarget} kcal, ${p.proteinTarget}g protein`)
 
-  if (p.examMode) add('Note', 'currently in exam season — protect study time, keep training light')
+  // Only a period the user is *inside* right now changes how the coach should
+  // talk to them — one scheduled for next month, or one that already finished,
+  // must not read as "they're in it".
+  const busy = activePeriod(s)
+  const busyMode = modeMeta(busy?.mode)
+  if (busy && busyMode) {
+    add('Note', `currently in a declared busy period (${periodTitle(busy)}) until ${busy.end} — training is set to "${busyMode.title}": ${busyMode.effect.toLowerCase()}. Protect their time and don't push for more`)
+  }
   add('Motivation', p.motivation?.trim())
 
   // A little live progress so advice reflects where they actually are.

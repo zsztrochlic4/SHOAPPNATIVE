@@ -1,5 +1,6 @@
 import { vars } from 'nativewind'
 import { useStore } from './store/store'
+import type { AccentKey } from './store/periods'
 
 /**
  * Theme is driven by CSS variables applied via `vars()` on the root view —
@@ -139,6 +140,23 @@ export const accent = {
   orange: '#F5A524',
   yellow: '#F5C518',
 }
+
+export type { AccentKey }
+
+/**
+ * Resolve an accent key (used by the planned-period modes and the dashboard
+ * stat cards) against a live palette.
+ */
+export function accentFor(key: AccentKey, c: Palette): string {
+  if (key === 'brand') return c.brand400
+  if (key === 'blue') return c.accentBlue
+  if (key === 'purple') return c.accentPurple
+  if (key === 'orange') return c.accentOrange
+  if (key === 'yellow') return c.accentYellow
+  return c.fg
+}
+
+export type Palette = (typeof palette)[ThemeName]
 
 /** Current theme name from the store. */
 export function useThemeName(): ThemeName {
