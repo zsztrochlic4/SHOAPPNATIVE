@@ -41,8 +41,8 @@ export function CloudSync() {
       .then((loaded) => {
         if (cancelled) return
         if (loaded && loaded.state.v === SCHEMA_VERSION) {
-          // Returning user: merge cloud over current state so local-only fields
-          // (photos) survive. Diff future saves against what's actually in the
+          // Returning user: merge cloud over current state so any local-only
+          // fields survive. Diff future saves against what's actually in the
           // cloud subcollections (empty for a legacy doc → first save migrates).
           savedRef.current = loaded.baseline
           dispatch({ type: 'HYDRATE', state: { ...stateRef.current, ...loaded.state } as AppState })

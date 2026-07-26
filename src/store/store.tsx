@@ -83,8 +83,6 @@ export type Action =
   | { type: 'MARK_NOTIF_READ'; id: string }
   | { type: 'MARK_ALL_READ' }
   | { type: 'ADD_NOTIFICATION'; notif: Omit<AppNotification, 'id' | 'dateKey' | 'time' | 'read'> }
-  | { type: 'ADD_PHOTO'; dataUrl: string; note?: string }
-  | { type: 'REMOVE_PHOTO'; id: string }
   | { type: 'SAVE_PERIOD'; period: PlannedPeriod }
   | { type: 'CANCEL_PERIOD'; id: string }
   | { type: 'COMPLETE_LESSON'; id: string }
@@ -459,14 +457,6 @@ function reducer(state: AppState, action: Action): AppState {
       const notif: AppNotification = { ...action.notif, id: `n-${Date.now()}`, dateKey: todayKey, time: nowTime(), read: false }
       return { ...state, notifications: [notif, ...state.notifications] }
     }
-
-    case 'ADD_PHOTO': {
-      const photo = { id: `ph-${Date.now()}`, dateKey: todayKey, dataUrl: action.dataUrl, note: action.note }
-      return { ...state, photos: [photo, ...state.photos] }
-    }
-
-    case 'REMOVE_PHOTO':
-      return { ...state, photos: state.photos.filter((p) => p.id !== action.id) }
 
     case 'SAVE_PERIOD': {
       // Upsert by id. Reading through `plannedPeriods` first means a legacy

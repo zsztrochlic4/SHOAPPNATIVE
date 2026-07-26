@@ -58,8 +58,9 @@ const SUBCOLLECTIONS = {
 type SubKey = keyof typeof SUBCOLLECTIONS
 const SUB_KEYS = Object.keys(SUBCOLLECTIONS) as SubKey[]
 
-/** Kept on-device only — too large for Firestore docs (base64 image data). */
-const LOCAL_ONLY: (keyof AppState)[] = ['photos']
+/** Slices kept on-device only (e.g. anything too large for a Firestore doc).
+ *  Currently none — every slice syncs. */
+const LOCAL_ONLY: (keyof AppState)[] = []
 
 /** Firestore allows 500 writes per batch; stay safely under it. */
 const BATCH_LIMIT = 400

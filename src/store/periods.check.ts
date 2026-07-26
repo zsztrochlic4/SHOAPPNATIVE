@@ -77,7 +77,7 @@ function makeState(over: Partial<AppState> = {}): AppState {
       { id: 'd', day: 'Fri', name: 'Legs', focus: '', exerciseIds: [] },
     ],
     posts: [], leaderboard: [], challenges: [], badges: [], notifications: [], events: [],
-    groups: [], photos: [], partners: [], coachThread: [], beginnerProgress: [],
+    groups: [], partners: [], coachThread: [], beginnerProgress: [],
     v: 1,
     ...over,
   } as AppState

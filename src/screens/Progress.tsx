@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { View, Text, Pressable, Image } from 'react-native'
-import { SlidersHorizontal, ChevronDown, ArrowRight, Trophy, Flame, Plus, Camera } from 'lucide-react-native'
+import { SlidersHorizontal, ChevronDown, ArrowRight, Flame, Plus } from 'lucide-react-native'
 import { default as Svg, Path, Line, Circle, Rect, G, Text as SvgText } from 'react-native-svg'
 import { Icon } from '../components/Icon'
 import { ProgressRing, ProgressBar, ScreenHeader, SectionHeader } from '../components/ui'
@@ -260,28 +260,6 @@ export default function Progress() {
         </View>
       </View>
 
-      {/* ---------------- Photos + recap ---------------- */}
-      <Pressable onPress={() => nav.open('photos')} className="mt-4 w-full flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-4 active:opacity-90">
-        <View className="h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-400/15">
-          <Camera size={20} color={brand[400]} />
-        </View>
-        <View className="flex-1">
-          <Text className="font-bold text-white">Progress photos</Text>
-          <Text className="text-[13px] text-white/55">{state.photos.length} photos · see your transformation</Text>
-        </View>
-        <ArrowRight size={18} color="rgba(255,255,255,0.3)" />
-      </Pressable>
-
-      <Pressable onPress={() => nav.open('recap')} className="mt-4 w-full flex-row items-center gap-3 rounded-2xl border border-brand-400/20 bg-brand-400/10 p-4 active:opacity-90">
-        <Trophy size={28} color={brand[400]} />
-        <View className="flex-1">
-          <Text className="font-bold text-white">You're in the top 20% of users</Text>
-          <Text className="text-[13px] text-white/55">Keep showing up. The results will follow.</Text>
-        </View>
-        <View className="btn-primary px-4 py-2">
-          <Text className="text-sm font-semibold text-black">Recap</Text>
-        </View>
-      </Pressable>
       <View className="h-2" />
     </View>
   )

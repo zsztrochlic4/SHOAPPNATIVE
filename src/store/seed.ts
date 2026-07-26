@@ -29,7 +29,6 @@ import type {
   PlannedMeal,
   Post,
   PostComment,
-  ProgressPhoto,
   WeightEntry,
   WorkoutSession,
 } from './types'
@@ -149,12 +148,6 @@ function todaysMeals(): LoggedMeal[] {
     const food = foodById(id)!
     return { id: `m-today-${idx}`, dateKey: todayKey, meal, name: food.name, qty: 1, kcal: food.kcal, p: food.p, c: food.c, f: food.f }
   })
-}
-
-/* tiny gradient SVG used as a seeded progress-photo placeholder */
-function photoDataUrl(label: string, hue: number) {
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='300' height='400'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='hsl(${hue},35%,18%)'/><stop offset='1' stop-color='hsl(${hue},45%,9%)'/></linearGradient></defs><rect width='300' height='400' fill='url(%23g)'/><text x='150' y='205' font-family='sans-serif' font-size='22' fill='rgba(255,255,255,0.55)' text-anchor='middle'>${label}</text></svg>`
-  return `data:image/svg+xml;utf8,${svg}`
 }
 
 export function buildSeed(): AppState {
@@ -366,13 +359,6 @@ export function buildSeed(): AppState {
     { id: 'g-4', icon: 'leaf', name: 'Campus Runners', members: 53, desc: 'Group runs around campus every week.', unread: 0, color: '#F5A524', joined: false },
   ]
 
-  /* -------- progress photos (seeded placeholders) -------- */
-  const photos: ProgressPhoto[] = [
-    { id: 'ph-1', dateKey: dayKey(39), dataUrl: photoDataUrl('Day 1', 150), note: 'Starting out, 74.6 kg' },
-    { id: 'ph-2', dateKey: dayKey(19), dataUrl: photoDataUrl('Day 20', 150), note: 'Halfway, 73.0 kg' },
-    { id: 'ph-3', dateKey: dayKey(0), dataUrl: photoDataUrl('Day 40', 150), note: 'Today, 72.4 kg, leaner & stronger' },
-  ]
-
   return {
     profile,
     settings: { units: 'metric', theme: 'dark', notificationsEnabled: true, soundEnabled: true, language: 'en', connections: {} },
@@ -415,7 +401,6 @@ export function buildSeed(): AppState {
     notifications,
     events,
     groups,
-    photos,
     partners: PARTNER_CANDIDATES,
     coachThread,
     beginnerProgress: [],
@@ -441,7 +426,6 @@ export function emptyState(): AppState {
     mealPlan: [],
     postComments: [],
     sessions: [],
-    photos: [],
     posts: s.posts.filter((p) => p.authorId !== 'you'),
     notifications: [],
     coachThread: [],

@@ -32,9 +32,7 @@ import {
   LogWeightSheet,
   LogHabitSheet,
   CreatePostSheet,
-  WeeklyRecapSheet,
   LeaderboardSheet,
-  PhotosSheet,
   QuickWorkoutsSheet,
   BadgesSheet,
   CoachSheet,
@@ -218,9 +216,7 @@ function Shell() {
       <LogWeightSheet open={overlay === 'logWeight'} onClose={nav.close} />
       <LogHabitSheet open={overlay === 'logHabit'} onClose={nav.close} params={params} />
       <CreatePostSheet open={overlay === 'createPost'} onClose={nav.close} />
-      <WeeklyRecapSheet open={overlay === 'recap'} onClose={nav.close} />
       <LeaderboardSheet open={overlay === 'leaderboard'} onClose={nav.close} />
-      <PhotosSheet open={overlay === 'photos'} onClose={nav.close} />
       <QuickWorkoutsSheet open={overlay === 'quick'} onClose={nav.close} />
       <BadgesSheet open={overlay === 'badges'} onClose={nav.close} />
       <PlanAroundLifeSheet open={overlay === 'examMode'} onClose={nav.close} />

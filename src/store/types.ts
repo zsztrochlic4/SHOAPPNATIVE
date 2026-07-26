@@ -414,13 +414,6 @@ export interface Group {
   joined: boolean
 }
 
-export interface ProgressPhoto {
-  id: string
-  dateKey: string
-  dataUrl: string
-  note?: string
-}
-
 export interface QuickWorkout {
   id: string
   name: string
@@ -529,7 +522,6 @@ export interface AppState {
   notifications: AppNotification[]
   events: CommunityEvent[]
   groups: Group[]
-  photos: ProgressPhoto[]
   partners: PartnerCandidate[]
   coachThread: CoachMessage[]
   /** user-created recipe meals */

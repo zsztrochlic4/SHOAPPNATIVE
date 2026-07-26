@@ -427,12 +427,12 @@ export function MenuDrawer({ open, onClose }: { open: boolean; onClose: () => vo
           </MenuSection>
 
           <MenuSection title="Activity">
-            <MenuRow icon={<Sparkles size={17} color={brand[400]} />} title="Weekly recap" sub="Your week in numbers" onPress={go('recap')} first />
             <MenuRow
               icon={<Bell size={17} color={brand[400]} />}
               title="Notifications"
               sub="Reminders, streaks & social"
               onPress={go('notifications')}
+              first
               badge={unread > 0 ? <View className="h-5 min-w-[20px] items-center justify-center rounded-full bg-brand-400 px-1.5"><Text className="text-[11px] font-bold text-black">{unread}</Text></View> : undefined}
             />
           </MenuSection>
@@ -523,9 +523,7 @@ export function ProfileSheet({ open, onClose }: Props) {
         <LinkRow icon={<Sparkles size={18} color={brand[400]} />} title="Your coach" sub="Daily check ins and milestones" onPress={() => nav.open('coach')} />
         <LinkRow icon={<Bell size={18} color={brand[400]} />} title="Notifications" sub="Reminders, streaks & social" onPress={() => nav.open('notifications')} />
         <LinkRow icon={<Award size={18} color={brand[400]} />} title="Badges" sub={`${earned} earned`} onPress={() => nav.open('badges')} />
-        <LinkRow icon={<Camera size={18} color={brand[400]} />} title="Progress photos" sub={`${state.photos.length} photos`} onPress={() => nav.open('photos')} />
         <LinkRow icon={<Trophy size={18} color={brand[400]} />} title="Campus leaderboard" sub={state.profile.university} onPress={() => nav.open('leaderboard')} />
-        <LinkRow icon={<Sparkles size={18} color={brand[400]} />} title="Weekly recap" sub="Your week in numbers" onPress={() => nav.open('recap')} />
         <LinkRow icon={<GraduationCap size={18} color={brand[400]} />} title="Plan Around Your Life" sub={planSub} onPress={() => nav.open('examMode')} />
         {state.profile.newToGym && <LinkRow icon={<Leaf size={18} color={brand[400]} />} title="New to the gym" sub="Your first 90 days" onPress={() => nav.open('beginner')} />}
         <LinkRow icon={<User size={18} color="rgba(255,255,255,0.7)" />} title="Settings" sub="Units, theme and data" onPress={() => nav.open('settings')} />
@@ -839,83 +837,6 @@ export function CreatePostSheet({ open, onClose }: Props) {
   )
 }
 
-/* ============================ Weekly Recap ============================ */
-export function WeeklyRecapSheet({ open, onClose }: Props) {
-  const { state } = useStore()
-  const toast = useToast()
-  const units = state.settings.units
-  const workouts = workoutsThisWeek(state)
-  const vol = totalVolumeRange(state, 7)
-  const streak = streakStats(state)
-  const hc = habitConsistencyWeek(state)
-  const w = weightStats(state)
-  const top = strengthProgress(state)[0]
-  const acts = activitiesInRange(state, 7)
-
-  async function share() {
-    const msg = `My week on StrengthHub 💪 ${workouts} workouts, a ${streak.current}-day streak, ${Math.round(weightVal(vol, units)).toLocaleString()} ${weightUnit(units)} lifted.`
-    const r = await shareText(msg, 'My week on StrengthHub')
-    toast(r === 'copied' ? 'Recap copied to clipboard' : r === 'shared' ? 'Recap shared' : 'Sharing not available')
-  }
-
-  return (
-    <Sheet open={open} onClose={onClose} title="Your week">
-      <LinearGradient colors={['#5cba36', brand[400]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ borderRadius: 24, padding: 20 }}>
-        <Text className="text-sm font-bold text-black/80">THIS WEEK</Text>
-        <Text className="mt-1 text-4xl font-extrabold text-black">{workouts} workouts</Text>
-        <Text className="font-semibold text-black/80">{streak.current}-day streak · top 20% of users</Text>
-        <View className="mt-4 flex-row flex-wrap gap-3">
-          <RecapStat label="Volume lifted" value={`${Math.round(weightVal(vol, units)).toLocaleString()} ${weightUnit(units)}`} />
-          <RecapStat label="Avg sleep" value={`${hc.avgSleep.toFixed(1)} h`} />
-          <RecapStat label="Avg steps" value={hc.avgSteps.toLocaleString()} />
-          <RecapStat label="Weight change" value={fmtWeight(Math.abs(w.delta), units, 1)} />
-        </View>
-      </LinearGradient>
-
-      {top && (
-        <View className="mt-4 flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-4">
-          <Sparkles size={22} color={brand[400]} />
-          <Text className="flex-1 text-[14px] text-white">
-            Biggest gain: <Text className="font-bold">{top.name}</Text> up{' '}
-            <Text className="font-bold text-brand-400">{top.pct}%</Text> in 4 weeks.
-          </Text>
-        </View>
-      )}
-
-      {acts.length > 0 && (
-        <View className="mt-3 rounded-2xl border border-white/5 bg-ink-800 p-4">
-          <Text className="mb-2.5 text-[12px] font-bold uppercase tracking-wide text-white/40">Other activities · {acts.length}</Text>
-          <View className="gap-2">
-            {acts.slice(0, 6).map((a) => (
-              <View key={a.id} className="flex-row items-center gap-2.5">
-                <ActivityIcon name={a.icon} size={16} color={brand[400]} />
-                <Text className="flex-1 text-[13px] text-white/75">{a.name}</Text>
-                {a.weekly && <View className="rounded-full bg-brand-400/15 px-1.5 py-0.5"><Text className="text-[10px] font-bold text-brand-300">Weekly</Text></View>}
-                <Text className="text-[12px] text-white/45">{a.minutes} min</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      )}
-
-      <Pressable onPress={share} className="btn-primary mt-5 w-full flex-row items-center justify-center gap-2 active:opacity-90">
-        <Share2 size={16} color="#000" />
-        <Text className="font-semibold text-black">Share recap</Text>
-      </Pressable>
-    </Sheet>
-  )
-}
-
-function RecapStat({ label, value }: { label: string; value: string }) {
-  return (
-    <View className="flex-1 rounded-2xl bg-black/10 p-3" style={{ minWidth: '45%' }}>
-      <Text className="text-[12px] font-semibold text-black/70">{label}</Text>
-      <Text className="text-lg font-extrabold text-black">{value}</Text>
-    </View>
-  )
-}
-
-/* ============================ Leaderboard ============================ */
 export function LeaderboardSheet({ open, onClose }: Props) {
   const { state } = useStore()
   const toast = useToast()
@@ -950,88 +871,6 @@ export function LeaderboardSheet({ open, onClose }: Props) {
   )
 }
 
-/* ============================ Progress Photos ============================ */
-export function PhotosSheet({ open, onClose }: Props) {
-  const { state, dispatch } = useStore()
-  const toast = useToast()
-  const photos = [...state.photos].sort((a, b) => b.dateKey.localeCompare(a.dateKey))
-
-  async function addPhoto() {
-    const res = await ImagePicker.launchImageLibraryAsync({ quality: 0.6 })
-    if (!res.canceled) { dispatch({ type: 'ADD_PHOTO', dataUrl: res.assets[0].uri }); toast('Photo added') }
-  }
-
-  return (
-    <Sheet open={open} onClose={onClose} title="Progress photos">
-      <Pressable onPress={addPhoto} className="btn-primary mb-4 w-full flex-row items-center justify-center gap-2 active:opacity-90">
-        <Camera size={16} color="#000" />
-        <Text className="font-semibold text-black">Add today's photo</Text>
-      </Pressable>
-      {photos.length === 0 ? (
-        <EmptyState icon={<Camera size={32} color="#fff" />} title="No photos yet" body="Snap a photo to track your visual progress over time." />
-      ) : (
-        <>
-          {photos.length >= 2 && (
-            <View className="mb-5">
-              <Text className="mb-2 text-[12px] font-bold uppercase tracking-wide text-white/40">Before &amp; after</Text>
-              <CompareSlider before={photos[photos.length - 1]} after={photos[0]} />
-            </View>
-          )}
-          <Text className="mb-2 text-[12px] font-bold uppercase tracking-wide text-white/40">All photos</Text>
-          <View className="flex-row flex-wrap gap-3">
-            {photos.map((p) => (
-              <View key={p.id} className="overflow-hidden rounded-2xl border border-white/5 bg-ink-800" style={{ width: '47%' }}>
-                <Image source={{ uri: p.dataUrl }} resizeMode="cover" style={{ width: '100%', aspectRatio: 3 / 4 }} />
-                <View className="p-2.5">
-                  <Text className="text-[12px] font-bold text-white">{shortDate(p.dateKey)}</Text>
-                  {p.note && <Text className="text-[11px] text-white/45">{p.note}</Text>}
-                </View>
-              </View>
-            ))}
-          </View>
-        </>
-      )}
-    </Sheet>
-  )
-}
-
-/* Web uses an <input type=range> with clipPath to wipe between two photos.
- * RN has no range input, so we drive the reveal with a +/- stepper that
- * clips the "after" image by width over the same 0–100% range. */
-function CompareSlider({ before, after }: { before: { dataUrl: string; dateKey: string }; after: { dataUrl: string; dateKey: string } }) {
-  const [pct, setPct] = useState(50)
-  const [w, setW] = useState(0)
-  return (
-    <View>
-      <View
-        onLayout={(e) => setW(e.nativeEvent.layout.width)}
-        className="relative overflow-hidden rounded-2xl border border-white/5"
-        style={{ width: '100%', aspectRatio: 3 / 4 }}
-      >
-        <Image source={{ uri: before.dataUrl }} resizeMode="cover" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
-        <View style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: `${pct}%`, overflow: 'hidden' }}>
-          <Image source={{ uri: after.dataUrl }} resizeMode="cover" style={{ width: w, height: '100%' }} />
-        </View>
-        {w > 0 && <View style={{ position: 'absolute', top: 0, bottom: 0, width: 2, left: (pct / 100) * w, backgroundColor: 'rgba(255,255,255,0.8)' }} />}
-        <View className="absolute bottom-2 left-2 rounded-full bg-black/60 px-2 py-0.5"><Text className="text-[10px] font-bold text-white">After · {shortDate(after.dateKey)}</Text></View>
-        <View className="absolute bottom-2 right-2 rounded-full bg-black/60 px-2 py-0.5"><Text className="text-[10px] font-bold text-white">Before · {shortDate(before.dateKey)}</Text></View>
-      </View>
-      <View className="mt-3 flex-row items-center gap-2">
-        <Pressable onPress={() => setPct((p) => Math.max(0, p - 10))} className="h-10 w-10 items-center justify-center rounded-xl bg-ink-700 active:opacity-80">
-          <Minus size={18} color="#fff" />
-        </Pressable>
-        <View className="h-2 flex-1 overflow-hidden rounded-full bg-white/10">
-          <View className="h-full rounded-full bg-brand-400" style={{ width: `${pct}%` }} />
-        </View>
-        <Pressable onPress={() => setPct((p) => Math.min(100, p + 10))} className="h-10 w-10 items-center justify-center rounded-xl bg-ink-700 active:opacity-80">
-          <Plus size={18} color="#fff" />
-        </Pressable>
-      </View>
-    </View>
-  )
-}
-
-/* ============================ Quick Workouts ============================ */
 export function QuickWorkoutsSheet({ open, onClose }: Props) {
   const toast = useToast()
   return (
