@@ -209,7 +209,7 @@ function Shell() {
       </View>
 
       {/* Overlays */}
-      <ActiveWorkout open={overlay === 'activeWorkout'} onClose={nav.close} params={params} />
+      <ActiveWorkout open={overlay === 'activeWorkout'} onClose={nav.close} onComplete={() => nav.goTab('dashboard')} params={params} />
       <NotificationsSheet open={overlay === 'notifications'} onClose={nav.close} />
       <SettingsSheet open={overlay === 'settings'} onClose={nav.close} />
       <MenuDrawer open={menuOpen} onClose={nav.closeMenu} />

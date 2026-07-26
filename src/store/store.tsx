@@ -42,6 +42,8 @@ export type Action =
   | { type: 'LOG_WEIGHT'; kg: number }
   | { type: 'ADJUST_WATER'; deltaL: number }
   | { type: 'PATCH_TODAY_HABIT'; patch: Partial<{ steps: number; sleepH: number; mindsetMin: number; waterL: number }> }
+  | { type: 'PATCH_HABIT'; dateKey: string; patch: Partial<{ steps: number; sleepH: number; mindsetMin: number; waterL: number }> }
+  | { type: 'SET_WORKOUT_DONE'; dateKey: string; done: boolean }
   | { type: 'ADD_MEAL'; meal: Omit<LoggedMeal, 'id' | 'dateKey'> }
   | { type: 'REMOVE_MEAL'; id: string }
   | { type: 'ADD_ACTIVITY'; activity: Omit<LoggedActivity, 'id' | 'dateKey' | 'time'> }
@@ -51,7 +53,7 @@ export type Action =
   | { type: 'REMOVE_PLANNED_MEAL'; id: string }
   | { type: 'ADD_COMMENT'; postId: string; text: string }
   | { type: 'SAVE_FOOD_REVIEW'; text: string; score: number }
-  | { type: 'TOGGLE_NUTRITION_TAG'; tag: string }
+  | { type: 'TOGGLE_NUTRITION_TAG'; tag: string; dateKey?: string }
   | { type: 'MARK_WORKOUT_STARTED' }
   | { type: 'MARK_NUTRITION_ASKED' }
   | { type: 'ADD_MY_MEAL'; meal: Omit<UserMeal, 'id' | 'createdAtKey'> }
@@ -185,6 +187,32 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, habits }
     }
 
+    // Like PATCH_TODAY_HABIT but for any day (retroactive logging), upserting the
+    // habit record if that day had none.
+    case 'PATCH_HABIT': {
+      const has = state.habits.some((h) => h.dateKey === action.dateKey)
+      const habits = has
+        ? state.habits.map((h) => (h.dateKey === action.dateKey ? { ...h, ...action.patch } : h))
+        : [...state.habits, { dateKey: action.dateKey, steps: 0, sleepH: 0, waterL: 0, mindsetMin: 0, nutritionScore: 0, workout: false, ...action.patch }]
+      return { ...state, habits }
+    }
+
+    // Retroactively mark a day's workout complete (or not). Drives `workoutStartedForDay`
+    // and the day's `workout` habit flag; also reflects on that day's session if one exists.
+    case 'SET_WORKOUT_DONE': {
+      const keys = new Set(state.workoutStartedKeys ?? [])
+      if (action.done) keys.add(action.dateKey)
+      else keys.delete(action.dateKey)
+      const hasHabit = state.habits.some((h) => h.dateKey === action.dateKey)
+      const habits = hasHabit
+        ? state.habits.map((h) => (h.dateKey === action.dateKey ? { ...h, workout: action.done } : h))
+        : action.done
+          ? [...state.habits, { dateKey: action.dateKey, steps: 0, sleepH: 0, waterL: 0, mindsetMin: 0, nutritionScore: 0, workout: true }]
+          : state.habits
+      const sessions = state.sessions.map((s) => (s.dateKey === action.dateKey ? { ...s, completed: action.done } : s))
+      return { ...state, workoutStartedKeys: [...keys], habits, sessions }
+    }
+
     case 'ADD_MEAL': {
       const meal: LoggedMeal = { ...action.meal, id: `m-${Date.now()}`, dateKey: todayKey }
       return { ...state, meals: [...state.meals, meal] }
@@ -233,13 +261,14 @@ function reducer(state: AppState, action: Action): AppState {
     }
 
     case 'TOGGLE_NUTRITION_TAG': {
+      const key = action.dateKey ?? todayKey
       const map = { ...(state.nutritionTags ?? {}) }
-      const current = map[todayKey] ?? []
+      const current = map[key] ?? []
       const next = current.includes(action.tag)
         ? current.filter((t) => t !== action.tag)
         : [...current, action.tag]
-      if (next.length) map[todayKey] = next
-      else delete map[todayKey]
+      if (next.length) map[key] = next
+      else delete map[key]
       return { ...state, nutritionTags: map }
     }
 

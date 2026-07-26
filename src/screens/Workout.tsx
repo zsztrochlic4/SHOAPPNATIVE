@@ -1,14 +1,19 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { View, Text, Pressable, Image, TextInput, StyleSheet, ScrollView } from 'react-native'
 import Svg, { Path, Circle } from 'react-native-svg'
-import { CalendarDays, Clock, Play, ChevronRight, Check, Leaf, Plus, Trash2, Activity, Repeat, RefreshCw, Dumbbell, X } from 'lucide-react-native'
+import {
+  Clock, Play, ChevronRight, ChevronDown, Check, Plus, Trash2, Activity, Repeat, RefreshCw,
+  Dumbbell, X, Search, Pencil, Leaf,
+} from 'lucide-react-native'
 import { Icon } from '../components/Icon'
 import { ActivityIcon } from '../components/ActivityIcon'
 import { ProgressBar, SegmentedTabs, ScreenHeader, Chip } from '../components/ui'
-import { Hero } from '../components/Hero'
+import { MuscleMapCard } from '../components/MuscleMapCard'
+import { Skeleton } from '../components/Skeleton'
 import { useStore } from '../store/store'
 import { useNav } from '../nav'
 import { ACTIVE_EXERCISES } from '../backend/data'
+import { BEGINNER_LESSONS } from '../data/catalog'
 import { fmtVolume, fmtWeight } from '../lib/format'
 import { relativeLabel, todayKey } from '../lib/date'
 import { todaySession, sessionProgress, completedSessions, activitiesForDay } from '../store/selectors'
@@ -23,17 +28,9 @@ const TABS = ['Today', 'Program', 'Exercises', 'History']
 
 export default function Workout() {
   const [tab, setTab] = useState('Today')
-  const colors = useColors()
   return (
     <View className="px-5 pt-2">
-      <ScreenHeader
-        title="Workout"
-        trailing={
-          <Pressable className="h-10 w-10 items-center justify-center rounded-xl active:opacity-70">
-            <CalendarDays size={22} color={colors.fg} />
-          </Pressable>
-        }
-      />
+      <ScreenHeader title="Workout" />
       <SegmentedTabs tabs={TABS} active={tab} onChange={setTab} />
       <View className="mt-5">
         {tab === 'Today' && <TodayTab />}
@@ -41,6 +38,23 @@ export default function Workout() {
         {tab === 'Exercises' && <ExercisesTab />}
         {tab === 'History' && <HistoryTab />}
       </View>
+    </View>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Small 40px exercise tile with a muscle-group fallback behind it.   */
+/* ------------------------------------------------------------------ */
+function RowThumb({ uri }: { uri: string }) {
+  const [failed, setFailed] = useState(false)
+  return (
+    <View className="h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-ink-700">
+      <View style={StyleSheet.absoluteFill} className="items-center justify-center">
+        <Dumbbell size={19} color="rgba(126,217,87,0.35)" />
+      </View>
+      {!failed && (
+        <Image source={{ uri }} resizeMode="cover" style={StyleSheet.absoluteFill} onError={() => setFailed(true)} />
+      )}
     </View>
   )
 }
@@ -72,62 +86,63 @@ function TodayTab() {
     )
   }
 
+  // Driven by the visible tick progress: none ticked → Start, some → Continue, all → Completed.
+  const ctaLabel = prog.total > 0 && prog.done === prog.total ? 'Completed' : prog.done > 0 ? 'Continue Workout' : 'Start Workout'
+
   return (
     <>
       {session ? (
         <>
-          <Hero image={session.image} rounded={16}>
-            <View className="absolute right-3 top-3 z-10 flex-row items-center gap-1.5 rounded-full bg-black/45 px-3 py-1.5">
-              <Clock size={14} color="#fff" />
-              <Text className="text-[13px] font-semibold text-white">~{session.durationMin} min</Text>
-            </View>
-            <Text className="text-sm font-semibold text-brand-400">{session.focus}</Text>
-            <Text className="mt-1 text-3xl font-extrabold text-white">{session.name}</Text>
-            <View className="mt-2 flex-row items-center gap-1.5">
-              <Clock size={15} color="rgba(255,255,255,0.65)" />
-              <Text className="text-sm text-white/65">{session.exercises.length} exercises</Text>
-            </View>
-            <Pressable onPress={() => nav.open('activeWorkout')} className="btn-primary mt-4 self-start active:opacity-90">
-              <Text className="font-semibold text-black">{session.completed ? 'Review Workout' : prog.done > 0 ? 'Resume Workout' : 'Start Workout'}</Text>
-              <Play size={16} color="#000" fill="#000" style={{ marginLeft: 8 }} />
-            </Pressable>
-          </Hero>
+          {/* Today's plan — anatomical muscle map (design handoff) */}
+          <MuscleMapCard session={session} sex={state.profile.sex} ctaLabel={ctaLabel} onPress={() => nav.open('activeWorkout')} />
 
+          {/* Today's Progress */}
           <View className="mt-6">
             <Text className="section-title mb-2">Today's Progress</Text>
-            <View className="mb-1.5 flex-row items-center justify-between">
-              <Text className="text-[13px] text-white/55">{prog.done}/{prog.total} exercises completed</Text>
-              <Text className="text-[13px] font-semibold text-white">{prog.pct}%</Text>
+            <View className="mb-[7px] flex-row items-center justify-between">
+              <Text className="text-[12.5px] text-white/55">{prog.done}/{prog.total} exercises completed</Text>
+              <Text className="text-[12.5px] font-semibold text-white">{prog.pct}%</Text>
             </View>
             <ProgressBar value={prog.pct} />
           </View>
 
-          <View className="mt-6">
+          {/* Exercises */}
+          <View className="mt-[26px]">
             <Text className="section-title mb-3">Exercises</Text>
-            <View className="gap-3">
+            <View className="gap-2.5">
               {session.exercises.map((e) => {
                 const done = e.sets.length > 0 && e.sets.every((s) => s.done)
-                const topWeight = Math.max(...e.sets.map((s) => s.weightKg))
+                const topWeight = e.sets.length ? Math.max(...e.sets.map((s) => s.weightKg)) : 0
                 return (
-                  <View key={e.defId} className="flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-3">
-                    <Pressable onPress={() => dispatch({ type: 'TOGGLE_EXERCISE_DONE', defId: e.defId })} className={`h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${done ? 'border-brand-400 bg-brand-400' : 'border-white/25'}`}>
-                      {done && <Check size={14} strokeWidth={3} color="#000" />}
+                  <Pressable
+                    key={e.defId}
+                    onPress={() => nav.open('exerciseDetail', { defId: e.defId })}
+                    className="flex-row items-center gap-[11px] rounded-[18px] border border-white/5 bg-ink-800 px-[11px] py-[9px] active:opacity-90"
+                  >
+                    <Pressable
+                      onPress={() => dispatch({ type: 'TOGGLE_EXERCISE_DONE', defId: e.defId })}
+                      hitSlop={6}
+                      className={`h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full ${done ? 'bg-brand-400' : 'border-2 border-white/20'}`}
+                    >
+                      {done && <Check size={15} strokeWidth={3.4} color="#000" />}
                     </Pressable>
-                    <Image source={{ uri: e.image }} resizeMode="cover" className="h-12 w-12 rounded-xl" />
-                    <Pressable onPress={() => nav.open('exerciseDetail', { defId: e.defId })} className="min-w-0 flex-1">
-                      <Text numberOfLines={1} className="font-bold leading-tight text-white">{e.name}</Text>
-                      <Text numberOfLines={1} className="text-[12px] text-white/50">{e.targetSets} sets • {e.targetReps} reps · how to</Text>
-                    </Pressable>
-                    <Chip color={done ? 'green' : 'gray'}>{fmtWeight(topWeight, units, units === 'imperial' ? 0 : 1)}</Chip>
-                    <Pressable onPress={() => nav.open('exerciseDetail', { defId: e.defId })}><ChevronRight size={18} color="rgba(255,255,255,0.3)" /></Pressable>
-                  </View>
+                    <RowThumb uri={e.image} />
+                    <View className="min-w-0 flex-1">
+                      <Text numberOfLines={1} className="text-[14px] font-bold leading-tight text-white">{e.name}</Text>
+                      <Text numberOfLines={1} className="mt-[1px] text-[11.5px] text-white/50">{e.targetSets} sets · {e.targetReps} reps</Text>
+                    </View>
+                    <View className={`shrink-0 rounded-full px-2 py-0.5 ${done ? 'bg-brand-400/15' : 'bg-white/10'}`}>
+                      <Text className={`text-[11px] font-medium ${done ? 'text-brand-300' : 'text-white/70'}`}>{fmtWeight(topWeight, units, units === 'imperial' ? 0 : 1)}</Text>
+                    </View>
+                    <ChevronRight size={17} color="rgba(255,255,255,0.3)" />
+                  </Pressable>
                 )
               })}
             </View>
           </View>
         </>
       ) : (
-        <View className="items-center rounded-2xl border border-white/5 bg-ink-800 p-8">
+        <View className="items-center rounded-[20px] border border-white/5 bg-ink-800 p-8">
           <Text className="text-2xl">😌</Text>
           <Text className="mt-2 font-bold text-white">Rest Day</Text>
           <Text className="mt-1 text-center text-[13px] text-white/50">Recovery is where you grow. Try a mobility flow, a walk, or log whatever you got up to below.</Text>
@@ -141,14 +156,14 @@ function TodayTab() {
 
       <OtherActivities />
 
-      {/* Got 15 minutes? Express, no-equipment sessions */}
-      <Pressable onPress={() => nav.open('quick')} className="mt-8 w-full flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-3.5 active:opacity-90">
-        <View className="h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-400/15"><Clock size={20} color={brand[400]} /></View>
-        <View className="flex-1">
-          <Text className="font-bold leading-tight text-white">Got 15 minutes?</Text>
-          <Text className="text-[12px] text-white/50">Express workouts between lectures</Text>
+      {/* 12-Minute Bodyweight Exercises — express, no-equipment sessions */}
+      <Pressable onPress={() => nav.open('quick')} className="mt-7 w-full flex-row items-center gap-3 rounded-[20px] border border-accent-blue/30 bg-accent-blue/[0.09] p-3.5 active:opacity-90">
+        <View className="h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-accent-blue/[0.18]"><Clock size={20} color="#3B82F6" /></View>
+        <View className="min-w-0 flex-1">
+          <Text className="text-[14.5px] font-bold leading-tight text-white">12-Minute Bodyweight Exercises</Text>
+          <Text className="mt-0.5 text-[12px] text-white/50">Quick, no-equipment workouts when you're short on time</Text>
         </View>
-        <ChevronRight size={18} color="rgba(255,255,255,0.3)" />
+        <ChevronRight size={17} color="rgba(59,130,246,0.55)" />
       </Pressable>
       <View className="h-2" />
     </>
@@ -161,35 +176,35 @@ function OtherActivities() {
   const nav = useNav()
   const acts = activitiesForDay(state)
   return (
-    <View className="mt-8">
-      <View className="mb-3 flex-row items-center justify-between">
+    <View className="mt-7">
+      <View className="mb-3 flex-row items-start justify-between">
         <View>
           <Text className="section-title">Other activities</Text>
-          <Text className="text-[12px] text-white/45">Log anything else you did today</Text>
+          <Text className="mt-0.5 text-[12px] text-white/45">Log anything else you did today</Text>
         </View>
-        <Pressable onPress={() => nav.open('logActivity')} className="flex-row items-center gap-1 active:opacity-70">
+        <Pressable onPress={() => nav.open('logActivity')} className="flex-row items-center gap-1 px-1 active:opacity-70">
           <Text className="see-all">Log</Text>
-          <Plus size={15} color={brand[400]} />
+          <Plus size={15} color={brand[400]} strokeWidth={2.6} />
         </Pressable>
       </View>
 
       {acts.length === 0 ? (
-        <Pressable onPress={() => nav.open('logActivity')} className="w-full flex-row items-center gap-3 rounded-2xl border border-dashed border-white/15 p-4 active:opacity-90">
-          <View className="h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-400/15"><Activity size={20} color={brand[400]} /></View>
-          <View className="flex-1">
-            <Text className="font-bold leading-tight text-white">Log a workout, sport or activity</Text>
-            <Text className="text-[12px] text-white/50">Swim, run, football, pickleball, anything counts</Text>
+        <Pressable onPress={() => nav.open('logActivity')} className="w-full flex-row items-center gap-3 rounded-[20px] border border-dashed border-white/15 p-4 active:opacity-90">
+          <View className="h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-brand-400/15"><Activity size={20} color={brand[400]} /></View>
+          <View className="min-w-0 flex-1">
+            <Text className="text-[14.5px] font-bold leading-tight text-white">Log a workout, sport or activity</Text>
+            <Text className="mt-0.5 text-[12px] text-white/50">Swim, run, football, pickleball, anything counts</Text>
           </View>
-          <ChevronRight size={18} color="rgba(255,255,255,0.3)" />
+          <ChevronRight size={17} color="rgba(255,255,255,0.3)" />
         </Pressable>
       ) : (
         <View className="gap-2.5">
           {acts.map((a) => (
-            <View key={a.id} className="flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-3">
-              <View className="h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-400/15"><ActivityIcon name={a.icon} size={20} color={brand[400]} /></View>
+            <View key={a.id} className="flex-row items-center gap-3 rounded-[20px] border border-white/5 bg-ink-800 p-3">
+              <View className="h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[14px] bg-brand-400/15"><ActivityIcon name={a.icon} size={20} color={brand[400]} /></View>
               <View className="min-w-0 flex-1">
                 <View className="flex-row items-center gap-1.5">
-                  <Text numberOfLines={1} className="font-bold leading-tight text-white">{a.name}</Text>
+                  <Text numberOfLines={1} className="text-[14.5px] font-bold leading-tight text-white">{a.name}</Text>
                   {a.weekly && (
                     <View className="flex-row shrink-0 items-center gap-1 rounded-full bg-brand-400/15 px-1.5 py-0.5">
                       <Repeat size={10} color={brand[300]} />
@@ -197,15 +212,15 @@ function OtherActivities() {
                     </View>
                   )}
                 </View>
-                <Text className="text-[12px] capitalize text-white/50">{a.minutes} min · {a.intensity}</Text>
+                <Text className="mt-0.5 text-[12px] capitalize text-white/50">{a.minutes} min · {a.intensity}</Text>
                 {a.note && <Text numberOfLines={1} className="text-[12px] text-white/40">{a.note}</Text>}
               </View>
               <Pressable onPress={() => dispatch({ type: 'TOGGLE_ACTIVITY_WEEKLY', id: a.id })} className={`h-8 w-8 shrink-0 items-center justify-center rounded-full active:opacity-80 ${a.weekly ? 'bg-brand-400/20' : 'bg-white/5'}`}><Repeat size={15} color={a.weekly ? brand[400] : 'rgba(255,255,255,0.4)'} /></Pressable>
               <Pressable onPress={() => dispatch({ type: 'REMOVE_ACTIVITY', id: a.id })} className="h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/5 active:opacity-80"><Trash2 size={15} color="rgba(255,255,255,0.4)" /></Pressable>
             </View>
           ))}
-          <Pressable onPress={() => nav.open('logActivity')} className="w-full items-center rounded-2xl border border-dashed border-white/15 py-3 active:opacity-80">
-            <Text className="text-sm font-semibold text-white/55">+ Log another activity</Text>
+          <Pressable onPress={() => nav.open('logActivity')} className="w-full items-center rounded-[20px] border border-dashed border-white/15 py-3 active:opacity-80">
+            <Text className="text-[13.5px] font-semibold text-white/55">+ Log another activity</Text>
           </Pressable>
         </View>
       )}
@@ -229,47 +244,56 @@ function MyWorkouts() {
   }
 
   return (
-    <View className="mt-8">
+    <View className="mt-7">
       <View className="mb-3">
         <Text className="section-title">Your workouts</Text>
-        <Text className="text-[12px] text-white/45">Build your own session — your exercises, your way</Text>
+        <Text className="mt-0.5 text-[12px] text-white/45">Build your own session, your exercises, your way</Text>
       </View>
 
-      <Pressable onPress={() => nav.open('createSession')} className="w-full flex-row items-center gap-3 rounded-2xl border border-brand-400/25 bg-brand-400/5 p-3.5 active:opacity-90">
-        <View className="h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-400/15"><Plus size={20} color={brand[400]} /></View>
-        <View className="flex-1">
-          <Text className="font-bold leading-tight text-white">New workout</Text>
-          <Text className="text-[12px] text-white/50">Pick exercises, set sets & reps, then start</Text>
+      <Pressable onPress={() => nav.open('createSession')} className="w-full flex-row items-center gap-3 rounded-[20px] border border-brand-400/25 bg-brand-400/[0.06] p-3.5 active:opacity-90">
+        <View className="h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-brand-400/15"><Plus size={20} color={brand[400]} strokeWidth={2.4} /></View>
+        <View className="min-w-0 flex-1">
+          <Text className="text-[14.5px] font-bold leading-tight text-white">New workout</Text>
+          <Text className="mt-0.5 text-[12px] text-white/50">Pick exercises, set sets & reps, then start</Text>
         </View>
-        <ChevronRight size={18} color="rgba(255,255,255,0.3)" />
+        <ChevronRight size={17} color="rgba(255,255,255,0.3)" />
       </Pressable>
 
       {templates.length > 0 && (
         <View className="mt-2.5 gap-2.5">
-          {templates.map((t) => (
-            <View key={t.id} className="flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-3">
-              <Pressable onPress={() => nav.open('createSession', { templateId: t.id })} className="min-w-0 flex-1 flex-row items-center gap-3 active:opacity-80">
-                <Image source={{ uri: t.exercises[0]?.image ?? '' }} resizeMode="cover" className="h-11 w-11 rounded-xl bg-ink-700" />
-                <View className="min-w-0 flex-1">
-                  <Text numberOfLines={1} className="font-bold leading-tight text-white">{t.name}</Text>
-                  <Text className="text-[12px] text-white/50">{t.exercises.length} exercise{t.exercises.length === 1 ? '' : 's'}</Text>
-                </View>
-              </Pressable>
-              <Pressable onPress={() => startTemplate(t.id)} className="flex-row items-center gap-1 rounded-full bg-brand-400 px-3.5 py-1.5 active:opacity-90">
-                <Play size={13} color="#000" fill="#000" />
-                <Text className="text-sm font-bold text-black">Start</Text>
-              </Pressable>
-              <Pressable onPress={() => { dispatch({ type: 'REMOVE_TEMPLATE', id: t.id }); toast('Workout removed') }} hitSlop={6} className="h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/5 active:opacity-80">
-                <Trash2 size={15} color="rgba(255,255,255,0.4)" />
-              </Pressable>
-            </View>
-          ))}
+          {templates.map((t) => {
+            const sets = t.exercises.reduce((a, e) => a + e.targetSets, 0)
+            return (
+              <View key={t.id} className="flex-row items-center gap-[11px] rounded-[18px] border border-white/5 bg-ink-800 px-[11px] py-2.5">
+                <Pressable onPress={() => nav.open('createSession', { templateId: t.id })} className="min-w-0 flex-1 flex-row items-center gap-[11px] active:opacity-80">
+                  <View className="h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[13px] bg-brand-400/[0.12]"><Dumbbell size={19} color={brand[400]} /></View>
+                  <View className="min-w-0 flex-1">
+                    <View className="flex-row items-center gap-1.5">
+                      <Text numberOfLines={1} className="text-[14px] font-bold leading-tight text-white">{t.name}</Text>
+                      <Pencil size={12} color="rgba(255,255,255,0.35)" />
+                    </View>
+                    <Text numberOfLines={1} className="mt-0.5 text-[11.5px] text-white/50">{t.exercises.length} exercise{t.exercises.length === 1 ? '' : 's'} · {sets} sets</Text>
+                  </View>
+                </Pressable>
+                <Pressable onPress={() => startTemplate(t.id)} className="flex-row items-center gap-1 rounded-full bg-brand-400 px-3.5 py-1.5 active:opacity-90">
+                  <Play size={12} color="#000" fill="#000" />
+                  <Text className="text-[13px] font-bold text-black">Start</Text>
+                </Pressable>
+                <Pressable onPress={() => { dispatch({ type: 'REMOVE_TEMPLATE', id: t.id }); toast('Workout removed') }} hitSlop={6} className="h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/5 active:opacity-80">
+                  <Trash2 size={15} color="rgba(255,255,255,0.45)" />
+                </Pressable>
+              </View>
+            )
+          })}
         </View>
       )}
     </View>
   )
 }
 
+/* ------------------------------------------------------------------ */
+/*  Program tab — the recommended plan, or the safety holding state.   */
+/* ------------------------------------------------------------------ */
 function ProgramTab() {
   const { state } = useStore()
   // Once a user has been through the safety-gated backend, their program comes from the
@@ -277,19 +301,54 @@ function ProgramTab() {
   // the fallback for demo/seed sessions that never ran the backend.
   if (state.programStatus && !state.programStatus.ok) return <ProgramHolding status={state.programStatus} />
   if (state.generatedProgram) return <GeneratedProgramView program={state.generatedProgram} />
+  return <LegacyProgram />
+}
+
+function LegacyProgram() {
+  const { state } = useStore()
+  const [openDay, setOpenDay] = useState<string | null>(state.program[0]?.day ?? null)
   return (
-    <View className="gap-3">
-      <Text className="text-[13px] text-white/50">Your weekly split · {state.profile.daysPerWeek}-day program</Text>
-      {state.program.map((d) => (
-        <View key={d.id} className="flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-4">
-          <View className="w-12 shrink-0"><Text className="text-[11px] font-semibold uppercase tracking-wide text-white/40">{d.day}</Text></View>
-          <View className="flex-1">
-            <Text className="font-bold text-white">{d.name}</Text>
-            <Text className="text-[12px] text-white/50">{d.focus}</Text>
+    <View className="gap-2.5">
+      <View className="rounded-[20px] border border-brand-400/20 bg-brand-400/[0.06] p-4">
+        <Text className="text-[14px] font-bold text-white">Your weekly split · {state.profile.daysPerWeek}-day program</Text>
+        <Text className="mt-1.5 text-[12.5px] leading-5 text-white/55">Built around your week. Weights adapt as you log each session.</Text>
+      </View>
+      {state.program.map((d) => {
+        const open = openDay === d.day && !d.rest && d.exerciseIds.length > 0
+        return (
+          <View key={d.id} className="overflow-hidden rounded-[20px] border border-white/5 bg-ink-800">
+            <Pressable onPress={() => setOpenDay(open ? null : d.day)} className="flex-row items-center gap-3 p-4 active:opacity-90">
+              <View className="w-[34px] shrink-0"><Text className="text-[11px] font-bold uppercase tracking-wider text-white/40">{d.day}</Text></View>
+              <View className="min-w-0 flex-1">
+                <Text className="text-[14.5px] font-bold text-white">{d.name}</Text>
+                <Text className="mt-0.5 text-[12px] text-white/50">{d.focus}</Text>
+              </View>
+              {d.rest ? <Chip color="gray">Rest</Chip> : <Chip color="green">{d.exerciseIds.length} ex</Chip>}
+              {!d.rest && d.exerciseIds.length > 0 && (
+                <ChevronDown size={17} color="rgba(255,255,255,0.3)" style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
+              )}
+            </Pressable>
+            {open && (
+              <View className="px-4 pb-4">
+                <View className="mb-1 h-px bg-white/5" />
+                <View className="mt-2 gap-2.5">
+                  {d.exerciseIds.map((id) => {
+                    const v = exerciseView(id)
+                    return (
+                      <View key={id} className="flex-row items-center justify-between gap-3">
+                        <View className="min-w-0 flex-1">
+                          <Text className="text-[13.5px] font-semibold text-white">{v?.name ?? id}</Text>
+                          <Text className="mt-px text-[11.5px] text-white/45">{v?.muscle ?? ''}</Text>
+                        </View>
+                      </View>
+                    )
+                  })}
+                </View>
+              </View>
+            )}
           </View>
-          {d.rest ? <Chip color="gray">Rest</Chip> : <Chip color="green">{d.exerciseIds.length} ex</Chip>}
-        </View>
-      ))}
+        )
+      })}
     </View>
   )
 }
@@ -299,15 +358,20 @@ const MUSCLE_ORDER = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Core',
 
 function ExercisesTab() {
   const nav = useNav()
+  const { state } = useStore()
   const [q, setQ] = useState('')
   const [muscle, setMuscle] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const loadTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
+  const beginnerDone = (state.beginnerProgress?.length ?? 0) >= BEGINNER_LESSONS.length
+
   // The full canonical exercise database (workbook source of truth, 113), adapted for display
   // through the same `exerciseView` used everywhere else so imagery/muscle stay consistent.
   const all = useMemo(
     () =>
       ACTIVE_EXERCISES.map((e) => {
         const v = exerciseView(e.id)
-        // Prefer a real uploaded photo (e.g. Barbell Back Squat) over the generic muscle placeholder.
         return { id: e.id, name: v?.name ?? e.name, muscle: v?.muscle ?? e.muscleGroup, image: posterOverrideUrl(e.id) ?? v?.image ?? imageForMuscle(e.muscleGroup) }
       }),
     [],
@@ -325,59 +389,110 @@ function ExercisesTab() {
       ),
     [q, muscle, all],
   )
+
+  // Brief skeleton on a filter change so the grid reshuffles with a settle, matching the design.
+  function pickMuscle(m: string | null) {
+    setMuscle(m)
+    setLoading(true)
+    clearTimeout(loadTimer.current)
+    loadTimer.current = setTimeout(() => setLoading(false), 380)
+  }
+  useEffect(() => () => clearTimeout(loadTimer.current), [])
+
   return (
     <View>
-      <Pressable onPress={() => nav.open('beginner')} className="mb-4 w-full flex-row items-center gap-3 rounded-2xl border border-brand-400/20 bg-brand-400/5 p-3.5 active:opacity-90">
-        <View className="h-9 w-9 items-center justify-center rounded-xl bg-brand-400/15"><Leaf size={18} color={brand[400]} /></View>
-        <View className="flex-1"><Text className="text-sm font-bold leading-tight text-white">New here?</Text><Text className="text-[12px] text-white/50">Start the beginner guide, no experience needed</Text></View>
-        <ChevronRight size={16} color="rgba(255,255,255,0.3)" />
-      </Pressable>
-      <TextInput
-        value={q}
-        onChangeText={setQ}
-        placeholder="Search exercises or muscle…"
-        placeholderTextColor="rgba(255,255,255,0.35)"
-        className="mb-3 w-full rounded-xl border border-white/10 bg-ink-800 px-4 py-3 text-sm text-white"
-      />
-      {/* Muscle-group filter chips — tap to filter, tap again (or the ✕) to clear */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-4 mb-3" contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
+      {/* Beginner guide — full card until finished, then a compact "revisit" row. */}
+      {beginnerDone ? (
+        <Pressable onPress={() => nav.open('beginner')} className="mb-3.5 flex-row items-center gap-2.5 rounded-[14px] bg-white/[0.03] px-3 py-2.5 active:opacity-90">
+          <Check size={13} strokeWidth={3} color="rgba(126,217,87,0.8)" />
+          <Text className="flex-1 text-[12.5px] font-semibold text-white/50">Beginner guide finished</Text>
+          <Text className="text-[12px] font-semibold text-white/35">Revisit</Text>
+          <ChevronRight size={14} color="rgba(255,255,255,0.25)" />
+        </Pressable>
+      ) : (
+        <Pressable onPress={() => nav.open('beginner')} className="mb-3.5 w-full flex-row items-center gap-3 rounded-[20px] border border-brand-400/20 bg-brand-400/[0.06] p-3.5 active:opacity-90">
+          <View className="h-[38px] w-[38px] items-center justify-center rounded-[14px] bg-brand-400/15"><Leaf size={18} color={brand[400]} /></View>
+          <View className="min-w-0 flex-1">
+            <Text className="text-[14px] font-bold leading-tight text-white">New here?</Text>
+            <Text className="mt-0.5 text-[12px] text-white/50">Start the beginner guide, no experience needed</Text>
+          </View>
+          <ChevronRight size={16} color="rgba(255,255,255,0.3)" />
+        </Pressable>
+      )}
+
+      {/* Search */}
+      <View className="relative mb-3">
+        <View className="absolute left-3.5 top-3 z-10"><Search size={17} color="rgba(255,255,255,0.4)" /></View>
+        <TextInput
+          value={q}
+          onChangeText={setQ}
+          placeholder="Search exercises or muscle…"
+          placeholderTextColor="rgba(255,255,255,0.35)"
+          className="w-full rounded-2xl border border-white/10 bg-ink-800 py-3 pl-10 pr-10 text-[13.5px] text-white"
+        />
+        {q.length > 0 && (
+          <Pressable onPress={() => setQ('')} className="absolute right-2.5 top-2.5 h-[26px] w-[26px] items-center justify-center rounded-full bg-white/[0.08] active:opacity-80">
+            <X size={13} strokeWidth={2.8} color="rgba(255,255,255,0.6)" />
+          </Pressable>
+        )}
+      </View>
+
+      {/* Muscle-group filter chips */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-5 mb-3" contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}>
         {muscles.map((m) => {
           const on = muscle === m
           return (
             <Pressable
               key={m}
-              onPress={() => setMuscle(on ? null : m)}
+              onPress={() => pickMuscle(on ? null : m)}
               className={`flex-row items-center gap-1.5 rounded-full px-3.5 py-2 active:opacity-80 ${on ? 'bg-brand-400' : 'border border-white/10 bg-ink-800'}`}
             >
-              <Text className={`text-[13px] font-semibold ${on ? 'text-black' : 'text-white/70'}`}>{m}</Text>
-              {on && <X size={13} strokeWidth={3} color="#000" />}
+              <Text className={`text-[12.5px] font-semibold ${on ? 'text-black' : 'text-white/70'}`}>{m}</Text>
+              {on && <X size={12} strokeWidth={3} color="#000" />}
             </Pressable>
           )
         })}
       </ScrollView>
+
+      {/* Filter title + count / loading */}
       <View className="mb-3 flex-row items-center justify-between px-0.5">
-        <Text className="text-[12px] font-semibold uppercase tracking-wide text-white/35">{muscle ?? 'All exercises'}</Text>
-        {muscle ? (
-          <Pressable onPress={() => setMuscle(null)} className="flex-row items-center gap-1 active:opacity-70" hitSlop={8}>
-            <Text className="text-[12px] font-semibold text-brand-400">{filtered.length} · Clear</Text>
-            <X size={12} strokeWidth={2.75} color={brand[400]} />
-          </Pressable>
+        <Text className="text-[12px] font-bold uppercase tracking-wider text-white/35">{muscle ?? 'All exercises'}</Text>
+        {loading ? (
+          <View className="flex-row items-center gap-1.5">
+            <RefreshCw size={12} color={brand[400]} />
+            <Text className="text-[12px] text-white/35">Loading</Text>
+          </View>
         ) : (
-          <Text className="text-[12px] text-white/35">{filtered.length}</Text>
+          <Text className="text-[12px] text-white/35">{filtered.length} of {all.length}</Text>
         )}
       </View>
-      <View className="flex-row flex-wrap gap-3">
-        {filtered.map((e) => (
-          <Pressable key={e.id} onPress={() => nav.open('exerciseDetail', { defId: e.id })} className="flex-1 basis-[47%] overflow-hidden rounded-2xl border border-white/5 bg-ink-800 active:opacity-90">
-            <ExerciseThumb uri={e.image} />
-            <View className="p-3">
-              <Text numberOfLines={1} className="text-sm font-bold text-white">{e.name}</Text>
-              <Text className="text-[12px] text-white/45">{e.muscle}</Text>
+
+      {loading ? (
+        <View className="flex-row flex-wrap gap-3">
+          {['78%', '58%', '66%', '84%', '52%', '72%'].map((w, i) => (
+            <View key={i} className="flex-1 basis-[47%] overflow-hidden rounded-[20px] border border-white/5 bg-ink-800">
+              <Skeleton width="100%" height={92} radius={0} />
+              <View className="p-3">
+                <Skeleton width={w as `${number}%`} height={10} />
+                <View className="mt-2"><Skeleton width="42%" height={8} /></View>
+              </View>
             </View>
-          </Pressable>
-        ))}
-        {filtered.length === 0 && <Text className="w-full py-8 text-center text-sm text-white/40">No exercises found.</Text>}
-      </View>
+          ))}
+        </View>
+      ) : (
+        <View className="flex-row flex-wrap gap-3">
+          {filtered.map((e) => (
+            <Pressable key={e.id} onPress={() => nav.open('exerciseDetail', { defId: e.id, library: true })} className="flex-1 basis-[47%] overflow-hidden rounded-[20px] border border-white/5 bg-ink-800 active:opacity-90">
+              <ExerciseThumb uri={e.image} />
+              <View className="p-3">
+                <Text numberOfLines={1} className="text-[13px] font-bold text-white">{e.name}</Text>
+                <Text className="mt-0.5 text-[11.5px] text-white/45">{e.muscle}</Text>
+              </View>
+            </Pressable>
+          ))}
+          {filtered.length === 0 && <Text className="w-full py-9 text-center text-[13.5px] text-white/40">No exercises found.</Text>}
+        </View>
+      )}
     </View>
   )
 }
@@ -387,7 +502,7 @@ function ExercisesTab() {
 function ExerciseThumb({ uri }: { uri: string }) {
   const [failed, setFailed] = useState(false)
   return (
-    <View className="h-24 w-full bg-ink-700">
+    <View className="h-[92px] w-full bg-ink-700">
       <View style={StyleSheet.absoluteFill} className="items-center justify-center">
         <Dumbbell size={26} color="rgba(126,217,87,0.35)" />
       </View>
@@ -395,7 +510,7 @@ function ExerciseThumb({ uri }: { uri: string }) {
         <Image
           source={{ uri }}
           resizeMode="cover"
-          className="h-24 w-full"
+          className="h-[92px] w-full"
           onError={() => setFailed(true)}
         />
       )}
@@ -422,15 +537,15 @@ function Sparkline({ values, activeIndex, color }: { values: number[]; activeInd
 }
 
 type HistoryItem =
-  | { kind: 'session'; id: string; dateKey: string; name: string; volumeKg: number; durationMin: number }
-  | { kind: 'activity'; id: string; dateKey: string; name: string; icon: string; minutes: number; calories: number; weekly?: boolean }
+  | { kind: 'session'; id: string; dateKey: string; name: string; volumeKg: number; durationMin: number; exercises: import('../store/types').LoggedExercise[] }
+  | { kind: 'activity'; id: string; dateKey: string; name: string; icon: string; minutes: number; calories: number; intensity: string; weekly?: boolean }
 
 function HistoryTab() {
   const { state, dispatch } = useStore()
-  const nav = useNav()
   const toast = useToast()
-  const [syncing, setSyncing] = useState(false)
   const units = state.settings.units
+  const [syncing, setSyncing] = useState(false)
+  const [openId, setOpenId] = useState<string | null>(null)
   const anyConnected = Object.values(state.integrations ?? {}).some((i) => i.connected)
 
   async function refresh() {
@@ -447,8 +562,8 @@ function HistoryTab() {
   const chron = completedSessions(state).slice().sort((a, b) => a.dateKey.localeCompare(b.dateKey))
   const volSeries = chron.map((s) => s.volumeKg)
   const volIndex = new Map(chron.map((s, i) => [s.id, i]))
-  const sessions: HistoryItem[] = completedSessions(state).map((s) => ({ kind: 'session', id: s.id, dateKey: s.dateKey, name: s.name, volumeKg: s.volumeKg, durationMin: s.durationMin }))
-  const acts: HistoryItem[] = (state.activities ?? []).map((a) => ({ kind: 'activity', id: a.id, dateKey: a.dateKey, name: a.name, icon: a.icon, minutes: a.minutes, calories: a.calories, weekly: a.weekly }))
+  const sessions: HistoryItem[] = completedSessions(state).map((s) => ({ kind: 'session', id: s.id, dateKey: s.dateKey, name: s.name, volumeKg: s.volumeKg, durationMin: s.durationMin, exercises: s.exercises }))
+  const acts: HistoryItem[] = (state.activities ?? []).map((a) => ({ kind: 'activity', id: a.id, dateKey: a.dateKey, name: a.name, icon: a.icon, minutes: a.minutes, calories: a.calories, intensity: a.intensity, weekly: a.weekly }))
   const history = [...sessions, ...acts].sort((a, b) => b.dateKey.localeCompare(a.dateKey)).slice(0, 30)
 
   if (history.length === 0 && !anyConnected) {
@@ -456,52 +571,98 @@ function HistoryTab() {
   }
 
   return (
-    <View className="gap-3">
+    <View className="gap-2.5">
       {anyConnected && (
         <Pressable
           onPress={refresh}
           disabled={syncing}
-          className={`flex-row items-center justify-center gap-2 rounded-2xl border border-brand-400/20 bg-brand-400/5 py-2.5 active:opacity-80 ${syncing ? 'opacity-60' : ''}`}
+          className={`flex-row items-center justify-center gap-2 rounded-[20px] border border-brand-400/20 bg-brand-400/5 py-2.5 active:opacity-80 ${syncing ? 'opacity-60' : ''}`}
         >
           <RefreshCw size={14} color={brand[400]} />
           <Text className="text-[13px] font-semibold text-brand-400">{syncing ? 'Syncing…' : 'Sync connected apps'}</Text>
         </Pressable>
       )}
-      {history.map((h) => (
-        <View key={h.id} className="flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-4">
-          <View className="h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-400/15">
-            {h.kind === 'session' ? <Icon name="dumbbell" size={20} color={brand[400]} /> : <ActivityIcon name={h.icon} size={20} color={brand[400]} />}
-          </View>
-          <View className="min-w-0 flex-1">
-            <View className="flex-row items-center gap-1.5">
-              <Text numberOfLines={1} className="font-bold text-white">{h.name}</Text>
-              {h.kind === 'activity' && h.weekly && (
-                <View className="flex-row shrink-0 items-center gap-1 rounded-full bg-brand-400/15 px-1.5 py-0.5">
-                  <Repeat size={10} color={brand[300]} />
-                  <Text className="text-[10px] font-bold text-brand-300">Weekly</Text>
+      {history.map((h) => {
+        const open = openId === h.id
+        return (
+          <View key={h.id} className="overflow-hidden rounded-[20px] border border-white/5 bg-ink-800">
+            <Pressable onPress={() => setOpenId(open ? null : h.id)} className="flex-row items-center gap-3 p-3.5 active:opacity-90">
+              <View className="h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[14px] bg-brand-400/15">
+                {h.kind === 'session' ? <Icon name="dumbbell" size={20} color={brand[400]} /> : <ActivityIcon name={h.icon} size={20} color={brand[400]} />}
+              </View>
+              <View className="min-w-0 flex-1">
+                <View className="flex-row items-center gap-1.5">
+                  <Text numberOfLines={1} className="text-[14.5px] font-bold text-white">{h.name}</Text>
+                  {h.kind === 'activity' && h.weekly && (
+                    <View className="rounded-full bg-brand-400/15 px-1.5 py-0.5">
+                      <Text className="text-[10px] font-bold text-brand-300">Weekly</Text>
+                    </View>
+                  )}
                 </View>
+                <Text className="mt-0.5 text-[12px] text-white/45">{relativeLabel(h.dateKey)}{h.kind === 'activity' ? ' · activity' : ''}</Text>
+              </View>
+              {h.kind === 'session' && volSeries.length >= 2 && (
+                <View className="mr-1 shrink-0"><Sparkline values={volSeries} activeIndex={volIndex.get(h.id) ?? -1} color={brand[400]} /></View>
               )}
-            </View>
-            <Text className="text-[12px] text-white/45">{relativeLabel(h.dateKey)}{h.kind === 'activity' ? ' · activity' : ''}</Text>
-          </View>
-          {h.kind === 'session' && volSeries.length >= 2 && (
-            <View className="mr-1 shrink-0"><Sparkline values={volSeries} activeIndex={volIndex.get(h.id) ?? -1} color={brand[400]} /></View>
-          )}
-          <View className="items-end">
-            {h.kind === 'session' ? (
-              <>
-                <Text className="text-sm font-semibold text-white">{fmtVolume(h.volumeKg, units)}</Text>
-                <Text className="text-[12px] text-white/45">{h.durationMin} min</Text>
-              </>
-            ) : (
-              <>
-                <Text className="text-sm font-semibold text-white">{h.minutes} min</Text>
-                <Text className="text-[12px] capitalize text-white/45">activity</Text>
-              </>
+              <View className="items-end">
+                {h.kind === 'session' ? (
+                  <>
+                    <Text className="text-[13.5px] font-bold text-white">{fmtVolume(h.volumeKg, units)}</Text>
+                    <Text className="mt-px text-[12px] text-white/45">{h.durationMin} min</Text>
+                  </>
+                ) : (
+                  <>
+                    <Text className="text-[13.5px] font-bold text-white">{h.minutes} min</Text>
+                    <Text className="mt-px text-[12px] capitalize text-white/45">activity</Text>
+                  </>
+                )}
+              </View>
+              <ChevronDown size={16} color="rgba(255,255,255,0.3)" style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
+            </Pressable>
+
+            {open && (
+              <View className="px-3.5 pb-3.5">
+                <View className="mb-3 h-px bg-white/5" />
+                <View className="mb-2 flex-row items-center justify-between">
+                  <Text className="text-[10.5px] font-bold uppercase tracking-wider text-white/35">{h.kind === 'session' ? 'What you lifted' : 'Effort'}</Text>
+                  <Text className="text-[11.5px] text-white/40">
+                    {h.kind === 'session' ? `${h.exercises.length} exercises · ${h.durationMin} min` : `${h.intensity} · ${h.minutes} min`}
+                  </Text>
+                </View>
+                <View className="gap-2.5">
+                  {h.kind === 'session' ? (
+                    h.exercises.map((x) => {
+                      const doneSets = x.sets.filter((s) => s.done)
+                      const top = doneSets.length ? Math.max(...doneSets.map((s) => s.weightKg)) : 0
+                      const vol = doneSets.reduce((a, s) => a + s.weightKg * s.reps, 0)
+                      return (
+                        <View key={x.defId} className="flex-row items-center justify-between gap-3">
+                          <View className="min-w-0 flex-1">
+                            <Text numberOfLines={1} className="text-[13px] font-semibold text-white">{x.name}</Text>
+                            <Text className="mt-px text-[11.5px] text-white/45">{x.sets.length} sets × {x.targetReps} reps</Text>
+                          </View>
+                          <View className="items-end">
+                            <Text className="text-[13px] font-bold text-brand-300">{fmtWeight(top, units, units === 'imperial' ? 0 : 1)}</Text>
+                            <Text className="mt-px text-[11px] text-white/35">{fmtVolume(vol, units)}</Text>
+                          </View>
+                        </View>
+                      )
+                    })
+                  ) : (
+                    <View className="flex-row items-center justify-between gap-3">
+                      <View className="min-w-0 flex-1">
+                        <Text className="text-[13px] font-semibold text-white">Estimated burn</Text>
+                        <Text className="mt-px text-[11.5px] capitalize text-white/45">{h.minutes} min at {h.intensity} effort</Text>
+                      </View>
+                      <Text className="text-[13px] font-bold text-brand-300">{h.calories} kcal</Text>
+                    </View>
+                  )}
+                </View>
+              </View>
             )}
           </View>
-        </View>
-      ))}
+        )
+      })}
     </View>
   )
 }

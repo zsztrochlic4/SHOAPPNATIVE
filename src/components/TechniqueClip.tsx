@@ -39,8 +39,8 @@ function WebVideo({
   })
 }
 
-/** The green play/pause control + time readout, over a bottom scrim for legibility. */
-function ClipControls({ playing, current, duration, onToggle }: { playing: boolean; current: number; duration: number; onToggle: () => void }) {
+/** The play/pause control + time readout, over a bottom scrim for legibility. */
+function ClipControls({ playing, current, duration, onToggle, accent }: { playing: boolean; current: number; duration: number; onToggle: () => void; accent: string }) {
   return (
     <>
       <LinearGradient
@@ -52,7 +52,7 @@ function ClipControls({ playing, current, duration, onToggle }: { playing: boole
         <Pressable
           onPress={onToggle}
           accessibilityLabel={playing ? 'Pause' : 'Play'}
-          style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: brand[400], alignItems: 'center', justifyContent: 'center' }}
+          style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: accent, alignItems: 'center', justifyContent: 'center' }}
         >
           {playing
             ? <Pause size={19} color="#000" fill="#000" />
@@ -71,7 +71,7 @@ function ClipControls({ playing, current, duration, onToggle }: { playing: boole
  * over its poster. If a clip hasn't been uploaded yet (or fails to load) it gracefully shows the
  * poster with a play badge, so nothing ever breaks. `poster` is a fallback image.
  */
-export function TechniqueClip({ exerciseId, poster, label }: { exerciseId?: string; poster?: string; label: string }) {
+export function TechniqueClip({ exerciseId, poster, label, accent = brand[400] }: { exerciseId?: string; poster?: string; label: string; accent?: string }) {
   const videoUrl = exerciseId ? exerciseVideo(exerciseId) : undefined
   const uploadedPoster = exerciseId ? exercisePoster(exerciseId) : undefined
   const [posterFailed, setPosterFailed] = useState(false)
@@ -140,10 +140,10 @@ export function TechniqueClip({ exerciseId, poster, label }: { exerciseId?: stri
         ) : (
           <VideoView player={player} style={{ width: '100%', height: '100%' }} contentFit="cover" nativeControls={false} />
         ))}
-      {videoOk && <ClipControls playing={playing} current={current} duration={duration} onToggle={toggle} />}
+      {videoOk && <ClipControls playing={playing} current={current} duration={duration} onToggle={toggle} accent={accent} />}
       {!videoOk && (
         <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
-          <View className="h-12 w-12 items-center justify-center rounded-full bg-brand-400">
+          <View className="h-12 w-12 items-center justify-center rounded-full" style={{ backgroundColor: accent }}>
             <Play size={20} color="#000" fill="#000" />
           </View>
           <Text className="mt-2 text-[12px] font-semibold text-white/70">{label}</Text>

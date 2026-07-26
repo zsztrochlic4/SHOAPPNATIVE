@@ -6,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import {
   Bell, Moon, Sun, GraduationCap, Wallet, RotateCcw, Trash2, Camera, Trophy,
   Flame, Search, ScanLine, Plus, Check, Share2, ChevronRight, User, Sparkles, Dumbbell,
-  Droplet, Footprints, BedDouble, Leaf, Clock, Play, Award, BellRing,
+  Droplet, Footprints, BedDouble, Leaf, Play, Award, BellRing,
   HeartPulse, Activity, Zap, Minus, X, LogOut, Volume2,
 } from 'lucide-react-native'
 import { Sheet, EmptyState } from '../components/Sheet'
@@ -21,6 +21,7 @@ import { useAuth } from '../auth/AuthProvider'
 import { useToast } from '../components/Toast'
 import { useNav } from '../nav'
 import { FOODS, QUICK_WORKOUTS } from '../data/catalog'
+import { buildCustomSession, imageForMuscle } from '../store/programSession'
 import { pick, makeRng } from '../lib/rng'
 import { requestPushPermission, resolveNotifPrefs } from '../lib/notifications'
 import { todayKey, relativeLabel, shortDate, fromKey } from '../lib/date'
@@ -859,7 +860,7 @@ export function LeaderboardSheet({ open, onClose }: Props) {
       </View>
       <Pressable
         onPress={async () => {
-          const r = await shareText('Join me on StrengthHub — train together and climb the campus leaderboard.', 'StrengthHub')
+          const r = await shareText('Join me on StrengthHub, train together and climb the campus leaderboard.', 'StrengthHub')
           toast(r === 'copied' ? 'Invite copied to clipboard' : r === 'shared' ? 'Invite shared' : 'Sharing not available')
         }}
         className="btn-primary mt-5 w-full flex-row items-center justify-center gap-2 active:opacity-90"
@@ -872,31 +873,55 @@ export function LeaderboardSheet({ open, onClose }: Props) {
 }
 
 export function QuickWorkoutsSheet({ open, onClose }: Props) {
-  const toast = useToast()
+  const { dispatch } = useStore()
+  const nav = useNav()
+
+  // Turn a quick workout into a loggable session and open the same guided
+  // follow-along (timer, rest, form) used for prescribed and custom workouts.
+  // Bodyweight moves seed at 0 kg; each gets a synthetic id so the technique
+  // sheet falls back to the generic form guide rather than opening blank.
+  function startQuick(q: (typeof QUICK_WORKOUTS)[number]) {
+    const items = q.exercises.map((name, i) => ({
+      defId: `quick-${q.id}-${i}`,
+      name,
+      image: imageForMuscle('Full Body & Conditioning'),
+      targetSets: 3,
+      targetReps: '12-15',
+    }))
+    const base = buildCustomSession(q.name, items, todayKey)
+    const session = { ...base, focus: q.focus, durationMin: q.minutes, calories: Math.round(q.minutes * 9), accent: 'blue' as const }
+    dispatch({ type: 'SAVE_SESSION', session })
+    nav.open('activeWorkout', { sessionId: session.id })
+  }
+
   return (
-    <Sheet open={open} onClose={onClose} title="Got 15 minutes?">
-      <Text className="mb-3 text-[13px] text-white/50">Express sessions for between lectures. No gym needed.</Text>
-      <View className="gap-3">
+    <Sheet open={open} onClose={onClose} full>
+      <Text className="text-[25px] font-extrabold tracking-[-0.03em] leading-[1.15] text-white">12-Minute Bodyweight Exercises</Text>
+      <Text className="mt-2.5 text-[13.5px] leading-5 text-white/55">Quick, no-equipment workouts when you're short on time.</Text>
+      <View className="mt-4 gap-2.5">
         {QUICK_WORKOUTS.map((q) => (
-          <View key={q.id} className="rounded-2xl border border-white/5 bg-ink-800 p-4">
-            <View className="flex-row items-center gap-3">
-              <View className="h-11 w-11 items-center justify-center rounded-xl bg-brand-400/15"><Clock size={20} color={brand[400]} /></View>
-              <View className="flex-1">
-                <Text className="font-bold leading-tight text-white">{q.name}</Text>
-                <Text className="text-[12px] text-white/45">{q.minutes} min · {q.focus}</Text>
+          <View key={q.id} className="rounded-[20px] border border-white/5 bg-white/[0.03] p-4">
+            <View className="flex-row items-start justify-between gap-3">
+              <View className="min-w-0 flex-1">
+                <Text className="text-[15px] font-bold leading-tight text-white">{q.name}</Text>
+                <Text className="mt-0.5 text-[12px] text-white/50">{q.focus} · {q.exercises.length} exercises</Text>
               </View>
-              <Pressable onPress={() => { toast(`Started: ${q.name}`); onClose() }} className="flex-row items-center gap-1 rounded-full bg-brand-400 px-3.5 py-1.5 active:opacity-90">
-                <Play size={14} color="#000" fill="#000" />
-                <Text className="text-sm font-bold text-black">Start</Text>
-              </Pressable>
+              <View className="shrink-0 items-end">
+                <Text className="text-[22px] font-extrabold leading-none text-accent-blue">{q.minutes}</Text>
+                <Text className="mt-[3px] text-[9.5px] font-bold uppercase tracking-wider text-white/35">minutes</Text>
+              </View>
             </View>
             <View className="mt-3 flex-row flex-wrap gap-1.5">
               {q.exercises.map((e) => (
-                <View key={e} className="rounded-full bg-white/5 px-2.5 py-1">
-                  <Text className="text-[11px] text-white/55">{e}</Text>
+                <View key={e} className="rounded-full bg-white/[0.06] px-2.5 py-1">
+                  <Text className="text-[11.5px] text-white/65">{e}</Text>
                 </View>
               ))}
             </View>
+            <Pressable onPress={() => startQuick(q)} className="mt-3 flex-row items-center justify-center gap-1.5 rounded-full bg-accent-blue py-2 active:opacity-90">
+              <Play size={12} color="#fff" fill="#fff" />
+              <Text className="text-[13.5px] font-bold text-white">Start {q.minutes} min session</Text>
+            </Pressable>
           </View>
         ))}
       </View>

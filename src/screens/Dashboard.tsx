@@ -3,13 +3,13 @@ import { View, Text, Pressable, Image, Animated, Easing, Platform, ScrollView, S
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Circle, G, Defs, RadialGradient, Stop, Rect } from 'react-native-svg'
 import { LinearGradient } from 'expo-linear-gradient'
-import { Menu, MessageCircle, Clock, Play, GraduationCap, ChevronRight, Leaf, Check, Flame, ChevronDown, Info, ArrowRight, X, SlidersHorizontal } from 'lucide-react-native'
+import { Menu, MessageCircle, Clock, GraduationCap, ChevronRight, Leaf, Check, Flame, ChevronDown, Info, ArrowRight, X, SlidersHorizontal } from 'lucide-react-native'
 import { Icon } from '../components/Icon'
 import { ActivityIcon } from '../components/ActivityIcon'
 import { Card } from '../components/ui'
+import { MuscleMapCard, MuscleFigures } from '../components/MuscleMapCard'
 import { AppModal, IS_WEB, WEB_SCREEN } from '../components/WebFrame'
 import { PressableScale } from '../components/PressableScale'
-import { Hero } from '../components/Hero'
 import { IndexGauge } from '../components/IndexGauge'
 import { useStore } from '../store/store'
 import { useNav } from '../nav'
@@ -18,9 +18,9 @@ import { fmtFluid, fmtWeightNum, weightUnit, fmtVolume } from '../lib/format'
 import {
   todayHabit, habitForDay, todaySession, sessionForDay, activitiesForDay,
   unreadChat, streakStats, foodReviewForDay, weeklyIndex, nutritionTagsForDay,
-  workoutStartedForDay,
+  workoutStartedForDay, sessionProgress,
 } from '../store/selectors'
-import { tagById, type TagTone } from '../data/nutrition'
+import { tagById, NUTRITION_TAGS, type TagTone } from '../data/nutrition'
 import { dashboardStatIds, dashboardTimeframe, statById, timeframeLabel, type StatResult } from '../lib/metrics'
 import { dailyTargets, examState } from '../store/training'
 import { activePeriod, upcomingPeriods, daysLabel, daysUntil, fmtPeriodDate, nextDayKey } from '../store/periods'
@@ -123,11 +123,18 @@ export default function Dashboard() {
   const isRestDay = !selSession
   const selWorkoutDone = isRestDay || workoutStartedForDay(state, selDate) || (selSession?.completed ?? false)
 
+  // CTA for the muscle-map plan card, driven by today's tick progress (mirrors the Workout tab).
+  const selProg = selSession ? sessionProgress(selSession) : null
+  const todayPlanCta =
+    selProg && selProg.total > 0 && selProg.done === selProg.total ? 'Completed'
+    : selProg && selProg.done > 0 ? 'Continue Workout'
+    : 'Start Workout'
+
   // Fixed order, matching the design — done rows stay in place, struck through.
   const goals: Goal[] = [
-    { id: 'steps', kind: 'measure', icon: 'footprints', tile: colors.brand400, label: 'Steps', done: selHabit.steps >= t.steps, value: selHabit.steps, target: t.steps, step: 500, fmt: (v) => Math.round(v).toLocaleString(), patch: (v) => dispatch({ type: 'PATCH_TODAY_HABIT', patch: { steps: v } }) },
-    { id: 'sleep', kind: 'measure', icon: 'moon', tile: colors.accentPurple, label: 'Sleep', done: selHabit.sleepH >= t.sleepH, value: selHabit.sleepH, target: t.sleepH, step: 0.5, fmt: (v) => `${Math.round(v * 10) / 10} hrs`, patch: (v) => dispatch({ type: 'PATCH_TODAY_HABIT', patch: { sleepH: v } }) },
-    { id: 'water', kind: 'measure', icon: 'droplet', tile: colors.accentBlue, label: 'Water', done: selHabit.waterL >= t.waterL, value: selHabit.waterL, target: t.waterL, step: 0.2, fmt: (v) => fmtFluid(v, units), patch: (v) => dispatch({ type: 'PATCH_TODAY_HABIT', patch: { waterL: v } }) },
+    { id: 'steps', kind: 'measure', icon: 'footprints', tile: colors.brand400, label: 'Steps', done: selHabit.steps >= t.steps, value: selHabit.steps, target: t.steps, step: 500, fmt: (v) => Math.round(v).toLocaleString(), patch: (v) => dispatch({ type: 'PATCH_HABIT', dateKey: selDate, patch: { steps: v } }) },
+    { id: 'sleep', kind: 'measure', icon: 'moon', tile: colors.accentPurple, label: 'Sleep', done: selHabit.sleepH >= t.sleepH, value: selHabit.sleepH, target: t.sleepH, step: 0.5, fmt: (v) => `${Math.round(v * 10) / 10} hrs`, patch: (v) => dispatch({ type: 'PATCH_HABIT', dateKey: selDate, patch: { sleepH: v } }) },
+    { id: 'water', kind: 'measure', icon: 'droplet', tile: colors.accentBlue, label: 'Water', done: selHabit.waterL >= t.waterL, value: selHabit.waterL, target: t.waterL, step: 0.2, fmt: (v) => fmtFluid(v, units), patch: (v) => dispatch({ type: 'PATCH_HABIT', dateKey: selDate, patch: { waterL: v } }) },
     { id: 'nutrition', kind: 'auto', icon: 'leaf', tile: colors.accentOrange, label: isToday ? "Today's nutrition choices" : 'Nutrition choices', done: selCheckedIn, sub: selCheckedIn ? 'Checked in · auto' : isToday ? 'Not checked in yet' : 'No check-in', sheetValue: selCheckedIn ? 'Checked in' : 'Not checked in yet', cta: 'Log', onOpen: () => nav.goTab('nutrition') },
     { id: 'workout', kind: 'auto', icon: 'dumbbell', tile: colors.brand400, label: 'Workout', done: selWorkoutDone, sub: isRestDay ? 'Rest day · auto' : `${selSession.name} · ${selWorkoutDone ? 'auto' : 'not started'}`, sheetValue: isRestDay ? 'Rest day' : selWorkoutDone ? 'Completed' : 'Not yet', cta: 'Start', onOpen: () => (selSession ? nav.open('activeWorkout') : nav.goTab('workout')) },
   ]
@@ -135,6 +142,8 @@ export default function Dashboard() {
 
   const [sheetOpen, setSheetOpen] = useState(false)
   const openSheet = () => setSheetOpen(true)
+  // Editor for retro-logging a past day (opened from the summary card's "Update").
+  const [pastEditorOpen, setPastEditorOpen] = useState(false)
 
   // Progress overview: the picked stats, computed over the picked window.
   const timeframe = dashboardTimeframe(state)
@@ -211,7 +220,7 @@ export default function Dashboard() {
         <Card className="mt-3 p-4">
           <Text className="text-[13px] font-bold text-white">How your readiness works</Text>
           <Text className="mt-1 text-[12px] leading-snug text-white/55">
-            It blends your last 7 days across five habits versus your targets. <Text className="font-semibold text-white/75">50 means on track</Text> — higher means you're beating your goals. Hit your targets and each bar fills toward 100%.
+            It blends your last 7 days across five habits versus your targets. <Text className="font-semibold text-white/75">50 means on track</Text>. Higher means you're beating your goals. Hit your targets and each bar fills toward 100%.
           </Text>
           <View className="mt-3 gap-2.5">
             {idx.parts.map((p) => {
@@ -238,51 +247,82 @@ export default function Dashboard() {
           const today = k === todayKey
           const selected = k === selDate
           const future = k > todayKey
-          const trained = state.sessions.some((s) => s.dateKey === k && s.completed) || (state.activities ?? []).some((a) => a.dateKey === k)
-          const logged = state.habits.some((h) => h.dateKey === k)
+          // A day is green only when everything is logged: steps, sleep, water, a
+          // nutrition check-in, and the workout (or a rest day). If even one is
+          // missing the dot is orange, so nothing slips through unlogged.
+          const dayHabit = habitForDay(state, k)
+          const sess = sessionForDay(state, k)
+          const workoutLogged = !sess || workoutStartedForDay(state, k) || sess.completed || (state.activities ?? []).some((a) => a.dateKey === k)
+          const fullyLogged =
+            dayHabit.steps > 0 && dayHabit.sleepH > 0 && dayHabit.waterL > 0 &&
+            (nutritionTagsForDay(state, k).length > 0 || !!foodReviewForDay(state, k)) &&
+            workoutLogged
           const date = parseInt(k.slice(-2))
           return (
-            <Pressable key={k} disabled={future} onPress={() => setSelDate(k)} className={`w-10 items-center gap-1.5 rounded-xl py-1.5 ${future ? 'opacity-30' : 'active:opacity-70'}`}>
+            <Pressable key={k} disabled={future} onPress={() => { setSelDate(k); setPastEditorOpen(false) }} className={`w-10 items-center gap-1.5 rounded-xl py-1.5 ${future ? 'opacity-30' : 'active:opacity-70'}`}>
               <Text className={`text-[10px] font-semibold uppercase tracking-wide ${today ? 'text-brand-400' : 'text-white/35'}`}>{WD[i]}</Text>
-              {/* "Today" is always a ring; the *selected* day is always a fill —
-               *  so when today is selected you see a filled disc inside its ring
-               *  and the two states never read as the same thing. */}
-              <View className={`h-8 w-8 items-center justify-center rounded-full ${today ? 'border-2 border-brand-400' : 'border-2 border-transparent'}`}>
+              {/* Selected day = a filled disc with a ring around it (a small gap
+               *  between). Today keeps a ring even when it isn't the selected day so
+               *  it stays marked. */}
+              <View className={`h-8 w-8 items-center justify-center rounded-full ${selected || today ? 'border-2 border-brand-400' : 'border-2 border-transparent'}`}>
                 <View className={`h-6 w-6 items-center justify-center rounded-full ${selected ? 'bg-brand-400' : ''}`}>
                   <Text className={`text-[14px] font-bold ${selected ? 'text-black' : today ? 'text-brand-400' : 'text-white/75'}`}>{date}</Text>
                 </View>
               </View>
-              <View className={`h-1.5 w-1.5 rounded-full ${trained ? 'bg-brand-400' : logged ? 'bg-white/30' : future ? 'bg-transparent' : 'bg-white/10'}`} />
+              <View className={`h-1.5 w-1.5 rounded-full ${future ? 'bg-transparent' : fullyLogged ? 'bg-brand-400' : 'bg-accent-orange'}`} />
             </Pressable>
           )
         })}
       </View>
 
       {/* Plan / workout: follows the selected day */}
-      <Section title={isToday ? 'Your plan' : `${selWeekday}'s workout`} />
-      <Hero image={selSession?.image ?? session?.image} rounded={16}>
-        <View className="flex-row items-center gap-2">
-          <Text className="text-sm font-semibold text-brand-400">{isToday ? "Today's plan" : selSession ? (selSession.completed ? 'Completed' : 'Logged') : 'Rest day'}</Text>
-          {exam.active && isToday && <View className="rounded-full bg-accent-purple/20 px-2 py-0.5"><Text className="text-[10px] font-bold text-accent-purple">Exam mode</Text></View>}
+      <Section title={isToday ? "Today's plan" : `${selWeekday}'s workout`} />
+      {selSession ? (
+        isToday ? (
+          <MuscleMapCard
+            session={selSession}
+            sex={state.profile.sex}
+            ctaLabel={todayPlanCta}
+            onPress={() => nav.open('activeWorkout')}
+          />
+        ) : (
+          // Past day: the muscle map (that day's trained groups), kept at the
+          // compact height the photo card used, with a read-only exercise list below.
+          <View style={{ position: 'relative', overflow: 'hidden', borderRadius: 16, borderWidth: 1, borderColor: `${colors.fg}0d`, backgroundColor: colors.ink800 }}>
+            <View style={{ position: 'absolute', top: 6, bottom: 6, right: 4, width: 150 }} pointerEvents="none">
+              <MuscleFigures session={selSession} sex={state.profile.sex} c={colors} />
+            </View>
+            <LinearGradient colors={[colors.ink800, `${colors.ink800}99`, `${colors.ink800}00`]} locations={[0.25, 0.47, 0.74]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} pointerEvents="none" />
+            <View className="p-5">
+              <Text className="text-sm font-semibold text-brand-400">{selSession.completed ? 'Completed' : 'Logged'}</Text>
+              <Text className="mt-1 text-2xl font-extrabold tracking-tight text-white">{selSession.name}</Text>
+              <View className="mt-2 flex-row items-center gap-1.5">
+                <Clock size={15} color="rgba(255,255,255,0.6)" />
+                <Text className="text-sm text-white/60">{selSession.exercises.length} exercises · {selSession.durationMin} min · {fmtVolume(selSession.volumeKg, units)}</Text>
+              </View>
+            </View>
+          </View>
+        )
+      ) : (
+        // Rest day: same card, muscle figures shown but nothing highlighted.
+        <View style={{ position: 'relative', overflow: 'hidden', borderRadius: 16, borderWidth: 1, borderColor: `${colors.fg}0d`, backgroundColor: colors.ink800 }}>
+          <View style={{ position: 'absolute', top: 6, bottom: 6, right: 4, width: 150 }} pointerEvents="none">
+            <MuscleFigures sex={state.profile.sex} c={colors} />
+          </View>
+          <LinearGradient colors={[colors.ink800, `${colors.ink800}99`, `${colors.ink800}00`]} locations={[0.25, 0.47, 0.74]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} pointerEvents="none" />
+          <View className="p-5">
+            <View className="flex-row items-center gap-2">
+              <Text className="text-sm font-semibold text-brand-400">{isToday ? "Today's plan" : 'Rest day'}</Text>
+              {exam.active && isToday && <View className="rounded-full bg-accent-purple/20 px-2 py-0.5"><Text className="text-[10px] font-bold text-accent-purple">Exam mode</Text></View>}
+            </View>
+            <Text className="mt-1 text-2xl font-extrabold tracking-tight text-white">Rest day</Text>
+            <View className="mt-2 flex-row items-center gap-1.5">
+              <Clock size={15} color="rgba(255,255,255,0.6)" />
+              <Text className="text-sm text-white/60">Recovery and mobility</Text>
+            </View>
+          </View>
         </View>
-        <Text className="mt-1 text-2xl font-extrabold tracking-tight text-white">{selSession?.name ?? 'Rest day'}</Text>
-        <View className="mt-2 flex-row items-center gap-1.5">
-          <Clock size={15} color="rgba(255,255,255,0.6)" />
-          <Text className="text-sm text-white/60">
-            {selSession
-              ? isToday
-                ? `${selSession.exercises.length} exercises, about ${exam.active ? 30 : 50} min`
-                : `${selSession.exercises.length} exercises · ${selSession.durationMin} min · ${fmtVolume(selSession.volumeKg, units)}`
-              : 'Recovery and mobility'}
-          </Text>
-        </View>
-        {isToday && selSession && (
-          <Pressable onPress={() => nav.open('activeWorkout')} className="btn-primary mt-4 self-start active:opacity-90">
-            <Play size={16} color="#000" fill="#000" />
-            <Text className="ml-2 font-semibold text-black">{selSession.completed ? 'View workout' : 'Start workout'}</Text>
-          </Pressable>
-        )}
-      </Hero>
+      )}
 
       {/* Past day: read-only list of what was done */}
       {!isToday && selSession && (
@@ -320,18 +360,17 @@ export default function Dashboard() {
         <Text className="mt-3 rounded-2xl border border-dashed border-white/15 py-4 text-center text-[13px] text-white/40">No workout or activity logged on {shortDate(selDate)}.</Text>
       )}
 
-      {/* Progress — the merged checklist for whichever day is selected. Today's
-       *  rows open the update sheet; past days are a read-only record. */}
+      {/* Progress — the merged checklist for today (opens the update sheet), or an
+       *  editable "catch-up" log for a past day so nothing gets missed. */}
       <Section title={selTitle} tight />
       {isToday && t.adjusted && <Text className="-mt-1 mb-3 text-[12px] text-accent-purple">Targets eased for exam season</Text>}
       <DayProgressCard
         goals={goals}
         doneCount={goalsDone}
         total={goals.length}
-        onUpdate={isToday ? openSheet : undefined}
-        stamp={isToday ? undefined : shortDate(selDate)}
+        onUpdate={isToday ? openSheet : () => setPastEditorOpen(true)}
         tags={selTags}
-        onTag={isToday ? () => nav.goTab('nutrition') : undefined}
+        onTag={isToday ? () => nav.goTab('nutrition') : () => setPastEditorOpen(true)}
         colors={colors}
       />
 
@@ -375,6 +414,20 @@ export default function Dashboard() {
 
       {isToday && (
         <UpdateTodaySheet open={sheetOpen} onClose={() => setSheetOpen(false)} goals={goals} doneCount={goalsDone} total={goals.length} colors={colors} />
+      )}
+      {!isToday && (
+        <DayEditorSheet
+          open={pastEditorOpen}
+          onClose={() => setPastEditorOpen(false)}
+          dateKey={selDate}
+          dayLabel={selWeekday}
+          goals={goals}
+          tags={selTags}
+          workoutDone={selWorkoutDone}
+          isRestDay={isRestDay}
+          colors={colors}
+          dispatch={dispatch}
+        />
       )}
     </View>
   )
@@ -566,6 +619,158 @@ function FoodCheckIn({ tags, colors, onTag }: { tags: string[]; colors: ThemeCol
         <Text className="text-[13px] text-white/35">No food tags for this day</Text>
       )}
     </View>
+  )
+}
+
+/* ---- Day editor -------------------------------------------------------------
+   One sheet for logging any day. Both today and a past catch-up open it from the
+   summary card's "Update", so a user who forgot can still fill the day in:
+   steppers for the measurable goals, a workout completed toggle, and the same 16
+   "how did your eating go" tags. Every write targets the selected day. -------- */
+
+function PastStepper({ onDec, onInc, colors }: { onDec: () => void; onInc: () => void; colors: ThemeColors }) {
+  return (
+    <View className="flex-row items-center" style={{ gap: 8 }}>
+      <PressableScale onPress={onDec} scaleTo={0.9}>
+        <View style={{ width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.06)' }}>
+          <Text style={{ fontSize: 20, lineHeight: 23, color: colors.fg }}>−</Text>
+        </View>
+      </PressableScale>
+      <PressableScale onPress={onInc} scaleTo={0.9}>
+        <View style={{ width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: `${colors.brand400}2e` }}>
+          <Text style={{ fontSize: 20, lineHeight: 23, color: colors.brand400 }}>+</Text>
+        </View>
+      </PressableScale>
+    </View>
+  )
+}
+
+function DayEditorSheet({ open, onClose, dateKey, dayLabel, goals, tags, workoutDone, isRestDay, colors, dispatch }: {
+  open: boolean
+  onClose: () => void
+  dateKey: string
+  dayLabel: string
+  goals: Goal[]
+  tags: string[]
+  workoutDone: boolean
+  isRestDay: boolean
+  colors: ThemeColors
+  dispatch: (action: any) => void // eslint-disable-line @typescript-eslint/no-explicit-any
+}) {
+  const win = useWindowDimensions()
+  const screenH = IS_WEB ? WEB_SCREEN.height : win.height
+  const insets = useSafeAreaInsets()
+  const [render, setRender] = useState(open)
+  const [panelH, setPanelH] = useState(560)
+  const progress = useRef(new Animated.Value(0)).current
+
+  useEffect(() => {
+    if (open) {
+      setRender(true)
+      Animated.timing(progress, { toValue: 1, duration: 440, easing: SHEET_EASE, useNativeDriver: Platform.OS !== 'web' }).start()
+    } else if (render) {
+      Animated.timing(progress, { toValue: 0, duration: 320, easing: SHEET_EASE, useNativeDriver: Platform.OS !== 'web' }).start(({ finished }) => { if (finished) setRender(false) })
+    }
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const round = (v: number) => Math.round(v * 100) / 100
+  const measures = goals.filter((g): g is Extract<Goal, { kind: 'measure' }> => g.kind === 'measure')
+
+  return (
+    <AppModal visible={render} transparent animationType="none" onRequestClose={onClose}>
+      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <Animated.View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.55)', opacity: progress }}>
+          <Pressable accessibilityLabel="Close" onPress={onClose} style={{ flex: 1 }} />
+        </Animated.View>
+
+        <Animated.View
+          onLayout={(e) => setPanelH(e.nativeEvent.layout.height)}
+          style={{
+            maxHeight: screenH * 0.86, backgroundColor: colors.ink800,
+            borderTopLeftRadius: 28, borderTopRightRadius: 28,
+            shadowColor: '#000', shadowOpacity: 0.55, shadowRadius: 40, shadowOffset: { width: 0, height: -12 }, elevation: 24,
+            transform: [{ translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [panelH, 0] }) }],
+          }}
+        >
+          <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 6 }}>
+            <View style={{ width: 38, height: 4, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'center', marginBottom: 12 }} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View>
+                <Text style={{ fontSize: 18, fontWeight: '800', color: '#fff' }}>Update {dayLabel}</Text>
+                <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>Fill in what you did. It still counts.</Text>
+              </View>
+              <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Close" style={{ width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.06)' }}>
+                <X size={14} color="rgba(255,255,255,0.5)" strokeWidth={2.5} />
+              </Pressable>
+            </View>
+          </View>
+
+          <ScrollView style={{ paddingHorizontal: 20 }} contentContainerStyle={{ paddingTop: 2, paddingBottom: 8 }} showsVerticalScrollIndicator={false}>
+            {measures.map((g, i) => (
+              <View key={g.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 13, paddingVertical: 12, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: 'rgba(255,255,255,0.06)' }}>
+                <GoalTile goal={g} colors={colors} size={38} />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>{g.label}</Text>
+                  <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 1 }}>{g.fmt(g.value)} / {g.fmt(g.target)}</Text>
+                </View>
+                <PastStepper onDec={() => g.patch(Math.max(0, round(g.value - g.step)))} onInc={() => g.patch(round(g.value + g.step))} colors={colors} />
+              </View>
+            ))}
+
+            {/* Workout completed toggle */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 13, paddingVertical: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)' }}>
+              <View style={{ width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: `${colors.brand400}26` }}>
+                <Icon name="dumbbell" size={18} color={colors.brand400} />
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>Workout</Text>
+                <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 1 }}>{isRestDay ? 'Rest day' : workoutDone ? 'Marked complete' : 'Not completed'}</Text>
+              </View>
+              {!isRestDay && (
+                <PressableScale onPress={() => dispatch({ type: 'SET_WORKOUT_DONE', dateKey, done: !workoutDone })} scaleTo={0.96}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: workoutDone ? colors.brand400 : 'rgba(255,255,255,0.08)' }}>
+                    {workoutDone && <Check size={14} strokeWidth={3} color="#000" />}
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: workoutDone ? '#000' : 'rgba(255,255,255,0.7)' }}>{workoutDone ? 'Completed' : 'Mark done'}</Text>
+                  </View>
+                </PressableScale>
+              )}
+            </View>
+
+            {/* How did your eating go? — the 16 tags, toggled for this day */}
+            <View style={{ marginTop: 6, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)', paddingTop: 16 }}>
+              <Text style={{ fontSize: 15, fontWeight: '800', color: '#fff' }}>How did your eating go?</Text>
+              <Text style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.45)', marginTop: 2, marginBottom: 12 }}>Tap any that fit. These show on your dashboard.</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {NUTRITION_TAGS.map((tg) => {
+                  const on = tags.includes(tg.id)
+                  const tint = toneColor(tg.tone, colors)
+                  return (
+                    <Pressable
+                      key={tg.id}
+                      onPress={() => dispatch({ type: 'TOGGLE_NUTRITION_TAG', tag: tg.id, dateKey })}
+                      style={{ width: '48%', flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 11, paddingHorizontal: 11, borderRadius: 13, backgroundColor: on ? `${tint}29` : 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: on ? `${tint}80` : 'transparent' }}
+                      className="active:opacity-80"
+                    >
+                      <Text style={{ fontSize: 17, lineHeight: 20 }}>{tg.emoji}</Text>
+                      <Text numberOfLines={2} style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: '600', lineHeight: 15, color: on ? tint : 'rgba(255,255,255,0.75)' }}>{tg.label}</Text>
+                      {on && <Check size={13} strokeWidth={3.4} color={tint} />}
+                    </Pressable>
+                  )
+                })}
+              </View>
+            </View>
+          </ScrollView>
+
+          <View style={{ borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.07)', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 22 + insets.bottom }}>
+            <PressableScale onPress={onClose} scaleTo={0.98}>
+              <View style={{ alignItems: 'center', borderRadius: 999, paddingVertical: 14, backgroundColor: colors.brand400 }}>
+                <Text style={{ fontSize: 15, fontWeight: '800', color: '#000' }}>Done</Text>
+              </View>
+            </PressableScale>
+          </View>
+        </Animated.View>
+      </View>
+    </AppModal>
   )
 }
 

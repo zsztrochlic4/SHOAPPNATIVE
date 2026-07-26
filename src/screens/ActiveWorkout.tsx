@@ -28,6 +28,21 @@ import type { Units, WorkoutSession } from '../store/types'
  * regardless of the app-wide light/dark setting. */
 const C = palette.dark
 
+// Blue accent scale for bodyweight "quick" sessions (matches their blue entry
+// point in the Workout section). Mirrors the brand-400/300/500 roles.
+const BLUE_400 = C.accentBlue // #3B82F6
+const BLUE_300 = '#60A5FA'
+const BLUE_500 = '#2563EB'
+
+/** hex → rgba string. With the brand-green #7ED957 this reproduces the old
+ *  rgba(126,217,87,…) literals exactly, so recolouring is a no-op for normal
+ *  sessions and turns blue automatically for quick ones. */
+function rgbaOf(hex: string, o: number): string {
+  const h = hex.replace('#', '')
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16)
+  return `rgba(${r},${g},${b},${o})`
+}
+
 /* ============================================================================
  *  Active Workout — 1:1 port of the "Active Workout Flow Redesign" design
  *  (Active Workout.dc.html). Five screens share one full-screen surface:
@@ -82,8 +97,23 @@ function mmss(total: number): string {
 
 /** Rest ring colour: brand green at full → amber → soft red near zero,
  *  matching the design's `hsl(96*frac, 62%, 55%)`. */
-function restColor(frac: number): string {
+/** Blend two #rrggbb colours (t: 0 → a, 1 → b). */
+function lerpHex(a: string, b: string, t: number): string {
+  const pa = a.replace('#', ''), pb = b.replace('#', '')
+  const ar = parseInt(pa.slice(0, 2), 16), ag = parseInt(pa.slice(2, 4), 16), ab = parseInt(pa.slice(4, 6), 16)
+  const br = parseInt(pb.slice(0, 2), 16), bg = parseInt(pb.slice(2, 4), 16), bb = parseInt(pb.slice(4, 6), 16)
+  const m = (x: number, y: number) => Math.round(x + (y - x) * Math.max(0, Math.min(1, t)))
+  return `rgb(${m(ar, br)},${m(ag, bg)},${m(ab, bb)})`
+}
+
+/**
+ * Rest-timer colour. Green sessions ramp green → red as time runs low (the
+ * classic urgency cue). Blue "quick" sessions hold the blue accent, warming to
+ * red only in the final stretch, so the whole session reads blue.
+ */
+function restColor(frac: number, accent?: string): string {
   const f = Math.max(0, Math.min(1, frac))
+  if (accent) return f > 0.18 ? accent : lerpHex('#f87171', accent, f / 0.18)
   return `hsl(${Math.round(96 * f)}, 62%, 55%)`
 }
 
@@ -123,15 +153,23 @@ function ScreenIn({ children, style }: { children: React.ReactNode; style?: any 
   )
 }
 
-export default function ActiveWorkout({ open, onClose, params }: { open: boolean; onClose: () => void; params?: Record<string, unknown> }) {
+export default function ActiveWorkout({ open, onClose, onComplete, params }: { open: boolean; onClose: () => void; onComplete?: () => void; params?: Record<string, unknown> }) {
   const { state, dispatch } = useStore()
-  const c = C
+  // Where the finish celebration returns to (dashboard). Cancelling mid-workout
+  // still uses `onClose` (back to the Workout tab).
+  const finishClose = onComplete ?? onClose
   const units = state.settings.units
 
   // A custom / template-launched session is opened by explicit id; everything
   // else falls back to today's prescribed session.
   const sessionId = params?.sessionId as string | undefined
   const session = (sessionId ? state.sessions.find((s) => s.id === sessionId) : undefined) ?? todaySession(state)
+
+  // Quick bodyweight sessions run the whole logger in blue; every other session
+  // stays brand green. Overriding the brand-* roles recolours the palette-driven
+  // greens, and rgbaOf(c.brand400, …) recolours the inline tints, in one place.
+  const isBlue = session?.accent === 'blue'
+  const c = isBlue ? { ...C, brand400: BLUE_400, brand300: BLUE_300, brand500: BLUE_500 } : C
 
   const [mode, setMode] = useState<Mode>('list')
   const [cursor, setCursor] = useState<Cursor>({ exIdx: 0, setIdx: 0 })
@@ -286,7 +324,7 @@ export default function ActiveWorkout({ open, onClose, params }: { open: boolean
     successChime()
     setShowHow(false); setStarted(false); setMode('finish')
     if (finishTimer.current) clearTimeout(finishTimer.current)
-    finishTimer.current = setTimeout(() => onClose(), 3600)
+    finishTimer.current = setTimeout(() => finishClose(), 3600)
   }
   function onFinishTap() {
     if (allDone) { finish(); return }
@@ -311,7 +349,7 @@ export default function ActiveWorkout({ open, onClose, params }: { open: boolean
   {
     let g = 0
     for (const e of session.exercises) for (const st of e.sets) {
-      rail.push(st.done ? c.brand400 : g === curGlobal ? 'rgba(126,217,87,0.55)' : 'rgba(255,255,255,0.12)')
+      rail.push(st.done ? c.brand400 : g === curGlobal ? rgbaOf(c.brand400, 0.55) : 'rgba(255,255,255,0.12)')
       g++
     }
   }
@@ -320,9 +358,12 @@ export default function ActiveWorkout({ open, onClose, params }: { open: boolean
   const streakStr = streak.current > 0 ? `Day ${streak.current} streak` : "another one in the bank"
 
   return (
-    <AppModal visible={open} transparent={false} animationType="fade" onRequestClose={onClose}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: mode === 'go' ? c.brand400 : c.ink900 }} edges={['top', 'bottom']}>
-        {(mode === 'list' || mode === 'finish') && (
+    <AppModal visible={open} transparent animationType="fade" onRequestClose={onClose}>
+      {/* Transparent in `finish` mode so the celebration's scrim floats over the
+       *  live app screen (the Workout section you launched from) instead of the
+       *  active-workout list. Every other mode paints its own opaque surface. */}
+      <SafeAreaView style={{ flex: 1, backgroundColor: mode === 'finish' ? 'transparent' : mode === 'go' ? c.brand400 : c.ink900 }} edges={['top', 'bottom']}>
+        {mode === 'list' && (
           <ListScreen
             key="list"
             session={session}
@@ -381,6 +422,7 @@ export default function ActiveWorkout({ open, onClose, params }: { open: boolean
           <RestScreen
             key="rest"
             colors={c}
+            blue={isBlue}
             units={units}
             remaining={restRemaining}
             total={restTotal}
@@ -415,7 +457,7 @@ export default function ActiveWorkout({ open, onClose, params }: { open: boolean
             streakStr={streakStr}
             stats={finishStatsRef.current}
             pr={finishPRRef.current}
-            onDone={onClose}
+            onDone={finishClose}
           />
         )}
       </SafeAreaView>
@@ -471,7 +513,7 @@ function ListScreen(props: any) {
             <Text style={{ fontSize: 23, fontWeight: '700', letterSpacing: -0.4, color: c.fg }}>{session.name}</Text>
             <Text style={{ marginTop: 3, fontSize: 12.5, fontWeight: '600', color: dim(0.45) }}>{session.focus}</Text>
           </View>
-          <View style={{ borderRadius: 999, backgroundColor: 'rgba(126,217,87,0.15)', paddingHorizontal: 10, paddingVertical: 4 }}>
+          <View style={{ borderRadius: 999, backgroundColor: rgbaOf(c.brand400, 0.15), paddingHorizontal: 10, paddingVertical: 4 }}>
             <Text style={{ fontSize: 11, fontWeight: '700', color: c.brand300 }}>{session.exercises.length} ex</Text>
           </View>
         </View>
@@ -563,17 +605,17 @@ function HeaderStat({ value, label, c }: { value: string; label: string; c: any 
 }
 
 function FinishButton({ c, pct, remaining, allDone, confirmEnd, onPress }: { c: any; pct: number; remaining: number; allDone: boolean; confirmEnd: boolean; onPress: () => void }) {
-  const bg = confirmEnd ? 'rgba(245,165,36,0.15)' : 'rgba(126,217,87,0.14)'
-  const border = confirmEnd ? 'rgba(245,165,36,0.5)' : 'rgba(126,217,87,0.3)'
+  const bg = confirmEnd ? 'rgba(245,165,36,0.15)' : rgbaOf(c.brand400, 0.14)
+  const border = confirmEnd ? 'rgba(245,165,36,0.5)' : rgbaOf(c.brand400, 0.3)
   const fg = confirmEnd ? c.accentOrange : c.brand400
   const hint = confirmEnd ? '' : allDone ? '· all done' : `· ${remaining} ${remaining === 1 ? 'set left' : 'sets left'}`
   return (
     <PressableScale onPress={onPress} haptic={false} scaleTo={0.98} className="w-full flex-row items-center justify-center overflow-hidden rounded-2xl" style={{ position: 'relative', marginTop: 20, padding: 14, backgroundColor: bg, borderWidth: 1, borderColor: border }}>
-      {!confirmEnd && <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${pct}%`, backgroundColor: 'rgba(126,217,87,0.1)' }} />}
+      {!confirmEnd && <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${pct}%`, backgroundColor: rgbaOf(c.brand400, 0.1) }} />}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
         <Flag size={16} color={fg} />
         <Text style={{ fontSize: 14.5, fontWeight: '700', color: fg }}>{confirmEnd ? 'End workout early' : 'Finish workout'}</Text>
-        {!!hint && <Text style={{ fontSize: 12, fontWeight: '600', color: 'rgba(126,217,87,0.6)' }}>{hint}</Text>}
+        {!!hint && <Text style={{ fontSize: 12, fontWeight: '600', color: rgbaOf(c.brand400, 0.6) }}>{hint}</Text>}
       </View>
     </PressableScale>
   )
@@ -593,15 +635,15 @@ function ExerciseCard({ ex, idx, c, units, isActive, isOptional, expanded, onTog
     ? `${fmtWeightNum(weights[0], units, units === 'imperial' ? 0 : 1)} ${u} × ${ex.sets.map((x: any) => x.reps).join(', ')}`
     : ex.sets.map((x: any) => `${fmtWeightNum(x.weightKg, units, units === 'imperial' ? 0 : 1)}${u}×${x.reps}`).join(', ')
 
-  const cardBorder = isActive ? 'rgba(126,217,87,0.5)' : dim(0.05)
-  const cardBg = isActive ? 'rgba(126,217,87,0.05)' : c.ink800
+  const cardBorder = isActive ? rgbaOf(c.brand400, 0.5) : dim(0.05)
+  const cardBg = isActive ? rgbaOf(c.brand400, 0.05) : c.ink800
   const dots: Dot[] = ex.sets.map((st: any, j: number) => ({
     bg: st.done ? c.brand400 : 'transparent',
     border: st.done ? 'transparent' : isActive && j === firstUndone ? c.brand400 : dim(0.25),
   }))
 
   return (
-    <View style={[{ borderWidth: 1, borderColor: cardBorder, backgroundColor: cardBg, borderRadius: 20, overflow: 'hidden', opacity: isOptional ? 0.7 : 1 }, isActive ? { boxShadow: '0 0 24px -8px rgba(126,217,87,0.55)' } : { boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }]}>
+    <View style={[{ borderWidth: 1, borderColor: cardBorder, backgroundColor: cardBg, borderRadius: 20, overflow: 'hidden', opacity: isOptional ? 0.7 : 1 }, isActive ? { boxShadow: `0 0 24px -8px ${rgbaOf(c.brand400, 0.55)}` } : { boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }]}>
       <View style={{ flexDirection: 'row', gap: 13, padding: 13 }}>
         <View style={{ position: 'relative' }}>
           <View style={{ width: 82, height: 82, borderRadius: 15, overflow: 'hidden', backgroundColor: c.ink700, borderWidth: 1, borderColor: dim(0.08), alignItems: 'center', justifyContent: 'center' }}>
@@ -621,7 +663,7 @@ function ExerciseCard({ ex, idx, c, units, isActive, isOptional, expanded, onTog
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Text numberOfLines={1} style={{ flex: 1, fontSize: 16.5, fontWeight: '700', lineHeight: 19, color: c.fg }}>{ex.name}</Text>
             {isActive && (
-              <View style={{ backgroundColor: 'rgba(126,217,87,0.16)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 }}>
+              <View style={{ backgroundColor: rgbaOf(c.brand400, 0.16), paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 }}>
                 <Text style={{ fontSize: 10, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', color: c.brand300 }}>Now</Text>
               </View>
             )}
@@ -672,12 +714,12 @@ function ExpandedForm({ ex, idx, c, units, detail, onAdjWeight, onAdjReps, onTog
   const u = weightUnit(units)
   return (
     <Animated.View style={{ borderTopWidth: 1, borderTopColor: dim(0.06), padding: 14, opacity: v, transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] }) }] }}>
-      <TechniqueClip exerciseId={ex.defId} poster={ex.image} label="Form clip · coming soon" />
+      <TechniqueClip exerciseId={ex.defId} poster={ex.image} label="Form clip · coming soon" accent={c.brand400} />
       <Text style={{ marginTop: 12, fontSize: 13, lineHeight: 19.5, color: dim(0.72) }}>{detail.desc}</Text>
       <View style={{ marginTop: 12, gap: 9 }}>
         {detail.cues.map((cue: string, k: number) => (
           <View key={k} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
-            <View style={{ width: 20, height: 20, borderRadius: 999, backgroundColor: 'rgba(126,217,87,0.16)', alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ width: 20, height: 20, borderRadius: 999, backgroundColor: rgbaOf(c.brand400, 0.16), alignItems: 'center', justifyContent: 'center' }}>
               <Text style={{ fontSize: 11, fontWeight: '700', color: c.brand400 }}>{k + 1}</Text>
             </View>
             <Text style={{ flex: 1, fontSize: 13, lineHeight: 18.2, color: dim(0.78) }}>{cue}</Text>
@@ -818,13 +860,13 @@ function HowToDialog({ c, ex, detail, onClose }: any) {
           <Pressable onPress={onClose} className="items-center justify-center rounded-full active:opacity-80" style={{ width: 32, height: 32, backgroundColor: dim(0.1) }}><X size={17} strokeWidth={2.4} color={dim(0.7)} /></Pressable>
         </View>
         <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 18 }} showsVerticalScrollIndicator={false}>
-          <TechniqueClip exerciseId={ex.defId} poster={ex.image} label="Form clip · coming soon" />
+          <TechniqueClip exerciseId={ex.defId} poster={ex.image} label="Form clip · coming soon" accent={c.brand400} />
           <Text style={{ marginTop: 14, fontSize: 14, lineHeight: 21, color: dim(0.78) }}>{detail.desc}</Text>
           <Text style={{ marginTop: 18, marginBottom: 10, fontSize: 11.5, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', color: dim(0.4) }}>Step by step</Text>
           <View style={{ gap: 11 }}>
             {detail.cues.map((cue: string, k: number) => (
               <View key={k} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 11 }}>
-                <View style={{ width: 24, height: 24, borderRadius: 999, backgroundColor: 'rgba(126,217,87,0.16)', alignItems: 'center', justifyContent: 'center' }}>
+                <View style={{ width: 24, height: 24, borderRadius: 999, backgroundColor: rgbaOf(c.brand400, 0.16), alignItems: 'center', justifyContent: 'center' }}>
                   <Text style={{ fontSize: 12, fontWeight: '700', color: c.brand400 }}>{k + 1}</Text>
                 </View>
                 <Text style={{ flex: 1, fontSize: 14, lineHeight: 20.3, color: dim(0.8) }}>{cue}</Text>
@@ -844,10 +886,10 @@ function HowToDialog({ c, ex, detail, onClose }: any) {
 }
 
 /* ============================ Rest ============================ */
-function RestScreen({ colors: c, units, remaining, total, rail, nextEx, nextCursor, nextSet, onBack, onSkip, onAdd, onSub }: any) {
+function RestScreen({ colors: c, blue, units, remaining, total, rail, nextEx, nextCursor, nextSet, onBack, onSkip, onAdd, onSub }: any) {
   const dim = (o: number) => `rgba(255,255,255,${o})`
   const frac = total > 0 ? Math.max(0, Math.min(1, remaining / total)) : 0
-  const color = restColor(frac)
+  const color = restColor(frac, blue ? c.brand400 : undefined)
   const endTime = new Date(Date.now() + remaining * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
   const stroke = 4
   const radius = 54
@@ -925,7 +967,7 @@ function RestScreen({ colors: c, units, remaining, total, rail, nextEx, nextCurs
           <PressableScale onPress={onSub} className="items-center justify-center rounded-full" style={{ width: 62, height: 62, backgroundColor: dim(0.08) }}>
             <Text style={{ fontSize: 14, fontWeight: '700', color: c.fg }}>−15s</Text>
           </PressableScale>
-          <PressableScale onPress={() => { thud(); onSkip() }} haptic={false} className="items-center justify-center rounded-full" style={{ width: 78, height: 78, backgroundColor: c.brand400, shadowColor: c.brand400, shadowOpacity: 0.7, shadowRadius: 22, shadowOffset: { width: 0, height: 8 }, elevation: 10 }}>
+          <PressableScale onPress={() => { thud(); onSkip() }} haptic={false} className="items-center justify-center rounded-full" style={{ width: 78, height: 78, backgroundColor: c.brand400, shadowColor: c.brand400, shadowOpacity: 0.45, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 6 }}>
             <Play size={24} color="#000" fill="#000" />
           </PressableScale>
           <PressableScale onPress={onAdd} className="items-center justify-center rounded-full" style={{ width: 62, height: 62, backgroundColor: dim(0.08) }}>
@@ -961,6 +1003,13 @@ function GoScreen({ colors: c, units, nextEx, nextCursor, nextSet, onStart }: an
 /* ============================ Finish (bottom sheet) ============================ */
 function FinishSheet({ colors: c, units, name, streakStr, stats, pr, onDone }: any) {
   const dim = (o: number) => `rgba(255,255,255,${o})`
+  // Translucent surface tinted from the theme's ink800, so the (dimmed) screen
+  // behind reads faintly through the sheet.
+  const inkA = (o: number) => {
+    const h = String(c.ink800 || '#121214').replace('#', '')
+    const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16)
+    return `rgba(${r},${g},${b},${o})`
+  }
   const scrim = useRef(new Animated.Value(0)).current
   const sheet = useRef(new Animated.Value(1)).current // 1 = off-screen (down)
   const pop = useRef(new Animated.Value(0)).current
@@ -981,16 +1030,16 @@ function FinishSheet({ colors: c, units, name, streakStr, stats, pr, onDone }: a
 
   return (
     <View style={[StyleSheet.absoluteFill, { zIndex: 30, justifyContent: 'flex-end' }]}>
-      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.6)', opacity: scrim }]} />
-      <Animated.View style={{ height: '56%', backgroundColor: c.ink800, borderTopLeftRadius: 28, borderTopRightRadius: 28, borderTopWidth: 1, borderTopColor: dim(0.1), overflow: 'hidden', transform: [{ translateY: sheet.interpolate({ inputRange: [0, 1], outputRange: [0, 600] }) }] }}>
-        <View style={{ alignItems: 'center', paddingTop: 10, paddingBottom: 2 }}>
-          <View style={{ width: 38, height: 5, borderRadius: 3, backgroundColor: dim(0.2) }} />
+      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.45)', opacity: scrim }]} />
+      <Animated.View style={{ height: '50%', backgroundColor: inkA(0.85), borderTopLeftRadius: 28, borderTopRightRadius: 28, borderTopWidth: 1, borderTopColor: dim(0.1), overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.55, shadowRadius: 40, shadowOffset: { width: 0, height: -12 }, elevation: 24, transform: [{ translateY: sheet.interpolate({ inputRange: [0, 1], outputRange: [0, 600] }) }] }}>
+        <View style={{ alignItems: 'center', paddingTop: 12, paddingBottom: 2 }}>
+          <View style={{ width: 38, height: 4, borderRadius: 999, backgroundColor: dim(0.2) }} />
         </View>
         <ScrollView contentContainerStyle={{ alignItems: 'center', paddingHorizontal: 26, paddingTop: 6, paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
           {/* check ring */}
           <View style={{ marginTop: 4, width: 96, height: 96, alignItems: 'center', justifyContent: 'center' }}>
-            <Animated.View style={{ position: 'absolute', width: 96, height: 96, borderRadius: 999, backgroundColor: 'rgba(126,217,87,0.25)', opacity: halo.interpolate({ inputRange: [0, 1], outputRange: [0.9, 0] }), transform: [{ scale: halo.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1.5] }) }] }} />
-            <Animated.View style={{ position: 'absolute', width: 96, height: 96, borderRadius: 999, borderWidth: 2, borderColor: 'rgba(126,217,87,0.5)', opacity: pop, transform: [{ scale: pop }] }} />
+            <Animated.View style={{ position: 'absolute', width: 96, height: 96, borderRadius: 999, backgroundColor: rgbaOf(c.brand400, 0.25), opacity: halo.interpolate({ inputRange: [0, 1], outputRange: [0.9, 0] }), transform: [{ scale: halo.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1.5] }) }] }} />
+            <Animated.View style={{ position: 'absolute', width: 96, height: 96, borderRadius: 999, borderWidth: 2, borderColor: rgbaOf(c.brand400, 0.5), opacity: pop, transform: [{ scale: pop }] }} />
             <Animated.View style={{ width: 76, height: 76, borderRadius: 999, backgroundColor: c.brand400, alignItems: 'center', justifyContent: 'center', opacity: pop, transform: [{ scale: pop }] }}>
               <Svg width={46} height={46} viewBox="0 0 24 24" fill="none">
                 <AnimatedPath d="M20 6 9 17l-5-5" stroke="#0a0a0b" strokeWidth={3.5} strokeLinecap="round" strokeLinejoin="round" strokeDasharray={40} strokeDashoffset={draw} />
@@ -1004,26 +1053,27 @@ function FinishSheet({ colors: c, units, name, streakStr, stats, pr, onDone }: a
           </Animated.View>
 
           {pr && (
-            <Animated.View style={[{ marginTop: 14, flexDirection: 'row', alignItems: 'center', gap: 9, borderWidth: 1, borderColor: 'rgba(245,197,24,0.35)', backgroundColor: 'rgba(245,197,24,0.12)', borderRadius: 999, paddingVertical: 8, paddingHorizontal: 15 }, riseStyle]}>
-              <Star size={16} color={c.accentYellow} fill={c.accentYellow} />
-              <Text style={{ fontSize: 13, fontWeight: '700', color: c.fg }}>New PR · {pr.name} · {fmtWeight(pr.weightKg, units, units === 'imperial' ? 0 : 1)} × {pr.reps}</Text>
+            <Animated.View style={[{ marginTop: 14, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: `${c.accentYellow}4d`, backgroundColor: `${c.accentYellow}1f`, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 14 }, riseStyle]}>
+              <Star size={15} color={c.accentYellow} fill={c.accentYellow} />
+              <Text style={{ fontSize: 12.5, fontWeight: '700', color: c.fg }}>New PR · {pr.name} · {fmtWeight(pr.weightKg, units, units === 'imperial' ? 0 : 1)} × {pr.reps}</Text>
             </Animated.View>
           )}
 
-          <Animated.View style={[{ marginTop: 18, flexDirection: 'row', alignItems: 'center', width: '100%', justifyContent: 'center' }, riseStyle]}>
+          {/* Stats grouped into a single card, echoing the dashboard's stat surfaces. */}
+          <Animated.View style={[{ marginTop: 20, flexDirection: 'row', alignItems: 'center', width: '100%', backgroundColor: dim(0.05), borderRadius: 18, borderWidth: 1, borderColor: dim(0.06), paddingVertical: 16 }, riseStyle]}>
             <FinishStat value={stats ? mmss(stats.time) : '0:00'} label="Time" c={c} />
-            <View style={{ width: 1, height: 30, backgroundColor: dim(0.1) }} />
+            <View style={{ width: 1, height: 34, backgroundColor: dim(0.08) }} />
             <FinishStat value={stats ? fmtVolume(stats.volume, units) : '0'} label="Volume" c={c} />
-            <View style={{ width: 1, height: 30, backgroundColor: dim(0.1) }} />
+            <View style={{ width: 1, height: 34, backgroundColor: dim(0.08) }} />
             <FinishStat value={stats ? String(stats.sets) : '0'} label="Sets" c={c} />
           </Animated.View>
 
-          <PressableScale onPress={onDone} className="w-full items-center rounded-2xl" style={{ marginTop: 22, padding: 15, backgroundColor: c.brand400 }}>
-            <Text style={{ fontSize: 15, fontWeight: '700', color: c.ink900 }}>Done</Text>
+          <PressableScale onPress={onDone} className="w-full items-center rounded-full" style={{ marginTop: 20, paddingVertical: 15, backgroundColor: c.brand400 }}>
+            <Text style={{ fontSize: 15, fontWeight: '800', color: c.ink900 }}>Done</Text>
           </PressableScale>
           <Animated.View style={[{ marginTop: 11, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }, riseStyle]}>
             <Spinner color={dim(0.4)} />
-            <Text style={{ fontSize: 12.5, fontWeight: '600', color: dim(0.45) }}>Returning to your workout…</Text>
+            <Text style={{ fontSize: 12.5, fontWeight: '600', color: dim(0.45) }}>Returning to your dashboard…</Text>
           </Animated.View>
         </ScrollView>
       </Animated.View>
@@ -1033,9 +1083,9 @@ function FinishSheet({ colors: c, units, name, streakStr, stats, pr, onDone }: a
 
 function FinishStat({ value, label, c }: { value: string; label: string; c: any }) {
   return (
-    <View style={{ flex: 1, alignItems: 'center' }}>
-      <Text style={{ fontSize: 21, fontWeight: '800', color: c.fg }}>{value}</Text>
-      <Text style={{ marginTop: 3, fontSize: 10, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>{label}</Text>
+    <View style={{ flex: 1, alignItems: 'center', paddingHorizontal: 4 }}>
+      <Text numberOfLines={1} style={{ fontSize: 22, fontWeight: '800', letterSpacing: -0.6, color: c.fg }}>{value}</Text>
+      <Text style={{ marginTop: 4, fontSize: 10.5, fontWeight: '700', letterSpacing: 0.7, textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>{label}</Text>
     </View>
   )
 }

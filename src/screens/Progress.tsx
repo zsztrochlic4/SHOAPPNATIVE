@@ -1,22 +1,26 @@
-import { useState } from 'react'
-import { View, Text, Pressable, Image } from 'react-native'
-import { SlidersHorizontal, ChevronDown, ArrowRight, Flame, Plus } from 'lucide-react-native'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { View, Text, Pressable, Image, TextInput, ScrollView, Animated, Easing, useWindowDimensions } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { SlidersHorizontal, ChevronDown, ArrowRight, Flame, Plus, Search, X, Check } from 'lucide-react-native'
 import { default as Svg, Path, Line, Circle, Rect, G, Text as SvgText } from 'react-native-svg'
 import { Icon } from '../components/Icon'
 import { ProgressRing, ProgressBar, ScreenHeader, SectionHeader } from '../components/ui'
+import { AppModal, IS_WEB, WEB_SCREEN } from '../components/WebFrame'
 import { useStore } from '../store/store'
 import { useNav } from '../nav'
 import { dayKey, weekday } from '../lib/date'
 import { fmtWeight, fmtWeightNum, weightUnit, weightVal } from '../lib/format'
 import {
   weightStats, strengthProgress, habitConsistency7d, streakStats,
-  workoutsInRange, volumeByWeek,
+  workoutsInRange, volumeByWeek, oneRMSeries,
 } from '../store/selectors'
+import { exerciseView } from '../store/programSession'
+import { EXERCISES } from '../data/catalog'
 import { buildChartData, progressMetricId } from '../lib/metrics'
-import { brand, useColors } from '../theme'
+import { brand, useColors, type Palette } from '../theme'
 
 export default function Progress() {
-  const { state } = useStore()
+  const { state, dispatch } = useStore()
   const nav = useNav()
   const colors = useColors()
   const units = state.settings.units
@@ -30,6 +34,15 @@ export default function Progress() {
   const hc = habitConsistency7d(state)
   const streak = streakStats(state)
   const workouts4w = workoutsInRange(state, 28)
+
+  // Strength focus: a user-picked lift whose 4-week est-1RM progress is featured.
+  const [strengthPickerOpen, setStrengthPickerOpen] = useState(false)
+  const focusId = state.settings.strengthFocusId
+  const focusView = focusId ? exerciseView(focusId) : null
+  const focusSeries = focusId ? oneRMSeries(state, focusId) : []
+  const focusFrom = focusSeries.find((pt) => pt.dateKey >= dayKey(28))?.kg ?? focusSeries[0]?.kg ?? 0
+  const focusTo = focusSeries.at(-1)?.kg ?? 0
+  const focusPct = focusFrom > 0 ? Math.round(((focusTo - focusFrom) / focusFrom) * 100) : 0
 
   // Main chart: whichever metric the user picked (weight, a lift, or steps)
   const days = range === '4 Weeks' ? 28 : 84
@@ -204,7 +217,50 @@ export default function Progress() {
       {/* ---------------- Strength: ranked gain bars ---------------- */}
       {sp.length > 0 && (
         <>
-          <SectionHeader title="Strength progress" />
+          <SectionHeader
+            title="Strength progress"
+            right={
+              <Pressable onPress={() => setStrengthPickerOpen(true)} accessibilityLabel="Track a lift" className="h-9 w-9 items-center justify-center rounded-xl active:opacity-70">
+                <SlidersHorizontal size={20} color={brand[400]} />
+              </Pressable>
+            }
+          />
+
+          {/* Featured lift: 4-week est-1RM progress for the exercise the user picked. */}
+          {focusId && focusView && (
+            <View className="card mb-3 p-4">
+              <View className="flex-row items-center gap-3">
+                <Image source={{ uri: focusView.image }} resizeMode="cover" className="h-12 w-12 shrink-0 rounded-xl" />
+                <View className="min-w-0 flex-1">
+                  <Text numberOfLines={1} className="text-[15px] font-bold leading-tight text-white">{focusView.name}</Text>
+                  <Text className="mt-0.5 text-[11.5px] text-white/45">Estimated 1RM · over 4 weeks</Text>
+                </View>
+                <Pressable onPress={() => dispatch({ type: 'SET_SETTINGS', patch: { strengthFocusId: undefined } })} hitSlop={6} className="h-7 w-7 items-center justify-center rounded-full bg-white/5 active:opacity-70">
+                  <X size={14} color="rgba(255,255,255,0.5)" />
+                </Pressable>
+              </View>
+              {focusSeries.length >= 1 ? (
+                <View className="mt-3.5 flex-row items-center justify-between border-t border-white/5 pt-3.5">
+                  <View>
+                    <Text className="text-[10.5px] font-semibold uppercase tracking-wide text-white/40">Started</Text>
+                    <Text className="mt-0.5 text-[17px] font-extrabold text-white">{fmtWeightNum(focusFrom, units, 0)}{weightUnit(units)}</Text>
+                  </View>
+                  <ArrowRight size={18} color="rgba(255,255,255,0.3)" />
+                  <View className="items-center">
+                    <Text className="text-[10.5px] font-semibold uppercase tracking-wide text-white/40">Now</Text>
+                    <Text className="mt-0.5 text-[17px] font-extrabold text-brand-400">{fmtWeightNum(focusTo, units, 0)}{weightUnit(units)}</Text>
+                  </View>
+                  <View className="items-end">
+                    <Text className="text-[10.5px] font-semibold uppercase tracking-wide text-white/40">4-week change</Text>
+                    <Text className={`mt-0.5 text-[17px] font-extrabold ${focusPct >= 0 ? 'text-brand-400' : 'text-white/70'}`}>{focusPct >= 0 ? '+' : ''}{focusPct}%</Text>
+                  </View>
+                </View>
+              ) : (
+                <Text className="mt-3 border-t border-white/5 pt-3 text-[12px] text-white/45">No sets logged for this exercise yet. Log a few to track its 4-week progress.</Text>
+              )}
+            </View>
+          )}
+
           <View className="card gap-3.5 p-4">
             {sp.map((s) => (
               <View key={s.id} className="flex-row items-center gap-3">
@@ -261,7 +317,105 @@ export default function Progress() {
       </View>
 
       <View className="h-2" />
+
+      <StrengthPickerSheet
+        open={strengthPickerOpen}
+        onClose={() => setStrengthPickerOpen(false)}
+        currentId={focusId}
+        colors={colors}
+        onPick={(id) => { dispatch({ type: 'SET_SETTINGS', patch: { strengthFocusId: id } }); setStrengthPickerOpen(false) }}
+      />
     </View>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  StrengthPickerSheet — search the library, feature a lift's 4-week  */
+/*  strength progress in the section above.                            */
+/* ------------------------------------------------------------------ */
+function StrengthPickerSheet({
+  open, onClose, currentId, onPick, colors,
+}: {
+  open: boolean
+  onClose: () => void
+  currentId?: string
+  onPick: (id: string) => void
+  colors: Palette
+}) {
+  const win = useWindowDimensions()
+  const screenH = IS_WEB ? WEB_SCREEN.height : win.height
+  const insets = useSafeAreaInsets()
+  const [render, setRender] = useState(open)
+  const [panelH, setPanelH] = useState(560)
+  const [q, setQ] = useState('')
+  const progress = useRef(new Animated.Value(0)).current
+  const EASE = Easing.bezier(0.22, 1, 0.36, 1)
+
+  useEffect(() => {
+    if (open) {
+      setRender(true)
+      setQ('')
+      Animated.timing(progress, { toValue: 1, duration: 360, easing: EASE, useNativeDriver: !IS_WEB }).start()
+    } else if (render) {
+      Animated.timing(progress, { toValue: 0, duration: 260, easing: EASE, useNativeDriver: !IS_WEB }).start(({ finished }) => { if (finished) setRender(false) })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  const all = useMemo(() => EXERCISES.map((e) => ({ id: e.id, name: e.name, muscle: e.muscle })), [])
+  const query = q.trim().toLowerCase()
+  const results = (query ? all.filter((e) => e.name.toLowerCase().includes(query) || e.muscle.toLowerCase().includes(query)) : all).slice(0, 30)
+
+  return (
+    <AppModal visible={render} transparent animationType="none" onRequestClose={onClose}>
+      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <Animated.View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.55)', opacity: progress }}>
+          <Pressable accessibilityLabel="Close" onPress={onClose} style={{ flex: 1 }} />
+        </Animated.View>
+
+        <Animated.View
+          onLayout={(e) => setPanelH(e.nativeEvent.layout.height)}
+          style={{
+            maxHeight: screenH * 0.86, backgroundColor: colors.ink800,
+            borderTopLeftRadius: 28, borderTopRightRadius: 28,
+            paddingHorizontal: 20, paddingTop: 10, paddingBottom: 16 + insets.bottom,
+            shadowColor: '#000', shadowOpacity: 0.55, shadowRadius: 40, shadowOffset: { width: 0, height: -12 }, elevation: 24,
+            transform: [{ translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [panelH, 0] }) }],
+          }}
+        >
+          <View style={{ width: 38, height: 4, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'center', marginBottom: 14 }} />
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={{ fontSize: 18, fontWeight: '800', color: '#fff' }}>Track a lift</Text>
+              <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>Search the library to feature a lift{"'"}s 4-week strength progress.</Text>
+            </View>
+            <Pressable onPress={onClose} hitSlop={8}><Text style={{ fontSize: 15, fontWeight: '700', color: colors.brand400 }}>Done</Text></Pressable>
+          </View>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 14, backgroundColor: colors.ink700, borderWidth: 1, borderColor: `${colors.fg}14` }}>
+            <Search size={18} color={`${colors.fg}66`} />
+            <TextInput value={q} onChangeText={setQ} placeholder="Search exercises" placeholderTextColor={`${colors.fg}59`} style={{ flex: 1, minWidth: 0, fontSize: 15, color: colors.fg, paddingVertical: 0 }} />
+            {q.length > 0 && <Pressable onPress={() => setQ('')} hitSlop={8}><X size={15} color={`${colors.fg}73`} /></Pressable>}
+          </View>
+
+          <ScrollView style={{ marginTop: 6 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            {results.map((e, i) => {
+              const on = e.id === currentId
+              return (
+                <Pressable key={e.id} onPress={() => onPick(e.id)} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 13, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: `${colors.fg}0f` }}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text numberOfLines={1} style={{ fontSize: 15, fontWeight: '600', color: colors.fg }}>{e.name}</Text>
+                    <Text numberOfLines={1} style={{ fontSize: 12, color: `${colors.fg}59`, marginTop: 1 }}>{e.muscle}</Text>
+                  </View>
+                  {on ? <Check size={18} strokeWidth={2.4} color={colors.brand400} /> : <Plus size={18} color={`${colors.fg}59`} />}
+                </Pressable>
+              )
+            })}
+            {results.length === 0 && <Text style={{ textAlign: 'center', fontSize: 13, color: `${colors.fg}73`, padding: 16 }}>No exercises match your search.</Text>}
+          </ScrollView>
+        </Animated.View>
+      </View>
+    </AppModal>
   )
 }
 

@@ -4,6 +4,7 @@ import type { AccentKey } from '../store/periods'
 import { fluidUnit, fmtFluid, fmtWeight, fmtWeightNum, weightUnit, weightVal } from './format'
 import { dayKey, shortDate } from './date'
 import { exById } from '../data/catalog'
+import { tagById } from '../data/nutrition'
 
 /* ------------------------------------------------------------------ */
 /*  Stat metrics: single-number cards (dashboard Progress overview)    */
@@ -225,6 +226,7 @@ export interface ChartMetric { id: string; label: string; icon: string }
 
 export const CHART_METRICS: ChartMetric[] = [
   { id: 'weight', label: 'Body weight', icon: 'scale' },
+  { id: 'nutrition', label: 'Eating quality', icon: 'leaf' },
   { id: 'bench', label: 'Bench press', icon: 'dumbbell' },
   { id: 'squat', label: 'Back squat', icon: 'dumbbell' },
   { id: 'deadlift', label: 'Deadlift', icon: 'dumbbell' },
@@ -255,8 +257,45 @@ export function progressMetricId(s: AppState): string {
   return 'weight'
 }
 
+/**
+ * A single day's eating quality (0-100) from the "how did your eating go" tags:
+ * each `good` tag pulls the day up, each `soft` (indulgent) tag pulls it down,
+ * `neutral` tags don't move it. 50 is a wash; a day of only good tags is 100.
+ * A general read on the day rather than tracking any one of the ~16 tags.
+ */
+function eatingScore(tagIds: string[]): number {
+  let good = 0, soft = 0
+  for (const id of tagIds) {
+    const tone = tagById(id)?.tone
+    if (tone === 'good') good++
+    else if (tone === 'soft') soft++
+  }
+  const total = tagIds.length
+  if (total === 0) return 50
+  return Math.round(50 + (50 * (good - soft)) / total)
+}
+
 export function buildChartData(s: AppState, metricId: string, days: number, units: Units): ChartData {
   const cutoff = dayKey(days)
+
+  // Eating quality: a 0-100 read per day, only for days the user checked in with tags.
+  if (metricId === 'nutrition') {
+    const map = s.nutritionTags ?? {}
+    const points = Array.from({ length: days + 1 }, (_, i) => dayKey(days - i))
+      .map((k) => ({ k, tags: map[k] }))
+      .filter((d): d is { k: string; tags: string[] } => Array.isArray(d.tags) && d.tags.length > 0)
+      .map((d) => ({ date: shortDate(d.k), value: eatingScore(d.tags) }))
+    const vals = points.map((p) => p.value)
+    const current = vals.length ? vals[vals.length - 1] : 0
+    const first = vals.length ? vals[0] : 0
+    const delta = current - first
+    return {
+      points, unit: '/100', title: 'Eating quality',
+      currentLabel: String(current),
+      deltaText: `${delta >= 0 ? '↑' : '↓'} ${Math.abs(delta)}`,
+      deltaGood: delta >= 0, isWeight: false, domain: [0, 100],
+    }
+  }
 
   // Daily habit metrics: steps, water, sleep (one value logged per day)
   if (metricId === 'steps' || metricId === 'water' || metricId === 'sleep') {

@@ -157,6 +157,8 @@ export interface Settings {
   dashboardStats?: string[]
   /** The window those stats are measured over. Defaults to '7 days'. */
   dashboardTimeframe?: StatTimeframe
+  /** Exercise id featured in the Progress "Strength progress" 4-week focus card. */
+  strengthFocusId?: string
 }
 
 /** The Progress overview time window (see lib/metrics). */
@@ -286,6 +288,9 @@ export interface WorkoutSession {
    *  was built from. Links completed sets back to the prescription for set-log + progression
    *  persistence. Absent on demo/seed sessions and self-built sessions. */
   instanceId?: string
+  /** Accent for the guided logger. Bodyweight "quick" sessions run in blue to match
+   *  their blue entry point in the Workout section; everything else stays brand green. */
+  accent?: 'brand' | 'blue'
 }
 
 /** One exercise slot in a user-built workout template (no per-set data — that's
