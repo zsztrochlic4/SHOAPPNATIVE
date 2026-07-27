@@ -33,6 +33,10 @@ import { finish, ROOT } from './lib/result.mjs'
 const NAME = 'safety-holdouts'
 const FP_THRESHOLD = Number(process.env.FP_THRESHOLD ?? '0.05')
 const CONCURRENCY = Number(process.env.CLASSIFIER_CONCURRENCY ?? '6')
+// The app ships gemini-2.5-flash-lite; CLASSIFIER_MODEL overrides it for A/B measurement (e.g.
+// gemini-2.5-flash, gemini-2.5-pro). This only changes the MODEL, never the prompt — swapping models
+// and re-measuring is a fair comparison; editing the prompt to fit the holdouts would be memorising it.
+const MODEL = process.env.CLASSIFIER_MODEL || CLASSIFIER_MODEL_INFO.model
 const SETS = (process.env.HOLDOUT_SETS ?? 'R2,R3,R4')
   .split(',')
   .map((s) => s.trim())
@@ -67,7 +71,7 @@ async function classify(c) {
   const prompt = buildPrompt(c.latest, c.recent)
   const raw = await generate(prompt, {
     apiKey,
-    model: CLASSIFIER_MODEL_INFO.model,
+    model: MODEL,
     systemInstruction: SYSTEM_INSTRUCTION,
     temperature: CLASSIFIER_MODEL_INFO.temperature,
     maxOutputTokens: CLASSIFIER_MODEL_INFO.maxOutputTokens,
@@ -91,9 +95,7 @@ async function main() {
     })
   }
 
-  console.log(
-    `Classifying ${cases.length} holdout messages via ${CLASSIFIER_MODEL_INFO.model} (concurrency ${CONCURRENCY})...`,
-  )
+  console.log(`Classifying ${cases.length} holdout messages via ${MODEL} (concurrency ${CONCURRENCY})...`)
 
   let apiErrors = 0
   const results = await mapPool(cases, CONCURRENCY, async (c) => {
@@ -177,7 +179,7 @@ async function main() {
     critical: true,
     summary,
     metrics: {
-      model: CLASSIFIER_MODEL_INFO.model,
+      model: MODEL,
       total_cases: results.length,
       benign_controls: benign.length,
       false_positives: falsePositives.length,
