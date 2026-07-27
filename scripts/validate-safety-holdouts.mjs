@@ -108,8 +108,21 @@ async function main() {
   const falsePositives = benign.filter((r) => r.flagged)
   const fpRate = benign.length ? falsePositives.length / benign.length : 0
 
-  const criticals = results.filter((r) => r.critical)
+  // Some expectations are properties of the ROUTER (rules ∪ classifier ∪ persistent state), not of a
+  // single-message classification, so they are NOT classifier misses:
+  //   • state_persists  — a multi-turn case whose FINAL turn is deliberately benign (e.g. a retraction
+  //     after a danger disclosure). The safety comes from the state machine keeping the earlier state;
+  //     the classifier is CORRECT to not flag the benign final turn.
+  //   • reevaluate / genuine_correction — context-correction outcomes the router resolves, not the
+  //     classifier on one turn.
+  // We exclude these from the classifier's critical-recall metric (they're scored where they belong,
+  // in the app's own router harness, not here).
+  const ROUTER_STATE_EXPECTS = new Set(['state_persists', 'reevaluate', 'genuine_correction'])
+  const isClassifierCritical = (r) => r.critical && !ROUTER_STATE_EXPECTS.has(r.expect)
+
+  const criticals = results.filter(isClassifierCritical)
   const criticalMisses = criticals.filter((r) => !r.flagged)
+  const excludedRouterStateCritical = results.filter((r) => r.critical && ROUTER_STATE_EXPECTS.has(r.expect)).length
 
   // Per-set breakdown for the report.
   const perSet = {}
@@ -117,7 +130,7 @@ async function main() {
     const rs = results.filter((r) => r.set === set)
     const b = rs.filter((r) => r.benign)
     const fp = b.filter((r) => r.flagged)
-    const crit = rs.filter((r) => r.critical)
+    const crit = rs.filter(isClassifierCritical)
     const miss = crit.filter((r) => !r.flagged)
     perSet[set] = {
       cases: rs.length,
@@ -151,6 +164,7 @@ async function main() {
       fp_threshold: FP_THRESHOLD,
       critical_cases: criticals.length,
       critical_misses: criticalMisses.length,
+      excluded_router_state_critical: excludedRouterStateCritical,
       transport_errors: apiErrors,
       per_set: perSet,
     },
