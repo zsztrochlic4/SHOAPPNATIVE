@@ -98,17 +98,23 @@ async function main() {
   console.log(`Classifying ${cases.length} holdout messages via ${MODEL} (concurrency ${CONCURRENCY})...`)
 
   let apiErrors = 0
+  const errorSamples = new Set()
   const results = await mapPool(cases, CONCURRENCY, async (c) => {
     try {
       const out = await classify(c)
       return { ...c, flagged: out.flagged, categories: out.categories, error: null }
     } catch (e) {
       apiErrors++
+      if (errorSamples.size < 3) errorSamples.add(e?.message ?? String(e))
       // A transport error is treated as a FLAG (fail-safe), matching the router: uncertainty escalates.
       const status = e instanceof GeminiError ? e.status : 0
       return { ...c, flagged: true, categories: ['catch_all'], error: `transport_${status}` }
     }
   })
+  if (apiErrors) {
+    console.log(`\n⚠️  ${apiErrors} transport errors. Sample messages:`)
+    for (const m of errorSamples) console.log(`   ${m}`)
+  }
 
   const benign = results.filter((r) => r.benign)
   const falsePositives = benign.filter((r) => r.flagged)
