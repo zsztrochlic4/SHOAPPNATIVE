@@ -1,0 +1,135 @@
+name: SHO Backend Validation
+
+# Validates and tests the whole SHO backend across Firebase and GitHub:
+#   • Firestore seed connects + the canonical users doc passes schema validation
+#   • Safety classifier (Gemini) measured against the R2/R3/R4 holdout sets — false-positive rate must
+#     stay <= 5% and there must be zero critical misses
+#   • Code test suite (typecheck + domain checks + safety-floor sweep) and Firestore/Storage rules tests
+#   • Lint (Prettier) and generated-artifact drift (committed holdouts match their source)
+#   • Static datasets (exercise workbook + meal database) in sync with the expectations manifest
+#
+# Results are aggregated to results/validation-<date>.json, uploaded as an artifact, and emailed.
+# The job FAILS if any critical check fails.
+#
+# Required repo secrets (Settings → Secrets and variables → Actions):
+#   GEMINI_API_KEY            — Google Generative Language API key for the classifier
+#   FIREBASE_PROJECT_ID       — Firebase project id
+#   FIREBASE_CLIENT_EMAIL     — service-account client email (needed with FIREBASE_PRIVATE_KEY)
+#   FIREBASE_PRIVATE_KEY      — service-account private key (PEM; newlines may be \n-escaped)
+#   SENDGRID_API_KEY          — SendGrid API key for the email summary
+#   REPORT_TO, REPORT_FROM    — comma-separated recipients / a verified SendGrid sender (secrets or vars)
+
+on:
+  schedule:
+    - cron: '0 2 * * *' # daily at 02:00 UTC
+  workflow_dispatch:
+    inputs:
+      require_gemini:
+        description: 'Fail (not skip) if GEMINI_API_KEY is missing'
+        type: boolean
+        default: false
+      require_firestore:
+        description: 'Fail (not skip) if a Firestore connection cannot be made'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-validation
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      REQUIRE_GEMINI: ${{ (github.event_name == 'workflow_dispatch' && inputs.require_gemini) && '1' || '0' }}
+      REQUIRE_FIRESTORE: ${{ (github.event_name == 'workflow_dispatch' && inputs.require_firestore) && '1' || '0' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install validation-only tools (firebase-admin, firebase-tools)
+        run: npm install --no-save firebase-admin firebase-tools
+
+      # ---- GitHub / code validation ----
+      - name: Code test suite (typecheck + domain checks + safety sweep)
+        continue-on-error: true
+        run: node scripts/run-step.mjs --name tests --critical 1 --cmd "npm run typecheck && npm run check && npm run sweep"
+
+      - name: Lint (Prettier)
+        continue-on-error: true
+        run: node scripts/run-step.mjs --name lint --critical 0 --cmd "npm run lint"
+
+      # Runs the repo's Firestore/Storage rules tests when a test/rules suite is present. Non-critical
+      # and self-skipping so it never blocks the gate before that suite is committed — flip --critical
+      # to 1 once test/rules/ is in the repo and you want a rules regression to fail the run.
+      - name: Firestore & Storage rules tests (emulator)
+        continue-on-error: true
+        run: node scripts/run-step.mjs --name rules --critical 0 --skip-if-missing test/rules --cmd "npx firebase emulators:exec --only firestore,storage \"node --test test/rules/\""
+
+      - name: Generated-artifact drift (committed holdouts match source)
+        continue-on-error: true
+        run: node scripts/run-step.mjs --name holdout-drift --critical 1 --cmd "node scripts/build-holdouts.mjs && git diff --exit-code -- data/holdouts"
+
+      # ---- Firebase validation ----
+      - name: Dataset sync (exercise workbook + meal database)
+        continue-on-error: true
+        run: node scripts/validate-data-sync.mjs
+
+      - name: Firestore seed + schema validation
+        continue-on-error: true
+        env:
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
+          FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
+        run: node scripts/firestore-seed.js
+
+      - name: Safety classifier holdout validation (Gemini)
+        continue-on-error: true
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          FP_THRESHOLD: '0.05'
+        run: node scripts/validate-safety-holdouts.mjs
+
+      # ---- Aggregate, publish, notify ----
+      - name: Aggregate results
+        id: aggregate
+        run: node scripts/aggregate-results.mjs
+
+      - name: Upload results artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-${{ steps.aggregate.outputs.date }}
+          path: |
+            results/validation-*.json
+            results/parts/*.json
+          if-no-files-found: warn
+
+      - name: Email summary (SendGrid)
+        if: always()
+        env:
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          REPORT_TO: ${{ secrets.REPORT_TO || vars.REPORT_TO }}
+          REPORT_FROM: ${{ secrets.REPORT_FROM || vars.REPORT_FROM }}
+        run: node scripts/send-report.mjs "${{ steps.aggregate.outputs.report }}"
+
+      - name: Gate — fail on any critical failure
+        if: steps.aggregate.outputs.overall != 'pass'
+        run: |
+          echo "::error::Backend validation failed — one or more critical checks did not pass. See the uploaded artifact."
+          exit 1

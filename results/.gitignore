@@ -1,0 +1,3 @@
+# Validation run outputs are build artifacts (uploaded by the workflow), not source. Keep the dir.
+*
+!.gitignore

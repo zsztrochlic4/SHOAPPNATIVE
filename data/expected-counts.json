@@ -1,0 +1,35 @@
+{
+  "_comment": "Firestore/dataset expectations contract for the static SHO datasets. validate-data-sync.mjs fails if the live source drifts from these counts or breaks integrity, so any dataset change is a deliberate, reviewed manifest update. Seeded to the ACTUAL repo counts on 2026-07-27. NOTE: the original request referenced a 98-exercise workbook and a 150-meal database; the live source currently holds 113 exercises and 50 budget meals + 36 food-KB items — update these numbers (and the datasets) if the larger workbook/meal DB lands.",
+  "datasets": {
+    "exercises": {
+      "source": "src/backend/data/exercises.ts",
+      "export": "EXERCISES",
+      "count": 113,
+      "id_field": "id",
+      "required_fields": ["id", "name", "muscleGroup", "equipmentTier"],
+      "enum_fields": {
+        "equipmentTier": ["Full Gym", "Basic Gym", "Bodyweight"]
+      }
+    },
+    "budget_meals": {
+      "source": "src/data/catalog.ts",
+      "export": "BUDGET_MEALS",
+      "count": 50,
+      "id_field": "id",
+      "required_fields": ["id", "name", "category", "kcal", "ingredients", "steps"],
+      "enum_fields": {
+        "category": ["Breakfast", "Lunch", "Dinner", "Snack", "Sweet"]
+      }
+    },
+    "food_kb": {
+      "source": "src/data/nutrition.ts",
+      "export": "FOOD_KB",
+      "count": 36,
+      "id_field": "label",
+      "required_fields": ["label", "keywords", "tier"],
+      "enum_fields": {
+        "tier": ["great", "good", "moderate", "limit"]
+      }
+    }
+  }
+}
