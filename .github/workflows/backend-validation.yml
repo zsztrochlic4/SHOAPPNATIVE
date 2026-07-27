@@ -33,14 +33,9 @@ on:
         type: boolean
         default: false
       classifier_model:
-        description: 'Gemini model for the safety classifier (blank = app default gemini-2.5-flash-lite)'
-        type: choice
+        description: 'Gemini model id for the classifier, blank = app default gemini-2.5-flash-lite (e.g. gemini-flash-latest, gemini-pro-latest)'
+        type: string
         default: ''
-        options:
-          - ''
-          - gemini-2.5-flash-lite
-          - gemini-2.5-flash
-          - gemini-2.5-pro
 
 permissions:
   contents: read
