@@ -93,6 +93,23 @@ export async function generate(prompt, opts) {
   throw lastErr ?? new GeminiError('exhausted retries', 0)
 }
 
+/** List the models this key can call for generateContent (diagnostic — names without the models/ prefix). */
+export async function listModels(apiKey, timeoutMs = 20000) {
+  const ctrl = new AbortController()
+  const t = setTimeout(() => ctrl.abort(), timeoutMs)
+  try {
+    const res = await fetch(`${ENDPOINT}?key=${encodeURIComponent(apiKey)}&pageSize=200`, { signal: ctrl.signal })
+    if (!res.ok) throw new GeminiError(`listModels_${res.status}`, res.status)
+    const data = await res.json()
+    return (data.models ?? [])
+      .filter((m) => (m.supportedGenerationMethods ?? []).includes('generateContent'))
+      .map((m) => (m.name ?? '').replace(/^models\//, ''))
+      .filter(Boolean)
+  } finally {
+    clearTimeout(t)
+  }
+}
+
 /** Bounded-concurrency map so a run doesn't fire hundreds of requests at once. */
 export async function mapPool(items, limit, fn) {
   const out = new Array(items.length)

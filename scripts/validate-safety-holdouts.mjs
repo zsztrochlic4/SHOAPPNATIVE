@@ -27,7 +27,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { buildPrompt, parseModelOutput, SYSTEM_INSTRUCTION, CLASSIFIER_MODEL_INFO } from './lib/classifier-prompt.mjs'
-import { generate, mapPool, GeminiError } from './lib/gemini.mjs'
+import { generate, listModels, mapPool, GeminiError } from './lib/gemini.mjs'
 import { finish, ROOT } from './lib/result.mjs'
 
 const NAME = 'safety-holdouts'
@@ -114,6 +114,15 @@ async function main() {
   if (apiErrors) {
     console.log(`\n⚠️  ${apiErrors} transport errors. Sample messages:`)
     for (const m of errorSamples) console.log(`   ${m}`)
+    // A wall of 404s usually means the chosen model isn't available to this key — list what IS.
+    if ([...errorSamples].some((m) => m.includes('_404'))) {
+      try {
+        const models = await listModels(apiKey)
+        console.log(`\nModels available to this key for generateContent:\n   ${models.join('\n   ')}`)
+      } catch (e) {
+        console.log(`   (could not list models: ${e?.message ?? e})`)
+      }
+    }
   }
 
   const benign = results.filter((r) => r.benign)
