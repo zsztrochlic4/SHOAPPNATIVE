@@ -2,8 +2,12 @@
 
 Operational companion to Hardening Plan v3 (§9, §11, §12). It covers what has
 been **implemented in code** and the **console/ops steps that only the project
-owner can do**. Nothing here has been deployed to production — deploy is a
-deliberate, gated step (below).
+owner can do**.
+
+> **STATUS (2026-07-28): the hardened Firestore + Storage rules are DEPLOYED to
+> production `strengthhub-2ab33`.** Production data was audited clean (0/7 users)
+> after migrating one legacy account. Remaining work is App Check, backups/PITR,
+> and the other console/build tasks below (see the Owner Task Checklist).
 
 > Project: `strengthhub-2ab33` · region `australia-southeast2` · Blaze.
 
