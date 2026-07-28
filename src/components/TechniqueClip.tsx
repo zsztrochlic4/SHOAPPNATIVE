@@ -35,7 +35,9 @@ function WebVideo({
   return createElement('video', {
     ref: videoRef, src, muted: true, loop: true, autoPlay: true, playsInline: true,
     onError, onTimeUpdate: onTime, onLoadedMetadata: onMeta, onPlay, onPause,
-    style: { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
+    // Absolute-fill so the clip renders ON TOP of the poster image (which is also
+    // absolutely positioned); otherwise the poster paints over the video.
+    style: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
   })
 }
 
@@ -138,7 +140,7 @@ export function TechniqueClip({ exerciseId, poster, label, accent = brand[400] }
             onPause={() => setWebPlaying(false)}
           />
         ) : (
-          <VideoView player={player} style={{ width: '100%', height: '100%' }} contentFit="cover" nativeControls={false} />
+          <VideoView player={player} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} contentFit="cover" nativeControls={false} />
         ))}
       {videoOk && <ClipControls playing={playing} current={current} duration={duration} onToggle={toggle} accent={accent} />}
       {!videoOk && (
