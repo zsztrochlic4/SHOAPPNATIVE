@@ -5,9 +5,12 @@ import { storageBucket } from './firebase'
  *
  * Objects under `exercises/` are world-readable (see storage.rules), so we can
  * link them with a plain, cacheable URL — no per-file token or async lookup.
- * Upload files from the Firebase console into an `exercises/` folder named by
- * exercise id (e.g. `exercises/bench.mp4`, `exercises/bench.jpg`) and they show
- * up automatically on that exercise.
+ *
+ * Convention: each exercise has its own folder `exercises/{id}/` containing
+ * `video.mp4` (looping form clip) and `thumb.jpg` (poster). Drop those two files
+ * into the exercise's folder — in the Firebase console or via
+ * `npm run media:upload` — and they show up automatically on that exercise. A
+ * missing file simply falls back to the placeholder, so nothing ever breaks.
  */
 const BASE = `https://firebasestorage.googleapis.com/v0/b/${storageBucket}/o`
 
@@ -40,15 +43,15 @@ export function storageUrl(path: string): string {
 
 const resolvePoster = (p: string): string => (p.startsWith('http') ? p : storageUrl(p))
 
-/** Looping form-clip URL for an exercise (upload as `exercises/{id}.mp4`). */
+/** Looping form-clip URL for an exercise (upload as `exercises/{id}/video.mp4`). */
 export function exerciseVideo(id: string): string {
-  return storageUrl(OVERRIDES[id]?.video ?? `exercises/${id}.mp4`)
+  return storageUrl(OVERRIDES[id]?.video ?? `exercises/${id}/video.mp4`)
 }
 
-/** Poster/thumbnail URL for an exercise (upload as `exercises/{id}.jpg`). */
+/** Poster/thumbnail URL for an exercise (upload as `exercises/{id}/thumb.jpg`). */
 export function exercisePoster(id: string): string {
   const o = OVERRIDES[id]?.poster
-  return o ? resolvePoster(o) : storageUrl(`exercises/${id}.jpg`)
+  return o ? resolvePoster(o) : storageUrl(`exercises/${id}/thumb.jpg`)
 }
 
 /** The uploaded poster URL for an exercise IF one is configured, else null — so callers can prefer

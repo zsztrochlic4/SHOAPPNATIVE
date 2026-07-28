@@ -64,7 +64,8 @@
     "validate:holdouts": "node scripts/validate-safety-holdouts.mjs",
     "recipes:build": "node scripts/build-recipes.mjs",
     "recipes:upload": "node scripts/upload-recipes.mjs",
-    "media:upload": "node scripts/upload-exercise-media.mjs"
+    "media:upload": "node scripts/upload-exercise-media.mjs",
+    "media:folders": "node scripts/create-exercise-folders.mjs"
   },
   "private": true
 }

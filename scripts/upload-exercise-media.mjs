@@ -48,8 +48,9 @@ for (const f of files) {
   const ext = extname(f).toLowerCase()
   if (!CT[ext]) { skipped.push(`${f} (unsupported type)`); continue }
   const id = basename(f, ext)
-  const dest = `exercises/${f}`
   const kind = ext.match(/mp4|mov|webm|m4v/) ? 'video' : 'image'
+  // Per-exercise folder convention: exercises/{id}/video.mp4 + exercises/{id}/thumb.jpg
+  const dest = `exercises/${id}/${kind === 'video' ? 'video' : 'thumb'}${ext}`
   items.push({ file: f, dest, id, kind, contentType: CT[ext] })
 }
 

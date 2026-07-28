@@ -7,14 +7,14 @@ command to publish them. They appear in the app **without an App Store release**
 ## How to use
 
 1. **Name each file by the exercise id.** The file name (without extension) must
-   match the exercise's id in the app. Examples:
-   - `bench.mp4` → looping form clip on the Bench Press exercise
-   - `bench.jpg` → thumbnail/poster on the Bench Press exercise
-   - `squat.mp4`, `deadlift.jpg`, `row.mp4`, …
+   match the exercise's id. The uploader files them into that exercise's folder
+   automatically (`{id}.mp4` → `exercises/{id}/video.mp4`, `{id}.jpg` →
+   `exercises/{id}/thumb.jpg`). Examples:
+   - `CH01.mp4` → form clip on Barbell Bench Press
+   - `CH01.jpg` → thumbnail on Barbell Bench Press
 
-   Some current ids: `bench, incline, shoulder, cablefly, tricep, squat,
-   deadlift, pulldown, row, curl, ohp, legpress, rdl, lateral`. (Ask Claude for
-   the full list, or check `src/data/catalog.ts`.)
+   Full id → exercise list: [`docs/EXERCISE_MEDIA_CHECKLIST.md`](../../docs/EXERCISE_MEDIA_CHECKLIST.md).
+   (Or upload straight in the Firebase console — see that checklist.)
 
 2. **Supported types:**
    - Video: `.mp4` (best), `.mov`, `.webm`, `.m4v`

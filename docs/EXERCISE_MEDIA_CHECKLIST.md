@@ -1,13 +1,17 @@
 # Exercise media checklist (113 exercises)
 
-Upload two files per exercise to the public `exercises/` folder in Cloud Storage:
+Each exercise has its own folder in Cloud Storage. Open the folder and drop in two files:
 
-- Video (form clip): **`{id}.mp4`**  (e.g. `CH01.mp4`)
-- Thumbnail photo: **`{id}.jpg`**  (e.g. `CH01.jpg`)
+- **`video.mp4`** — the looping form clip
+- **`thumb.jpg`** — the thumbnail photo
 
-Either drag straight into the Firebase console Storage `exercises/` folder, or drop into `data/exercise-media/` and run `npm run media:upload -- --apply`. The app shows them on that exercise automatically. Tick off as you go.
+Folder path: **`exercises/{id}/`** (e.g. `exercises/CH01/` for Barbell Bench Press).
 
-Console: https://console.firebase.google.com/project/strengthhub-2ab33/storage
+Two ways to upload:
+1. **Firebase console** — open the exercise folder and drag the two files in: https://console.firebase.google.com/project/strengthhub-2ab33/storage
+2. **Bulk** — drop files named `{id}.mp4` / `{id}.jpg` into `data/exercise-media/`, then `npm run media:upload -- --apply` (they get filed into the right folders automatically).
+
+Run `npm run media:folders -- --apply` once to pre-create all 113 labelled folders. The app shows each file on its exercise automatically; a missing file just falls back to the placeholder. Tick off as you go.
 
 ## Chest
 
