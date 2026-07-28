@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "permissions": {
+    "allow": [
+      "mcp__Claude_Browser__read_page",
+      "mcp__Claude_Browser__get_page_text",
+      "mcp__Claude_Browser__preview_logs",
+      "mcp__Claude_Browser__read_console_messages",
+      "mcp__Claude_Browser__find",
+      "mcp__Claude_Browser__preview_list",
+      "mcp__Claude_Browser__read_network_requests",
+      "mcp__Claude_Preview__preview_screenshot",
+      "mcp__Claude_Preview__preview_logs",
+      "mcp__Claude_Preview__preview_console_logs",
+      "mcp__Claude_Preview__preview_list",
+      "mcp__Claude_Preview__preview_snapshot",
+      "mcp__firebase__storage_get_object_download_url",
+      "mcp__firebase__firebase_get_environment",
+      "mcp__firebase__firebase_get_security_rules",
+      "mcp__firebase__firestore_list_documents",
+      "mcp__firebase__firebase_get_project"
+    ]
+  }
+}
