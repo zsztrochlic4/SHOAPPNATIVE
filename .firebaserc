@@ -1,5 +1,6 @@
 {
   "projects": {
-    "default": "strengthhub-2ab33"
+    "default": "strengthhub-2ab33",
+    "production": "strengthhub-2ab33"
   }
 }

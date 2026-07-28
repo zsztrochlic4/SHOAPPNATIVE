@@ -95,7 +95,7 @@ jobs:
       # to 1 once test/rules/ is in the repo and you want a rules regression to fail the run.
       - name: Firestore & Storage rules tests (emulator)
         continue-on-error: true
-        run: node scripts/run-step.mjs --name rules --critical 0 --skip-if-missing test/rules --cmd "npx firebase emulators:exec --only firestore,storage \"node --test test/rules/\""
+        run: node scripts/run-step.mjs --name rules --critical 1 --skip-if-missing test/rules --cmd "npx firebase emulators:exec --only firestore,storage \"node --test test/rules/*.test.mjs\""
 
       - name: Generated-artifact drift (committed holdouts match source)
         continue-on-error: true

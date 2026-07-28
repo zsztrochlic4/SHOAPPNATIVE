@@ -33,20 +33,20 @@ after(async () => {
 const aliceStore = () => testEnv.authenticatedContext(ALICE).storage()
 const bobStore = () => testEnv.authenticatedContext(BOB).storage()
 
-test('owner can upload an image to their own media path', async () => {
+// User media is LOCKED until the upload feature ships (Hardening Plan v3 §5).
+// The app has no upload path today, so even the owner is denied — no speculative
+// recursive write surface. These flip to allow-with-validation only when the
+// precise users/{uid}/progressPhotos/{photoId} rule is added.
+test('owner cannot upload to user media (feature not shipped — path locked)', async () => {
   const r = ref(aliceStore(), `users/${ALICE}/photo.png`)
-  await assertSucceeds(uploadBytes(r, new Uint8Array([1, 2, 3]), PNG))
+  await assertFails(uploadBytes(r, new Uint8Array([1, 2, 3]), PNG))
 })
 
-test('non-image upload to user media is denied', async () => {
-  const r = ref(aliceStore(), `users/${ALICE}/notes.txt`)
-  await assertFails(uploadBytes(r, new Uint8Array([1, 2, 3]), { contentType: 'text/plain' }))
-})
-
-test('over-10MB image upload is denied', async () => {
-  const r = ref(aliceStore(), `users/${ALICE}/big.png`)
-  const tooBig = new Uint8Array(10 * 1024 * 1024 + 1)
-  await assertFails(uploadBytes(r, tooBig, PNG))
+test('owner cannot read user media path while locked', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await uploadBytes(ref(ctx.storage(), `users/${ALICE}/seeded.png`), new Uint8Array([1]), PNG)
+  })
+  await assertFails(getBytes(ref(aliceStore(), `users/${ALICE}/seeded.png`)))
 })
 
 test('stranger cannot write another user media', async () => {

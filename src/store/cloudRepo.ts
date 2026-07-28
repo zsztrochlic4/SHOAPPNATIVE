@@ -2,6 +2,7 @@ import {
   doc, collection, getDoc, getDocs, writeBatch, serverTimestamp,
 } from 'firebase/firestore'
 import { db } from '../lib/firebase'
+import { sanitizeForPersist, sanitizeEntry } from '../lib/sanitize'
 import type { AppState } from './types'
 
 /**
@@ -182,12 +183,19 @@ export async function saveUserState(
   const batches = chunk(ops, BATCH_LIMIT)
   if (batches.length === 0) batches.push([])
 
+  // Canonical sanitisation boundary (Hardening Plan v3 §7.1): every free-text
+  // field is normalised, and obsolete plaintext tokens stripped, IMMEDIATELY
+  // before persistence. Done after the diff so it never disturbs which entries
+  // are written. The server-side backend, when it exists, must run the same
+  // routine — the client layer improves UX; the server is the security boundary.
+  const safeRoot = sanitizeForPersist(root)
+
   for (let i = 0; i < batches.length; i++) {
     const batch = writeBatch(db)
-    if (i === 0) batch.set(rootRef, { ...clean(root), updatedAt: serverTimestamp() })
+    if (i === 0) batch.set(rootRef, { ...clean(safeRoot), updatedAt: serverTimestamp() })
     for (const op of batches[i]) {
       const ref = doc(db, COL, uid, op.key, op.id)
-      if (op.kind === 'set') batch.set(ref, clean(op.data))
+      if (op.kind === 'set') batch.set(ref, clean(sanitizeEntry(op.key, op.data as Record<string, unknown>)))
       else batch.delete(ref)
     }
     await batch.commit()

@@ -55,7 +55,7 @@ export function IntegrationsSection() {
   function onPress(p: Provider) {
     const st = integ[p.id]
     if (st?.connected) {
-      dispatch({ type: 'SET_INTEGRATION', id: p.id, patch: { connected: false, accessToken: undefined, refreshToken: undefined } })
+      dispatch({ type: 'SET_INTEGRATION', id: p.id, patch: { connected: false } })
       toast(`${p.name} disconnected`)
       return
     }

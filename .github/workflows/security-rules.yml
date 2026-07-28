@@ -1,0 +1,107 @@
+name: Security Rules
+
+# The security-rules gate (Hardening Plan v3 §10 "CI gate", §11, §13).
+#
+#   • `rules-tests` runs the Firestore + Storage emulator rule tests AND the
+#     input-sanitisation / AI-response unit tests on every push and pull request
+#     that touches the rules, their tests, or the sanitisation/coach-schema code.
+#     Make this a REQUIRED status check (Settings → Branches → branch protection)
+#     so a rules or schema regression blocks merge.
+#
+#   • `deploy-rules` deploys ONLY the Firestore + Storage rules to production and
+#     is gated on `needs: rules-tests` — production rules cannot deploy unless
+#     compilation and all tests pass (§13). It is manual (workflow_dispatch) and
+#     requires typing the project id, so it is never an accidental default.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'firestore.rules'
+      - 'storage.rules'
+      - 'firebase.json'
+      - 'test/rules/**'
+      - 'test/unit/**'
+      - 'src/lib/sanitize.ts'
+      - 'src/backend/coach/responseSchema.ts'
+      - '.github/workflows/security-rules.yml'
+  pull_request:
+    paths:
+      - 'firestore.rules'
+      - 'storage.rules'
+      - 'firebase.json'
+      - 'test/rules/**'
+      - 'test/unit/**'
+      - 'src/lib/sanitize.ts'
+      - 'src/backend/coach/responseSchema.ts'
+      - '.github/workflows/security-rules.yml'
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: 'Deploy rules to production after tests pass'
+        type: boolean
+        default: false
+      project_id:
+        description: 'Firebase project id to deploy to (must match .firebaserc)'
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-rules-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rules-tests:
+    name: Rules + sanitisation tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install dependencies
+        run: npm ci
+      - name: Install firebase-tools (emulator runner)
+        run: npm install --no-save firebase-tools
+      - name: Input-sanitisation + AI-response unit tests
+        run: npm run test:unit
+      - name: Firestore & Storage rules tests (emulator)
+        run: npx firebase emulators:exec --only firestore,storage "node --test test/rules/*.test.mjs"
+
+  deploy-rules:
+    name: Deploy rules to production
+    needs: rules-tests
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy && inputs.project_id != '' }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - name: Install firebase-tools
+        run: npm install --no-save firebase-tools
+      # Auth via a service account JSON stored as the FIREBASE_SERVICE_ACCOUNT secret.
+      - name: Deploy Firestore + Storage rules only
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/sa.json
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "::error::FIREBASE_SERVICE_ACCOUNT secret is not set — cannot deploy." && exit 1
+          fi
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > sa.json
+          npx firebase deploy \
+            --only firestore:rules,storage:rules \
+            --project "${{ inputs.project_id }}" \
+            --non-interactive
+          rm -f sa.json

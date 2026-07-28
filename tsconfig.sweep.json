@@ -11,5 +11,5 @@
     "types": ["node"],
     "rootDir": "src"
   },
-  "include": ["src/backend/**/*.ts", "src/store/types.ts", "src/lib/i18n.ts"]
+  "include": ["src/backend/**/*.ts", "src/store/types.ts", "src/lib/i18n.ts", "src/lib/sanitize.ts", "src/backend/coach/responseSchema.ts"]
 }

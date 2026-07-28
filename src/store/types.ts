@@ -216,15 +216,21 @@ export interface FoodReview {
 }
 
 /** A self-logged fitness activity not prescribed by the app (run, swim, sport…). */
-/** Connection + tokens for one external health platform. */
+/**
+ * Connection state for one external health platform.
+ *
+ * SECURITY (Hardening Plan v3 §6): the former OAuth `accessToken` / `refreshToken`
+ * / `expiresAt` fields were REMOVED. Those integrations no longer exist, and a
+ * client-writable Firestore document must never hold plaintext third-party
+ * credentials. Any future credentials belong in Secret Manager or a server-only
+ * backend — never here. The Firestore rules additionally reject top-level
+ * `accessToken`/`refreshToken`, and the canonical sanitiser strips them from any
+ * nested integration map before a write (src/lib/sanitize.ts).
+ */
 export interface IntegrationState {
   connected: boolean
   /** ISO timestamp of the last successful sync */
   lastSyncAt?: string
-  accessToken?: string
-  refreshToken?: string
-  /** unix seconds when the access token expires */
-  expiresAt?: number
 }
 
 export interface LoggedActivity {
