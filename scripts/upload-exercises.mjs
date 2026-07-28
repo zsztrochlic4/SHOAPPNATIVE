@@ -25,7 +25,7 @@ const has = (n) => process.argv.includes(`--${n}`)
 const XLSX = arg('file', join(repoRoot, 'data', 'exercises', 'StrengthHub_Workout_Backend.xlsx'))
 const PROJECT = arg('project', process.env.GCLOUD_PROJECT || 'strengthhub-2ab33')
 const APPLY = has('apply')
-const BATCH = 400
+const BATCH = 200 // 2 ops per record (set name-doc + delete old id-doc), stay < 500
 
 let records
 try {
@@ -51,14 +51,19 @@ const db = getFirestore(initializeApp({ credential: applicationDefault(), projec
 
 function chunk(a, n) { const o = []; for (let i = 0; i < a.length; i += n) o.push(a.slice(i, i + n)); return o }
 
+// Documents are keyed by the exercise NAME (readable in the console). The app
+// keys off the `id` field inside each doc, so the doc id can be anything.
 let written = 0
 for (const part of chunk(records, BATCH)) {
   const b = db.batch()
-  for (const r of part) b.set(db.collection('exercises').doc(r.id), { ...r, updatedAt: FieldValue.serverTimestamp() }, { merge: true })
+  for (const r of part) {
+    b.set(db.collection('exercises').doc(r.name), { ...r, updatedAt: FieldValue.serverTimestamp() }, { merge: true })
+    b.delete(db.collection('exercises').doc(r.id)) // remove the old id-keyed doc (CH01…)
+  }
   await b.commit()
   written += part.length
   console.log(`  …wrote ${written}/${records.length}`)
 }
 const total = (await db.collection('exercises').count().get()).data().count
-console.log(`\n✔ Uploaded ${written} exercise info docs. Collection now has ${total} docs.`)
+console.log(`\n✔ Uploaded ${written} exercise info docs (named by exercise). Collection now has ${total} docs.`)
 process.exit(0)
