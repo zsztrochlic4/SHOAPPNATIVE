@@ -37,6 +37,12 @@ const CONCURRENCY = Number(process.env.CLASSIFIER_CONCURRENCY ?? '6')
 // gemini-2.5-flash, gemini-2.5-pro). This only changes the MODEL, never the prompt — swapping models
 // and re-measuring is a fair comparison; editing the prompt to fit the holdouts would be memorising it.
 const MODEL = process.env.CLASSIFIER_MODEL || CLASSIFIER_MODEL_INFO.model
+// EXPERIMENT: FEWSHOT=1 injects hand-authored (non-holdout) exemplars into the prompt to test whether
+// few-shot calibration lowers the false-positive rate without hurting recall. Off by default.
+const FEWSHOT = process.env.FEWSHOT === '1'
+const EXEMPLARS = FEWSHOT
+  ? JSON.parse(readFileSync(resolve(ROOT, 'data', 'fewshot-exemplars.json'), 'utf8')).exemplars
+  : []
 const SETS = (process.env.HOLDOUT_SETS ?? 'R2,R3,R4')
   .split(',')
   .map((s) => s.trim())
@@ -68,7 +74,7 @@ function loadCases() {
 }
 
 async function classify(c) {
-  const prompt = buildPrompt(c.latest, c.recent)
+  const prompt = buildPrompt(c.latest, c.recent, EXEMPLARS)
   const raw = await generate(prompt, {
     apiKey,
     model: MODEL,
@@ -95,7 +101,10 @@ async function main() {
     })
   }
 
-  console.log(`Classifying ${cases.length} holdout messages via ${MODEL} (concurrency ${CONCURRENCY})...`)
+  console.log(
+    `Classifying ${cases.length} holdout messages via ${MODEL}` +
+      `${FEWSHOT ? ` + ${EXEMPLARS.length} few-shot exemplars` : ''} (concurrency ${CONCURRENCY})...`,
+  )
 
   let apiErrors = 0
   const errorSamples = new Set()
@@ -195,6 +204,8 @@ async function main() {
     summary,
     metrics: {
       model: MODEL,
+      fewshot: FEWSHOT,
+      fewshot_exemplars: EXEMPLARS.length,
       total_cases: results.length,
       benign_controls: benign.length,
       false_positives: falsePositives.length,

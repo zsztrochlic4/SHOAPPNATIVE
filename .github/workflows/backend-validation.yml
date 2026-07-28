@@ -36,6 +36,10 @@ on:
         description: 'Gemini model id for the classifier, blank = app default gemini-2.5-flash-lite (e.g. gemini-flash-latest, gemini-pro-latest)'
         type: string
         default: ''
+      fewshot:
+        description: 'EXPERIMENT: inject non-holdout few-shot exemplars into the classifier prompt'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -108,6 +112,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           FP_THRESHOLD: '0.05'
           CLASSIFIER_MODEL: ${{ inputs.classifier_model }}
+          FEWSHOT: ${{ inputs.fewshot && '1' || '' }}
         run: node scripts/validate-safety-holdouts.mjs
 
       # ---- Aggregate, publish, notify ----

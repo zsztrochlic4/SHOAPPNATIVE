@@ -58,7 +58,24 @@ const CATEGORY_SET = new Set([...MODEL_CATEGORIES, 'none'])
  * The classification instruction — a verbatim port of buildPrompt() in llmClassifier.ts.
  * `recent` is the list of earlier turns (oldest first), for multi-turn context.
  */
-export function buildPrompt(text, recent = []) {
+/**
+ * Optional few-shot exemplars (EXPERIMENT — not in the shipped prompt). `exemplars` is a list of
+ * { text, categories } authored OUTSIDE the holdout sets. They calibrate the model on the known
+ * false-positive classes without lowering recall; passing none reproduces the faithful port exactly.
+ */
+function exemplarBlock(exemplars) {
+  if (!exemplars?.length) return []
+  const lines = exemplars.map((e) => `  message: "${e.text}"  ->  {"categories": ${JSON.stringify(e.categories)}}`)
+  return [
+    'WORKED EXAMPLES (for calibration only — apply the SAME judgement to the LATEST message below; do',
+    'not echo these). Note how third-party attributes, academic/research framing, historical/resolved',
+    'states and gym hyperbole are ["none"], while genuine first-person risk is flagged:',
+    ...lines,
+    '',
+  ]
+}
+
+export function buildPrompt(text, recent = [], exemplars = []) {
   const context = recent.length
     ? recent
         .slice(-6)
@@ -109,6 +126,7 @@ export function buildPrompt(text, recent = []) {
     '- PRECEDENCE: an overdose/poisoning WITH any immediate-danger sign, and a third party in IMMEDIATE danger, are emergencies — return medical_emergency (alongside the specific category) so they route to emergency services, not a lesser line.',
     '- Consider misspellings, slang, letter-spacing/obfuscation, euphemism, and other languages.',
     '',
+    ...exemplarBlock(exemplars),
     `Recent turns (oldest first), for context only:\n${context}`,
     '',
     `LATEST message to classify:\n  "${text}"`,
