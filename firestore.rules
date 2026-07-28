@@ -254,6 +254,15 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Exercise info overlay (name, how-to steps, common mistake, safety note),
+    // editable via the workbook. Same Zone C policy: signed-in read, no client
+    // write (uploaded by the Admin SDK). The app bundles a full copy, so this is
+    // an editable overlay, not a hard dependency.
+    match /exercises/{id} {
+      allow get, list: if request.auth != null;
+      allow write: if false;
+    }
+
     // ----------------------------------------------------------------- //
     //  Default deny — everything outside the paths above                 //
     // ----------------------------------------------------------------- //

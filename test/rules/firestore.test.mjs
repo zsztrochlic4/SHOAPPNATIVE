@@ -241,3 +241,11 @@ test('recipes: signed-in get + list allowed; client write + anon read denied', a
   await assertFails(getDoc(doc(anonDb(), 'recipes', 'bm-scrambled-eggs')))
   await assertFails(setDoc(doc(aliceDb(), 'recipes', 'bm-hack'), { id: 'bm-hack', name: 'x', category: 'Lunch' }))
 })
+
+test('exercises info: signed-in get + list allowed; client write + anon read denied', async () => {
+  await seed((db) => setDoc(doc(db, 'exercises', 'CH01'), { id: 'CH01', name: 'Barbell Bench Press' }))
+  await assertSucceeds(getDoc(doc(aliceDb(), 'exercises', 'CH01')))
+  await assertSucceeds(getDocs(collection(aliceDb(), 'exercises')))
+  await assertFails(getDoc(doc(anonDb(), 'exercises', 'CH01')))
+  await assertFails(setDoc(doc(aliceDb(), 'exercises', 'CH99'), { id: 'CH99', name: 'x' }))
+})

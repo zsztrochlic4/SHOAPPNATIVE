@@ -12,6 +12,7 @@ import { loggableSlots } from '../backend/runtime/logging'
 import { EXERCISE_BY_ID } from '../backend/data'
 import type { WorkoutInstanceDoc } from '../backend/schema'
 import { img, exById, exerciseDetail, type ExerciseDetail } from '../data/catalog'
+import { getExerciseInfo } from '../data/exerciseInfo'
 import { fromKey } from '../lib/date'
 import type { LoggedExercise, SetLog, TemplateExercise, WorkoutSession } from './types'
 
@@ -161,16 +162,19 @@ export function exerciseView(defId: string): ExerciseView | null {
 
   const ex = EXERCISE_BY_ID[defId]
   if (!ex) return null
+  // Editable info (name, what-it-does, steps, mistake, safety) comes from the
+  // Firestore overlay when present, falling back to the bundled record.
+  const info = getExerciseInfo(defId) ?? ex
   return {
-    name: ex.name,
-    muscle: ex.muscleGroup,
-    image: imageForMuscle(ex.muscleGroup),
+    name: info.name,
+    muscle: info.muscleGroup,
+    image: imageForMuscle(info.muscleGroup),
     detail: {
-      desc: ex.whatItDoes,
-      cues: ex.steps,
-      commonMistake: ex.commonMistake,
-      ifTaken: ex.safetyNote || 'Swap to a similar machine or free-weight variation that’s free.',
-      beginnerFriendly: ex.skillLevel === 'Beginner',
+      desc: info.whatItDoes,
+      cues: info.steps,
+      commonMistake: info.commonMistake,
+      ifTaken: info.safetyNote || 'Swap to a similar machine or free-weight variation that’s free.',
+      beginnerFriendly: info.skillLevel === 'Beginner',
     },
   }
 }

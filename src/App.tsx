@@ -18,6 +18,7 @@ import { NavProvider, type Overlay } from './nav'
 import { themeVars, useThemeName, brand, cssVars } from './theme'
 import { setSoundEnabled } from './lib/sound'
 import { initBudgetMeals } from './data/recipes'
+import { initExerciseInfo } from './data/exerciseInfo'
 import { Skeleton, SkeletonLines } from './components/Skeleton'
 import Dashboard from './screens/Dashboard'
 import Workout from './screens/Workout'
@@ -252,6 +253,7 @@ function ThemedRoot() {
   // in demo mode / offline (see src/data/recipes.ts).
   useEffect(() => {
     void initBudgetMeals()
+    void initExerciseInfo()
   }, [])
 
   // On web, RN-Web modals (menu, sheets, full-screen views) portal to <body>,

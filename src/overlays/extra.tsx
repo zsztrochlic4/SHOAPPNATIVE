@@ -21,6 +21,7 @@ import {
   ACTIVITY_PRESETS, activityPreset, INTENSITY_MULT, EXERCISES, exById,
 } from '../data/catalog'
 import { useBudgetMeals } from '../data/recipes'
+import { useExerciseInfo } from '../data/exerciseInfo'
 import { fmtWeight } from '../lib/format'
 import { ActivityIcon } from '../components/ActivityIcon'
 import { exerciseView, imageForMuscle, buildCustomSession } from '../store/programSession'
@@ -258,6 +259,9 @@ export function ExerciseDetailSheet({ open, onClose, params }: Props) {
   const units = state.settings.units
   const defId = (params?.defId as string) ?? 'bench'
   const library = !!params?.library
+  // Subscribe to the exercise-info overlay so the sheet re-renders if the cloud
+  // copy (edited via the workbook) loads after open.
+  useExerciseInfo()
   // Resolve the demo catalogue first, then the 113-exercise Database so a generated-program
   // row (backend id like CH02) opens with real technique copy instead of a blank sheet.
   const view = exerciseView(defId)
