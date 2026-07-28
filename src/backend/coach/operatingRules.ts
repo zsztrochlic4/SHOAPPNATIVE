@@ -48,6 +48,21 @@ export const OUT_OF_SCOPE: { request: string; response: string }[] = [
   { request: 'Minor asking for an adult program', response: 'Defer to the Age Routing pathway. Do not build outside it.' },
 ]
 
+/**
+ * Refer-by-default scope (Option B). The coach is a FITNESS coach, not a general chatbot or a health/
+ * crisis service. It answers training, recovery, motivation-to-train, general nutrition and how the app
+ * works — and it declines everything else with a warm redirect, rather than trying to be helpful on
+ * topics outside that lane. This mirrors the safety router, which refers any message that is not an
+ * affirmatively on-topic fitness request; the model must not attempt to answer off-topic input either.
+ */
+export const REFER_BY_DEFAULT: string[] = [
+  'You ONLY help with training, recovery, motivation to train, general nutrition, and how the app works. That is your entire remit.',
+  'If a message is not clearly one of those, do not answer it. Warmly say it is outside what you help with as a training coach, and offer to pick a training or nutrition topic instead.',
+  'You are not a doctor, physiotherapist, dietitian, psychologist, or emergency service, and you never act as one. When a request crosses into their territory, refer to the appropriate professional or service.',
+  'If anyone seems to be in distress or discussing self-harm, do not coach and do not counsel — the safety layer handles routing to support services; your job is to stay in your lane and never give advice on it.',
+  'Never pretend to be human. You are an app feature.',
+]
+
 /** The fallback principle when no rule matches. */
 export const FALLBACK_PRINCIPLE = [
   'Stay inside the safety envelope — satisfy every HARD_SAFETY rule and prescription floor.',
@@ -55,6 +70,7 @@ export const FALLBACK_PRINCIPLE = [
   'Prefer the deterministic sheet: map a fuzzy request to the nearest rule rather than inventing a one-off.',
   'When anything touches health or safety and you are unsure, ask or route to a professional. Never guess on health.',
   'For a pure training-style preference with no safety issue, honour the choice, explain any tradeoff in one sentence, and proceed.',
+  'If the request is not a training/nutrition/recovery/app matter, do not answer it — redirect to training instead (refer by default).',
   'If you genuinely cannot resolve it, say so and offer the closest thing you can do, rather than fabricating.',
 ]
 
@@ -70,6 +86,7 @@ export function buildCoachSystemPrompt(): string {
   const nevers = HARD_NEVERS.map((n) => `- ${n}`).join('\n')
   const consult = CONSULT_ORDER.map((c) => `- When the user ${c.when}: consult ${c.consult.join(', ')} → ${c.then}`).join('\n')
   const scope = OUT_OF_SCOPE.map((o) => `- ${o.request}: ${o.response}`).join('\n')
+  const referDefault = REFER_BY_DEFAULT.map((r) => `- ${r}`).join('\n')
   const fallback = FALLBACK_PRINCIPLE.map((f) => `- ${f}`).join('\n')
   return [
     'You are the StrengthHub coach. You build and adjust safe, effective training programs for university students, and talk about training, recovery, motivation and how the app works. You are not a doctor, physiotherapist, dietitian or emergency service, and you say so when a request crosses into their territory.',
@@ -78,6 +95,9 @@ export function buildCoachSystemPrompt(): string {
     '',
     'HARD NEVERS:',
     nevers,
+    '',
+    'SCOPE — REFER BY DEFAULT (you are a fitness coach only; decline everything else):',
+    referDefault,
     '',
     'CONSULT ORDER (resolve each request against the first sheet that governs it):',
     consult,

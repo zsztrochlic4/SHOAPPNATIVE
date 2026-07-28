@@ -30,6 +30,7 @@ import { coachReply } from '../lib/coachChat'
 import { askCoach } from '../lib/coachApi'
 import { coachContext, coachOperational, COACH_PREVIEW, coachPrecheckAsync, guardOutgoing, newSafetySession } from '../lib/coachSafety'
 import { SafetyContactButtons } from '../components/SafetyContactButtons'
+import { CoachSafetyStrip } from '../components/CoachSafetyStrip'
 import { CoachComingSoon } from '../components/CoachComingSoon'
 import { todaySession, leaderboardSorted, youRank } from '../store/selectors'
 import { relativeLabel, todayKey } from '../lib/date'
@@ -672,6 +673,9 @@ export function CoachChatSheet({ open, onClose }: Props) {
               </View>
             </View>
           </View>
+
+          {/* Always-on crisis affordance (Option B): persistent, detection-independent access to help */}
+          <CoachSafetyStrip isAustralia={coachContext(state).isAustralia} fg={colors.fg} brand={colors.brand400} />
 
           {/* Thread — fills the space, scrolls, sticks to newest */}
           <ScrollView
