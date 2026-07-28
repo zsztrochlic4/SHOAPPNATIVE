@@ -1,178 +1,178 @@
 # Exercise media checklist (113 exercises)
 
-Each exercise has its own folder in Cloud Storage. Open the folder and drop in two files:
+Each exercise has its own folder in Cloud Storage, **named after the exercise**. Open the folder and drop in two files:
 
 - **`video.mp4`** — the looping form clip
 - **`thumb.jpg`** — the thumbnail photo
 
-Folder path: **`exercises/{id}/`** (e.g. `exercises/CH01/` for Barbell Bench Press).
+Folder path: **`exercises/<Exercise Name>/`** (e.g. `exercises/Barbell Bench Press/`).
 
-Two ways to upload:
-1. **Firebase console** — open the exercise folder and drag the two files in: https://console.firebase.google.com/project/strengthhub-2ab33/storage
-2. **Bulk** — drop files named `{id}.mp4` / `{id}.jpg` into `data/exercise-media/`, then `npm run media:upload -- --apply` (they get filed into the right folders automatically).
+Upload in the Firebase console — open the exercise folder and drag the two files in: https://console.firebase.google.com/project/strengthhub-2ab33/storage
 
-Run `npm run media:folders -- --apply` once to pre-create all 113 labelled folders. The app shows each file on its exercise automatically; a missing file just falls back to the placeholder. Tick off as you go.
+(Bulk option: drop files named `{id}.mp4` / `{id}.jpg` into `data/exercise-media/`, then `npm run media:upload -- --apply` — they get filed into the right named folders automatically.)
+
+A missing file just falls back to the placeholder. Tick off as you go.
 
 ## Chest
 
-| id | exercise | video | photo |
-|----|----------|:----:|:----:|
-| `CH01` | Barbell Bench Press | ☐ | ☐ |
-| `CH02` | Dumbbell Bench Press | ☐ | ☐ |
-| `CH03` | Incline Dumbbell Press | ☐ | ☐ |
-| `CH04` | Push Up | ☐ | ☐ |
-| `CH05` | Machine Chest Press | ☐ | ☐ |
-| `CH06` | Cable Chest Fly | ☐ | ☐ |
-| `CH07` | Dumbbell Chest Fly | ☐ | ☐ |
-| `CH08` | Dip (Chest Lean) | ☐ | ☐ |
-| `CH09` | Incline Barbell Bench Press | ☐ | ☐ |
-| `CH10` | Decline Barbell Bench Press | ☐ | ☐ |
-| `CH11` | Incline Push Up | ☐ | ☐ |
-| `CH12` | Feet Elevated Push Up | ☐ | ☐ |
+| exercise (folder name) | id | video | photo |
+|----|----|:----:|:----:|
+| Barbell Bench Press | `CH01` | ☐ | ☐ |
+| Dumbbell Bench Press | `CH02` | ☐ | ☐ |
+| Incline Dumbbell Press | `CH03` | ☐ | ☐ |
+| Push Up | `CH04` | ☐ | ☐ |
+| Machine Chest Press | `CH05` | ☐ | ☐ |
+| Cable Chest Fly | `CH06` | ☐ | ☐ |
+| Dumbbell Chest Fly | `CH07` | ☐ | ☐ |
+| Dip (Chest Lean) | `CH08` | ☐ | ☐ |
+| Incline Barbell Bench Press | `CH09` | ☐ | ☐ |
+| Decline Barbell Bench Press | `CH10` | ☐ | ☐ |
+| Incline Push Up | `CH11` | ☐ | ☐ |
+| Feet Elevated Push Up | `CH12` | ☐ | ☐ |
 
 ## Back
 
-| id | exercise | video | photo |
-|----|----------|:----:|:----:|
-| `BK01` | Conventional Deadlift | ☐ | ☐ |
-| `BK02` | Barbell Bent Over Row | ☐ | ☐ |
-| `BK03` | Dumbbell Single Arm Row | ☐ | ☐ |
-| `BK04` | Chin Up | ☐ | ☐ |
-| `BK05` | Lat Pulldown | ☐ | ☐ |
-| `BK06` | Seated Cable Row | ☐ | ☐ |
-| `BK07` | Inverted Row | ☐ | ☐ |
-| `BK08` | Chest Supported Dumbbell Row | ☐ | ☐ |
-| `BK09` | Straight Arm Pulldown | ☐ | ☐ |
-| `BK10` | Rack Pull | ☐ | ☐ |
-| `BK11` | Band Lat Pulldown | ☐ | ☐ |
-| `BK12` | Trap Bar Deadlift | ☐ | ☐ |
-| `BK13` | Dumbbell Deadlift | ☐ | ☐ |
-| `BK14` | Band Bent Over Row | ☐ | ☐ |
-| `BK15` | Band Assisted Chin Up | ☐ | ☐ |
+| exercise (folder name) | id | video | photo |
+|----|----|:----:|:----:|
+| Conventional Deadlift | `BK01` | ☐ | ☐ |
+| Barbell Bent Over Row | `BK02` | ☐ | ☐ |
+| Dumbbell Single Arm Row | `BK03` | ☐ | ☐ |
+| Chin Up | `BK04` | ☐ | ☐ |
+| Lat Pulldown | `BK05` | ☐ | ☐ |
+| Seated Cable Row | `BK06` | ☐ | ☐ |
+| Inverted Row | `BK07` | ☐ | ☐ |
+| Chest Supported Dumbbell Row | `BK08` | ☐ | ☐ |
+| Straight Arm Pulldown | `BK09` | ☐ | ☐ |
+| Rack Pull | `BK10` | ☐ | ☐ |
+| Band Lat Pulldown | `BK11` | ☐ | ☐ |
+| Trap Bar Deadlift | `BK12` | ☐ | ☐ |
+| Dumbbell Deadlift | `BK13` | ☐ | ☐ |
+| Band Bent Over Row | `BK14` | ☐ | ☐ |
+| Band Assisted Chin Up | `BK15` | ☐ | ☐ |
 
 ## Shoulders
 
-| id | exercise | video | photo |
-|----|----------|:----:|:----:|
-| `SH01` | Barbell Overhead Press | ☐ | ☐ |
-| `SH02` | Seated Dumbbell Shoulder Press | ☐ | ☐ |
-| `SH03` | Dumbbell Lateral Raise | ☐ | ☐ |
-| `SH04` | Cable Lateral Raise | ☐ | ☐ |
-| `SH05` | Rear Delt Fly | ☐ | ☐ |
-| `SH06` | Face Pull | ☐ | ☐ |
-| `SH07` | Arnold Press | ☐ | ☐ |
-| `SH08` | Pike Push Up | ☐ | ☐ |
-| `SH09` | Band Lateral Raise | ☐ | ☐ |
-| `SH10` | Prone Y-T-W Raise | ☐ | ☐ |
-| `SH11` | Band Overhead Press | ☐ | ☐ |
-| `SH12` | Band Pull Apart | ☐ | ☐ |
+| exercise (folder name) | id | video | photo |
+|----|----|:----:|:----:|
+| Barbell Overhead Press | `SH01` | ☐ | ☐ |
+| Seated Dumbbell Shoulder Press | `SH02` | ☐ | ☐ |
+| Dumbbell Lateral Raise | `SH03` | ☐ | ☐ |
+| Cable Lateral Raise | `SH04` | ☐ | ☐ |
+| Rear Delt Fly | `SH05` | ☐ | ☐ |
+| Face Pull | `SH06` | ☐ | ☐ |
+| Arnold Press | `SH07` | ☐ | ☐ |
+| Pike Push Up | `SH08` | ☐ | ☐ |
+| Band Lateral Raise | `SH09` | ☐ | ☐ |
+| Prone Y-T-W Raise | `SH10` | ☐ | ☐ |
+| Band Overhead Press | `SH11` | ☐ | ☐ |
+| Band Pull Apart | `SH12` | ☐ | ☐ |
 
 ## Quads
 
-| id | exercise | video | photo |
-|----|----------|:----:|:----:|
-| `QD01` | Barbell Back Squat | ☐ | ☐ |
-| `QD02` | Goblet Squat | ☐ | ☐ |
-| `QD03` | Bulgarian Split Squat | ☐ | ☐ |
-| `QD04` | Walking Lunge | ☐ | ☐ |
-| `QD05` | Leg Press | ☐ | ☐ |
-| `QD06` | Front Squat | ☐ | ☐ |
-| `QD07` | Leg Extension | ☐ | ☐ |
-| `QD08` | Step Up | ☐ | ☐ |
-| `QD09` | Bodyweight Squat | ☐ | ☐ |
-| `QD10` | Reverse Nordic Curl | ☐ | ☐ |
-| `QD11` | Split Squat | ☐ | ☐ |
-| `QD12` | Wall Sit | ☐ | ☐ |
-| `QD13` | Jump Squat | ☐ | ☐ |
-| `QD14` | Sissy Squat | ☐ | ☐ |
+| exercise (folder name) | id | video | photo |
+|----|----|:----:|:----:|
+| Barbell Back Squat | `QD01` | ☐ | ☐ |
+| Goblet Squat | `QD02` | ☐ | ☐ |
+| Bulgarian Split Squat | `QD03` | ☐ | ☐ |
+| Walking Lunge | `QD04` | ☐ | ☐ |
+| Leg Press | `QD05` | ☐ | ☐ |
+| Front Squat | `QD06` | ☐ | ☐ |
+| Leg Extension | `QD07` | ☐ | ☐ |
+| Step Up | `QD08` | ☐ | ☐ |
+| Bodyweight Squat | `QD09` | ☐ | ☐ |
+| Reverse Nordic Curl | `QD10` | ☐ | ☐ |
+| Split Squat | `QD11` | ☐ | ☐ |
+| Wall Sit | `QD12` | ☐ | ☐ |
+| Jump Squat | `QD13` | ☐ | ☐ |
+| Sissy Squat | `QD14` | ☐ | ☐ |
 
 ## Hamstrings & Glutes
 
-| id | exercise | video | photo |
-|----|----------|:----:|:----:|
-| `HG01` | Romanian Deadlift | ☐ | ☐ |
-| `HG02` | Hip Thrust | ☐ | ☐ |
-| `HG03` | Glute Bridge | ☐ | ☐ |
-| `HG04` | Seated Leg Curl | ☐ | ☐ |
-| `HG05` | Lying Leg Curl | ☐ | ☐ |
-| `HG06` | Nordic Hamstring Curl | ☐ | ☐ |
-| `HG07` | Single Leg Romanian Deadlift | ☐ | ☐ |
-| `HG08` | Cable Pull Through | ☐ | ☐ |
-| `HG09` | Back Extension | ☐ | ☐ |
-| `HG10` | Hip Abduction | ☐ | ☐ |
-| `HG11` | Single Leg Glute Bridge | ☐ | ☐ |
-| `HG12` | Prone Superman | ☐ | ☐ |
-| `HG13` | Lateral Band Walk | ☐ | ☐ |
-| `HG14` | Slider Hamstring Curl | ☐ | ☐ |
+| exercise (folder name) | id | video | photo |
+|----|----|:----:|:----:|
+| Romanian Deadlift | `HG01` | ☐ | ☐ |
+| Hip Thrust | `HG02` | ☐ | ☐ |
+| Glute Bridge | `HG03` | ☐ | ☐ |
+| Seated Leg Curl | `HG04` | ☐ | ☐ |
+| Lying Leg Curl | `HG05` | ☐ | ☐ |
+| Nordic Hamstring Curl | `HG06` | ☐ | ☐ |
+| Single Leg Romanian Deadlift | `HG07` | ☐ | ☐ |
+| Cable Pull Through | `HG08` | ☐ | ☐ |
+| Back Extension | `HG09` | ☐ | ☐ |
+| Hip Abduction | `HG10` | ☐ | ☐ |
+| Single Leg Glute Bridge | `HG11` | ☐ | ☐ |
+| Prone Superman | `HG12` | ☐ | ☐ |
+| Lateral Band Walk | `HG13` | ☐ | ☐ |
+| Slider Hamstring Curl | `HG14` | ☐ | ☐ |
 
 ## Biceps
 
-| id | exercise | video | photo |
-|----|----------|:----:|:----:|
-| `BI01` | Barbell Curl | ☐ | ☐ |
-| `BI02` | Dumbbell Incline Curl | ☐ | ☐ |
-| `BI03` | Hammer Curl | ☐ | ☐ |
-| `BI04` | Cable Curl | ☐ | ☐ |
-| `BI05` | Chin Up (Close Grip) | ☐ | ☐ |
-| `BI06` | Band Curl | ☐ | ☐ |
-| `BI07` | Supinated Inverted Row | ☐ | ☐ |
+| exercise (folder name) | id | video | photo |
+|----|----|:----:|:----:|
+| Barbell Curl | `BI01` | ☐ | ☐ |
+| Dumbbell Incline Curl | `BI02` | ☐ | ☐ |
+| Hammer Curl | `BI03` | ☐ | ☐ |
+| Cable Curl | `BI04` | ☐ | ☐ |
+| Chin Up (Close Grip) | `BI05` | ☐ | ☐ |
+| Band Curl | `BI06` | ☐ | ☐ |
+| Supinated Inverted Row | `BI07` | ☐ | ☐ |
 
 ## Triceps
 
-| id | exercise | video | photo |
-|----|----------|:----:|:----:|
-| `TR01` | Close Grip Bench Press | ☐ | ☐ |
-| `TR02` | Overhead Cable Extension | ☐ | ☐ |
-| `TR03` | Triceps Pushdown | ☐ | ☐ |
-| `TR04` | Skull Crusher | ☐ | ☐ |
-| `TR05` | Bench Dip | ☐ | ☐ |
-| `TR06` | Diamond Push Up | ☐ | ☐ |
-| `TR07` | Band Triceps Pushdown | ☐ | ☐ |
+| exercise (folder name) | id | video | photo |
+|----|----|:----:|:----:|
+| Close Grip Bench Press | `TR01` | ☐ | ☐ |
+| Overhead Cable Extension | `TR02` | ☐ | ☐ |
+| Triceps Pushdown | `TR03` | ☐ | ☐ |
+| Skull Crusher | `TR04` | ☐ | ☐ |
+| Bench Dip | `TR05` | ☐ | ☐ |
+| Diamond Push Up | `TR06` | ☐ | ☐ |
+| Band Triceps Pushdown | `TR07` | ☐ | ☐ |
 
 ## Core
 
-| id | exercise | video | photo |
-|----|----------|:----:|:----:|
-| `CO01` | Plank | ☐ | ☐ |
-| `CO02` | Dead Bug | ☐ | ☐ |
-| `CO03` | Hanging Leg Raise | ☐ | ☐ |
-| `CO04` | Cable Woodchop | ☐ | ☐ |
-| `CO05` | Pallof Press | ☐ | ☐ |
-| `CO06` | Ab Wheel Rollout | ☐ | ☐ |
-| `CO07` | Side Plank | ☐ | ☐ |
-| `CO08` | Cable Crunch | ☐ | ☐ |
-| `CO09` | Reverse Crunch | ☐ | ☐ |
-| `CO10` | Standing Band Rotation | ☐ | ☐ |
-| `CO11` | Hollow Body Hold | ☐ | ☐ |
-| `CO12` | Bird Dog | ☐ | ☐ |
-| `CO13` | Copenhagen Plank | ☐ | ☐ |
-| `CO14` | Russian Twist | ☐ | ☐ |
+| exercise (folder name) | id | video | photo |
+|----|----|:----:|:----:|
+| Plank | `CO01` | ☐ | ☐ |
+| Dead Bug | `CO02` | ☐ | ☐ |
+| Hanging Leg Raise | `CO03` | ☐ | ☐ |
+| Cable Woodchop | `CO04` | ☐ | ☐ |
+| Pallof Press | `CO05` | ☐ | ☐ |
+| Ab Wheel Rollout | `CO06` | ☐ | ☐ |
+| Side Plank | `CO07` | ☐ | ☐ |
+| Cable Crunch | `CO08` | ☐ | ☐ |
+| Reverse Crunch | `CO09` | ☐ | ☐ |
+| Standing Band Rotation | `CO10` | ☐ | ☐ |
+| Hollow Body Hold | `CO11` | ☐ | ☐ |
+| Bird Dog | `CO12` | ☐ | ☐ |
+| Copenhagen Plank | `CO13` | ☐ | ☐ |
+| Russian Twist | `CO14` | ☐ | ☐ |
 
 ## Calves
 
-| id | exercise | video | photo |
-|----|----------|:----:|:----:|
-| `CA01` | Standing Calf Raise | ☐ | ☐ |
-| `CA02` | Seated Calf Raise | ☐ | ☐ |
-| `CA03` | Single Leg Calf Raise | ☐ | ☐ |
-| `CA04` | Pogo Hop | ☐ | ☐ |
+| exercise (folder name) | id | video | photo |
+|----|----|:----:|:----:|
+| Standing Calf Raise | `CA01` | ☐ | ☐ |
+| Seated Calf Raise | `CA02` | ☐ | ☐ |
+| Single Leg Calf Raise | `CA03` | ☐ | ☐ |
+| Pogo Hop | `CA04` | ☐ | ☐ |
 
 ## Full Body & Conditioning
 
-| id | exercise | video | photo |
-|----|----------|:----:|:----:|
-| `FB01` | Kettlebell Swing | ☐ | ☐ |
-| `FB02` | Farmer Carry | ☐ | ☐ |
-| `FB07` | Suitcase Carry | ☐ | ☐ |
-| `FB03` | Burpee | ☐ | ☐ |
-| `FB04` | Mountain Climber | ☐ | ☐ |
-| `FB08` | Jumping Jack | ☐ | ☐ |
-| `FB09` | Bear Crawl | ☐ | ☐ |
-| `FB05` | Rowing Machine Interval | ☐ | ☐ |
-| `FB06` | Assault Bike or Stationary Bike Interval | ☐ | ☐ |
-| `FB10` | High Knees | ☐ | ☐ |
-| `FB11` | Dumbbell Swing | ☐ | ☐ |
-| `FB12` | Treadmill Interval | ☐ | ☐ |
-| `FB13` | Stairmaster Interval | ☐ | ☐ |
-| `FB14` | Stationary Bike Steady | ☐ | ☐ |
+| exercise (folder name) | id | video | photo |
+|----|----|:----:|:----:|
+| Kettlebell Swing | `FB01` | ☐ | ☐ |
+| Farmer Carry | `FB02` | ☐ | ☐ |
+| Suitcase Carry | `FB07` | ☐ | ☐ |
+| Burpee | `FB03` | ☐ | ☐ |
+| Mountain Climber | `FB04` | ☐ | ☐ |
+| Jumping Jack | `FB08` | ☐ | ☐ |
+| Bear Crawl | `FB09` | ☐ | ☐ |
+| Rowing Machine Interval | `FB05` | ☐ | ☐ |
+| Assault Bike or Stationary Bike Interval | `FB06` | ☐ | ☐ |
+| High Knees | `FB10` | ☐ | ☐ |
+| Dumbbell Swing | `FB11` | ☐ | ☐ |
+| Treadmill Interval | `FB12` | ☐ | ☐ |
+| Stairmaster Interval | `FB13` | ☐ | ☐ |
+| Stationary Bike Steady | `FB14` | ☐ | ☐ |
 

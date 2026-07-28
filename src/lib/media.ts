@@ -1,4 +1,5 @@
 import { storageBucket } from './firebase'
+import { EXERCISES } from '../backend/data/exercises'
 
 /**
  * Public URLs for media stored in Cloud Storage.
@@ -43,15 +44,22 @@ export function storageUrl(path: string): string {
 
 const resolvePoster = (p: string): string => (p.startsWith('http') ? p : storageUrl(p))
 
-/** Looping form-clip URL for an exercise (upload as `exercises/{id}/video.mp4`). */
+// Storage folders are named by the exercise's readable NAME (e.g.
+// `exercises/Barbell Bench Press/`), so they're easy to find in the console. Map
+// the backend exercise id → that folder name; unknown ids fall back to the id.
+const FOLDER: Record<string, string> = {}
+for (const e of EXERCISES) FOLDER[e.id] = e.name
+const folderFor = (id: string): string => FOLDER[id] ?? id
+
+/** Looping form-clip URL for an exercise (upload as `exercises/{name}/video.mp4`). */
 export function exerciseVideo(id: string): string {
-  return storageUrl(OVERRIDES[id]?.video ?? `exercises/${id}/video.mp4`)
+  return storageUrl(OVERRIDES[id]?.video ?? `exercises/${folderFor(id)}/video.mp4`)
 }
 
-/** Poster/thumbnail URL for an exercise (upload as `exercises/{id}/thumb.jpg`). */
+/** Poster/thumbnail URL for an exercise (upload as `exercises/{name}/thumb.jpg`). */
 export function exercisePoster(id: string): string {
   const o = OVERRIDES[id]?.poster
-  return o ? resolvePoster(o) : storageUrl(`exercises/${id}/thumb.jpg`)
+  return o ? resolvePoster(o) : storageUrl(`exercises/${folderFor(id)}/thumb.jpg`)
 }
 
 /** The uploaded poster URL for an exercise IF one is configured, else null — so callers can prefer

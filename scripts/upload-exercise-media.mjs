@@ -18,8 +18,10 @@
 import { readdirSync, statSync } from 'node:fs'
 import { join, dirname, extname, basename } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { readExercises, folderFor } from './lib/exercises-list.mjs'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
+const NAME_BY_ID = Object.fromEntries(readExercises().map((e) => [e.id, e.name]))
 const arg = (n, d) => { const i = process.argv.indexOf(`--${n}`); return i >= 0 && process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : d }
 const has = (n) => process.argv.includes(`--${n}`)
 const DIR = arg('dir', join(repoRoot, 'data', 'exercise-media'))
@@ -48,10 +50,11 @@ for (const f of files) {
   const ext = extname(f).toLowerCase()
   if (!CT[ext]) { skipped.push(`${f} (unsupported type)`); continue }
   const id = basename(f, ext)
+  const folder = folderFor(NAME_BY_ID[id] ?? id) // name-based folder; falls back to id
   const kind = ext.match(/mp4|mov|webm|m4v/) ? 'video' : 'image'
-  // Per-exercise folder convention: exercises/{id}/video.mp4 + exercises/{id}/thumb.jpg
-  const dest = `exercises/${id}/${kind === 'video' ? 'video' : 'thumb'}${ext}`
-  items.push({ file: f, dest, id, kind, contentType: CT[ext] })
+  // Per-exercise folder convention: exercises/{name}/video.mp4 + exercises/{name}/thumb.jpg
+  const dest = `exercises/${folder}/${kind === 'video' ? 'video' : 'thumb'}${ext}`
+  items.push({ file: f, dest, id: folder, kind, contentType: CT[ext] })
 }
 
 console.log(`▶ Exercise media upload to bucket "${BUCKET}" — ${APPLY ? 'APPLY' : 'DRY RUN'}`)
