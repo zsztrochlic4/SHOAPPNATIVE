@@ -61,7 +61,8 @@
     "validate:data": "node scripts/validate-data-sync.mjs",
     "validate:firestore": "node scripts/firestore-seed.js",
     "audit:schema": "node scripts/audit-production-schema.mjs",
-    "validate:holdouts": "node scripts/validate-safety-holdouts.mjs"
+    "validate:holdouts": "node scripts/validate-safety-holdouts.mjs",
+    "recipes:build": "node scripts/build-recipes.mjs"
   },
   "private": true
 }

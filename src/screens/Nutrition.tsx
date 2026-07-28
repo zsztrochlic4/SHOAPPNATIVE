@@ -577,7 +577,7 @@ function RecipesTab({ onOpenRecipe, onAddMeal }: { onOpenRecipe: (m: BudgetMeal 
                 {!!m.flavour && <Text numberOfLines={2} className="mt-0.5 text-[12px] leading-[1.35] text-white/55">{m.flavour}</Text>}
                 <View className="mt-1.5 flex-row items-center gap-1.5">
                   <Clock size={12} color={c.brand400} />
-                  <Text className="text-[12px] font-bold text-brand-400">{m.minutes} min</Text>
+                  <Text className="text-[12px] font-bold text-brand-400">{m.timeDisplay ?? `${m.minutes} min`}</Text>
                 </View>
               </View>
               <ChevronRight size={18} color="rgba(255,255,255,0.3)" />
@@ -1047,7 +1047,7 @@ function RecipeModal({ meal, onClose, onEdit }: { meal: BudgetMeal | UserMeal | 
               <Pressable onPress={onClose} className="absolute right-3 top-3 h-[34px] w-[34px] items-center justify-center rounded-full active:opacity-80" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}><X size={17} color="#fff" /></Pressable>
               <View className="absolute inset-x-4 bottom-3">
                 <Text className="text-[19px] font-extrabold leading-tight text-white">{budget.name}</Text>
-                <View className="mt-1 flex-row items-center gap-1.5"><Clock size={13} color="#9fe264" /><Text className="text-[12.5px] font-bold text-brand-300">{budget.minutes} min · {budget.category} · serves {budget.serves}</Text></View>
+                <View className="mt-1 flex-row items-center gap-1.5"><Clock size={13} color="#9fe264" /><Text className="text-[12.5px] font-bold text-brand-300">{budget.timeDisplay ?? `${budget.minutes} min`} · {budget.category} · serves {budget.serves}</Text></View>
               </View>
             </View>
           ) : (

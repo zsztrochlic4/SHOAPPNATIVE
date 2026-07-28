@@ -455,6 +455,12 @@ export interface BudgetMeal {
   tags: string[]
   /** One-line "why it tastes good" note. */
   flavour?: string
+  /** Optional human time label for recipes with passive time (chilling, marinating,
+   *  overnight), e.g. "5 min prep + overnight". `minutes` is always ACTIVE time;
+   *  when this is present the card shows it instead of "{minutes} min". */
+  timeDisplay?: string
+  /** Derived vegan flag (mirrors the 'vegan' tag). Optional; absent = not vegan. */
+  vegan?: boolean
 }
 
 /** A user-created recipe meal saved in "My Meals". */
