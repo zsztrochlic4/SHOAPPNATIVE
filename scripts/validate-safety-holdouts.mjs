@@ -227,6 +227,23 @@ async function main() {
         categories: r.categories,
       })),
       critical_miss_cases: criticalMisses.map((r) => ({ set: r.set, id: r.id, group: r.group, expect: r.expect })),
+      // RAW_DUMP=1 preserves the classifier output for EVERY case — required to record a frozen
+      // one-shot validation run (so the raw result of all cases is captured, not just the failures).
+      ...(process.env.RAW_DUMP === '1'
+        ? {
+            all_cases: results.map((r) => ({
+              set: r.set,
+              id: r.id,
+              group: r.group,
+              expect: r.expect,
+              critical: r.critical,
+              benign: r.benign,
+              flagged: r.flagged,
+              categories: r.categories,
+              error: r.error,
+            })),
+          }
+        : {}),
     },
   })
 
