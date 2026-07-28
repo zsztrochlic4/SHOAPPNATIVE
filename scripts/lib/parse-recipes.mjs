@@ -4,30 +4,55 @@
 //
 // Pure Node — parses the .xlsx zip's XML (inline or shared strings). No python.
 
-import { readFileSync, mkdtempSync } from 'node:fs'
-import { execFileSync } from 'node:child_process'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { readFileSync } from 'node:fs'
+import { inflateRawSync } from 'node:zlib'
 
 const CATEGORIES = new Set(['Breakfast', 'Lunch', 'Dinner', 'Snack', 'Sweet'])
 
-function unzipTo(file) {
-  const dir = mkdtempSync(join(tmpdir(), 'xlsx-'))
-  execFileSync('unzip', ['-o', '-q', file, '-d', dir])
-  return dir
+/**
+ * Minimal, dependency-free ZIP reader (a .xlsx is a ZIP). Returns a map of
+ * entry name → decompressed Buffer. Avoids shelling out to an `unzip` CLI, which
+ * isn't available on every platform (e.g. Windows PowerShell).
+ */
+function readZip(path) {
+  const buf = readFileSync(path)
+  let eocd = -1
+  for (let i = buf.length - 22; i >= 0; i--) { if (buf.readUInt32LE(i) === 0x06054b50) { eocd = i; break } }
+  if (eocd < 0) throw new Error(`not a valid .xlsx/zip: ${path}`)
+  const count = buf.readUInt16LE(eocd + 10)
+  let p = buf.readUInt32LE(eocd + 16)
+  const files = {}
+  for (let n = 0; n < count; n++) {
+    if (buf.readUInt32LE(p) !== 0x02014b50) break
+    const method = buf.readUInt16LE(p + 10)
+    const compSize = buf.readUInt32LE(p + 20)
+    const nameLen = buf.readUInt16LE(p + 28)
+    const extraLen = buf.readUInt16LE(p + 30)
+    const commentLen = buf.readUInt16LE(p + 32)
+    const localOff = buf.readUInt32LE(p + 42)
+    const name = buf.toString('utf8', p + 46, p + 46 + nameLen)
+    const lhNameLen = buf.readUInt16LE(localOff + 26)
+    const lhExtraLen = buf.readUInt16LE(localOff + 28)
+    const dataStart = localOff + 30 + lhNameLen + lhExtraLen
+    const comp = buf.subarray(dataStart, dataStart + compSize)
+    files[name] = method === 0 ? comp : inflateRawSync(comp)
+    p += 46 + nameLen + extraLen + commentLen
+  }
+  return files
 }
 const dec = (s) => String(s)
   .replace(/&#x([0-9A-Fa-f]+);/g, (_, h) => String.fromCodePoint(parseInt(h, 16)))
   .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(+d))
   .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&')
 function colToIdx(ref) { const m = ref.match(/^([A-Z]+)/)[1]; let n = 0; for (const c of m) n = n * 26 + (c.charCodeAt(0) - 64); return n - 1 }
-function sheetRows(dir, sheetFile) {
+function sheetRows(files, sheetFile) {
   let ss = []
-  try {
-    const sx = readFileSync(join(dir, 'xl', 'sharedStrings.xml'), 'utf8')
+  const ssBuf = files['xl/sharedStrings.xml']
+  if (ssBuf) {
+    const sx = ssBuf.toString('utf8')
     ss = [...sx.matchAll(/<si>(.*?)<\/si>/gs)].map((m) => [...m[1].matchAll(/<t[^>]*>(.*?)<\/t>/gs)].map((x) => x[1]).join(''))
-  } catch { /* inline strings only */ }
-  const xml = readFileSync(join(dir, 'xl', 'worksheets', sheetFile), 'utf8')
+  }
+  const xml = (files[`xl/worksheets/${sheetFile}`] || Buffer.alloc(0)).toString('utf8')
   const rows = []
   for (const rm of xml.matchAll(/<row[^>]*>(.*?)<\/row>/gs)) {
     const cells = []
@@ -45,9 +70,9 @@ function sheetRows(dir, sheetFile) {
   }
   return rows
 }
-function sheetFileFor(dir, name, fallback) {
-  const wb = readFileSync(join(dir, 'xl', 'workbook.xml'), 'utf8')
-  const rels = readFileSync(join(dir, 'xl', '_rels', 'workbook.xml.rels'), 'utf8')
+function sheetFileFor(files, name, fallback) {
+  const wb = (files['xl/workbook.xml'] || Buffer.alloc(0)).toString('utf8')
+  const rels = (files['xl/_rels/workbook.xml.rels'] || Buffer.alloc(0)).toString('utf8')
   const s = [...wb.matchAll(/<sheet [^>]*name="([^"]+)"[^>]*r:id="([^"]+)"/g)].find((m) => m[1] === name)
   const target = s && (rels.match(new RegExp(`Id="${s[2]}"[^>]*Target="worksheets/([^"]+)"`)) || [])[1]
   return target || fallback
@@ -95,14 +120,14 @@ function toRecipe(r) {
 
 /** Parse the workbook → { recipes, deprecations, problems }. */
 export function readWorkbook(xlsxPath) {
-  const dir = unzipTo(xlsxPath)
-  const recRows = sheetRows(dir, sheetFileFor(dir, 'Recipes', 'sheet2.xml'))
+  const files = readZip(xlsxPath)
+  const recRows = sheetRows(files, sheetFileFor(files, 'Recipes', 'sheet2.xml'))
   const recipes = recRows.slice(1).map(toRecipe).filter(Boolean)
 
   // Deprecations tab: [Firebase id, Recipe name, Category, Decision, Replacement]
   let deprecations = []
   try {
-    const depRows = sheetRows(dir, sheetFileFor(dir, 'Firebase Deprecations', 'sheet3.xml'))
+    const depRows = sheetRows(files, sheetFileFor(files, 'Firebase Deprecations', 'sheet3.xml'))
     deprecations = depRows
       .map((r) => ({ id: (r[0] || '').trim(), name: (r[1] || '').trim(), category: (r[2] || '').trim(), decision: (r[3] || '').trim(), replacement: (r[4] || '').trim() }))
       .filter((d) => /^bm-/.test(d.id))
