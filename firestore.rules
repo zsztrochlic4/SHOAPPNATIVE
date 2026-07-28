@@ -2,17 +2,22 @@ rules_version = '2';
 
 // StrengthHub — Firestore security rules.
 //
-// Data model (see src/store/cloudRepo.ts):
+// Data model (see src/store/cloudRepo.ts and src/backend/repo/*):
 //   users/{uid}                    ← the user's singleton state document
 //   users/{uid}/{collection}/{id}  ← one document per entry for each unbounded
-//                                     log (sessions, weights, habits, meals,
-//                                     activities, foodReviews, chat, coachThread,
-//                                     notifications).
+//                                     log. The collections are ALLOWLISTED below;
+//                                     an unknown collection name is denied.
 //
-// A signed-in user can read and write ONLY their own tree under users/{uid};
-// everything else is denied by default. That owner-only guarantee is what makes
-// it safe to ship the (non-secret) Firebase web config in the app, and it scales
-// to any number of users because access is scoped per-uid rather than globally.
+// A signed-in user can read and write ONLY their own tree under users/{uid}.
+// On top of that owner-only base, these rules add two hardening layers:
+//   1. Field-level: profile.premium is an entitlement (unlocks paid coach video
+//      calls). There is no billing/server writer yet, so the client may only
+//      CREATE it as false and may NEVER change it — a future Admin-SDK webhook
+//      will be the only thing that can grant it.
+//   2. Shape/size: an explicit collection allowlist plus field-count and
+//      free-text length caps, so a client cannot invent arbitrary collections
+//      or write multi-MB junk under its own tree.
+// Everything else is denied by default.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -21,30 +26,69 @@ service cloud.firestore {
         return request.auth != null && request.auth.uid == uid;
       }
 
-      // The root singleton document.
-      allow read, write: if isOwner();
-
-      // Every per-user subcollection document (sessions, weights, …) inherits
-      // the same owner-only rule at any depth. Includes the workout-backend
-      // records: programs/{id} and workout_instances/{id}.
-      match /{document=**} {
-        allow read, write: if isOwner();
+      // --- entitlement guard (profile.premium) ---
+      function newPremium() {
+        return request.resource.data.get('profile', {}).get('premium', false);
       }
+      function oldPremium() {
+        return resource.data.get('profile', {}).get('premium', false);
+      }
+      // Client may create the doc only with premium == false, and may never flip it.
+      function premiumFalseOnCreate() { return newPremium() == false; }
+      function premiumUnchanged()     { return newPremium() == oldPremium(); }
+
+      // --- shape/size guard for the root singleton doc ---
+      function rootDocValid() {
+        return request.resource.data.size() < 60
+          && request.resource.data.get('profile', {}).get('motivation', '').size() <= 2000
+          && request.resource.data.get('profile', {}).get('injuries', '').size() <= 2000
+          && request.resource.data.get('backendUser', {}).get('notes', '').size() <= 4000;
+      }
+
+      // The root singleton document.
+      allow read:   if isOwner();
+      allow create: if isOwner() && premiumFalseOnCreate() && rootDocValid();
+      allow update: if isOwner() && premiumUnchanged()     && rootDocValid();
+      allow delete: if isOwner();
+
+      // --- per-entry shape/size guard for subcollection docs ---
+      function entryValid() {
+        return request.resource.data.size() < 100
+          && request.resource.data.get('text', '').size() <= 8000
+          && request.resource.data.get('body', '').size() <= 8000;
+      }
+
+      // Allowlisted per-user subcollections. Reads and deletes need only
+      // ownership; creates/updates additionally pass the shape/size guard.
+      // An unknown collection name falls through to the default-deny below.
+      match /sessions/{id}          { allow read, delete: if isOwner(); allow create, update: if isOwner() && entryValid(); }
+      match /weights/{id}           { allow read, delete: if isOwner(); allow create, update: if isOwner() && entryValid(); }
+      match /habits/{id}            { allow read, delete: if isOwner(); allow create, update: if isOwner() && entryValid(); }
+      match /meals/{id}             { allow read, delete: if isOwner(); allow create, update: if isOwner() && entryValid(); }
+      match /activities/{id}        { allow read, delete: if isOwner(); allow create, update: if isOwner() && entryValid(); }
+      match /foodReviews/{id}       { allow read, delete: if isOwner(); allow create, update: if isOwner() && entryValid(); }
+      match /chat/{id}              { allow read, delete: if isOwner(); allow create, update: if isOwner() && entryValid(); }
+      match /coachThread/{id}       { allow read, delete: if isOwner(); allow create, update: if isOwner() && entryValid(); }
+      match /notifications/{id}     { allow read, delete: if isOwner(); allow create, update: if isOwner() && entryValid(); }
+      match /programs/{id}          { allow read, delete: if isOwner(); allow create, update: if isOwner() && entryValid(); }
+      match /workout_instances/{id} { allow read, delete: if isOwner(); allow create, update: if isOwner() && entryValid(); }
+      match /set_logs/{id}          { allow read, delete: if isOwner(); allow create, update: if isOwner() && entryValid(); }
+      match /progression_state/{id} { allow read, delete: if isOwner(); allow create, update: if isOwner() && entryValid(); }
+      match /pushTokens/{token}     { allow read, delete: if isOwner(); allow create, update: if isOwner() && entryValid(); }
     }
 
-    // Global coach runtime config (config/coach: message limits, guardrail prompt).
-    // Not per-user and not sensitive, but it does not need to be world-readable — the
-    // coach is a signed-in feature — so it is readable by any authenticated user and
-    // never client-writable (set from the console/admin only).
-    // NOTE: the live project currently allows PUBLIC read here. Before deploying this
-    // tightened rule, confirm nothing in the deployed client reads config/coach BEFORE
-    // sign-in, or that pre-login read will start failing.
+    // Global coach runtime config (config/coach: kill switch, message limits,
+    // guardrail prompt). Readable by any authenticated user (the coach is a
+    // signed-in feature) and never client-writable — set from the console/admin
+    // only. The live project already serves this authenticated-read rule.
     match /config/{doc} {
       allow read: if request.auth != null;
       allow write: if false;
     }
 
-    // Deny everything outside a user's own tree.
+    // Deny everything outside a user's own tree. Any future admin-only
+    // collection is blocked to clients here; a Cloud Function writes it via the
+    // Admin SDK.
     match /{document=**} {
       allow read, write: if false;
     }

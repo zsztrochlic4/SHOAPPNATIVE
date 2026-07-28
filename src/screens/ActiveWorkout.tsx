@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { View, Text, Pressable, ScrollView, Image, Animated, Easing, Platform, StyleSheet } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import Svg, { Circle, Path } from 'react-native-svg'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
+import Svg, { Circle, Path, G, Defs, RadialGradient, Stop, Rect } from 'react-native-svg'
 import {
   Check, Plus, Minus, Flag, Info, ChevronDown, Bell, BookOpen, Play, Target,
   ChevronLeft, Timer, ListChecks, HelpCircle, X, Dumbbell, Star,
@@ -12,7 +12,7 @@ import { tick, thud } from '../lib/haptics'
 import { beep, restTick, successChime } from '../lib/sound'
 import { TechniqueClip } from '../components/TechniqueClip'
 import { useStore } from '../store/store'
-import { todaySession, sessionProgress, streakStats } from '../store/selectors'
+import { todaySession, sessionProgress, streakStats, workoutsThisWeek } from '../store/selectors'
 import { examState, examTrim, nextSetRecommendation } from '../store/training'
 import { prForSession, type PR } from '../store/coach'
 import { exerciseDetail, workoutGoalLine } from '../data/catalog'
@@ -323,8 +323,8 @@ export default function ActiveWorkout({ open, onClose, onComplete, params }: { o
     if (!prefersReducedMotion()) (typeof navigator !== 'undefined' ? (navigator as any) : undefined)?.vibrate?.([0, 55, 45, 120])
     successChime()
     setShowHow(false); setStarted(false); setMode('finish')
-    if (finishTimer.current) clearTimeout(finishTimer.current)
-    finishTimer.current = setTimeout(() => finishClose(), 3600)
+    // The celebration now waits for an explicit "Continue" tap (see FinishSheet),
+    // so there is no auto-return timer — the user leaves when they're ready.
   }
   function onFinishTap() {
     if (allDone) { finish(); return }
@@ -355,7 +355,9 @@ export default function ActiveWorkout({ open, onClose, onComplete, params }: { o
   }
 
   const streak = streakStats(state)
-  const streakStr = streak.current > 0 ? `Day ${streak.current} streak` : "another one in the bank"
+  const firstName = (state.profile.name || '').trim().split(/\s+/)[0] || 'there'
+  const weekDone = workoutsThisWeek(state)
+  const weekTarget = Math.max(weekDone, state.profile.daysPerWeek || 0)
 
   return (
     <AppModal visible={open} transparent animationType="fade" onRequestClose={onClose}>
@@ -454,7 +456,10 @@ export default function ActiveWorkout({ open, onClose, onComplete, params }: { o
             colors={c}
             units={units}
             name={session.name}
-            streakStr={streakStr}
+            firstName={firstName}
+            streakN={streak.current}
+            weekDone={weekDone}
+            weekTarget={weekTarget}
             stats={finishStatsRef.current}
             pr={finishPRRef.current}
             onDone={finishClose}
@@ -1001,108 +1006,139 @@ function GoScreen({ colors: c, units, nextEx, nextCursor, nextSet, onStart }: an
 }
 
 /* ============================ Finish (bottom sheet) ============================ */
-function FinishSheet({ colors: c, units, name, streakStr, stats, pr, onDone }: any) {
+// Ring geometry (viewBox 132, r 55) and check-mark path length, used to drive the
+// stroke-dash "draw on" animations.
+const RING_C = 2 * Math.PI * 55
+const CHECK_LEN = 64
+// Burst rays around the badge: angle in degrees, and which accent paints each.
+const RAYS: { deg: number; accent: 'brand' | 'yellow' }[] = [
+  { deg: 0, accent: 'brand' }, { deg: 51, accent: 'brand' }, { deg: 103, accent: 'yellow' },
+  { deg: 154, accent: 'brand' }, { deg: 206, accent: 'brand' }, { deg: 257, accent: 'yellow' },
+  { deg: 309, accent: 'brand' },
+]
+
+function FinishSheet({ colors: c, units, name, firstName, streakN, weekDone, weekTarget, stats, pr, onDone }: any) {
   const dim = (o: number) => `rgba(255,255,255,${o})`
-  // Translucent surface tinted from the theme's ink800, so the (dimmed) screen
-  // behind reads faintly through the sheet.
-  const inkA = (o: number) => {
-    const h = String(c.ink800 || '#121214').replace('#', '')
-    const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16)
-    return `rgba(${r},${g},${b},${o})`
-  }
+  const insets = useSafeAreaInsets()
+
   const scrim = useRef(new Animated.Value(0)).current
   const sheet = useRef(new Animated.Value(1)).current // 1 = off-screen (down)
-  const pop = useRef(new Animated.Value(0)).current
+  const disc = useRef(new Animated.Value(0)).current   // inner disc entrance
+  const pop = useRef(new Animated.Value(0)).current     // "hit" bounce (0→1→0)
   const halo = useRef(new Animated.Value(0)).current
-  const draw = useRef(new Animated.Value(40)).current
-  const rise = useRef(new Animated.Value(0)).current
+  const rays = useRef(new Animated.Value(0)).current
+  const ring = useRef(new Animated.Value(RING_C)).current   // stroke-dashoffset
+  const check = useRef(new Animated.Value(CHECK_LEN)).current
+  const rise = useRef(new Animated.Value(0)).current   // text / pr / stats reveal
 
   useEffect(() => {
-    Animated.timing(scrim, { toValue: 1, duration: 200, useNativeDriver: USE_NATIVE }).start()
-    Animated.timing(sheet, { toValue: 0, duration: 420, easing: Easing.out(Easing.cubic), useNativeDriver: USE_NATIVE }).start()
-    Animated.spring(pop, { toValue: 1, delay: 120, speed: 12, bounciness: 14, useNativeDriver: USE_NATIVE }).start()
-    Animated.timing(halo, { toValue: 1, delay: 250, duration: 1100, easing: Easing.out(Easing.quad), useNativeDriver: USE_NATIVE }).start()
-    Animated.timing(draw, { toValue: 0, delay: 350, duration: 450, easing: Easing.bezier(0.6, 0, 0.4, 1), useNativeDriver: false }).start()
-    Animated.timing(rise, { toValue: 1, delay: 260, duration: 450, easing: Easing.out(Easing.cubic), useNativeDriver: USE_NATIVE }).start()
-  }, [scrim, sheet, pop, halo, draw, rise])
+    const HIT = 950 // ring finishes sweeping and the check lands
+    Animated.timing(scrim, { toValue: 1, duration: 300, easing: Easing.out(Easing.quad), useNativeDriver: USE_NATIVE }).start()
+    Animated.timing(sheet, { toValue: 0, duration: 520, easing: Easing.out(Easing.cubic), useNativeDriver: USE_NATIVE }).start()
+    Animated.timing(disc, { toValue: 1, delay: 300, duration: 380, easing: Easing.bezier(0.34, 1.56, 0.64, 1), useNativeDriver: USE_NATIVE }).start()
+    Animated.timing(ring, { toValue: 0, delay: 340, duration: 560, easing: Easing.bezier(0.4, 0, 0.2, 1), useNativeDriver: false }).start()
+    Animated.timing(check, { toValue: 0, delay: 740, duration: 300, easing: Easing.bezier(0.65, 0, 0.35, 1), useNativeDriver: false }).start()
+    Animated.timing(rise, { toValue: 1, delay: 260, duration: 460, easing: Easing.out(Easing.cubic), useNativeDriver: USE_NATIVE }).start()
+    Animated.sequence([
+      Animated.delay(HIT),
+      Animated.timing(pop, { toValue: 1, duration: 210, easing: Easing.out(Easing.quad), useNativeDriver: USE_NATIVE }),
+      Animated.timing(pop, { toValue: 0, duration: 210, easing: Easing.in(Easing.quad), useNativeDriver: USE_NATIVE }),
+    ]).start()
+    Animated.timing(halo, { toValue: 1, delay: HIT, duration: 760, easing: Easing.out(Easing.cubic), useNativeDriver: USE_NATIVE }).start()
+    Animated.timing(rays, { toValue: 1, delay: HIT + 40, duration: 700, easing: Easing.out(Easing.quad), useNativeDriver: USE_NATIVE }).start()
+  }, [scrim, sheet, disc, pop, halo, rays, ring, check, rise])
 
-  const riseStyle = { opacity: rise, transform: [{ translateY: rise.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] }
+  const riseStyle = { opacity: rise, transform: [{ translateY: rise.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }] }
+  // Entrance scale composes with the "hit" bounce (1 → 1.12 → 1).
+  const discScale = { transform: [{ scale: disc.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }) }, { scale: pop.interpolate({ inputRange: [0, 1], outputRange: [1, 1.12] }) }] }
+
+  const streakPart = streakN > 0 ? `Day ${streakN} of your streak` : 'Streak building'
+  const weekPart = weekTarget > 0 ? `${weekDone} of ${weekTarget} workouts this week` : `${weekDone} ${weekDone === 1 ? 'workout' : 'workouts'} this week`
+  const volFull = stats ? fmtVolume(stats.volume, units) : '0 kg'
+  const spaceIdx = volFull.lastIndexOf(' ')
+  const volNum = spaceIdx > 0 ? volFull.slice(0, spaceIdx) : volFull
+  const volUnit = spaceIdx > 0 ? volFull.slice(spaceIdx + 1) : ''
 
   return (
     <View style={[StyleSheet.absoluteFill, { zIndex: 30, justifyContent: 'flex-end' }]}>
-      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.45)', opacity: scrim }]} />
-      <Animated.View style={{ height: '50%', backgroundColor: inkA(0.85), borderTopLeftRadius: 28, borderTopRightRadius: 28, borderTopWidth: 1, borderTopColor: dim(0.1), overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.55, shadowRadius: 40, shadowOffset: { width: 0, height: -12 }, elevation: 24, transform: [{ translateY: sheet.interpolate({ inputRange: [0, 1], outputRange: [0, 600] }) }] }}>
-        <View style={{ alignItems: 'center', paddingTop: 12, paddingBottom: 2 }}>
-          <View style={{ width: 38, height: 4, borderRadius: 999, backgroundColor: dim(0.2) }} />
-        </View>
-        <ScrollView contentContainerStyle={{ alignItems: 'center', paddingHorizontal: 26, paddingTop: 6, paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
-          {/* check ring */}
-          <View style={{ marginTop: 4, width: 96, height: 96, alignItems: 'center', justifyContent: 'center' }}>
-            <Animated.View style={{ position: 'absolute', width: 96, height: 96, borderRadius: 999, backgroundColor: rgbaOf(c.brand400, 0.25), opacity: halo.interpolate({ inputRange: [0, 1], outputRange: [0.9, 0] }), transform: [{ scale: halo.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1.5] }) }] }} />
-            <Animated.View style={{ position: 'absolute', width: 96, height: 96, borderRadius: 999, borderWidth: 2, borderColor: rgbaOf(c.brand400, 0.5), opacity: pop, transform: [{ scale: pop }] }} />
-            <Animated.View style={{ width: 76, height: 76, borderRadius: 999, backgroundColor: c.brand400, alignItems: 'center', justifyContent: 'center', opacity: pop, transform: [{ scale: pop }] }}>
-              <Svg width={46} height={46} viewBox="0 0 24 24" fill="none">
-                <AnimatedPath d="M20 6 9 17l-5-5" stroke="#0a0a0b" strokeWidth={3.5} strokeLinecap="round" strokeLinejoin="round" strokeDasharray={40} strokeDashoffset={draw} />
+      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(4,4,5,0.5)', opacity: scrim }]} />
+      <Animated.View style={{ backgroundColor: c.ink800, borderTopLeftRadius: 34, borderTopRightRadius: 34, borderTopWidth: 1, borderTopColor: rgbaOf(c.brand400, 0.18), overflow: 'hidden', paddingHorizontal: 22, paddingTop: 20, paddingBottom: Math.max(insets.bottom, 14) + 8, shadowColor: '#000', shadowOpacity: 0.6, shadowRadius: 50, shadowOffset: { width: 0, height: -20 }, elevation: 28, transform: [{ translateY: sheet.interpolate({ inputRange: [0, 1], outputRange: [0, 640] }) }] }}>
+        {/* Soft brand glow bleeding down from the top edge, behind the badge. */}
+        <Svg pointerEvents="none" width={420} height={300} style={{ position: 'absolute', top: -170, left: '50%', marginLeft: -210 }}>
+          <Defs>
+            <RadialGradient id="finishGlow" cx="50%" cy="50%" rx="50%" ry="50%">
+              <Stop offset="0" stopColor={c.brand400} stopOpacity={0.22} />
+              <Stop offset="1" stopColor={c.brand400} stopOpacity={0} />
+            </RadialGradient>
+          </Defs>
+          <Rect x={0} y={0} width={420} height={300} fill="url(#finishGlow)" />
+        </Svg>
+
+        <View style={{ alignItems: 'center' }}>
+          {/* Animated check badge: ring sweeps, check draws, halo + rays burst. */}
+          <View style={{ marginTop: 8, width: 72, height: 72, alignItems: 'center', justifyContent: 'center' }}>
+            <Animated.View style={{ position: 'absolute', width: 72, height: 72, borderRadius: 999, backgroundColor: rgbaOf(c.brand400, 0.35), opacity: halo.interpolate({ inputRange: [0, 1], outputRange: [0.5, 0] }), transform: [{ scale: halo.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1.9] }) }] }} />
+            <Animated.View style={{ position: 'absolute', width: 72, height: 72, opacity: rays.interpolate({ inputRange: [0, 0.35, 1], outputRange: [0, 1, 0] }), transform: [{ scale: rays.interpolate({ inputRange: [0, 0.35, 1], outputRange: [0.72, 1, 1.18] }) }] }}>
+              {RAYS.map((r, i) => (
+                <View key={i} style={{ position: 'absolute', width: 72, height: 72, transform: [{ rotate: `${r.deg}deg` }] }}>
+                  <View style={{ position: 'absolute', top: -6, left: 36 - 1.5, width: 3, height: 13, borderRadius: 2, backgroundColor: r.accent === 'yellow' ? c.accentYellow : c.brand300 }} />
+                </View>
+              ))}
+            </Animated.View>
+            <Animated.View style={[{ position: 'absolute', width: 53, height: 53, borderRadius: 999, backgroundColor: rgbaOf(c.brand400, 0.12), borderWidth: 1, borderColor: rgbaOf(c.brand400, 0.2) }, discScale]} />
+            <Animated.View style={discScale}>
+              <Svg width={72} height={72} viewBox="0 0 132 132">
+                <Circle cx={66} cy={66} r={55} fill="none" stroke={dim(0.07)} strokeWidth={7} />
+                <G originX={66} originY={66} rotation={-90}>
+                  <AnimatedCircle cx={66} cy={66} r={55} fill="none" stroke={c.brand400} strokeWidth={7} strokeLinecap="round" strokeDasharray={RING_C} strokeDashoffset={ring} />
+                </G>
+                <AnimatedPath d="M45 67 L60 82 L88 51" fill="none" stroke={c.brand400} strokeWidth={8} strokeLinecap="round" strokeLinejoin="round" strokeDasharray={CHECK_LEN} strokeDashoffset={check} />
               </Svg>
             </Animated.View>
           </View>
 
-          <Animated.View style={[{ marginTop: 16, alignItems: 'center' }, riseStyle]}>
-            <Text style={{ fontSize: 23, fontWeight: '800', letterSpacing: -0.4, color: c.fg }}>Workout complete</Text>
-            <Text style={{ marginTop: 3, fontSize: 13, color: dim(0.55) }}>{name} · {streakStr}</Text>
+          <Animated.View style={[{ alignItems: 'center' }, riseStyle]}>
+            <Text style={{ marginTop: 12, fontSize: 11, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase', color: c.brand400 }}>{name} complete</Text>
+            <Text style={{ marginTop: 4, fontSize: 24, fontWeight: '800', letterSpacing: -0.6, lineHeight: 26, color: c.fg, textAlign: 'center' }}>Nice work, {firstName}</Text>
+            <Text style={{ marginTop: 5, fontSize: 13.5, fontWeight: '500', color: dim(0.7), textAlign: 'center' }}>{streakPart} · {weekPart}</Text>
           </Animated.View>
+        </View>
 
-          {pr && (
-            <Animated.View style={[{ marginTop: 14, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: `${c.accentYellow}4d`, backgroundColor: `${c.accentYellow}1f`, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 14 }, riseStyle]}>
+        {pr && (
+          <Animated.View style={[{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 11, paddingVertical: 9, paddingHorizontal: 12, borderRadius: 16, backgroundColor: rgbaOf(c.accentYellow, 0.1), borderWidth: 1, borderColor: rgbaOf(c.accentYellow, 0.25) }, riseStyle]}>
+            <View style={{ width: 27, height: 27, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: rgbaOf(c.accentYellow, 0.18) }}>
               <Star size={15} color={c.accentYellow} fill={c.accentYellow} />
-              <Text style={{ fontSize: 12.5, fontWeight: '700', color: c.fg }}>New PR · {pr.name} · {fmtWeight(pr.weightKg, units, units === 'imperial' ? 0 : 1)} × {pr.reps}</Text>
-            </Animated.View>
-          )}
-
-          {/* Stats grouped into a single card, echoing the dashboard's stat surfaces. */}
-          <Animated.View style={[{ marginTop: 20, flexDirection: 'row', alignItems: 'center', width: '100%', backgroundColor: dim(0.05), borderRadius: 18, borderWidth: 1, borderColor: dim(0.06), paddingVertical: 16 }, riseStyle]}>
-            <FinishStat value={stats ? mmss(stats.time) : '0:00'} label="Time" c={c} />
-            <View style={{ width: 1, height: 34, backgroundColor: dim(0.08) }} />
-            <FinishStat value={stats ? fmtVolume(stats.volume, units) : '0'} label="Volume" c={c} />
-            <View style={{ width: 1, height: 34, backgroundColor: dim(0.08) }} />
-            <FinishStat value={stats ? String(stats.sets) : '0'} label="Sets" c={c} />
+            </View>
+            <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, fontWeight: '600', color: dim(0.9) }}>
+              <Text style={{ fontWeight: '800', color: c.accentYellow }}>New PR</Text> · {pr.name} — {fmtWeight(pr.weightKg, units, units === 'imperial' ? 0 : 1)} × {pr.reps}
+            </Text>
           </Animated.View>
+        )}
 
-          <PressableScale onPress={onDone} className="w-full items-center rounded-full" style={{ marginTop: 20, paddingVertical: 15, backgroundColor: c.brand400 }}>
-            <Text style={{ fontSize: 15, fontWeight: '800', color: c.ink900 }}>Done</Text>
-          </PressableScale>
-          <Animated.View style={[{ marginTop: 11, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }, riseStyle]}>
-            <Spinner color={dim(0.4)} />
-            <Text style={{ fontSize: 12.5, fontWeight: '600', color: dim(0.45) }}>Returning to your dashboard…</Text>
-          </Animated.View>
-        </ScrollView>
+        {/* Stats grouped into a single card, echoing the dashboard's stat surfaces. */}
+        <Animated.View style={[{ flexDirection: 'row', marginTop: 9, paddingVertical: 11, borderRadius: 16, backgroundColor: dim(0.04), borderWidth: 1, borderColor: dim(0.05) }, riseStyle]}>
+          <FinishStat value={stats ? mmss(stats.time) : '0:00'} label="Time" c={c} />
+          <View style={{ flex: 1, borderLeftWidth: 1, borderRightWidth: 1, borderColor: dim(0.07) }}>
+            <FinishStat value={volNum} unit={volUnit} label="Volume" c={c} />
+          </View>
+          <FinishStat value={stats ? String(stats.sets) : '0'} label="Sets" c={c} />
+        </Animated.View>
+
+        <PressableScale onPress={onDone} className="items-center rounded-full" style={{ marginTop: 20, height: 48, justifyContent: 'center', backgroundColor: c.brand400 }}>
+          <Text style={{ fontSize: 15, fontWeight: '800', color: c.ink900 }}>Continue</Text>
+        </PressableScale>
       </Animated.View>
     </View>
   )
 }
 
-function FinishStat({ value, label, c }: { value: string; label: string; c: any }) {
+function FinishStat({ value, unit, label, c }: { value: string; unit?: string; label: string; c: any }) {
   return (
     <View style={{ flex: 1, alignItems: 'center', paddingHorizontal: 4 }}>
-      <Text numberOfLines={1} style={{ fontSize: 22, fontWeight: '800', letterSpacing: -0.6, color: c.fg }}>{value}</Text>
-      <Text style={{ marginTop: 4, fontSize: 10.5, fontWeight: '700', letterSpacing: 0.7, textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>{label}</Text>
+      <Text numberOfLines={1} style={{ fontSize: 21, fontWeight: '800', letterSpacing: -0.5, color: c.fg }}>
+        {value}{unit ? <Text style={{ fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.45)' }}> {unit}</Text> : null}
+      </Text>
+      <Text style={{ marginTop: 5, fontSize: 11, fontWeight: '700', letterSpacing: 1.1, textTransform: 'uppercase', color: 'rgba(255,255,255,0.42)' }}>{label}</Text>
     </View>
-  )
-}
-
-/** A quiet spinning ring — the auto-return indicator on the finish sheet. */
-function Spinner({ color }: { color: string }) {
-  const spin = useRef(new Animated.Value(0)).current
-  useEffect(() => {
-    const loop = Animated.loop(Animated.timing(spin, { toValue: 1, duration: 1000, easing: Easing.linear, useNativeDriver: USE_NATIVE }))
-    loop.start()
-    return () => loop.stop()
-  }, [spin])
-  return (
-    <Animated.View style={{ width: 14, height: 14, transform: [{ rotate: spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] }}>
-      <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-        <Circle cx="12" cy="12" r="9" stroke={color} strokeWidth={2.4} strokeLinecap="round" strokeDasharray="44" strokeDashoffset={12} />
-      </Svg>
-    </Animated.View>
   )
 }

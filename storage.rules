@@ -12,10 +12,13 @@ service firebase.storage {
       allow write: if false;
     }
 
-    // Each user's own media (e.g. progress photos) — owner-only.
+    // Each user's own media (e.g. progress photos) — owner-only. Uploads must be
+    // images and under 10MB per file; reads are scoped to the owner.
     match /users/{uid}/{allPaths=**} {
-      allow read, write: if request.auth != null && request.auth.uid == uid
-                          && request.resource.size < 15 * 1024 * 1024; // 15MB cap per file
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if request.auth != null && request.auth.uid == uid
+                    && request.resource.size < 10 * 1024 * 1024        // 10MB cap per file
+                    && request.resource.contentType.matches('image/.*'); // images only
     }
 
     // Everything else is denied by default.
