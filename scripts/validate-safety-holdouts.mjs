@@ -43,7 +43,7 @@ const FEWSHOT = process.env.FEWSHOT === '1'
 const EXEMPLARS = FEWSHOT
   ? JSON.parse(readFileSync(resolve(ROOT, 'data', 'fewshot-exemplars.json'), 'utf8')).exemplars
   : []
-const SETS = (process.env.HOLDOUT_SETS ?? 'R2,R3,R4')
+const SETS = (process.env.HOLDOUT_SETS || 'R2,R3,R4')
   .split(',')
   .map((s) => s.trim())
   .filter(Boolean)

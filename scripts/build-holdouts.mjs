@@ -22,6 +22,11 @@ const SETS = [
   { name: 'R2', src: 'src/dev/safetyHoldoutR2.ts', label: 'Round 2 — reviewed & confirmed' },
   { name: 'R3', src: 'src/dev/safetyHoldoutR3.ts', label: 'Round 3 — reviewed & confirmed' },
   { name: 'R4', src: 'src/dev/safetyHoldoutR4.ts', label: 'Round 4 — difficult benign + safety controls' },
+  // R5/R6 are the harder euphemism / adversarial-framing sets — NOT part of the daily gate (default
+  // HOLDOUT_SETS stays R2,R3,R4), but generated so an opt-in run can measure recall on the cases the
+  // classifier actually misses. Treat as burned dev sets: measure, do not tune to them.
+  { name: 'R5', src: 'src/dev/safetyHoldoutR5.ts', label: 'Round 5 — academic-frame + current-intent recall tail' },
+  { name: 'R6', src: 'src/dev/safetyHoldoutR6.ts', label: 'Round 6 — euphemism recall + benign ending look-alikes' },
 ]
 
 /** Pull the `export const HOLDOUT ... = [ ... ]` array out of a TS file and JSON.parse it. */

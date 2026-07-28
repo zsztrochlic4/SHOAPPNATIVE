@@ -40,6 +40,10 @@ on:
         description: 'EXPERIMENT: inject non-holdout few-shot exemplars into the classifier prompt'
         type: boolean
         default: false
+      holdout_sets:
+        description: 'Comma-separated holdout sets, blank = default R2,R3,R4 (e.g. R5,R6 for the recall tail)'
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -113,6 +117,7 @@ jobs:
           FP_THRESHOLD: '0.05'
           CLASSIFIER_MODEL: ${{ inputs.classifier_model }}
           FEWSHOT: ${{ inputs.fewshot && '1' || '' }}
+          HOLDOUT_SETS: ${{ inputs.holdout_sets }}
         run: node scripts/validate-safety-holdouts.mjs
 
       # ---- Aggregate, publish, notify ----
