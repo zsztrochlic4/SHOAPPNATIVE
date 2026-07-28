@@ -130,9 +130,10 @@ function auditEntry(uid, col, id, d) {
 /* --------------------------------- main ----------------------------------- */
 
 async function main() {
-  let admin
+  let appMod, fsMod
   try {
-    admin = await import('firebase-admin')
+    appMod = await import('firebase-admin/app')
+    fsMod = await import('firebase-admin/firestore')
   } catch {
     console.error('✖ firebase-admin not installed. Run:  npm install --no-save firebase-admin')
     process.exit(2)
@@ -142,8 +143,8 @@ async function main() {
     process.exit(2)
   }
 
-  const app = admin.default.initializeApp({ projectId: PROJECT })
-  const db = admin.default.firestore(app)
+  const app = appMod.initializeApp({ credential: appMod.applicationDefault(), projectId: PROJECT })
+  const db = fsMod.getFirestore(app)
   console.log(`▶ Auditing project "${PROJECT}" (read-only)…`)
 
   let usersQuery = db.collection('users')
