@@ -1,240 +1,146 @@
-# Owner Task Checklist — Security Hardening go-live
+# Owner Task Checklist — what's left to do
 
-Everything on the code side is committed, tested, and pushed. This is the ordered
-list of tasks **only you can do** — they need the Firebase / Google Cloud console,
-GitHub settings, or credentials that don't live in the dev environment. Do the
-phases in order; later ones depend on earlier ones.
+> **STATUS (2026-07-28): the hardened Firestore + Storage rules are LIVE in
+> production.** Production data was audited **clean (0/7 users)** after migrating
+> one legacy account (backed up). Everything below is the remaining **console /
+> settings** work — none of it blocks the App Store or the rules already
+> protecting your backend.
 
 - **Project:** `strengthhub-2ab33` · region `australia-southeast2` · Blaze plan
 - **Repo:** `zsztrochlic4/SHOAPPNATIVE`
-- **Priority key:** 🔴 blocks the production rules deploy · 🟠 needed before enforcing App Check · 🟢 hygiene
-
-**Quick console links** (bookmark these):
-| Area | Link |
-|------|------|
-| Firebase project home | https://console.firebase.google.com/project/strengthhub-2ab33/overview |
-| Service accounts (keys) | https://console.firebase.google.com/project/strengthhub-2ab33/settings/serviceaccounts/adminsdk |
-| Firestore Database | https://console.firebase.google.com/project/strengthhub-2ab33/firestore |
-| Firestore Rules tab | https://console.firebase.google.com/project/strengthhub-2ab33/firestore/rules |
-| Firestore Usage/metrics | https://console.firebase.google.com/project/strengthhub-2ab33/firestore/usage |
-| Cloud Firestore backups/PITR (GCP) | https://console.cloud.google.com/firestore/databases/-default-/backups?project=strengthhub-2ab33 |
-| Storage | https://console.firebase.google.com/project/strengthhub-2ab33/storage |
-| App Check | https://console.firebase.google.com/project/strengthhub-2ab33/appcheck |
-| reCAPTCHA Enterprise (GCP) | https://console.cloud.google.com/security/recaptcha?project=strengthhub-2ab33 |
-| Billing / budgets (GCP) | https://console.cloud.google.com/billing |
-| Cloud Monitoring alerts (GCP) | https://console.cloud.google.com/monitoring/alerting?project=strengthhub-2ab33 |
-| GitHub → branch protection | https://github.com/zsztrochlic4/SHOAPPNATIVE/settings/branches |
-| GitHub → Actions secrets | https://github.com/zsztrochlic4/SHOAPPNATIVE/settings/secrets/actions |
-| GitHub → Actions | https://github.com/zsztrochlic4/SHOAPPNATIVE/actions |
+- Each task lists a **link** *and* the exact **click-path** — if a link ever
+  drifts, follow the click-path instead.
 
 ---
 
-## Phase 0 — Safety nets (do first) 🔴
+## ✅ Already done (no action needed)
+- All code hardening (rules, input sanitiser, coach response-schema, tests, CI) — committed & pushed to `main`.
+- Read-only production audit → 1 legacy account migrated into subcollections (backup in `migration-backups/`).
+- Re-audit **clean**, then **`firebase deploy`** published `firestore.rules` + `storage.rules` to production.
 
-### 0.1 Create a service-account key
-**Why:** the audit script (Phase 1) and the optional CI deploy job need a credential that can read/deploy Firestore. Firebase‑CLI login alone can't read raw documents.
-**Where:** [Service accounts](https://console.firebase.google.com/project/strengthhub-2ab33/settings/serviceaccounts/adminsdk)
+---
+
+## ▶ Your remaining tasks
+
+Ordered by priority. 🔴 = do soon · 🟠 = needed before the AI coach goes live · 🟢 = hygiene.
+
+---
+
+### 0. LIVE SMOKE TEST — confirm real saves still work  🔴
+*(You have a reminder set for Wed 29 Jul, 7 pm.)*
+
+**Why:** the rules are now enforcing on real users. A 2-minute check proves no legitimate write is being wrongly blocked.
+
 **Steps:**
-1. Open the Service accounts link above (Firebase console → ⚙ **Project settings** → **Service accounts**).
-2. Under **Firebase Admin SDK**, click **Generate new private key** → **Generate key**. A JSON file downloads.
-3. Move it somewhere private **outside the repo**, e.g. `C:\keys\sho-admin.json`. (As a safety net the repo `.gitignore` now ignores `serviceAccount*.json`, `sho-admin*.json`, `*-firebase-adminsdk-*.json`, and `audit.json` — but keeping the key outside the repo folder entirely is best.)
-**Done when:** you have the JSON path noted for later.
-**Docs:** https://firebase.google.com/docs/admin/setup#initialize-sdk
+1. Open the app on your phone and **sign in** with a real account.
+2. Do a few saves: **log a weight**, **send a chat message**, **complete/log a workout**. Each should save with no error.
+3. Open the Firestore usage dashboard and watch for a **permission-denied** spike for ~5 min:
+   - Link: https://console.firebase.google.com/project/strengthhub-2ab33/firestore/usage
+   - Click-path: Firebase console → **Firestore Database** → **Usage** tab.
+4. **If a save fails / you see permission-denied:** revert instantly —
+   - Link: https://console.firebase.google.com/project/strengthhub-2ab33/firestore/rules
+   - Click-path: Firebase console → **Firestore Database** → **Rules** tab → **history** icon (clock, top-right of the editor) → pick the previous version → **Publish**. Do the same on **Storage → Rules**.
+   - Then send me the denied write's collection + fields and I'll patch the rule.
 
-### 0.2 Turn on backups + delete protection
-**Why:** PITR and delete‑protection are currently **OFF**. A bad rules deploy or a migration must be recoverable.
-**Where:** [Firestore backups/PITR (GCP)](https://console.cloud.google.com/firestore/databases/-default-/backups?project=strengthhub-2ab33)
+**Done when:** weight, chat, and workout saves all succeed and the permission-denied count stays flat.
+
+---
+
+### 1. Turn on backups + recovery  🔴  *(~5 min — do this soon)*
+
+**Why:** Point-in-Time Recovery, scheduled backups, and delete-protection are all **currently OFF**. Right after a rules change + a data migration is exactly when you want a safety net.
+
+**Where:**
+- Link: https://console.firebase.google.com/project/strengthhub-2ab33/firestore
+- Click-path: Firebase console → **Firestore Database** → **Backups** tab (row of tabs: Data · Rules · Indexes · Usage · **Backups**).
+
 **Steps:**
-1. Open the backups link. On the `(default)` database:
-2. **Point‑in‑time recovery** → **Enable** (gives you 7 days of continuous recovery).
-3. **Backup schedules** → **Create schedule** → daily, retention e.g. 7–14 days.
-4. Database **settings** (pencil/⋯ on the database) → enable **Delete protection**.
-**Done when:** PITR shows *Enabled*, a daily backup schedule exists, delete‑protection is on.
-**Docs:** https://firebase.google.com/docs/firestore/backups · https://firebase.google.com/docs/firestore/use-pitr
+1. **Point-in-time recovery:** on the `(default)` database, toggle **PITR → Enable** (gives 7 days of continuous recovery).
+2. **Scheduled backups:** **Create backup schedule** → **Daily** → retention **7–14 days** → Save.
+3. **Delete-protection:** open the database's **settings** (⋯ or gear next to the `(default)` database) → enable **Delete protection**.
+
+**Done when:** PITR shows *Enabled*, one daily schedule is listed, and delete-protection is on.
+**Exact steps / screenshots:** https://firebase.google.com/docs/firestore/use-pitr and https://firebase.google.com/docs/firestore/backups
 
 ---
 
-## Phase 1 — Audit production data (the deploy gate) 🔴
+### 2. Revoke the OLD admin key  🟢  *(~2 min)*
 
-### 1.1 Run the read‑only schema audit
-**Why:** the hardened rules reject documents that break the new caps / allowlist / id
-rules. If an **existing** user doc breaks one, that user's saves start failing after
-deploy. This finds them first and **never writes**.
-**Where:** your terminal, in the repo root.
-**Steps (PowerShell — your shell):**
-```powershell
-npm install --no-save firebase-admin
-$env:GOOGLE_APPLICATION_CREDENTIALS = "C:\keys\sho-admin.json"
-npm run audit:schema -- --project strengthhub-2ab33 --json audit.json
-```
-**Steps (bash equivalent):**
-```bash
-npm install --no-save firebase-admin
-export GOOGLE_APPLICATION_CREDENTIALS=/c/keys/sho-admin.json
-npm run audit:schema -- --project strengthhub-2ab33 --json audit.json
-```
-**Read the result:**
-- **`✔ Clean`** (exit 0) → skip Phase 2, go to Phase 3.
-- **`✖ NOT clean`** (exit 1) → the categories print to screen; the full list is in `audit.json`. Go to Phase 2.
-**Done when:** you have a result (clean, or a violations list in `audit.json`).
-**Script:** [`scripts/audit-production-schema.mjs`](../../scripts/audit-production-schema.mjs)
+**Why:** you now have **two** live service-account keys (I used the newer one for the audit/migration). Fewer live keys = less that can leak. Keep the newest, delete yesterday's.
 
----
+**Where:**
+- Link: https://console.firebase.google.com/project/strengthhub-2ab33/settings/serviceaccounts/adminsdk
+- Click-path: Firebase console → ⚙ (gear, top-left) → **Project settings** → **Service accounts** tab → **Manage service account permissions** (opens Google Cloud IAM) → **Service Accounts** → click the `firebase-adminsdk` account → **Keys** tab.
 
-## Phase 2 — Migrate violations (only if the audit was NOT clean) 🔴
-
-### 2.1 Fix offending documents with a one‑time, reversible migration
-**Why:** so no real user is locked out when the rules tighten.
 **Steps:**
-1. Open `audit.json`. Each finding has `rule`, `path`, `detail`.
-2. Map each category to a fix:
-   | `rule` | Fix |
-   |--------|-----|
-   | `unknown-root-field` | delete the stray top‑level field |
-   | `oversize` | truncate to the cap (see [`DATA_SCHEMA.md`](DATA_SCHEMA.md)) |
-   | `plaintext-token` | delete `accessToken` / `refreshToken` / `expiresAt` |
-   | `id-mismatch` / `bad-datekey` | rewrite under the correct id, delete the old doc |
-   | `premium-true` | move to `entitlements/{uid}`, set `profile.premium=false` |
-   | `bad-enum` (pushTokens) | delete the stale token doc |
-3. **Ask Claude to write the migration script** — paste the category counts from
-   `audit.json` and it will generate a targeted, reversible Admin‑SDK script.
-4. Back up first (Phase 0.2 covers this), run the migration against production.
-5. **Re‑run Phase 1.1** until it prints **✔ Clean**.
-**Done when:** `npm run audit:schema` exits 0.
+1. In the **Keys** list you'll see two keys. Keep the one created **2026-07-28** (id starts `93b98daa4e`).
+2. Delete the older one created **2026-07-27** (id starts `e4bbcb3cdb`) → trash icon → confirm.
+
+**Done when:** only the newer key remains.
 
 ---
 
-## Phase 3 — Staging deploy + smoke test 🔴
+### 3. Require the security tests before merging to `main`  🟢  *(~2 min)*
 
-### 3.1 Create a staging Firebase project
-**Why:** deploy and exercise the rules somewhere real before touching production.
-**Where:** [Add project](https://console.firebase.google.com/) (the "Add project" card).
+**Why:** so a future change that breaks the rules or sanitiser can't be merged.
+
+**Where:**
+- Link: https://github.com/zsztrochlic4/SHOAPPNATIVE/settings/branches
+- Click-path: GitHub repo → **Settings** → **Branches** (left sidebar) → **Add branch ruleset** / **Add rule**.
+
 **Steps:**
-1. Create e.g. `strengthhub-staging`; enable Firestore + Storage; same region if offered.
-2. Add it to [`.firebaserc`](../../.firebaserc):
-   ```json
-   { "projects": {
-       "default": "strengthhub-2ab33",
-       "production": "strengthhub-2ab33",
-       "staging": "strengthhub-staging"
-   } }
-   ```
-**Done when:** `firebase projects:list` shows staging.
+1. Branch name pattern: `main`.
+2. Tick **Require status checks to pass before merging**.
+3. In the search box add **Rules + sanitisation tests**. *(It only appears in the list after the Security Rules workflow has run once on a pull request — so open any small PR first if you don't see it yet.)*
+4. Save.
 
-### 3.2 Deploy to staging + smoke‑test
-```bash
-firebase deploy --only firestore:rules,storage --project staging
-```
-Point a build at staging (set the `EXPO_PUBLIC_FIREBASE_*` env to the staging app's
-config) and exercise: **onboarding → save/load → a workout → a weight log → a meal →
-a chat message → program generation → set logging → push‑token registration.**
-**Done when:** all flows work with **zero** `permission-denied` errors.
-**Docs:** https://firebase.google.com/docs/rules/manage-deploy
+**Done when:** a PR that fails the rules tests shows a red "required check" and can't be merged.
 
 ---
 
-## Phase 4 — Production rules deploy 🔴
+### 4. Move the squat poster to the public folder  🟢  *(~5 min)*
 
-### 4.1 Save the current live rules (rollback point)
-**Where:** [Firestore Rules](https://console.firebase.google.com/project/strengthhub-2ab33/firestore/rules) and the **Storage → Rules** tab.
-**Steps:** copy the current ruleset text from each tab into a local file; note the date. This is your rollback.
+**Why:** `Thumbnails/squating.avif` is currently served through a permanent, unguarded download-token URL. Moving it into the public `exercises/` folder makes it public through the proper security model instead.
 
-### 4.2 Deploy
-**Precondition:** Phase 1 clean (or Phase 2 done) **and** Phase 3 smoke test passed.
-- **Option A — CLI:**
-  ```bash
-  firebase deploy --only firestore:rules,storage --project production
-  ```
-- **Option B — GitHub Action:** open [Security Rules workflow](https://github.com/zsztrochlic4/SHOAPPNATIVE/actions/workflows/security-rules.yml) → **Run workflow** → set `deploy = true`, `project_id = strengthhub-2ab33`. It won't deploy unless the tests job passes (needs the secret in 8.2).
-**Immediately after:** watch [Firestore usage/metrics](https://console.firebase.google.com/project/strengthhub-2ab33/firestore/usage) for a **permission‑denied** spike for 30–60 min.
-**Rollback:** paste the saved previous rules back into the console Rules tab → **Publish** (never open dev rules).
-**Done when:** rules deployed, no permission‑denied spike for real users.
+**Where:**
+- Link: https://console.firebase.google.com/project/strengthhub-2ab33/storage
+- Click-path: Firebase console → **Storage** → file browser.
 
----
-
-## Phase 5 — App Check setup (do NOT enforce yet) 🟠
-
-### 5.1 Register the web app with reCAPTCHA Enterprise
-**Where:** [App Check](https://console.firebase.google.com/project/strengthhub-2ab33/appcheck) · [reCAPTCHA Enterprise (GCP)](https://console.cloud.google.com/security/recaptcha?project=strengthhub-2ab33)
 **Steps:**
-1. App Check → **Apps** → select the **web** app → **Register** → provider **reCAPTCHA Enterprise**.
-2. Create a reCAPTCHA **Enterprise key** (score‑based, for your web domain) via the linked reCAPTCHA console; add your production domain(s) and `localhost` for testing.
-3. Put the **site key** in your web build env (already wired in code):
-   `EXPO_PUBLIC_APPCHECK_RECAPTCHA_ENTERPRISE_KEY=<site key>`
-4. (Optional, dev/staging only) generate a **debug token** in the browser console and register it under App Check → **Manage debug tokens**.
-**Done when:** the App Check dashboard shows the web app receiving **verified** requests once a keyed build runs.
-**Docs:** https://firebase.google.com/docs/app-check/web/recaptcha-enterprise-provider
+1. In `Thumbnails/`, download `squating.avif`, then upload it into the `exercises/` folder (or a subfolder there).
+2. Open the old `Thumbnails/squating.avif` → file details → **manage/rotate token** → revoke the existing token.
+3. Tell me — I'll repoint `src/lib/media.ts` to the new public `exercises/` path and you rebuild.
 
-### 5.2 Register iOS + Android and add NATIVE App Check (engineering task)
-**Why:** native currently sends **no** App Check token by design. Required before any Firestore/Storage enforcement, or the app breaks on device.
-**Heads‑up:** this app uses the Firebase **JS SDK**, whose App Check is web/reCAPTCHA only. Native attestation (App Attest / Play Integrity) needs a **native module** — add `@react-native-firebase/app-check` (+ `/app`) in an **EAS dev build**, or a custom provider bridging native attestation. This is code + a dev build, not console‑only.
-**Steps:**
-1. App Check console → register the **iOS** and **Android** apps (bundle id `com.zaggy887.strengthhub`).
-2. Add the native App Check module and config plugin; rebuild with EAS.
-3. iOS: enable **App Attest** (DeviceCheck fallback). Android: enable **Play Integrity**.
-4. Verify tokens on **physical devices** (dev + release).
-**Done when:** iOS + Android builds produce verified tokens on real devices.
-**Docs:** iOS https://firebase.google.com/docs/app-check/ios/app-attest-provider · Android https://firebase.google.com/docs/app-check/android/play-integrity-provider · RN module https://rnfirebase.io/app-check/usage
+**Done when:** the poster loads from `exercises/` and the old token is revoked.
 
 ---
 
-## Phase 6 — Enforce App Check (staged, per service) 🟠
+### 5. App Check  🟠  *(bigger — needed before the AI coach ever goes live, not before)*
 
-**Where:** App Check → **APIs**/**Products**: https://console.firebase.google.com/project/strengthhub-2ab33/appcheck
-**Precondition:** token‑capable web + iOS + Android clients shipped and showing **verified** traffic (still unenforced).
-**Steps — one at a time, watching metrics between each:**
-1. If already launched, wait until **~99% of supported‑client traffic is verified for ≥ 7 days**.
-2. Enforce **Cloud Firestore**.
-3. Enforce **Cloud Storage**.
-4. Enforce **Firebase AI Logic** — **before** enabling the live coach.
-**Rollback:** enforcement toggles **per service** and takes effect fast, so you can back any single one out if verified clients fail.
-**Done when:** Firestore + Storage (+ AI Logic) enforced with no legitimate‑client breakage.
-**Docs:** https://firebase.google.com/docs/app-check
+App Check blocks unofficial clients from hitting your Firestore/Storage/AI endpoints. **Set it up and monitor first; only enforce once real apps are sending verified tokens** — enforcing too early would break the app.
 
----
+**5a. Web (console + one env value):**
+- Link: https://console.firebase.google.com/project/strengthhub-2ab33/appcheck
+- Click-path: Firebase console → **Build** → **App Check** → **Apps** tab → your **web** app → **Register** → provider **reCAPTCHA Enterprise**.
+- Create the reCAPTCHA Enterprise key here: https://console.cloud.google.com/security/recaptcha?project=strengthhub-2ab33 (add your production domain + `localhost`).
+- Put the **site key** in your web build env: `EXPO_PUBLIC_APPCHECK_RECAPTCHA_ENTERPRISE_KEY=<key>` (already wired in `src/lib/appCheck.ts`).
+- Exact steps: https://firebase.google.com/docs/app-check/web/recaptcha-enterprise-provider
 
-## Phase 7 — Public asset cleanup 🟢
+**5b. iOS + Android (needs a code change + an EAS build — this is engineering, not just clicks):**
+- Register the **iOS** and **Android** apps in the same App Check → Apps tab (bundle id `com.zaggy887.strengthhub`).
+- The app uses the Firebase **JS SDK**, which can't do native attestation — add `@react-native-firebase/app-check` in an EAS dev build (ping me and I'll do the code side), enable **App Attest** (iOS) / **Play Integrity** (Android), and verify tokens on a physical device.
+- Exact steps: iOS https://firebase.google.com/docs/app-check/ios/app-attest-provider · Android https://firebase.google.com/docs/app-check/android/play-integrity-provider · RN module https://rnfirebase.io/app-check/usage
 
-### 7.1 Migrate the squat poster off its long‑lived token
-**Why:** `Thumbnails/squating.avif` is served via a permanent download‑token URL (see [`src/lib/media.ts`](../../src/lib/media.ts)); make it public through the documented model instead.
-**Where:** [Storage](https://console.firebase.google.com/project/strengthhub-2ab33/storage)
-**Steps:**
-1. In the bucket, copy/move `Thumbnails/squating.avif` into `exercises/`.
-2. Open the old file → ⋯ → **manage tokens** → revoke the existing token.
-3. Ask Claude to repoint `src/lib/media.ts` at the public `exercises/` path (then rebuild).
-**Done when:** the poster loads from `exercises/` and the old token is dead.
+**5c. Enforce (only after 5a + 5b are shipping verified traffic):**
+- App Check → **APIs** / **Products** tab → enforce in this order, watching metrics between each: **Cloud Firestore** → **Cloud Storage** → **Firebase AI Logic** (AI Logic must be enforced **before** the coach is enabled).
+- Enforcement can be turned off **per API** instantly if something breaks.
+
+**Done when:** web + iOS + Android send verified tokens and enforcement is on for Firestore + Storage.
 
 ---
 
-## Phase 8 — Repo / CI hardening 🟢
-
-### 8.1 Require the rules test check on `main`
-**Where:** [Branch protection](https://github.com/zsztrochlic4/SHOAPPNATIVE/settings/branches)
-**Steps:**
-1. **Add branch protection rule** → branch name pattern `main`.
-2. Tick **Require status checks to pass before merging** → search and select **Rules + sanitisation tests** (it appears in the list after the [Security Rules workflow](https://github.com/zsztrochlic4/SHOAPPNATIVE/actions/workflows/security-rules.yml) has run once on a PR).
-3. Save.
-**Done when:** a PR that fails the rules tests can't be merged.
-
-### 8.2 Add the deploy secret (only if using Option B in 4.2)
-**Where:** [Actions secrets](https://github.com/zsztrochlic4/SHOAPPNATIVE/settings/secrets/actions)
-**Steps:** **New repository secret** → name `FIREBASE_SERVICE_ACCOUNT`, value = the full JSON from Phase 0.1.
-**Done when:** the deploy‑rules job can authenticate.
-
----
-
-## Phase 9 — Monitoring (ongoing) 🟢
-
-**Where:** [Cloud Monitoring alerts](https://console.cloud.google.com/monitoring/alerting?project=strengthhub-2ab33) · [Billing budgets](https://console.cloud.google.com/billing) · [Firestore usage](https://console.firebase.google.com/project/strengthhub-2ab33/firestore/usage)
-Set alerts/dashboards for (plan §12): Firestore **permission‑denied** + failed syncs · App Check **verified vs unverified** · auth abuse / sign‑in failures · **Blaze billing** spikes · input‑sanitisation rejection counts · AI schema‑rejection + safety‑suppression rates · coach fallback/latency/error rate (once live).
-
----
-
-## The coach stays OFF regardless
-
-`COACH_ENABLED` ([`src/backend/coach/coachGate.ts`](../../src/backend/coach/coachGate.ts)) stays `false` until: input + output guardrails in place, the detection classifier **validated on the labelled holdout**, professional review complete, **and** App Check enforced on AI Logic (Phase 6.4). None of the above flips it on by itself.
-
----
-
-### Minimum path to get the hardened rules live
-**0.1** key → **0.2** backups → **1.1** audit (→ **2** if not clean) → **3** staging → **4** production deploy. Phases 5–9 harden further but aren't required for the rules themselves.
+## Reference
+- Full schema/security contract: [`DATA_SCHEMA.md`](DATA_SCHEMA.md)
+- Deploy / monitor / rollback runbook: [`HARDENING_RUNBOOK.md`](HARDENING_RUNBOOK.md)
+- Audit script: [`scripts/audit-production-schema.mjs`](../../scripts/audit-production-schema.mjs) · Migration: [`scripts/migrate-legacy-root-arrays.mjs`](../../scripts/migrate-legacy-root-arrays.mjs)
+- The AI coach stays disabled (`COACH_ENABLED = false`) until its guardrails, classifier validation, professional review, **and** App Check on AI Logic are all in place.
