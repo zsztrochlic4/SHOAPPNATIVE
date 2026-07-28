@@ -42,12 +42,20 @@ until you have confirmed existing documents comply** (plan §4.5, §11):
    `.firebaserc` under a `staging` alias. Deploy + smoke-test there first.
 2. **Recovery backup:** enable a scheduled Firestore backup **or** Point-in-Time
    Recovery, and turn on delete-protection. (Currently OFF.)
-3. **Read-only production schema audit:** with the Admin SDK, scan existing
-   `users/*` docs and every subcollection for: unknown top-level fields, oversized
-   free-text (vs the caps in `DATA_SCHEMA.md`), any `accessToken`/`refreshToken`
-   values, and id/dateKey/uid mismatches. Fix via a one-time trusted migration
-   before tightening rules — otherwise legitimate saves for those users will start
-   failing.
+3. **Read-only production schema audit:** run the bundled script — it scans every
+   `users/*` doc + subcollection for exactly what the hardened rules reject
+   (unknown top-level fields, oversized free-text, `accessToken`/`refreshToken`
+   values, id/dateKey/uid mismatches, bad platform enums) and never writes:
+
+   ```bash
+   npm install --no-save firebase-admin
+   export GOOGLE_APPLICATION_CREDENTIALS=/path/to/serviceAccount.json
+   npm run audit:schema -- --project production --json audit.json
+   ```
+
+   Exit 0 = clean (safe to deploy); exit 1 = violations listed (fix via a one-time
+   trusted migration before tightening rules, or legitimate saves for those users
+   will start failing). See `scripts/audit-production-schema.mjs`.
 4. **Confirm app-version compatibility:** the sanitiser + rules match the current
    client; verify any older shipped versions still write compatible shapes.
 
