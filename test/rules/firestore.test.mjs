@@ -231,3 +231,13 @@ test('config/coach: signed-in read allowed; client write + other config denied',
   await assertFails(setDoc(doc(aliceDb(), 'config', 'coach'), { killSwitch: true }))
   await assertFails(getDoc(doc(aliceDb(), 'config', 'secret'))) // exact-path lockdown
 })
+
+/* -------------------------------- recipes ----------------------------- */
+
+test('recipes: signed-in get + list allowed; client write + anon read denied', async () => {
+  await seed((db) => setDoc(doc(db, 'recipes', 'bm-scrambled-eggs'), { id: 'bm-scrambled-eggs', name: 'Eggs', category: 'Breakfast' }))
+  await assertSucceeds(getDoc(doc(aliceDb(), 'recipes', 'bm-scrambled-eggs')))
+  await assertSucceeds(getDocs(collection(aliceDb(), 'recipes')))
+  await assertFails(getDoc(doc(anonDb(), 'recipes', 'bm-scrambled-eggs')))
+  await assertFails(setDoc(doc(aliceDb(), 'recipes', 'bm-hack'), { id: 'bm-hack', name: 'x', category: 'Lunch' }))
+})

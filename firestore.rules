@@ -243,6 +243,18 @@ service cloud.firestore {
     }
 
     // ----------------------------------------------------------------- //
+    //  Zone C — public reference content: recipes/{id}                   //
+    // ----------------------------------------------------------------- //
+    // The recipe catalogue shown in Nutrition → Recipes. Identical for every
+    // user, read-only from the client (signed-in feature), and written only by
+    // the trusted upload script (Admin SDK) from the recipe spreadsheet. The app
+    // bundles a seed copy, so this is an editable overlay, not a hard dependency.
+    match /recipes/{id} {
+      allow get, list: if request.auth != null;
+      allow write: if false;
+    }
+
+    // ----------------------------------------------------------------- //
     //  Default deny — everything outside the paths above                 //
     // ----------------------------------------------------------------- //
     match /{document=**} {

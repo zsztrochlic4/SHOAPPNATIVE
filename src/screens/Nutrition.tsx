@@ -12,7 +12,7 @@ import {
 import { AppModal } from '../components/WebFrame'
 import { useStore } from '../store/store'
 import { useToast } from '../components/Toast'
-import { BUDGET_MEALS } from '../data/catalog'
+import { useBudgetMeals } from '../data/recipes'
 import { NUTRITION_TAGS, type TagTone } from '../data/nutrition'
 import { nutritionTagsForDay } from '../store/selectors'
 import { useColors } from '../theme'
@@ -498,6 +498,7 @@ function RecipesTab({ onOpenRecipe, onAddMeal }: { onOpenRecipe: (m: BudgetMeal 
   const c = useColors()
   const scrollPad = useScrollPad()
   const myMeals = state.myMeals ?? []
+  const BUDGET_MEALS = useBudgetMeals()
   const [cat, setCat] = useState<(typeof CATS)[number]>('All')
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
@@ -636,6 +637,7 @@ function MealPlanTab() {
   const wItems = plan.filter((p) => (p.w ?? 0) === weekOffset)
   const plannedCount = wItems.length
 
+  const BUDGET_MEALS = useBudgetMeals()
   const pq = planSearch.trim().toLowerCase()
   const wordStart = (name: string) => name.toLowerCase().split(/[^a-z0-9]+/).some((w) => w.startsWith(pq))
   const suggested = pq ? BUDGET_MEALS.filter((m) => wordStart(m.name)).slice(0, 6) : []

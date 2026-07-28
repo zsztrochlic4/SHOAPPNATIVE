@@ -17,9 +17,10 @@ import { useStore } from '../store/store'
 import { useToast } from '../components/Toast'
 import { useNav } from '../nav'
 import {
-  BUDGET_MEALS, BEGINNER_LESSONS, exerciseDetail, REP_TARGETS, BASE_WEIGHTS, SET_TARGETS,
+  BEGINNER_LESSONS, exerciseDetail, REP_TARGETS, BASE_WEIGHTS, SET_TARGETS,
   ACTIVITY_PRESETS, activityPreset, INTENSITY_MULT, EXERCISES, exById,
 } from '../data/catalog'
+import { useBudgetMeals } from '../data/recipes'
 import { fmtWeight } from '../lib/format'
 import { ActivityIcon } from '../components/ActivityIcon'
 import { exerciseView, imageForMuscle, buildCustomSession } from '../store/programSession'
@@ -194,6 +195,7 @@ export function BeginnerSheet({ open, onClose }: Props) {
 /* ======================== Budget eats ============================= */
 export function BudgetEatsSheet({ open, onClose }: Props) {
   const [openId, setOpenId] = useState<string | null>(null)
+  const BUDGET_MEALS = useBudgetMeals()
 
   return (
     <Sheet open={open} onClose={onClose} title="Easy recipes">

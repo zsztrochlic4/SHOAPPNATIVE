@@ -17,6 +17,7 @@ import { ToastProvider } from './components/Toast'
 import { NavProvider, type Overlay } from './nav'
 import { themeVars, useThemeName, brand, cssVars } from './theme'
 import { setSoundEnabled } from './lib/sound'
+import { initBudgetMeals } from './data/recipes'
 import { Skeleton, SkeletonLines } from './components/Skeleton'
 import Dashboard from './screens/Dashboard'
 import Workout from './screens/Workout'
@@ -245,6 +246,13 @@ function ThemedRoot() {
   useEffect(() => {
     setSoundEnabled(soundOn)
   }, [soundOn])
+
+  // Load the recipe catalogue once: bundled seed shows instantly, then the
+  // Firestore `recipes` overlay (edited via the spreadsheet) is applied. No-op
+  // in demo mode / offline (see src/data/recipes.ts).
+  useEffect(() => {
+    void initBudgetMeals()
+  }, [])
 
   // On web, RN-Web modals (menu, sheets, full-screen views) portal to <body>,
   // outside this themed subtree, so they wouldn't see the `vars()` applied
