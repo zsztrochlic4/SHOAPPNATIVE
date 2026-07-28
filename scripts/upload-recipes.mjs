@@ -11,9 +11,9 @@
 //   node scripts/upload-recipes.mjs --file "C:/path/to/your.xlsx" --apply
 //
 // Behaviour:
-//   • Upserts every active recipe → recipes/{id} (merge), deprecated:false.
-//   • Marks the "Firebase Deprecations" ids as deprecated:true stubs so any old
-//     favourite/reference still resolves gracefully (never hard-deleted).
+//   • Upserts every active recipe → recipes/{id} (merge).
+//   • Deletes any retired-recipe docs (the "Firebase Deprecations" ids) — we do
+//     not keep deprecated stubs.
 //   • Idempotent; safe to re-run. DRY-RUN by default.
 //
 // After editing recipes: run `npm run recipes:build` too, so the bundled seed
@@ -34,13 +34,13 @@ const BATCH = 400
 const { recipes, deprecations, problems } = readWorkbook(XLSX)
 if (problems.length) { console.error('✖ recipe problems:\n  ' + problems.join('\n  ')); process.exit(1) }
 
-// Deprecations that aren't superseded by an active recipe of the same id.
+// Retired ids to DELETE (from the deprecations tab), minus any that are still active.
 const activeIds = new Set(recipes.map((r) => r.id))
-const depStubs = deprecations.filter((d) => !activeIds.has(d.id))
+const retiredIds = deprecations.filter((d) => !activeIds.has(d.id)).map((d) => d.id)
 
 console.log(`▶ Recipe upload to "${PROJECT}" — ${APPLY ? 'APPLY' : 'DRY RUN'}`)
 console.log(`  active recipes: ${recipes.length}  (${Object.entries(countByCategory(recipes)).map(([k, v]) => `${k}:${v}`).join(' ')})`)
-console.log(`  deprecated stubs: ${depStubs.length}`)
+console.log(`  retired ids to delete: ${retiredIds.length}`)
 
 if (!APPLY) {
   console.log('\nDry run only — re-run with --apply (and GOOGLE_APPLICATION_CREDENTIALS set) to write.')
@@ -59,19 +59,27 @@ const db = getFirestore(app)
 
 function chunk(a, n) { const o = []; for (let i = 0; i < a.length; i += n) o.push(a.slice(i, i + n)); return o }
 
-const activeDocs = recipes.map((r) => ({ id: r.id, data: { ...r, deprecated: false, updatedAt: FieldValue.serverTimestamp() } }))
-const depDocs = depStubs.map((d) => ({ id: d.id, data: { id: d.id, name: d.name, category: d.category, deprecated: true, replacement: d.replacement || '', updatedAt: FieldValue.serverTimestamp() } }))
-const all = [...activeDocs, ...depDocs]
+// Active recipes: upsert, and clear any leftover `deprecated` field from prior runs.
+const activeDocs = recipes.map((r) => ({ id: r.id, data: { ...r, deprecated: FieldValue.delete(), updatedAt: FieldValue.serverTimestamp() } }))
 
 let written = 0
-for (const part of chunk(all, BATCH)) {
+for (const part of chunk(activeDocs, BATCH)) {
   const b = db.batch()
   for (const { id, data } of part) b.set(db.collection('recipes').doc(id), data, { merge: true })
   await b.commit()
   written += part.length
-  console.log(`  …wrote ${written}/${all.length}`)
+  console.log(`  …wrote ${written}/${activeDocs.length}`)
+}
+
+// Delete retired-recipe docs (idempotent — deleting a missing doc is a no-op).
+let deleted = 0
+for (const part of chunk(retiredIds, BATCH)) {
+  const b = db.batch()
+  for (const id of part) b.delete(db.collection('recipes').doc(id))
+  await b.commit()
+  deleted += part.length
 }
 
 const total = (await db.collection('recipes').count().get()).data().count
-console.log(`\n✔ Uploaded ${activeDocs.length} recipes + ${depDocs.length} deprecated stubs. Collection now has ${total} docs.`)
+console.log(`\n✔ Uploaded ${activeDocs.length} recipes, deleted ${deleted} retired docs. Collection now has ${total} docs.`)
 process.exit(0)
