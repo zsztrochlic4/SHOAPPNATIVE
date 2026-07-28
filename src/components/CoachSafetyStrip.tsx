@@ -1,16 +1,15 @@
-import { View, Text, Pressable, Linking } from 'react-native'
-import { Phone, HeartHandshake } from 'lucide-react-native'
+import { View, Text, Pressable, Alert, Linking } from 'react-native'
+import { Info } from 'lucide-react-native'
 
 /**
- * Always-on crisis affordance for the coach chat (Option B).
+ * Quiet, always-present coach disclaimer + on-demand support (Option B).
  *
- * Persistent and DETECTION-INDEPENDENT: it states plainly that the coach is a fitness coach — not a
- * medical or crisis service — and keeps one-tap access to real help visible at all times, so support is
- * reachable even if the safety classifier misses something. This is a deliberate architectural mitigation
- * for the fact that no classifier catches 100%: the user never has to be correctly detected to get help.
- *
- * AU numbers by default (the app's audience); non-AU users are pointed to local services in text, since
- * 000 / 13 11 14 are not universal.
+ * DELIBERATELY LOW-KEY: a fitness coach must not signal crisis at every benign turn — someone asking
+ * about squats should not be shown suicide-line numbers. So this is a subtle "training coach — not a
+ * medical or crisis service" note plus a discreet "Get support" link that reveals help ONLY when tapped.
+ * Help is therefore always one tap away (detection-independent), without making ordinary chat feel like
+ * a crisis intervention. Prominent tap-to-call numbers still appear via SafetyContactButtons on an
+ * actual safety response, where they belong.
  */
 function dial(num: string) {
   const url = `tel:${num}`
@@ -19,6 +18,22 @@ function dial(num: string) {
     .catch(() => {
       /* ignore — no dialer available */
     })
+}
+
+function openSupport(isAustralia: boolean) {
+  if (isAustralia) {
+    Alert.alert('Support', 'You can reach these any time — you don’t have to be in crisis to call.', [
+      { text: 'Call Lifeline 13 11 14', onPress: () => dial('131114') },
+      { text: 'Call 000 (emergency)', onPress: () => dial('000') },
+      { text: 'Close', style: 'cancel' },
+    ])
+  } else {
+    Alert.alert(
+      'Support',
+      'In an emergency, contact your local emergency services. A local crisis or support line can also help.',
+      [{ text: 'Close', style: 'cancel' }],
+    )
+  }
 }
 
 export function CoachSafetyStrip({
@@ -30,53 +45,25 @@ export function CoachSafetyStrip({
   fg: string
   brand: string
 }) {
-  const Pill = ({ label, number, a11y }: { label: string; number: string; a11y: string }) => (
-    <Pressable
-      onPress={() => dial(number)}
-      accessibilityRole="button"
-      accessibilityLabel={a11y}
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        borderRadius: 999,
-        backgroundColor: brand,
-        paddingHorizontal: 9,
-        paddingVertical: 4,
-      }}
-      className="active:opacity-80"
-    >
-      <Phone size={11} color="#000" strokeWidth={2.4} />
-      <Text style={{ fontSize: 11, fontWeight: '700', color: '#000' }}>{label}</Text>
-    </Pressable>
-  )
-
   return (
     <View
       style={{
         flexDirection: 'row',
-        flexWrap: 'wrap',
         alignItems: 'center',
-        columnGap: 8,
-        rowGap: 6,
+        gap: 8,
         paddingHorizontal: 16,
-        paddingVertical: 8,
+        paddingVertical: 7,
         borderBottomWidth: 1,
-        borderBottomColor: `${fg}14`,
+        borderBottomColor: 'rgba(128,128,128,0.15)',
       }}
     >
-      <HeartHandshake size={13} color={fg} strokeWidth={2} style={{ opacity: 0.5 }} />
-      <Text style={{ flexShrink: 1, fontSize: 11, color: fg, opacity: 0.5 }}>
-        Fitness coach — not a medical or crisis service.
+      <Info size={12} color={fg} style={{ opacity: 0.4 }} />
+      <Text style={{ flex: 1, fontSize: 11, color: fg, opacity: 0.45 }}>
+        Training coach — not a medical or crisis service.
       </Text>
-      {isAustralia ? (
-        <>
-          <Pill label="Lifeline 13 11 14" number="131114" a11y="Call Lifeline on 13 11 14" />
-          <Pill label="000" number="000" a11y="Call emergency services on 000" />
-        </>
-      ) : (
-        <Text style={{ fontSize: 11, color: fg, opacity: 0.5 }}>In an emergency, contact your local services.</Text>
-      )}
+      <Pressable onPress={() => openSupport(isAustralia)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Get support options">
+        <Text style={{ fontSize: 11, fontWeight: '700', color: brand }}>Get support</Text>
+      </Pressable>
     </View>
   )
 }
