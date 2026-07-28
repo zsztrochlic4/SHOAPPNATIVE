@@ -46,21 +46,19 @@ Ordered by priority. 🔴 = do soon · 🟠 = needed before the AI coach goes li
 
 ---
 
-### 1. Turn on backups + recovery  🔴  *(~5 min — do this soon)*
+### 1. Turn on backups + recovery  ✅ DONE (2026-07-28)
 
-**Why:** Point-in-Time Recovery, scheduled backups, and delete-protection are all **currently OFF**. Right after a rules change + a data migration is exactly when you want a safety net.
+PITR, delete-protection, and a daily 7-day backup schedule are all **enabled** on
+the `(default)` database. Done via the Firebase CLI:
 
-**Where:**
-- Link: https://console.firebase.google.com/project/strengthhub-2ab33/firestore
-- Click-path: Firebase console → **Firestore Database** → **Backups** tab (row of tabs: Data · Rules · Indexes · Usage · **Backups**).
+```powershell
+firebase firestore:databases:update "(default)" --point-in-time-recovery ENABLED --delete-protection ENABLED --project strengthhub-2ab33
+firebase firestore:backups:schedules:create --database "(default)" --recurrence DAILY --retention 7d --project strengthhub-2ab33
+```
 
-**Steps:**
-1. **Point-in-time recovery:** on the `(default)` database, toggle **PITR → Enable** (gives 7 days of continuous recovery).
-2. **Scheduled backups:** **Create backup schedule** → **Daily** → retention **7–14 days** → Save.
-3. **Delete-protection:** open the database's **settings** (⋯ or gear next to the `(default)` database) → enable **Delete protection**.
-
-**Done when:** PITR shows *Enabled*, one daily schedule is listed, and delete-protection is on.
-**Exact steps / screenshots:** https://firebase.google.com/docs/firestore/use-pitr and https://firebase.google.com/docs/firestore/backups
+Verify anytime: `firebase firestore:databases:get "(default)" --project strengthhub-2ab33`
+(shows `POINT_IN_TIME_RECOVERY_ENABLED` + `DELETE_PROTECTION_ENABLED`).
+Docs: https://firebase.google.com/docs/firestore/use-pitr · https://firebase.google.com/docs/firestore/backups
 
 ---
 

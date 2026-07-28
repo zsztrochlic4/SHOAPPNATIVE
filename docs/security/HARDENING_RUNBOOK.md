@@ -6,7 +6,8 @@ owner can do**.
 
 > **STATUS (2026-07-28): the hardened Firestore + Storage rules are DEPLOYED to
 > production `strengthhub-2ab33`.** Production data was audited clean (0/7 users)
-> after migrating one legacy account. Remaining work is App Check, backups/PITR,
+> after migrating one legacy account. Backups/PITR/delete-protection are now ON.
+> Remaining work is App Check
 > and the other console/build tasks below (see the Owner Task Checklist).
 
 > Project: `strengthhub-2ab33` · region `australia-southeast2` · Blaze.
@@ -45,7 +46,7 @@ until you have confirmed existing documents comply** (plan §4.5, §11):
 1. **Create a staging project** (e.g. `strengthhub-staging`) and add it to
    `.firebaserc` under a `staging` alias. Deploy + smoke-test there first.
 2. **Recovery backup:** enable a scheduled Firestore backup **or** Point-in-Time
-   Recovery, and turn on delete-protection. (Currently OFF.)
+   Recovery, and turn on delete-protection. (DONE 2026-07-28 — PITR + delete-protection + daily backups enabled via the Firebase CLI.)
 3. **Read-only production schema audit:** run the bundled script — it scans every
    `users/*` doc + subcollection for exactly what the hardened rules reject
    (unknown top-level fields, oversized free-text, `accessToken`/`refreshToken`
@@ -129,12 +130,12 @@ per-user coach call volume + cost anomalies.
 ## 7. Remaining owner/console follow-ups (not doable from the repo)
 
 - [ ] Create staging project + `staging` alias; deploy/smoke-test there first.
-- [ ] Enable scheduled backup / PITR + delete-protection (currently OFF).
-- [ ] Run the read-only production schema audit + one-time data migration.
+- [x] Enable scheduled backup / PITR + delete-protection (DONE 2026-07-28).
+- [x] Run the read-only production schema audit + one-time data migration (DONE 2026-07-28 — 1 legacy account migrated, audit clean).
 - [ ] Migrate `Thumbnails/squating.avif` into public `exercises/`, revoke the old
       download token, then repoint `src/lib/media.ts` to the public path.
 - [ ] Register App Check apps (web + iOS + Android) and create the reCAPTCHA
       Enterprise key; add native App Check in a dev build.
-- [ ] Deploy hardened rules to production (staged), then roll out App Check per service.
+- [x] Deploy hardened rules to production (DONE 2026-07-28). App Check rollout still pending.
 - [ ] Mark the **Security Rules / rules-tests** check as required in branch protection.
 - [ ] Add the `FIREBASE_SERVICE_ACCOUNT` GitHub secret if using the deploy action.
