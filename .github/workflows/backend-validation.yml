@@ -84,7 +84,7 @@ jobs:
       # ---- GitHub / code validation ----
       - name: Code test suite (typecheck + domain checks + safety sweep)
         continue-on-error: true
-        run: node scripts/run-step.mjs --name tests --critical 1 --cmd "npm run typecheck && npm run check && npm run sweep"
+        run: node scripts/run-step.mjs --name tests --critical 1 --cmd "npm run typecheck && npm run check && npm run sweep && npm run test:safety"
 
       - name: Lint (Prettier)
         continue-on-error: true

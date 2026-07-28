@@ -444,12 +444,24 @@ function detectSupplementDosing(n: Norm): DetectorHit[] {
   return []
 }
 
+/** Numeric-unit lookahead so an age match isn't a reps/kg/weeks quantity. */
+const NOT_A_QUANTITY = '(?!\\s*(kg|kgs|kilo|kilos|pound|pounds|lb|lbs|rep|reps|set|sets|week|weeks|min|minutes|km|hour|hours|days|day|percent))'
+
 function detectUnder18(n: Norm): DetectorHit[] {
   // Age with clear self-reference, guarding against reps/kg/weeks/etc.
   const ageStmt = hasRe(n, /\b(i am|i m|im|only|actually|just|turned|turning)\s+(1[0-7]|[1-9])\b(?!\s*(kg|kgs|kilo|kilos|pound|pounds|lb|lbs|rep|reps|set|sets|week|weeks|min|minutes|km|hour|hours|days|day|percent|reps))/)
   const explicit = has(n, 'under 18', 'underage', 'im a minor', 'i m a minor', 'still in high school', 'in year 8',
     'in year 9', 'in year 10', 'in year 11', 'year 8', 'year 9', 'year 10', 'high schooler')
-  if (ageStmt || explicit) return [hit('under_18', 'stated_under_18')]
+  // Indirect "not yet 18" disclosures (the Jack JV-U03 class): approaching 18, an UPCOMING 18th birthday,
+  // or "not yet 18" all mean the user is CURRENTLY under 18. First-person is required by the pattern shape
+  // ("i …", or "my 18th/eighteenth birthday" with no relative in between), so a third party's upcoming
+  // 18th ("my sister's 18th birthday") does not match. "turned 18 last year" is not matched (that is now 18+).
+  const approachingEighteen =
+    hasRe(n, new RegExp(`\\b(?:im|i m|i am|i)(?:\\s+(?:will be|ll be))?\\s+(?:turning|turn|almost|nearly|about to (?:turn|be)|going to (?:turn|be))\\s*(?:18|eighteen)\\b${NOT_A_QUANTITY}`)) ||
+    hasRe(n, /\bmy (?:18th|eighteenth) birthday\b/) ||
+    hasRe(n, /\b(?:before|until|when) i turn (?:18|eighteen)\b/) ||
+    hasRe(n, new RegExp(`\\bnot (?:yet|quite) (?:18|eighteen)\\b${NOT_A_QUANTITY}`))
+  if (ageStmt || explicit || approachingEighteen) return [hit('under_18', 'stated_under_18')]
   return []
 }
 

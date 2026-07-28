@@ -31,6 +31,7 @@
     "react-native-web": "^0.21.2"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.1",
     "@types/react": "~19.2.2",
     "babel-preset-expo": "~57.0.0",
     "prettier": "^3.8.4",
@@ -47,7 +48,9 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test": "npm run typecheck && npm run check && npm run sweep",
+    "test": "npm run typecheck && npm run check && npm run sweep && npm run test:safety",
+    "test:rules": "firebase emulators:exec --only firestore,storage \"node --test test/rules/\"",
+    "test:safety": "tsc -p tsconfig.sweep.json && node --test \"test/safety/**/*.test.mjs\"",
     "check": "tsc -p tsconfig.check.json && node .check-out/store/periods.check.js",
     "sweep": "tsc -p tsconfig.sweep.json && node .sweep-out/backend/generator/runSweep.js",
     "lint": "prettier --check \"scripts/**/*.{mjs,js}\"",
