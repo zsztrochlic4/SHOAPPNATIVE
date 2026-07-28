@@ -101,7 +101,7 @@ jobs:
           fi
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > sa.json
           npx firebase deploy \
-            --only firestore:rules,storage:rules \
+            --only firestore:rules,storage \
             --project "${{ inputs.project_id }}" \
             --non-interactive
           rm -f sa.json

@@ -123,7 +123,7 @@ npm run audit:schema -- --project strengthhub-2ab33 --json audit.json
 
 ### 3.2 Deploy to staging + smoke‑test
 ```bash
-firebase deploy --only firestore:rules,storage:rules --project staging
+firebase deploy --only firestore:rules,storage --project staging
 ```
 Point a build at staging (set the `EXPO_PUBLIC_FIREBASE_*` env to the staging app's
 config) and exercise: **onboarding → save/load → a workout → a weight log → a meal →
@@ -143,7 +143,7 @@ a chat message → program generation → set logging → push‑token registrat
 **Precondition:** Phase 1 clean (or Phase 2 done) **and** Phase 3 smoke test passed.
 - **Option A — CLI:**
   ```bash
-  firebase deploy --only firestore:rules,storage:rules --project production
+  firebase deploy --only firestore:rules,storage --project production
   ```
 - **Option B — GitHub Action:** open [Security Rules workflow](https://github.com/zsztrochlic4/SHOAPPNATIVE/actions/workflows/security-rules.yml) → **Run workflow** → set `deploy = true`, `project_id = strengthhub-2ab33`. It won't deploy unless the tests job passes (needs the secret in 8.2).
 **Immediately after:** watch [Firestore usage/metrics](https://console.firebase.google.com/project/strengthhub-2ab33/firestore/usage) for a **permission‑denied** spike for 30–60 min.

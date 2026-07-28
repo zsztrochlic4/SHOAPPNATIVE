@@ -65,10 +65,10 @@ Rules deploy is intentionally explicit (no accidental prod default):
 
 ```bash
 # staging first
-firebase deploy --only firestore:rules,storage:rules --project staging
+firebase deploy --only firestore:rules,storage --project staging
 # …smoke-test onboarding, save/load, workouts, weights, meals, chat,
 #   program generation, set logging, push-token registration…
-firebase deploy --only firestore:rules,storage:rules --project production
+firebase deploy --only firestore:rules,storage --project production
 ```
 
 Or use the manual **Security Rules → deploy-rules** GitHub Action (requires the
