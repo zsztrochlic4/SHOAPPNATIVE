@@ -61,3 +61,7 @@ migration-backups/
 
 # domain-check build output
 /.check-out
+
+# exercise media drop folder — files live in Cloud Storage, not git
+data/exercise-media/*
+!data/exercise-media/README.md

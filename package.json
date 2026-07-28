@@ -63,7 +63,8 @@
     "audit:schema": "node scripts/audit-production-schema.mjs",
     "validate:holdouts": "node scripts/validate-safety-holdouts.mjs",
     "recipes:build": "node scripts/build-recipes.mjs",
-    "recipes:upload": "node scripts/upload-recipes.mjs"
+    "recipes:upload": "node scripts/upload-recipes.mjs",
+    "media:upload": "node scripts/upload-exercise-media.mjs"
   },
   "private": true
 }
