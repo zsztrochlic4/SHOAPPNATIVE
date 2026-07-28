@@ -10,7 +10,7 @@
 
 import type { CoachContext, DetectorHit, SafetyAction, SafetyCategory, SafetyDecision, SafetySession } from './types'
 import { CATEGORY_TIER } from './types'
-import { runRules, scopeClassifierHits, hasImmediacy, hasCurrentSafetySignal, normalize } from './rules'
+import { runRules, scopeClassifierHits, hasImmediacy, hasCurrentSafetySignal, normalize, isOnTopicFitness } from './rules'
 import { activeClassifier } from './classifier'
 import { correctionAdjust, isGenuineCorrection, stateHits, applyDecision } from './stateMachine'
 
@@ -68,6 +68,18 @@ function decide(hits: DetectorHit[]): SafetyDecision {
 
 function failSafe(): SafetyDecision {
   return { category: 'none', tier: -1, action: 'service_unavailable', responseKey: null, allowCoaching: false, hits: [], reason: 'classification_unavailable' }
+}
+
+/**
+ * Option B — REFER BY DEFAULT. The coach only free-coaches an affirmatively on-topic training/nutrition
+ * request; anything else is referred, not coached. This only ever fires when the composed decision is
+ * already `allow` (nothing was flagged), so it can NEVER downgrade a safety route — it only makes the
+ * benign default safer: a message that slipped every detector but isn't a clear fitness request is
+ * routed to the gentle off-topic referral instead of being freely coached.
+ */
+function referByDefault(decision: SafetyDecision, text: string): SafetyDecision {
+  if (decision.action !== 'allow' || isOnTopicFitness(text)) return decision
+  return decide([{ category: 'off_topic', source: 'rules', reason: 'refer_by_default_not_fitness' }])
 }
 
 /**
@@ -151,6 +163,7 @@ export function route(text: string, ctx: CoachContext, session: SafetySession): 
     // composed decision came out lower, the emergency wins. Most-protective route always prevails.
     const floor = emergencyFloor([...ruleHits, ...escalated])
     if (floor && decision.tier < CATEGORY_TIER[floor.category]) decision = decide([floor])
+    decision = referByDefault(decision, text) // Option B: coach fitness only; refer everything else
     decision.suppressions = [...rules.suppressions, ...clsScoped.suppressions]
     applyDecision(session, decision)
     return decision
@@ -198,6 +211,7 @@ export async function routeAsync(
     if (floor && decision.tier < CATEGORY_TIER[floor.category]) decision = decide([floor])
     // Fail-safe: classifier unavailable AND nothing else caught it → never allow normal coaching.
     if (clsUnavailable && decision.action === 'allow') return failSafe()
+    decision = referByDefault(decision, text) // Option B: coach fitness only; refer everything else
     decision.suppressions = [...rules.suppressions, ...clsScoped.suppressions]
     applyDecision(session, decision)
     return decision

@@ -782,3 +782,47 @@ export function hasAnySafetyAdjacentSignal(text: string): boolean {
     'steroid', 'sarm', 'testosterone', 'supplement', 'caffeine', 'overdose', 'drug', 'alcohol', 'drunk',
   )
 }
+
+/* ------------------------------------------------------------------ */
+/*  Option B: refer-by-default — the coach's on-topic allowlist        */
+/* ------------------------------------------------------------------ */
+
+/** Training / nutrition / recovery vocabulary — an affirmatively on-topic coaching request. */
+const FITNESS_TERMS = [
+  'workout', 'work out', 'training', 'train', 'exercise', 'gym', 'lift', 'lifting', 'weight', 'weights',
+  'squat', 'bench', 'deadlift', 'press', 'row', 'curl', 'pull up', 'push up', 'pullup', 'pushup', 'chin up',
+  'cardio', 'run', 'running', 'jog', 'sprint', 'hiit', 'conditioning', 'program', 'programme', 'routine',
+  'split', 'plan', 'session', 'rep', 'reps', 'set', 'sets', 'superset', 'muscle', 'strength', 'hypertrophy',
+  'bulk', 'bulking', 'cut', 'cutting', 'lean', 'physique', 'abs', 'core', 'legs', 'leg day', 'chest', 'back',
+  'shoulders', 'arms', 'bicep', 'tricep', 'glute', 'hamstring', 'quad', 'calf', 'calves', 'warm up', 'warmup',
+  'cooldown', 'stretch', 'mobility', 'flexibility', 'recovery', 'rest day', 'deload', 'progress', 'progression',
+  'pb', '1rm', 'one rep max', 'form', 'technique', 'tempo', 'rir', 'rpe', 'volume', 'frequency', 'motiv',
+  'dumbbell', 'barbell', 'kettlebell', 'machine', 'cable', 'band', 'bodyweight', 'treadmill', 'steps', 'walk',
+  'swim', 'swimming', 'cycle', 'cycling', 'bike', 'yoga', 'pilates', 'fitness', 'stronger', 'tone', 'toned',
+  // nutrition / recovery in scope
+  'protein', 'carb', 'carbs', 'calorie', 'calories', 'macro', 'macros', 'meal', 'meals', 'nutrition', 'eat',
+  'eating', 'food', 'snack', 'hydration', 'water', 'creatine', 'preworkout', 'post workout', 'soreness',
+  'sore', 'doms', 'sleep', 'fuel', 'recipe', 'diet',
+]
+
+/** Very short in-flow affirmations — allowed only when the whole message is a brief continuation. */
+const CONTINUITY = [
+  'yes', 'yeah', 'yep', 'yup', 'ok', 'okay', 'sure', 'thanks', 'thank you', 'cheers', 'sounds good',
+  'got it', 'cool', 'great', 'perfect', 'awesome', 'continue', 'go on', 'next', 'please', 'more',
+]
+
+/**
+ * Option B "refer by default": the coach only free-coaches a message that is affirmatively an on-topic
+ * training/nutrition request (or a short in-flow affirmation). Everything else — off-topic, ambiguous,
+ * or a distress disclosure that slipped every safety detector — is NOT coached; the router routes it to
+ * a gentle referral instead. This inverts the old default (no-signal ⇒ coach) to (no-fitness-intent ⇒
+ * refer), so an undetected crisis can never be freely coached. The short-message guard keeps a smuggled
+ * euphemism ("ok i'll do it tonight") from passing as a bare affirmation — that would still be scored by
+ * the safety detectors upstream, and if it reaches here it is too long to be treated as continuity.
+ */
+export function isOnTopicFitness(text: string): boolean {
+  const n = normalize(text)
+  if (has(n, ...FITNESS_TERMS)) return true
+  const words = n.p.trim().split(/\s+/).filter(Boolean)
+  return words.length <= 4 && has(n, ...CONTINUITY)
+}
