@@ -10,6 +10,7 @@ import {
 } from 'firebase/auth'
 import { getFirestore, type Firestore } from 'firebase/firestore'
 import { getStorage, type FirebaseStorage } from 'firebase/storage'
+import { getFunctions, type Functions } from 'firebase/functions'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { initAppCheck } from './appCheck'
 import { startCoachKillSwitch } from './coachKillSwitch'
@@ -65,6 +66,7 @@ let app: FirebaseApp | null = null
 let auth: Auth | null = null
 let db: Firestore | null = null
 let storage: FirebaseStorage | null = null
+let functions: Functions | null = null
 
 if (firebaseEnabled) {
   app = initializeApp(config as Required<typeof config>)
@@ -88,6 +90,9 @@ if (firebaseEnabled) {
   // live coach surface runs the async precheck, which stays gated off while COACH_ENABLED is false.
   initCoachClassifier()
   storage = getStorage(app)
+  // Trusted backend (Cloud Functions v2) — co-located with Firestore. Hosts the
+  // server-side meal analysis (and, later, coach / notifications / deletion).
+  functions = getFunctions(app, 'australia-southeast2')
 }
 
-export { app, auth, db, storage }
+export { app, auth, db, storage, functions }

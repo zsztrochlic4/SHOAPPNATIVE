@@ -1,7 +1,7 @@
 import { onCall, HttpsError, type CallableRequest } from 'firebase-functions/v2/https'
 import { defineSecret } from 'firebase-functions/params'
 import { GoogleGenerativeAI } from '@google/generative-ai'
-import { requireVerifiedUser } from './lib/guards'
+import { requireAuth } from './lib/guards'
 import { enforceDailyLimit } from './lib/rateLimit'
 import { MEAL_SCAN_PROMPT, parseMealAnalysis, type MealAnalysis } from './lib/mealParse'
 
@@ -30,10 +30,14 @@ interface AnalyzeMealInput {
   mimeType?: string
 }
 
+// App Check note (DEVELOPMENT_PLAN.md §4.3): the app uses the Firebase JS SDK on
+// mobile, which cannot produce a native App Check token, so we secure this with
+// sign-in + a per-user rate limit rather than enforcing App Check. Server-side
+// Play Integrity / App Attest verification (Option B) is a later enhancement.
 export const analyzeMeal = onCall<AnalyzeMealInput>(
-  { enforceAppCheck: true, timeoutSeconds: 30, memory: '512MiB', secrets: [GEMINI_API_KEY] },
+  { enforceAppCheck: false, timeoutSeconds: 30, memory: '512MiB', secrets: [GEMINI_API_KEY] },
   async (req: CallableRequest<AnalyzeMealInput>): Promise<MealAnalysis> => {
-    const uid = requireVerifiedUser(req)
+    const uid = requireAuth(req)
 
     const image = req.data?.image
     if (!image || typeof image !== 'string') {
