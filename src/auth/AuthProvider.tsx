@@ -12,7 +12,8 @@ import {
   signOut as fbSignOut,
   type User,
 } from 'firebase/auth'
-import { auth, firebaseEnabled } from '../lib/firebase'
+import { httpsCallable } from 'firebase/functions'
+import { auth, functions, firebaseEnabled } from '../lib/firebase'
 import { deleteUserData } from '../store/cloudRepo'
 
 type AuthState = {
@@ -100,9 +101,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function deleteAccount() {
     if (!auth || !auth.currentUser) throw new Error('You are not signed in.')
     const current = auth.currentUser
-    // Remove cloud data first (the delete rules require the owner to still be
-    // authenticated), then delete the login itself. deleteUser may throw
-    // `auth/requires-recent-login`; the caller surfaces that to the user.
+    // Prefer the server-side complete purge: it removes data + storage + the login
+    // with Admin privileges and needs no recent re-auth. Fall back to the
+    // client-side path if the backend is unreachable, so deletion always works.
+    if (functions) {
+      try {
+        await httpsCallable(functions, 'deleteAccount')()
+        await fbSignOut(auth).catch(() => {}) // clear the now-defunct local session
+        return
+      } catch {
+        /* backend unavailable — fall through to the client-side deletion below */
+      }
+    }
+    // Fallback: delete cloud data (owner-authenticated), then the login itself.
+    // deleteUser may throw `auth/requires-recent-login`; the caller surfaces that.
     await deleteUserData(current.uid)
     await deleteUser(current)
   }
