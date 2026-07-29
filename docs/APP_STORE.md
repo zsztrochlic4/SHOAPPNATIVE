@@ -74,6 +74,8 @@ Then in **App Store Connect** (https://appstoreconnect.apple.com):
   functional on seeded data). Apps that look like thin demos can be rejected.
 - **Android / Google Play** is the same flow with `--platform android` and a
   Google Play Developer account ($25 one-time).
-- The **AI coach** stays in graceful-fallback (on-device rules) unless you set
-  `EXPO_PUBLIC_COACH_API` to a deployed `/api/coach` endpoint — that backend is a
-  good candidate for a Firebase Cloud Function if you want it live.
+- The **AI coach** is gated off for v1 (`COACH_ENABLED=false`) and, per the
+  Production Readiness plan, must move server-side behind a trusted backend and
+  pass an independent safety holdout before it can be enabled. Until then the app
+  uses its on-device rules engine. (The legacy Claude `/api/coach` endpoint has
+  been retired.)

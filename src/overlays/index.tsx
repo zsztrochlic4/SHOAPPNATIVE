@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { View, Text, Pressable, TextInput, Image, ScrollView, Animated, Easing } from 'react-native'
+import { View, Text, Pressable, TextInput, Image, ScrollView, Animated, Easing, Platform } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -184,13 +184,25 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
   useEffect(() => { if (!visible) { setConfirmingClear(false); setLangOpen(false) } }, [visible])
   const currentLang = LANGUAGES.find((l) => l.code === lang) ?? LANGUAGES[0]
 
-  function toggleNotifs() {
+  const NATIVE = Platform.OS === 'ios' || Platform.OS === 'android'
+  async function toggleNotifs() {
     const next = !notificationsEnabled
+    // Enabling on a real device: ask for OS permission first. If it's denied we
+    // must NOT imply success — leave the toggle off and point the user to their
+    // device Settings, so the switch always reflects whether notifications can
+    // actually fire. On web / Expo Go there's no OS prompt, so the setting just
+    // persists (local reminders are a safe no-op there).
+    if (next && NATIVE) {
+      const granted = await requestPushPermission()
+      if (!granted) {
+        dispatch({ type: 'SET_SETTINGS', patch: { notificationsEnabled: false } })
+        toast(t('toast.notifsDenied'))
+        return
+      }
+    }
     dispatch({ type: 'SET_SETTINGS', patch: { notificationsEnabled: next } })
-    // Enable → ask permission now (the moment it's relevant) + PushRegistration
-    // registers the token. Scheduling/cancelling local reminders is reconciled
-    // centrally by <NotificationsSync/>, which reacts to this settings change.
-    if (next) void requestPushPermission()
+    // PushRegistration registers the token; <NotificationsSync/> reconciles the
+    // scheduling/cancelling of local reminders in reaction to this settings change.
     toast(next ? t('toast.notifsOn') : t('toast.notifsOff'))
   }
 

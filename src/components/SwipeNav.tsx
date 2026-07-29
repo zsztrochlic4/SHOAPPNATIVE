@@ -1,5 +1,7 @@
 import { useState, type ReactNode } from 'react'
-import { View, Text, Animated, StyleSheet } from 'react-native'
+import { View, Text, StyleSheet } from 'react-native'
+import { GestureDetector } from 'react-native-gesture-handler'
+import Animated, { useAnimatedStyle, interpolate, Extrapolation } from 'react-native-reanimated'
 import { Menu, MessageCircle } from 'lucide-react-native'
 import { useColors } from '../theme'
 import { useHorizontalSwipe } from '../lib/useHorizontalSwipe'
@@ -26,7 +28,7 @@ export function SwipeNav({
 }) {
   const colors = useColors()
   const [width, setWidth] = useState(IS_WEB ? WEB_SCREEN.width : 0)
-  const { panHandlers, dragX } = useHorizontalSwipe({
+  const { gesture, dragX } = useHorizontalSwipe({
     width: width || 402,
     onSwipeRight: onOpenMenu,
     onSwipeLeft: onOpenCoach,
@@ -34,41 +36,44 @@ export function SwipeNav({
 
   const commit = (width || 402) * 0.32
   // Left pill fades / slides in as the content is pulled right.
-  const leftOpacity = dragX.interpolate({ inputRange: [0, commit], outputRange: [0, 1], extrapolate: 'clamp' })
-  const leftShift = dragX.interpolate({ inputRange: [0, commit], outputRange: [-28, 0], extrapolate: 'clamp' })
-  const leftScale = dragX.interpolate({ inputRange: [0, commit], outputRange: [0.85, 1], extrapolate: 'clamp' })
+  const leftStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(dragX.value, [0, commit], [0, 1], Extrapolation.CLAMP),
+    transform: [
+      { translateX: interpolate(dragX.value, [0, commit], [-28, 0], Extrapolation.CLAMP) },
+      { scale: interpolate(dragX.value, [0, commit], [0.85, 1], Extrapolation.CLAMP) },
+    ],
+  }))
   // Right pill mirrors it for a leftward drag.
-  const rightOpacity = dragX.interpolate({ inputRange: [-commit, 0], outputRange: [1, 0], extrapolate: 'clamp' })
-  const rightShift = dragX.interpolate({ inputRange: [-commit, 0], outputRange: [0, 28], extrapolate: 'clamp' })
-  const rightScale = dragX.interpolate({ inputRange: [-commit, 0], outputRange: [1, 0.85], extrapolate: 'clamp' })
+  const rightStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(dragX.value, [-commit, 0], [1, 0], Extrapolation.CLAMP),
+    transform: [
+      { translateX: interpolate(dragX.value, [-commit, 0], [0, 28], Extrapolation.CLAMP) },
+      { scale: interpolate(dragX.value, [-commit, 0], [1, 0.85], Extrapolation.CLAMP) },
+    ],
+  }))
+  const contentStyle = useAnimatedStyle(() => ({ transform: [{ translateX: dragX.value }] }))
 
   return (
     <View style={{ flex: 1 }} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
       {/* Edge affordances sit behind the content and are revealed as it slides. */}
       <View pointerEvents="none" style={[StyleSheet.absoluteFill, { justifyContent: 'center' }]}>
         <Animated.View
-          style={[
-            styles.pill,
-            { left: 14, backgroundColor: colors.ink700, opacity: leftOpacity, transform: [{ translateX: leftShift }, { scale: leftScale }] },
-          ]}
+          style={[styles.pill, { left: 14, backgroundColor: colors.ink700 }, leftStyle]}
         >
           <Menu size={18} color={colors.brand400} />
           <Text style={[styles.pillText, { color: colors.fg }]}>Menu</Text>
         </Animated.View>
         <Animated.View
-          style={[
-            styles.pill,
-            { right: 14, backgroundColor: colors.ink700, opacity: rightOpacity, transform: [{ translateX: rightShift }, { scale: rightScale }] },
-          ]}
+          style={[styles.pill, { right: 14, backgroundColor: colors.ink700 }, rightStyle]}
         >
           <MessageCircle size={18} color={colors.brand400} />
           <Text style={[styles.pillText, { color: colors.fg }]}>Coach</Text>
         </Animated.View>
       </View>
 
-      <Animated.View style={{ flex: 1, transform: [{ translateX: dragX }] }} {...panHandlers}>
-        {children}
-      </Animated.View>
+      <GestureDetector gesture={gesture}>
+        <Animated.View style={[{ flex: 1 }, contentStyle]}>{children}</Animated.View>
+      </GestureDetector>
     </View>
   )
 }

@@ -3,6 +3,9 @@
     "name": "StrengthHub",
     "slug": "strengthhub",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",

@@ -60,6 +60,7 @@ const en: Dict = {
   'notif.to': 'To',
   'toast.notifsOn': 'Notifications on',
   'toast.notifsOff': 'Notifications off',
+  'toast.notifsDenied': 'Turn on notifications in your device Settings to enable this',
   'toast.soundOn': 'Sounds on',
   'toast.soundOff': 'Sounds off',
   'toast.langSet': 'Language updated',

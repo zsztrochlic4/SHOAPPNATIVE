@@ -5,13 +5,21 @@ import { X, ChevronLeft } from 'lucide-react-native'
 import { useColors } from '../theme'
 import { useNav } from '../nav'
 import { useHorizontalSwipe } from '../lib/useHorizontalSwipe'
+import { GestureDetector } from 'react-native-gesture-handler'
+import Reanimated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  interpolate,
+  runOnJS,
+  Easing as ReEasing,
+} from 'react-native-reanimated'
 import { AppModal, IS_WEB, WEB_SCREEN } from './WebFrame'
 
 // Menu → detail transition: 280ms ease-out, both directions — a short slide
 // crossfaded with opacity (see MenuDetailPanel), calm enough to read as a clean,
 // natural reveal rather than an abrupt full-width sweep.
 const DETAIL_MS = 280
-const DETAIL_EASE = Easing.out(Easing.cubic)
 
 /** Bottom sheet / modal used for logging flows and the active workout. */
 export function Sheet({
@@ -143,35 +151,37 @@ function MenuDetailPanel({
   const height = IS_WEB ? WEB_SCREEN.height : win.height
 
   const [render, setRender] = useState(open)
-  const progress = useRef(new Animated.Value(0)).current
+  const progress = useSharedValue(0)
+  // Clean "rise into place": a short left-anchored slide (a fraction of the
+  // width, not a full-screen sweep) crossfaded with opacity, so the detail
+  // materialises from the menu's side rather than wiping across a dark backdrop.
+  // Swipe-back is a leftward drag toward that same exit edge.
+  const { gesture, dragX } = useHorizontalSwipe({ width, onSwipeLeft: onBack })
   useEffect(() => {
     // Identical duration + easing in BOTH directions, so opening a detail and
     // closing it are exact mirror animations at the same speed.
     if (open) {
       setRender(true)
-      Animated.timing(progress, { toValue: 1, duration: DETAIL_MS, easing: DETAIL_EASE, useNativeDriver: !IS_WEB }).start()
-    } else if (render) {
-      Animated.timing(progress, { toValue: 0, duration: DETAIL_MS, easing: DETAIL_EASE, useNativeDriver: !IS_WEB }).start(({ finished }) => {
-        if (finished) setRender(false)
+      progress.value = withTiming(1, { duration: DETAIL_MS, easing: ReEasing.out(ReEasing.cubic) })
+    } else {
+      progress.value = withTiming(0, { duration: DETAIL_MS, easing: ReEasing.out(ReEasing.cubic) }, (finished) => {
+        if (finished) runOnJS(setRender)(false)
       })
     }
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Clean "rise into place": a short left-anchored slide (a fraction of the
-  // width, not a full-screen sweep) crossfaded with opacity, so the detail
-  // materialises from the menu's side rather than wiping across a dark backdrop.
-  // Swipe-back is a leftward drag toward that same exit edge.
-  const { panHandlers, dragX } = useHorizontalSwipe({ width, onSwipeLeft: onBack })
-  const base = progress.interpolate({ inputRange: [0, 1], outputRange: [-Math.round(width * 0.22), 0] })
-  const translateX = Animated.add(base, dragX)
-  const opacity = progress.interpolate({ inputRange: [0, 1], outputRange: [0, 1] })
+  const animStyle = useAnimatedStyle(() => ({
+    opacity: progress.value,
+    // The open/close slide plus the live finger drag toward the exit edge.
+    transform: [{ translateX: interpolate(progress.value, [0, 1], [-Math.round(width * 0.22), 0]) + dragX.value }],
+  }))
 
   return (
     <AppModal visible={render} animationType="none" onRequestClose={onBack}>
-      <Animated.View
-        {...panHandlers}
+      <GestureDetector gesture={gesture}>
+      <Reanimated.View
         className="flex-1 bg-ink-900"
-        style={{ paddingTop: insets.top, opacity, transform: [{ translateX }], ...(IS_WEB ? { flex: 1, minHeight: 0 } : null) }}
+        style={[{ paddingTop: insets.top }, animStyle, IS_WEB ? { flex: 1, minHeight: 0 } : null]}
       >
         <View className="flex-row items-center gap-1 px-3 py-2.5">
           <Pressable onPress={onBack} hitSlop={8} accessibilityLabel="Back to menu" className="h-9 w-9 items-center justify-center rounded-full active:opacity-70">
@@ -191,7 +201,8 @@ function MenuDetailPanel({
         >
           {children}
         </ScrollView>
-      </Animated.View>
+      </Reanimated.View>
+      </GestureDetector>
     </AppModal>
   )
 }

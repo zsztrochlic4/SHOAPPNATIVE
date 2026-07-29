@@ -5,6 +5,11 @@ import * as Notifications from 'expo-notifications'
 import { doc, setDoc, deleteDoc } from 'firebase/firestore'
 import { db } from './firebase'
 import type { NotificationPrefs } from '../store/types'
+import { inQuietHours, nextAllowedHour } from './quietHours'
+
+// Re-exported for existing importers; the implementation lives in the pure,
+// unit-tested ./quietHours module.
+export { inQuietHours, nextAllowedHour }
 
 /**
  * Push-notification foundation (client side).
@@ -157,12 +162,6 @@ export const DEFAULT_NOTIF_PREFS: NotificationPrefs = {
 /** The evening streak nudge is fixed at 8pm (outside the default quiet window). */
 const STREAK_HOUR = 20
 
-/** Is `hour` inside the quiet window [startH, endH)? Handles windows that wrap midnight. */
-export function inQuietHours(hour: number, startH: number, endH: number): boolean {
-  if (startH === endH) return false
-  return startH < endH ? hour >= startH && hour < endH : hour >= startH || hour < endH
-}
-
 /** Merge stored prefs over the defaults so older saves always resolve fully. */
 export function resolveNotifPrefs(prefs?: Partial<NotificationPrefs>): NotificationPrefs {
   return { ...DEFAULT_NOTIF_PREFS, ...(prefs ?? {}) }
@@ -170,8 +169,10 @@ export function resolveNotifPrefs(prefs?: Partial<NotificationPrefs>): Notificat
 
 /**
  * Reconcile scheduled local reminders with the user's settings: clears everything, then
- * re-schedules only the enabled categories at their times (skipping any that land inside
- * quiet hours). Safe no-op on web / Expo Go. Call on launch and whenever prefs change.
+ * re-schedules only the enabled categories at their times. The user's preferred workout
+ * reminder time is DEFERRED to the next valid hour if it lands inside quiet hours (rather
+ * than being dropped); the fixed evening streak nudge is skipped when quiet covers it.
+ * Safe no-op on web / Expo Go. Call on launch and whenever prefs change.
  */
 export async function syncReminders(enabled: boolean, prefs?: Partial<NotificationPrefs>): Promise<void> {
   if (!NATIVE) return
@@ -180,8 +181,10 @@ export async function syncReminders(enabled: boolean, prefs?: Partial<Notificati
   const p = resolveNotifPrefs(prefs)
   const quiet = (h: number) => p.quiet && inQuietHours(h, p.quietStartHour, p.quietEndHour)
   const jobs: DailyReminder[] = []
-  if (p.workoutReminder && !quiet(p.reminderHour)) {
-    jobs.push({ id: 'workout-reminder', title: 'Time to train 💪', body: "Your session's ready when you are — 45 minutes and it's done.", hour: p.reminderHour })
+  if (p.workoutReminder) {
+    // A preferred time inside quiet hours is deferred to the next valid hour, not dropped.
+    const hour = nextAllowedHour(p.reminderHour, p.quiet, p.quietStartHour, p.quietEndHour)
+    jobs.push({ id: 'workout-reminder', title: 'Time to train 💪', body: "Your session's ready when you are — 45 minutes and it's done.", hour })
   }
   if (p.streakReminder && !quiet(STREAK_HOUR)) {
     jobs.push({ id: 'streak-reminder', title: 'Keep your streak alive 🔥', body: 'Log today to keep the run going. Even a quick check-in counts.', hour: STREAK_HOUR })

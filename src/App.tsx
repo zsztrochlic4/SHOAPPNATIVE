@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { View, ActivityIndicator, ScrollView, Animated, Easing } from 'react-native'
+import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar'
 import '../global.css'
@@ -333,14 +334,17 @@ export default function App() {
   if (devHarness) return devHarness
 
   return (
-    <WebPreviewFrame>
-      <SafeAreaProvider>
-        <StoreProvider>
-          <AuthProvider>
-            <ThemedRoot />
-          </AuthProvider>
-        </StoreProvider>
-      </SafeAreaProvider>
-    </WebPreviewFrame>
+    // GestureHandlerRootView must wrap the whole app for react-native-gesture-handler.
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <WebPreviewFrame>
+        <SafeAreaProvider>
+          <StoreProvider>
+            <AuthProvider>
+              <ThemedRoot />
+            </AuthProvider>
+          </StoreProvider>
+        </SafeAreaProvider>
+      </WebPreviewFrame>
+    </GestureHandlerRootView>
   )
 }

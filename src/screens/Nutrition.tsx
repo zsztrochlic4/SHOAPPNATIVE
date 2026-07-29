@@ -16,6 +16,8 @@ import { useBudgetMeals } from '../data/recipes'
 import { NUTRITION_TAGS, type TagTone } from '../data/nutrition'
 import { nutritionTagsForDay } from '../store/selectors'
 import { useColors } from '../theme'
+import { analyzeMealPhoto } from '../lib/mealScan'
+import type { Confidence, Rec, MealFood } from '../lib/mealScan'
 import type { MealName, MealCategory, BudgetMeal, UserMeal } from '../store/types'
 
 /* ================================================================== */
@@ -74,20 +76,41 @@ const LESSONS = [
   { id: 'hydration', emoji: '🚰', title: 'Hydration and hunger', summary: 'Why hydration helps your diet', body: ['Mild thirst can feel like hunger. A glass of water before a snack often settles it.', 'Sip through the day, and a reusable bottle is the easiest reminder. Remember juice, fizzy drinks and coffees carry calories too.'], takeaway: 'Reach for water first. It is the free, zero-calorie default that often settles a craving.' },
 ]
 
-/* Scripted meal-scan samples (no real ML) — cycle through on each scan. */
-type ScanSample = { name: string; confidence: number; kcal: number; p: number; c: number; f: number; photo: string; items: string[]; rec: 'freely' | 'moderation' | 'occasional'; note: string }
+/* Labelled demo meals for the "Try a sample" button (clearly a demo, not a real
+ * scan). The real scan analyses the actual photo with Gemini vision (see
+ * ../lib/mealScan). */
+type ScanSample = { name: string; kcal: number; p: number; c: number; f: number; photo: string; items: string[]; rec: Rec; note: string }
 const px = (id: number) => `https://images.pexels.com/photos/${id}/pexels-photo-${id}.jpeg?auto=compress&cs=tinysrgb&w=600`
 const SCAN_SAMPLES: ScanSample[] = [
-  { name: 'Grilled chicken & rice bowl', confidence: 94, kcal: 645, p: 48, c: 72, f: 18, photo: px(1640777), items: ['Chicken breast', 'White rice', 'Mixed veg'], rec: 'freely', note: 'Lean protein, smart carbs and plenty of veg. A great everyday meal.' },
-  { name: 'Scrambled eggs on toast', confidence: 91, kcal: 380, p: 22, c: 30, f: 18, photo: px(824635), items: ['Eggs', 'White toast', 'Butter'], rec: 'moderation', note: 'Good protein, but white toast and butter add up. Fine a few times a week.' },
-  { name: 'Salmon, potatoes & greens', confidence: 88, kcal: 525, p: 42, c: 46, f: 14, photo: px(3763847), items: ['Salmon fillet', 'Baby potatoes', 'Green beans'], rec: 'freely', note: 'Omega 3s, protein and fibre. One of the best plates you can build.' },
-  { name: 'Greek yogurt & berry bowl', confidence: 90, kcal: 330, p: 24, c: 38, f: 9, photo: px(1099680), items: ['Greek yogurt', 'Granola', 'Mixed berries'], rec: 'freely', note: 'High protein and light on calories. An ideal snack or breakfast.' },
+  { name: 'Grilled chicken & rice bowl', kcal: 645, p: 48, c: 72, f: 18, photo: px(1640777), items: ['Chicken breast', 'White rice', 'Mixed veg'], rec: 'freely', note: 'Lean protein, smart carbs and plenty of veg. A great everyday meal.' },
+  { name: 'Scrambled eggs on toast', kcal: 380, p: 22, c: 30, f: 18, photo: px(824635), items: ['Eggs', 'White toast', 'Butter'], rec: 'moderation', note: 'Good protein, but white toast and butter add up. Fine a few times a week.' },
+  { name: 'Salmon, potatoes & greens', kcal: 525, p: 42, c: 46, f: 14, photo: px(3763847), items: ['Salmon fillet', 'Baby potatoes', 'Green beans'], rec: 'freely', note: 'Omega 3s, protein and fibre. One of the best plates you can build.' },
+  { name: 'Greek yogurt & berry bowl', kcal: 330, p: 24, c: 38, f: 9, photo: px(1099680), items: ['Greek yogurt', 'Granola', 'Mixed berries'], rec: 'freely', note: 'High protein and light on calories. An ideal snack or breakfast.' },
 ]
-const REC_INFO: Record<ScanSample['rec'], { label: string; color: string }> = {
+const REC_INFO: Record<Rec, { label: string; color: string }> = {
   freely: { label: 'Enjoy freely', color: '#7ED957' },
   moderation: { label: 'In moderation', color: '#F5A524' },
   occasional: { label: 'Keep occasional', color: '#f87171' },
 }
+const CONFIDENCE_INFO: Record<Confidence, { label: string; color: string }> = {
+  high: { label: 'High confidence', color: '#7ED957' },
+  medium: { label: 'Rough estimate', color: '#F5A524' },
+  low: { label: 'Low confidence', color: '#f87171' },
+}
+
+/** Unified shape the scan UI renders — from a real AI analysis or a demo sample. */
+type ScanResult = {
+  name: string; kcalLow: number; kcalHigh: number; p: number; c: number; f: number
+  items: string[]; confidence: Confidence; rec: Rec; note: string; photo?: string; sample?: boolean
+}
+const sampleToResult = (s: ScanSample): ScanResult => ({
+  name: s.name, kcalLow: s.kcal, kcalHigh: s.kcal, p: s.p, c: s.c, f: s.f,
+  items: s.items, confidence: 'high', rec: s.rec, note: s.note, photo: s.photo, sample: true,
+})
+const foodToResult = (a: MealFood): ScanResult => ({
+  name: a.name, kcalLow: a.kcalLow, kcalHigh: a.kcalHigh, p: a.p, c: a.c, f: a.f,
+  items: a.items, confidence: a.confidence, rec: a.rec, note: a.note,
+})
 
 /* Nutrition owns its scrolling now (the app shell no longer wraps it in an outer
  * ScrollView), so each tab's scroller must leave room for the floating bottom nav. */
@@ -242,7 +265,9 @@ function OverviewTab() {
 
   const [scan, setScan] = useState<ScanState>('idle')
   const [img, setImg] = useState<string | null>(null)
-  const [result, setResult] = useState<ScanSample | null>(null)
+  const [result, setResult] = useState<ScanResult | null>(null)
+  const [notFood, setNotFood] = useState(false)
+  const [scanError, setScanError] = useState<string | null>(null)
   const [servings, setServings] = useState(1)
   const [nameEdit, setNameEdit] = useState<string | null>(null)
   const [logPick, setLogPick] = useState(false)
@@ -251,31 +276,53 @@ function OverviewTab() {
   const timers = useRef<ReturnType<typeof setTimeout>[]>([])
   useEffect(() => () => timers.current.forEach(clearTimeout), [])
 
-  function nextSample(): ScanSample {
+  function nextSample(): ScanResult {
     const s = SCAN_SAMPLES[idxRef.current % SCAN_SAMPLES.length]
     idxRef.current += 1
-    return s
+    return sampleToResult(s)
   }
   async function pick(from: 'camera' | 'library') {
+    let asset: ImagePicker.ImagePickerAsset
     try {
       const res = from === 'camera'
-        ? await ImagePicker.launchCameraAsync({ quality: 0.6 })
-        : await ImagePicker.launchImageLibraryAsync({ quality: 0.6 })
+        ? await ImagePicker.launchCameraAsync({ quality: 0.6, base64: true })
+        : await ImagePicker.launchImageLibraryAsync({ quality: 0.6, base64: true })
       if (res.canceled) return
-      const sample = nextSample()
-      setImg(res.assets[0].uri); setResult(sample); setServings(1); setNameEdit(null); setLogPick(false); setScan('analyzing')
-      timers.current.push(setTimeout(() => setScan('result'), 1900))
+      asset = res.assets[0]
     } catch {
       toast("Couldn't open the camera")
+      return
+    }
+    // Real analysis: show the scanning state, then Gemini vision reads the photo.
+    setImg(asset.uri); setResult(null); setNotFood(false); setScanError(null)
+    setServings(1); setNameEdit(null); setLogPick(false); setScan('analyzing')
+    if (!asset.base64) {
+      setScanError("We couldn't read that photo. You can still log this meal manually below.")
+      setScan('result'); return
+    }
+    try {
+      const analysis = await analyzeMealPhoto(asset.base64, asset.mimeType ?? 'image/jpeg')
+      if (analysis.kind === 'not_food') { setNotFood(true); setScan('result'); return }
+      setResult(foodToResult(analysis)); setScan('result')
+    } catch {
+      // Firebase AI Logic not enabled, offline, or the model errored — stay honest.
+      setScanError("Meal scan isn't available right now. You can still log this meal manually below.")
+      setScan('result')
     }
   }
   function trySample() {
     const sample = nextSample()
-    setImg(null); setResult(sample); setServings(1); setNameEdit(null); setLogPick(false); setScan('analyzing')
-    timers.current.push(setTimeout(() => setScan('result'), 1500))
+    setImg(null); setResult(sample); setNotFood(false); setScanError(null)
+    setServings(1); setNameEdit(null); setLogPick(false); setScan('analyzing')
+    timers.current.push(setTimeout(() => setScan('result'), 1200))
   }
-  function retake() { setScan('idle'); setImg(null); setResult(null); setServings(1); setLogPick(false); setNameEdit(null) }
+  function retake() {
+    setScan('idle'); setImg(null); setResult(null); setNotFood(false); setScanError(null)
+    setServings(1); setLogPick(false); setNameEdit(null)
+  }
   const scanName = () => (nameEdit != null && nameEdit.trim() ? nameEdit.trim() : result?.name ?? '')
+  // A single number to log from a range: the midpoint, scaled by servings.
+  const kcalToLog = () => (result ? Math.round(((result.kcalLow + result.kcalHigh) / 2) * servings) : 0)
   function logMeal(slot: MealName) {
     if (!result) return
     const day = todayShort()
@@ -287,14 +334,17 @@ function OverviewTab() {
   }
   function saveToMeals() {
     if (!result) return
-    dispatch({ type: 'ADD_MY_MEAL', meal: { name: scanName(), kcal: Math.round(result.kcal * servings), p: Math.round(result.p * servings), c: Math.round(result.c * servings), f: Math.round(result.f * servings), ingredients: result.items.slice(), notes: 'Scanned meal' } })
+    dispatch({ type: 'ADD_MY_MEAL', meal: { name: scanName(), kcal: kcalToLog(), p: Math.round(result.p * servings), c: Math.round(result.c * servings), f: Math.round(result.f * servings), ingredients: result.items.slice(), notes: 'Scanned meal (estimate)' } })
     setLoggedMsg({ title: scanName(), sub: 'Saved to My Meals' })
     setLogPick(false); setScan('logged')
     toast('Saved to My Meals')
     timers.current.push(setTimeout(retake, 1250))
   }
 
-  const kcal = result ? Math.round(result.kcal * servings) : 0
+  const kLow = result ? Math.round(result.kcalLow * servings) : 0
+  const kHigh = result ? Math.round(result.kcalHigh * servings) : 0
+  const kcalLabel = kLow === kHigh ? `${kLow}` : `${kLow}–${kHigh}`
+  const conf = result ? CONFIDENCE_INFO[result.confidence] : CONFIDENCE_INFO.low
   const rec = result ? REC_INFO[result.rec] : REC_INFO.freely
   const macros = result
     ? (() => {
@@ -306,7 +356,7 @@ function OverviewTab() {
         ]
       })()
     : []
-  const scanImg = img || (result ? result.photo : '')
+  const scanImg = img || result?.photo || ''
 
   const tagCount = selected.length
   const tagCountLabel = tagCount === 0 ? 'Tap any that fit your day' : `${tagCount} logged today`
@@ -338,12 +388,29 @@ function OverviewTab() {
                 <Text className="text-[14px] font-semibold text-white/70">Upload from library</Text>
               </Pressable>
               <View className="h-[3px] w-[3px] rounded-full bg-white/25" />
-              <Pressable onPress={trySample} className="active:opacity-70"><Text className="text-[14px] font-semibold text-brand-400">Try a sample</Text></Pressable>
+              <Pressable onPress={trySample} className="active:opacity-70"><Text className="text-[14px] font-semibold text-brand-400">Try a demo</Text></Pressable>
             </View>
           </>
         )}
 
         {scan === 'analyzing' && <ScanAnalyzing img={scanImg} />}
+
+        {scan === 'result' && notFood && (
+          <View className="mt-3 items-center gap-2 rounded-[15px] border border-white/[0.06] bg-white/[0.03] px-4 py-6">
+            <View className="h-11 w-11 items-center justify-center rounded-full" style={{ backgroundColor: alpha('#f87171', 0.14) }}><X size={22} color="#f87171" strokeWidth={2.6} /></View>
+            <Text className="text-[14px] font-extrabold text-white">That doesn’t look like food</Text>
+            <Text className="max-w-[240px] text-center text-[12px] leading-[1.5] text-white/50">Point the camera at a meal or drink and try again.</Text>
+            <Pressable onPress={retake} className="mt-1 rounded-xl bg-white/[0.06] px-5 py-2.5 active:opacity-80"><Text className="text-[13px] font-bold text-white">Try again</Text></Pressable>
+          </View>
+        )}
+
+        {scan === 'result' && scanError && (
+          <View className="mt-3 items-center gap-2 rounded-[15px] border border-white/[0.06] bg-white/[0.03] px-4 py-6">
+            <Text className="text-[13.5px] font-extrabold text-white">Scan unavailable</Text>
+            <Text className="max-w-[250px] text-center text-[12px] leading-[1.5] text-white/50">{scanError}</Text>
+            <Pressable onPress={retake} className="mt-1 rounded-xl bg-white/[0.06] px-5 py-2.5 active:opacity-80"><Text className="text-[13px] font-bold text-white">Back</Text></Pressable>
+          </View>
+        )}
 
         {scan === 'result' && result && (
           <View>
@@ -351,8 +418,8 @@ function OverviewTab() {
               <Image source={{ uri: scanImg }} resizeMode="cover" className="h-[50px] w-[50px] rounded-xl bg-ink-700" />
               <View className="min-w-0 flex-1">
                 <View className="flex-row items-center gap-1.5">
-                  <Check size={13} color={c.brand400} strokeWidth={3} />
-                  <Text className="text-[10.5px] font-extrabold text-brand-400">{result.confidence}% match</Text>
+                  <View className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: conf.color }} />
+                  <Text className="text-[10.5px] font-extrabold" style={{ color: conf.color }}>{result.sample ? 'Demo sample' : conf.label}</Text>
                 </View>
                 <View className="mt-0.5 flex-row items-center gap-2">
                   <TextInput
@@ -364,13 +431,13 @@ function OverviewTab() {
                 </View>
               </View>
             </View>
-            <Text className="mt-1.5 text-[10px] leading-[1.4] text-white/35">this is our best guess and may not be 100% accurate. tap the name to edit it.</Text>
+            <Text className="mt-1.5 text-[10px] leading-[1.4] text-white/35">{result.sample ? 'A demo example, not a real scan. Tap the name to edit it.' : 'An AI estimate from your photo, not a nutrition label. Numbers are approximate. Tap the name to edit.'}</Text>
 
             <View className="mt-3 flex-row items-end justify-between gap-3">
               <View>
                 <Text className="text-[10px] font-extrabold uppercase tracking-wider text-white/40">Est. calories</Text>
                 <View className="flex-row items-baseline gap-1.5">
-                  <Text className="text-[30px] font-black leading-none text-brand-400">{kcal}</Text>
+                  <Text className="text-[28px] font-black leading-none text-brand-400">{kcalLabel}</Text>
                   <Text className="text-[13px] font-bold text-white/50">kcal</Text>
                 </View>
               </View>

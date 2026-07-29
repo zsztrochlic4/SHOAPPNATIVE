@@ -1,6 +1,6 @@
-import { useRef } from 'react'
-import { Animated, PanResponder } from 'react-native'
-import { IS_WEB } from '../components/WebFrame'
+import { useMemo } from 'react'
+import { Gesture } from 'react-native-gesture-handler'
+import { useSharedValue, withSpring, runOnJS, type SharedValue } from 'react-native-reanimated'
 import { tick, thud } from './haptics'
 
 export type HorizontalSwipeConfig = {
@@ -18,92 +18,85 @@ export type HorizontalSwipeConfig = {
   velocity?: number
 }
 
-/**
- * A finger-tracking horizontal swipe built on core `Animated` + `PanResponder`
- * (this codebase has no gesture-handler / reanimated, and adding them would
- * force a native rebuild and break the web preview).
- *
- * It only claims the gesture when the movement is clearly horizontal, so a
- * vertical ScrollView underneath keeps scrolling. The returned `dragX` tracks
- * the finger 1:1 up to the commit point, then rubber-bands so the trigger has a
- * felt edge. On release it decides by distance OR velocity, fires the matching
- * callback with a confirm haptic, and springs back to rest (the opened surface
- * covers the return). A directional callback left undefined disables that side.
- */
-export function useHorizontalSwipe(cfg: HorizontalSwipeConfig) {
-  const dragX = useRef(new Animated.Value(0)).current
-  // Keep the latest config in a ref so the PanResponder (created once) always
-  // reads current callbacks/flags without being recreated on every render.
-  const ref = useRef(cfg)
-  ref.current = cfg
-  // Whether we've buzzed for crossing the commit line on the current drag.
-  const crossed = useRef(false)
+export type HorizontalSwipe = {
+  /** Pass to a <GestureDetector>. */
+  gesture: ReturnType<typeof Gesture.Pan>
+  /** Shared value tracking the finger (drive a useAnimatedStyle transform). */
+  dragX: SharedValue<number>
+}
 
-  const responder = useRef(
-    PanResponder.create({
-      // Never steal a plain tap.
-      onStartShouldSetPanResponder: () => false,
-      // Claim only clearly-horizontal drags so vertical scrolling still works.
-      onMoveShouldSetPanResponder: (_e, g) => {
-        if (ref.current.enabled === false) return false
-        const horizontal = Math.abs(g.dx) > Math.abs(g.dy) * 1.4 && Math.abs(g.dx) > 8
-        if (!horizontal) return false
-        // Ignore a direction with no handler.
-        if (g.dx > 0 && !ref.current.onSwipeRight) return false
-        if (g.dx < 0 && !ref.current.onSwipeLeft) return false
-        return true
-      },
-      onPanResponderTerminationRequest: () => false,
-      onPanResponderGrant: () => {
-        crossed.current = false
-      },
-      onPanResponderMove: (_e, g) => {
-        const { width, onSwipeRight, onSwipeLeft } = ref.current
-        let dx = g.dx
+/**
+ * A finger-tracking horizontal swipe built on react-native-gesture-handler +
+ * reanimated. The gesture runs on the UI thread, so tracking stays smooth even
+ * while JS is busy (a step up from the previous PanResponder + Animated version).
+ *
+ * It only claims the gesture when the movement is clearly horizontal
+ * (`activeOffsetX` / `failOffsetY`), so a vertical ScrollView underneath keeps
+ * scrolling. `dragX` tracks the finger 1:1 up to the commit point, then
+ * rubber-bands so the trigger has a felt edge. On release it decides by distance
+ * OR velocity, fires the matching callback with a confirm haptic, and springs
+ * back to rest. A directional callback left undefined disables (and damps) that side.
+ */
+export function useHorizontalSwipe(cfg: HorizontalSwipeConfig): HorizontalSwipe {
+  const dragX = useSharedValue(0)
+  // Whether we've buzzed for crossing the commit line on the current drag.
+  const crossed = useSharedValue(false)
+
+  const { width, onSwipeRight, onSwipeLeft, enabled = true, distanceRatio = 0.32, velocity = 0.4 } = cfg
+
+  const gesture = useMemo(() => {
+    const commit = width * distanceRatio
+    const hasRight = !!onSwipeRight
+    const hasLeft = !!onSwipeLeft
+    return Gesture.Pan()
+      .enabled(enabled !== false)
+      // Claim only clearly-horizontal drags; yield vertical movement to scrollers.
+      .activeOffsetX([-8, 8])
+      .failOffsetY([-12, 12])
+      .onBegin(() => {
+        'worklet'
+        crossed.value = false
+      })
+      .onUpdate((e) => {
+        'worklet'
+        let dx = e.translationX
         // Damp a direction that has no handler so it barely gives.
-        if (dx > 0 && !onSwipeRight) dx *= 0.12
-        if (dx < 0 && !onSwipeLeft) dx *= 0.12
-        const commit = width * (ref.current.distanceRatio ?? 0.32)
+        if (dx > 0 && !hasRight) dx *= 0.12
+        if (dx < 0 && !hasLeft) dx *= 0.12
         const mag = Math.abs(dx)
         // 1:1 until the commit line, then rubber-band at 35% past it.
         const shown = mag <= commit ? mag : commit + (mag - commit) * 0.35
-        dragX.setValue(Math.sign(dx) * shown)
+        dragX.value = Math.sign(dx) * shown
         const past = mag >= commit
-        if (past && !crossed.current) {
-          crossed.current = true
-          tick()
-        } else if (!past && crossed.current) {
-          crossed.current = false
+        if (past && !crossed.value) {
+          crossed.value = true
+          runOnJS(tick)()
+        } else if (!past && crossed.value) {
+          crossed.value = false
         }
-      },
-      onPanResponderRelease: (_e, g) => {
-        const { width, onSwipeRight, onSwipeLeft } = ref.current
-        const commit = width * (ref.current.distanceRatio ?? 0.32)
-        const vThresh = ref.current.velocity ?? 0.4
-        const right = g.dx > 0 && (g.dx >= commit || g.vx >= vThresh)
-        const left = g.dx < 0 && (-g.dx >= commit || -g.vx >= vThresh)
-        if (right && onSwipeRight) {
-          thud()
-          onSwipeRight()
-        } else if (left && onSwipeLeft) {
-          thud()
-          onSwipeLeft()
+      })
+      .onEnd((e) => {
+        'worklet'
+        // gesture-handler velocity is px/s; the threshold is pts/ms, so /1000.
+        const vx = e.velocityX / 1000
+        const right = e.translationX > 0 && (e.translationX >= commit || vx >= velocity)
+        const left = e.translationX < 0 && (-e.translationX >= commit || -vx >= velocity)
+        if (right && hasRight && onSwipeRight) {
+          runOnJS(thud)()
+          runOnJS(onSwipeRight)()
+        } else if (left && hasLeft && onSwipeLeft) {
+          runOnJS(thud)()
+          runOnJS(onSwipeLeft)()
         }
-        Animated.spring(dragX, {
-          toValue: 0,
-          velocity: g.vx,
-          tension: 120,
-          friction: 14,
-          useNativeDriver: !IS_WEB,
-        }).start()
-        crossed.current = false
-      },
-      onPanResponderTerminate: () => {
-        Animated.spring(dragX, { toValue: 0, tension: 120, friction: 14, useNativeDriver: !IS_WEB }).start()
-        crossed.current = false
-      },
-    }),
-  ).current
+      })
+      .onFinalize((e) => {
+        'worklet'
+        // Always settle back to rest (covers both a normal release and an
+        // interrupted/terminated gesture), carrying the fling velocity through.
+        dragX.value = withSpring(0, { velocity: e.velocityX, stiffness: 120, damping: 14 })
+        crossed.value = false
+      })
+  }, [width, distanceRatio, velocity, enabled, onSwipeRight, onSwipeLeft, dragX, crossed])
 
-  return { panHandlers: responder.panHandlers, dragX }
+  return { gesture, dragX }
 }
