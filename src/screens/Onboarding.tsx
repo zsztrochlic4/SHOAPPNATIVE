@@ -2081,11 +2081,18 @@ function Welcome({ onStart, onLogin }: { onStart: () => void; onLogin: () => voi
 
 function Login({ onBack }: { onBack: () => void }) {
   const tok = useTok()
-  const { signIn } = useAuth()
+  const { signIn, resetPassword } = useAuth()
   const [email, setEmail] = useState('')
   const [pw, setPw] = useState('')
   const [busy, setBusy] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
   const submit = async () => { setBusy(true); try { await signIn(email, pw) } catch { /* auth listener handles success; errors surface in the real AuthScreen */ } finally { setBusy(false) } }
+  const forgot = async () => {
+    setNotice(null)
+    if (!email.trim()) { setNotice('Enter your email above first, then tap “Forgot password?”.'); return }
+    try { await resetPassword(email); setNotice('Reset email sent. Check your inbox and spam folder.') }
+    catch { setNotice('Couldn’t send a reset email. Check the address and try again.') }
+  }
   return (
     <View style={{ flex: 1 }}>
       <View style={{ paddingTop: 10, paddingHorizontal: 20 }}>
@@ -2113,7 +2120,8 @@ function Login({ onBack }: { onBack: () => void }) {
           <Text style={{ fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', color: tok.rgb('--fg', 0.4), marginBottom: 8 }}>Password</Text>
           <PasswordInput value={pw} onChangeText={setPw} />
         </Reveal>
-        <Reveal delay={340}><Pressable style={{ marginTop: 12 }}><Text style={{ color: tok.rgb('--brand-300'), fontSize: 14, fontWeight: '600' }}>Forgot password?</Text></Pressable></Reveal>
+        <Reveal delay={340}><Pressable style={{ marginTop: 12 }} onPress={forgot} hitSlop={6}><Text style={{ color: tok.rgb('--brand-300'), fontSize: 14, fontWeight: '600' }}>Forgot password?</Text></Pressable></Reveal>
+        {notice && <Text style={{ marginTop: 10, fontSize: 13, lineHeight: 18, color: tok.rgb('--fg', 0.6) }}>{notice}</Text>}
       </ScrollView>
       <ActionBar label={busy ? 'Logging in…' : 'Log In'} disabled={!(email && pw) || busy} onPress={submit} />
     </View>

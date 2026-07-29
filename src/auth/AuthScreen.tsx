@@ -38,16 +38,37 @@ function friendlyError(code: string): string {
 
 export function AuthScreen({ initialMode = 'signin', onBack }: { initialMode?: 'signin' | 'signup'; onBack?: () => void }) {
   const insets = useSafeAreaInsets()
-  const { signIn, signUp, signInWithGoogle } = useAuth()
+  const { signIn, signUp, signInWithGoogle, resetPassword } = useAuth()
   const [mode, setMode] = useState<'signin' | 'signup'>(initialMode)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+
+  async function forgot() {
+    setError(null)
+    setNotice(null)
+    if (!email.trim()) {
+      setError('Enter your email above first, then tap “Forgot password?”.')
+      return
+    }
+    setBusy(true)
+    try {
+      await resetPassword(email)
+      setNotice('Password reset email sent. Check your inbox (and your spam folder).')
+    } catch (e: unknown) {
+      const code = (e as { code?: string })?.code ?? ''
+      setError(friendlyError(code) || (e as Error)?.message || 'Couldn’t send the reset email.')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   async function submit() {
     setError(null)
+    setNotice(null)
     setBusy(true)
     try {
       if (mode === 'signup') await signUp(email, password, name)
@@ -106,9 +127,21 @@ export function AuthScreen({ initialMode = 'signin', onBack }: { initialMode?: '
           secureTextEntry autoCapitalize="none"
         />
 
+        {!isSignup && (
+          <Pressable onPress={forgot} disabled={busy} hitSlop={6} className="mt-2 self-end active:opacity-70">
+            <Text className="text-[13px] font-semibold" style={{ color: brand[400] }}>Forgot password?</Text>
+          </Pressable>
+        )}
+
         {error && (
           <View className="mt-3 rounded-xl border border-red-500/25 bg-red-500/10 p-3">
             <Text className="text-[13px] text-red-300">{error}</Text>
+          </View>
+        )}
+
+        {notice && (
+          <View className="mt-3 rounded-xl border border-brand-400/25 bg-brand-400/10 p-3">
+            <Text className="text-[13px]" style={{ color: brand[400] }}>{notice}</Text>
           </View>
         )}
 
@@ -136,7 +169,7 @@ export function AuthScreen({ initialMode = 'signin', onBack }: { initialMode?: '
           <Text className="font-semibold text-white">Continue with Google</Text>
         </PressableScale>
 
-        <Pressable onPress={() => { setMode(isSignup ? 'signin' : 'signup'); setError(null) }} className="mt-6 active:opacity-70">
+        <Pressable onPress={() => { setMode(isSignup ? 'signin' : 'signup'); setError(null); setNotice(null) }} className="mt-6 active:opacity-70">
           <Text className="text-center text-[14px] text-white/55">
             {isSignup ? 'Already have an account? ' : 'New here? '}
             <Text className="font-bold" style={{ color: brand[400] }}>{isSignup ? 'Sign in' : 'Create one'}</Text>

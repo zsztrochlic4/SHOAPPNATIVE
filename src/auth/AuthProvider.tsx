@@ -7,6 +7,7 @@ import {
   GoogleAuthProvider,
   updateProfile,
   onAuthStateChanged,
+  sendPasswordResetEmail,
   signOut as fbSignOut,
   type User,
 } from 'firebase/auth'
@@ -22,6 +23,7 @@ type AuthState = {
   signUp: (email: string, password: string, name?: string) => Promise<void>
   signIn: (email: string, password: string) => Promise<void>
   signInWithGoogle: () => Promise<void>
+  resetPassword: (email: string) => Promise<void>
   signOut: () => Promise<void>
 }
 
@@ -85,6 +87,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signInWithPopup(auth, new GoogleAuthProvider())
   }
 
+  async function resetPassword(email: string) {
+    if (!auth) throw new Error('Accounts are not available yet.')
+    // Sends the branded reset email configured in Firebase → Authentication → Templates.
+    await sendPasswordResetEmail(auth, email.trim())
+  }
+
   async function signOut() {
     if (auth) await fbSignOut(auth)
   }
@@ -96,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signUp,
     signIn,
     signInWithGoogle,
+    resetPassword,
     signOut,
   }
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
