@@ -49,6 +49,12 @@
           "backgroundColor": "#0A0A0B"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "4dbde520-4690-4bd0-947a-a8f76ef6eb9f"
+      }
+    },
+    "owner": "strengthhubonline"
   }
 }
