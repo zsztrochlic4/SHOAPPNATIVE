@@ -1,0 +1,24 @@
+{
+  "name": "strengthhub-functions",
+  "description": "Trusted backend for StrengthHub Online — Cloud Functions v2 (App Check enforcement point + server-side AI, notifications, account deletion). See docs/DEVELOPMENT_PLAN.md Phase B.",
+  "private": true,
+  "engines": {
+    "node": "20"
+  },
+  "main": "lib/index.js",
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "serve": "npm run build && firebase emulators:start --only functions",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.7.0",
+    "firebase-functions": "^6.3.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}
