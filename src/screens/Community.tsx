@@ -33,6 +33,10 @@ export default function Community() {
         }
       />
       <SegmentedTabs tabs={TABS} active={tab} onChange={setTab} />
+      <View className="mt-3 flex-row items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
+        <CalendarClock size={14} color={brand[400]} />
+        <Text className="flex-1 text-[12px] leading-snug text-white/55">Preview — social features aren’t live yet, so the posts and people shown here are examples.</Text>
+      </View>
       <View className="mt-5">
         {tab === 'Feed' && <FeedTab />}
         {tab === 'Groups' && <GroupList />}
