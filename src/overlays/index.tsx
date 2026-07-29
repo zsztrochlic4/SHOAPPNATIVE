@@ -173,6 +173,7 @@ function GoalRow({ label, unit, children }: { label: string; unit: string; child
 export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: () => void }) {
   const { state, dispatch } = useStore()
   const toast = useToast()
+  const { enabled: authEnabled, deleteAccount } = useAuth()
   const { notificationsEnabled } = state.settings
   const soundEnabled = state.settings.soundEnabled ?? true
   const lang = state.settings.language ?? 'en'
@@ -180,8 +181,29 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
   // Two-step inline confirm for the destructive wipe — works on web and native
   // (RN's Alert is a no-op on react-native-web, so a dialog would never show).
   const [confirmingClear, setConfirmingClear] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [langOpen, setLangOpen] = useState(false)
-  useEffect(() => { if (!visible) { setConfirmingClear(false); setLangOpen(false) } }, [visible])
+  useEffect(() => { if (!visible) { setConfirmingClear(false); setConfirmingDelete(false); setLangOpen(false) } }, [visible])
+
+  async function onDeleteAccount() {
+    if (!confirmingDelete) { setConfirmingDelete(true); return }
+    setDeleting(true)
+    try {
+      await deleteAccount()
+      dispatch({ type: 'RESET_EMPTY' }) // clear local state; auth listener routes to login
+      toast('Your account has been deleted')
+      onDone?.()
+    } catch (e: unknown) {
+      const code = (e as { code?: string })?.code ?? ''
+      toast(code === 'auth/requires-recent-login'
+        ? 'For security, log out and back in, then delete your account'
+        : 'Could not delete your account. Please try again.')
+      setConfirmingDelete(false)
+    } finally {
+      setDeleting(false)
+    }
+  }
   const currentLang = LANGUAGES.find((l) => l.code === lang) ?? LANGUAGES[0]
 
   const NATIVE = Platform.OS === 'ios' || Platform.OS === 'android'
@@ -299,6 +321,19 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
             <Text className="text-[12px] text-white/50">{confirmingClear ? 'Erases your data and restarts onboarding' : t('settings.clearSub')}</Text>
           </View>
         </Pressable>
+        {authEnabled && (
+          <Pressable
+            onPress={onDeleteAccount}
+            disabled={deleting}
+            className={`w-full flex-row items-center gap-3 rounded-2xl border p-4 active:opacity-90 ${confirmingDelete ? 'border-red-500/60 bg-red-500/15' : 'border-red-500/20 bg-red-500/5'} ${deleting ? 'opacity-60' : ''}`}
+          >
+            <Trash2 size={18} color="#f87171" />
+            <View className="flex-1">
+              <Text className="font-bold text-red-300">{deleting ? 'Deleting…' : confirmingDelete ? 'Tap again to permanently delete' : 'Delete account'}</Text>
+              <Text className="text-[12px] text-white/50">{confirmingDelete ? 'Erases your account and all data — this cannot be undone' : 'Permanently delete your account and data'}</Text>
+            </View>
+          </Pressable>
+        )}
       </Group>
 
       <View className="mt-7 items-center gap-2">

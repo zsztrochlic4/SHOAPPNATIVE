@@ -8,10 +8,12 @@ import {
   updateProfile,
   onAuthStateChanged,
   sendPasswordResetEmail,
+  deleteUser,
   signOut as fbSignOut,
   type User,
 } from 'firebase/auth'
 import { auth, firebaseEnabled } from '../lib/firebase'
+import { deleteUserData } from '../store/cloudRepo'
 
 type AuthState = {
   /** True while we're still figuring out if someone is logged in. */
@@ -24,6 +26,8 @@ type AuthState = {
   signIn: (email: string, password: string) => Promise<void>
   signInWithGoogle: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
+  /** Permanently delete the signed-in user's cloud data and their account. */
+  deleteAccount: () => Promise<void>
   signOut: () => Promise<void>
 }
 
@@ -93,6 +97,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await sendPasswordResetEmail(auth, email.trim())
   }
 
+  async function deleteAccount() {
+    if (!auth || !auth.currentUser) throw new Error('You are not signed in.')
+    const current = auth.currentUser
+    // Remove cloud data first (the delete rules require the owner to still be
+    // authenticated), then delete the login itself. deleteUser may throw
+    // `auth/requires-recent-login`; the caller surfaces that to the user.
+    await deleteUserData(current.uid)
+    await deleteUser(current)
+  }
+
   async function signOut() {
     if (auth) await fbSignOut(auth)
   }
@@ -105,6 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signIn,
     signInWithGoogle,
     resetPassword,
+    deleteAccount,
     signOut,
   }
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

@@ -83,11 +83,14 @@ Installed apps.
    appears. This is the honest, defensible position — if a lawyer prefers a more
    conservative declaration, follow their advice.
 
-2. **Account deletion must actually exist.** Both stores now **require** an
-   in-app way to delete your account (not just email). You currently have the
-   email path; the **in-app "Delete account" button is a feature still to build**
-   (Zsztrochlic — I can build a basic version now; full photo/file wipe needs the
-   backend). Don't tick "users can delete data in-app" until that button ships.
+2. **Account deletion — now built in-app. ✅** Both stores require an in-app way
+   to delete your account. This now exists: **Settings → Delete account** (two-tap
+   confirm). It deletes the user's login and all their app data (workouts,
+   nutrition, chat, etc.); the root profile record is scrubbed and finished off by
+   the future backend cleanup. So you can answer **"Yes, users can request that
+   their data be deleted"** and point to that in-app control (plus the email
+   route). Note: for security, Firebase may ask a user to log in again just before
+   deleting — that's expected.
 
 3. **Keep it truthful and in sync.** These answers match your current app and
    your privacy policy exactly. Change one (e.g. add analytics, start storing

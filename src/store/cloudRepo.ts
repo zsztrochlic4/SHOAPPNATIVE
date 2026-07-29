@@ -1,5 +1,5 @@
 import {
-  doc, collection, getDoc, getDocs, writeBatch, serverTimestamp,
+  doc, collection, getDoc, getDocs, writeBatch, setDoc, serverTimestamp,
 } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { sanitizeForPersist, sanitizeEntry } from '../lib/sanitize'
@@ -87,6 +87,45 @@ function chunk<T>(items: T[], size: number): T[][] {
   const out: T[][] = []
   for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size))
   return out
+}
+
+/**
+ * Delete a signed-in user's cloud data, for in-app account deletion.
+ *
+ * Removes every document in every per-user subcollection (firestore.rules allows
+ * an owner to delete these), then best-effort scrubs the root singleton doc. The
+ * root doc itself cannot be *deleted* from the client by design (firestore.rules:
+ * `allow delete: if false` — reserved for the server account-deletion workflow),
+ * so we overwrite it to strip personal data; once the user's Auth account is
+ * removed the doc is owner-less and unreadable, and the backend workflow removes
+ * it fully later.
+ *
+ * Call this BEFORE deleting the Auth user, while the owner is still authenticated
+ * (the delete rules require `isOwner()`).
+ */
+export async function deleteUserData(uid: string): Promise<void> {
+  if (!db || !uid || uid === 'local') return
+  // Every per-user subcollection defined in firestore.rules.
+  const subs = [
+    'sessions', 'weights', 'habits', 'meals', 'activities', 'foodReviews',
+    'chat', 'coachThread', 'notifications', 'programs', 'workout_instances',
+    'set_logs', 'progression_state', 'pushTokens',
+  ]
+  for (const sub of subs) {
+    const snap = await getDocs(collection(db, COL, uid, sub))
+    for (const group of chunk(snap.docs, BATCH_LIMIT)) {
+      const batch = writeBatch(db)
+      for (const d of group) batch.delete(d.ref)
+      await batch.commit()
+    }
+  }
+  // Strip personal data from the root doc (a client delete is blocked by rules).
+  try {
+    await setDoc(doc(db, COL, uid), { demo: false }, { merge: false })
+  } catch {
+    /* Rules may reject the scrub (e.g. a set premium flag); the root becomes
+       unreadable once the Auth account is gone, and the backend cleanup finishes it. */
+  }
 }
 
 /**
