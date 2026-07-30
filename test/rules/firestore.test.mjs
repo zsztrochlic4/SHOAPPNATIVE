@@ -50,6 +50,7 @@ const fixtures = (uid) => ({
   chat: ['c1', { id: 'c1', role: 'user', text: 'hi', dateKey: DK }],
   coachThread: ['ct1', { id: 'ct1', dateKey: DK, kind: 'nudge', title: 'Hi', body: 'keep going' }],
   notifications: ['n1', { id: 'n1', type: 'system', title: 'T', body: 'B', dateKey: DK }],
+  workoutSummaries: ['s1', { id: 's1', dateKey: DK, volumeKg: 1200, lifts: { bench: 100, squat: 140 } }],
   programs: ['p1', { program_id: 'p1', uid, version: 1, active: true }],
   workout_instances: ['wi1', { instance_id: 'wi1', program_id: 'p1', uid, status: 'planned' }],
   set_logs: ['sl1', { log_id: 'sl1', instance_id: 'wi1', uid, exercise_id: 'squat', set_number: 1 }],
@@ -189,6 +190,23 @@ test('unknown subcollection is denied', async () => {
 
 test('id-keyed entry with mismatched embedded id is denied', async () => {
   await assertFails(setDoc(doc(aliceDb(), 'users', ALICE, 'sessions', 's1'), { id: 'DIFFERENT', name: 'x' }))
+})
+
+test('workoutSummary with mismatched id or non-numeric volume is denied', async () => {
+  const db = aliceDb()
+  await assertFails(setDoc(doc(db, 'users', ALICE, 'workoutSummaries', 's1'), { id: 'OTHER', dateKey: DK, volumeKg: 1, lifts: {} }))
+  await assertFails(setDoc(doc(db, 'users', ALICE, 'workoutSummaries', 's1'), { id: 's1', dateKey: DK, volumeKg: 'lots', lifts: {} }))
+})
+
+test('another user cannot read or write a workoutSummary', async () => {
+  await seed((db) => setDoc(doc(db, 'users', ALICE, 'workoutSummaries', 's1'), { id: 's1', dateKey: DK, volumeKg: 1, lifts: {} }))
+  await assertFails(getDoc(doc(bobDb(), 'users', ALICE, 'workoutSummaries', 's1')))
+  await assertFails(setDoc(doc(bobDb(), 'users', ALICE, 'workoutSummaries', 's1'), { id: 's1', dateKey: DK, volumeKg: 2, lifts: {} }))
+})
+
+test('workoutSummaryComplete is an accepted boolean root field', async () => {
+  await assertSucceeds(setDoc(doc(aliceDb(), 'users', ALICE), rootDoc({ workoutSummaryComplete: true })))
+  await assertFails(setDoc(doc(aliceDb(), 'users', ALICE), rootDoc({ workoutSummaryComplete: 'yes' })))
 })
 
 test('dateKey-keyed entry with mismatched / malformed dateKey is denied', async () => {

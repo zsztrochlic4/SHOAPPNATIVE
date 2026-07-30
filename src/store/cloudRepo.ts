@@ -55,6 +55,7 @@ const SUBCOLLECTIONS = {
   chat: (e: any) => e.id as string,
   coachThread: (e: any) => e.id as string,
   notifications: (e: any) => e.id as string,
+  workoutSummaries: (e: any) => e.id as string,
 } as const
 
 type SubKey = keyof typeof SUBCOLLECTIONS
@@ -82,6 +83,10 @@ const LOAD_POLICY: Record<SubKey, 'full' | 'window'> = {
   weights: 'full',
   habits: 'full',
   foodReviews: 'full',
+  // The compact per-session projection (Phase C Option B): tiny, and it backs the
+  // all-time Progress charts, so load it fully — that's what lets full sessions
+  // stay windowed without the charts losing history.
+  workoutSummaries: 'full',
   sessions: 'window',
   meals: 'window',
   activities: 'window',
@@ -152,8 +157,8 @@ export async function deleteUserData(uid: string): Promise<void> {
   // Every per-user subcollection defined in firestore.rules.
   const subs = [
     'sessions', 'weights', 'habits', 'meals', 'activities', 'foodReviews',
-    'chat', 'coachThread', 'notifications', 'programs', 'workout_instances',
-    'set_logs', 'progression_state', 'pushTokens',
+    'chat', 'coachThread', 'notifications', 'workoutSummaries', 'programs',
+    'workout_instances', 'set_logs', 'progression_state', 'pushTokens',
   ]
   for (const sub of subs) {
     const snap = await getDocs(collection(db, COL, uid, sub))

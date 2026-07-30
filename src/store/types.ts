@@ -299,6 +299,24 @@ export interface WorkoutSession {
   accent?: 'brand' | 'blue'
 }
 
+/**
+ * A compact projection of one COMPLETED workout session (Phase C Option B).
+ * Everything the all-time Progress charts need — total volume and the best
+ * estimated 1RM per exercise — without the full per-set session document. Kept
+ * tiny (~4–8 lift entries) so the whole history loads on cold start cheaply and
+ * the charts never have to read full sessions. Maintained client-side; id and
+ * dateKey mirror the session it summarises. See src/store/workoutSummary.ts.
+ */
+export interface WorkoutSummary {
+  /** == the source WorkoutSession.id */
+  id: string
+  dateKey: string
+  /** WorkoutSession.volumeKg (done sets only, already computed). */
+  volumeKg: number
+  /** exercise defId → best Epley estimated-1RM across that exercise's sets. */
+  lifts: Record<string, number>
+}
+
 /** One exercise slot in a user-built workout template (no per-set data — that's
  *  filled in live when the session is started). */
 export interface TemplateExercise {
@@ -531,6 +549,13 @@ export interface AppState {
   nutritionTags?: Record<string, string[]>
   foods: FoodItem[]
   sessions: WorkoutSession[]
+  /** Compact per-completed-session projections backing the all-time Progress
+   *  charts (Phase C Option B). Maintained client-side; see workoutSummary.ts. */
+  workoutSummaries?: WorkoutSummary[]
+  /** True once `workoutSummaries` covers every completed session on the server
+   *  (a new account, or after the one-time backfill on first Progress open).
+   *  While false the charts derive from whatever sessions are currently loaded. */
+  workoutSummaryComplete?: boolean
   program: ProgramDay[]
   posts: Post[]
   leaderboard: LeaderUser[]

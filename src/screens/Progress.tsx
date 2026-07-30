@@ -28,10 +28,13 @@ export default function Progress() {
   const p = state.profile
   const [range, setRange] = useState<'4 Weeks' | '12 Weeks'>('4 Weeks')
 
-  // This screen renders all-time charts/stats. Cold start only loads a recent
-  // window of history (cloudRepo LOAD_POLICY), so pull the older remainder in
-  // now; the merge is additive and repopulates these stats a beat later.
-  useEffect(() => { ensureFullHistory() }, [])
+  // This screen renders all-time charts. Once the workout-summary projection is
+  // complete (Phase C Option B) the charts read the tiny summaries, so there's
+  // nothing to fetch. Until then (an existing account's first open), pull the
+  // full history in once so the backfill can build the summaries.
+  useEffect(() => {
+    if (!state.workoutSummaryComplete) ensureFullHistory()
+  }, [state.workoutSummaryComplete])
 
   const w = weightStats(state)
   const sp = strengthProgress(state)

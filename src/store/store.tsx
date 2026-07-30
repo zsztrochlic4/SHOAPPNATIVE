@@ -30,6 +30,7 @@ import { sessionFromInstance, fullWeekday } from './programSession'
 import { sessionForDay } from './selectors'
 import { plannedPeriods, toPlannedAbsence } from './periods'
 import { mergeById, type HistoryEntry } from './historyMerge'
+import { summarizeSession, buildAllSummaries } from './workoutSummary'
 
 /** The append-heavy slices that load lazily under the bounded-read model. */
 export type WindowedHistory = Partial<
@@ -42,6 +43,7 @@ const STORAGE_KEY = 'sho.state.v1'
 export type Action =
   | { type: 'HYDRATE'; state: AppState }
   | { type: 'MERGE_HISTORY'; history: WindowedHistory }
+  | { type: 'BUILD_WORKOUT_SUMMARIES' }
   | { type: 'SET_SETTINGS'; patch: Partial<Settings> }
   | { type: 'SET_PROFILE'; patch: Partial<Profile> }
   | { type: 'COMPLETE_ONBOARDING'; profile: Partial<Profile>; backendUser?: UserDoc; generatedProgram?: StoredProgram | null; programStatus?: ProgramStatus | null; workoutInstances?: WorkoutInstanceDoc[] }
@@ -104,6 +106,19 @@ function nowTime() {
   return new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 }
 
+/**
+ * Keep the workout-summary projection (Phase C Option B) in step with a
+ * completed session: upsert its compact summary so the all-time Progress charts
+ * stay current without ever re-reading full session history. No-op for a session
+ * that isn't completed (only completed sessions feed the charts).
+ */
+function withSummary(state: AppState, session: WorkoutSession): AppState {
+  if (!session.completed) return state
+  const sum = summarizeSession(session)
+  const rest = (state.workoutSummaries ?? []).filter((w) => w.id !== sum.id)
+  return { ...state, workoutSummaries: [...rest, sum] }
+}
+
 function recalc(s: WorkoutSession): WorkoutSession {
   const volumeKg = Math.round(
     s.exercises.reduce((a, ex) => a + ex.sets.reduce((b, set) => b + (set.done ? set.weightKg * set.reps : 0), 0), 0),
@@ -160,6 +175,12 @@ function reducer(state: AppState, action: Action): AppState {
         notifications: merge(state.notifications, h.notifications),
       }
     }
+
+    // The one-time backfill: once the full session history is loaded (after
+    // MERGE_HISTORY), rebuild every summary and mark the projection complete.
+    // From here charts read summaries and full sessions never load again.
+    case 'BUILD_WORKOUT_SUMMARIES':
+      return { ...state, workoutSummaries: buildAllSummaries(state.sessions), workoutSummaryComplete: true }
 
     case 'SET_SETTINGS':
       return { ...state, settings: { ...state.settings, ...action.patch } }
@@ -418,7 +439,8 @@ function reducer(state: AppState, action: Action): AppState {
       const sessions = exists
         ? state.sessions.map((s) => (s.id === action.session.id ? recalc(action.session) : s))
         : [...state.sessions, recalc(action.session)]
-      return { ...state, sessions }
+      const saved = sessions.find((s) => s.id === action.session.id)
+      return saved ? withSummary({ ...state, sessions }, saved) : { ...state, sessions }
     }
 
     case 'TOGGLE_EXERCISE_DONE': {
@@ -448,7 +470,9 @@ function reducer(state: AppState, action: Action): AppState {
         time: nowTime(),
         read: false,
       }
-      return { ...state, sessions, habits, notifications: [notif, ...state.notifications] }
+      const next = { ...state, sessions, habits, notifications: [notif, ...state.notifications] }
+      const completed = sessions.find((s) => s.id === action.id)
+      return completed ? withSummary(next, completed) : next
     }
 
     case 'TOGGLE_LIKE': {

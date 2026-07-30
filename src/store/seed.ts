@@ -426,6 +426,10 @@ export function emptyState(): AppState {
     mealPlan: [],
     postComments: [],
     sessions: [],
+    // New account: no history to backfill, so the projection starts complete and
+    // stays complete via the per-completion upsert (Phase C Option B).
+    workoutSummaries: [],
+    workoutSummaryComplete: true,
     posts: s.posts.filter((p) => p.authorId !== 'you'),
     notifications: [],
     coachThread: [],

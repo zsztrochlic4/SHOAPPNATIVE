@@ -117,6 +117,10 @@ export function CloudSync() {
       historyLoadedRef.current = true
       hasMoreRef.current = false
       dispatch({ type: 'MERGE_HISTORY', history: older as unknown as WindowedHistory })
+      // Full session history is now in state → build the summary projection once
+      // (Phase C Option B). Applied in the same commit as the merge; the new
+      // summaries + the completion flag then persist via the normal diff-save.
+      dispatch({ type: 'BUILD_WORKOUT_SUMMARIES' })
     } catch {
       // offline / transient — leave historyLoadedRef false so a later call
       // retries, and clear the guard since no merge is pending.

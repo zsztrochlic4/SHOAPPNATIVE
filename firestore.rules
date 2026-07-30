@@ -55,7 +55,8 @@ service cloud.firestore {
           'events', 'groups', 'partners', 'myMeals', 'templates',
           'workoutStartedKeys', 'nutritionAskedKeys', 'beginnerProgress',
           'coachUsage', 'integrations', 'plannedPeriods', 'backendUser',
-          'generatedProgram', 'workoutInstances', 'programStatus', 'demo', 'v',
+          'generatedProgram', 'workoutInstances', 'programStatus',
+          'workoutSummaryComplete', 'demo', 'v',
           'updatedAt'
         ];
       }
@@ -81,6 +82,7 @@ service cloud.firestore {
           && (!('integrations' in d)       || d.integrations is map)
           && (!('coachUsage' in d)         || d.coachUsage is map)
           && (!('demo' in d)               || d.demo is bool)
+          && (!('workoutSummaryComplete' in d) || d.workoutSummaryComplete is bool)
           && (!('v' in d)                  || d.v is int)
           && (!('updatedAt' in d)          || d.updatedAt is timestamp || d.updatedAt is string);
       }
@@ -188,6 +190,15 @@ service cloud.firestore {
         allow get, list, delete: if isOwner();
         allow create, update: if isOwner() && entryKeysBounded() && idMatches(id)
           && textCap('title', 200) && textCap('body', 1000);
+      }
+      // Compact per-completed-session projection (Phase C Option B): the app's
+      // own display cache for the all-time Progress charts. Owner-owned Zone A,
+      // no free text. `lifts` is a small numeric map; the key/size cap bounds it.
+      match /workoutSummaries/{id} {
+        allow get, list, delete: if isOwner();
+        allow create, update: if isOwner() && entryKeysBounded() && idMatches(id)
+          && request.resource.data.get('dateKey', '') is string
+          && request.resource.data.get('volumeKg', 0) is number;
       }
       match /programs/{program_id} {
         allow get, list, delete: if isOwner();

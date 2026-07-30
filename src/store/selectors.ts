@@ -1,5 +1,12 @@
 import { currentWeekKeys, dayKey, todayKey, fromKey, toKey, addDays } from '../lib/date'
 import type { AppState, HabitDay, WorkoutSession } from './types'
+import {
+  workoutPoints,
+  strengthProgressFromPoints,
+  oneRMSeriesFromPoints,
+  bestLiftIdFromPoints,
+  volumeByWeekFromPoints,
+} from './workoutSummary'
 
 export function todayHabit(s: AppState): HabitDay {
   return habitForDay(s, todayKey)
@@ -181,88 +188,41 @@ export function regularWorkoutsInRange(s: AppState, fromDays: number, toDays = 0
 }
 
 /* -------------------------- Strength progress -------------------------- */
-/** Epley 1RM estimate from a session's best set of an exercise. */
-function best1RM(session: WorkoutSession, defId: string): number | null {
-  const ex = session.exercises.find((e) => e.defId === defId)
-  if (!ex) return null
-  let max = 0
-  for (const set of ex.sets) {
-    const est = set.weightKg * (1 + set.reps / 30)
-    if (est > max) max = est
+/**
+ * The all-time strength/volume charts now read the compact WorkoutSummary
+ * projection (Phase C Option B, src/store/workoutSummary.ts) via `workoutPoints`
+ * instead of scanning full session history, so they stay exact without loading
+ * every session on cold start. The math is unchanged — see the regression tests
+ * in test/unit/workoutSummary.test.mjs.
+ */
+
+/** Most recent loaded session image for a lift (cosmetic thumbnail only). */
+function latestLiftImage(s: AppState, defId: string): string {
+  let best: { dateKey: string; image: string } | null = null
+  for (const sess of s.sessions) {
+    const ex = sess.exercises.find((e) => e.defId === defId)
+    if (ex?.image && (!best || sess.dateKey >= best.dateKey)) best = { dateKey: sess.dateKey, image: ex.image }
   }
-  return max || null
+  return best?.image ?? ''
 }
 
 export function strengthProgress(s: AppState) {
-  const lifts = ['bench', 'squat', 'deadlift', 'ohp']
-  const names: Record<string, string> = { bench: 'Bench Press', squat: 'Back Squat', deadlift: 'Deadlift', ohp: 'Overhead Press' }
-  const done = completedSessions(s).sort((a, b) => a.dateKey.localeCompare(b.dateKey))
-  const fourWeeksAgo = dayKey(28)
-
-  return lifts
-    .map((id) => {
-      const withLift = done.filter((x) => x.exercises.some((e) => e.defId === id))
-      if (withLift.length === 0) return null
-      const latest = withLift.at(-1)!
-      const past = withLift.find((x) => x.dateKey >= fourWeeksAgo) ?? withLift[0]
-      const to = best1RM(latest, id)
-      const from = best1RM(past, id)
-      if (!to || !from) return null
-      const pct = Math.round(((to - from) / from) * 100)
-      const ex = latest.exercises.find((e) => e.defId === id)!
-      return {
-        id,
-        name: names[id],
-        from: Math.round(from / 2.5) * 2.5,
-        to: Math.round(to / 2.5) * 2.5,
-        pct,
-        image: ex.image,
-      }
-    })
-    .filter(Boolean) as { id: string; name: string; from: number; to: number; pct: number; image: string }[]
-}
-
-/* -------------------------- Strength & volume series -------------------------- */
-function epley(weightKg: number, reps: number) {
-  return weightKg * (1 + reps / 30)
+  return strengthProgressFromPoints(workoutPoints(s)).map((r) => ({ ...r, image: latestLiftImage(s, r.id) }))
 }
 
 /** Estimated 1RM per completed session for a lift, chronological. */
 export function oneRMSeries(s: AppState, defId: string) {
-  return completedSessions(s)
-    .filter((x) => x.exercises.some((e) => e.defId === defId))
-    .sort((a, b) => a.dateKey.localeCompare(b.dateKey))
-    .map((x) => {
-      const ex = x.exercises.find((e) => e.defId === defId)!
-      const kg = Math.max(0, ...ex.sets.map((set) => epley(set.weightKg, set.reps)))
-      return { dateKey: x.dateKey, kg: Math.round(kg / 2.5) * 2.5 }
-    })
-    .filter((p) => p.kg > 0)
+  return oneRMSeriesFromPoints(workoutPoints(s), defId)
 }
 
 /** The lift with the most logged history (for the default strength chart). */
 export function bestLiftId(s: AppState): string | null {
-  const lifts = ['bench', 'squat', 'deadlift', 'ohp', 'row', 'pulldown']
-  let best: string | null = null
-  let n = 0
-  for (const id of lifts) {
-    const c = completedSessions(s).filter((x) => x.exercises.some((e) => e.defId === id)).length
-    if (c > n) { n = c; best = id }
-  }
-  return best
+  return bestLiftIdFromPoints(workoutPoints(s))
 }
 
 /** Total training volume bucketed into the last `weeks` weeks (oldest → newest). */
 export function volumeByWeek(s: AppState, weeks = 8) {
-  const done = completedSessions(s)
-  const out: { label: string; volume: number }[] = []
-  for (let wk = weeks - 1; wk >= 0; wk--) {
-    const start = dayKey(wk * 7 + 6)
-    const end = dayKey(wk * 7)
-    const volume = done.filter((x) => x.dateKey >= start && x.dateKey <= end).reduce((a, x) => a + x.volumeKg, 0)
-    out.push({ label: wk === 0 ? 'Now' : `${wk}w`, volume: Math.round(volume) })
-  }
-  return out
+  return volumeByWeekFromPoints(workoutPoints(s), weeks)
 }
 
 /* -------------------------- Habit consistency (this week) -------------------------- */
