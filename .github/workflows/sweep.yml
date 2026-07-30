@@ -1,11 +1,19 @@
-name: Profile Sweep (safety gate)
+name: Code gate (typecheck · domain checks · sweep · tests)
 
-# Runs the workout generator's profile sweep on every push and PR. The sweep is the
-# HARD gate for the backend: it generates a program across every 4 goals x 3 experience
-# levels x 2-6 days plus edge cases and fails the build if any prescription breaches a
-# safety floor (reps<4 on Load, RIR below the exercise Min RIR or grid floor, %1RM>88,
-# an advanced lift to a non-advanced user, a solo spotter lift without its cue) or leaves
-# a required slot empty. This is what stops a future change silently reintroducing a breach.
+# The fast per-push/PR gate for the app + backend code. Runs on every branch:
+#   • typecheck (tsc --noEmit)
+#   • domain checks (planned periods + dashboard stats)
+#   • the workout-generator profile sweep — the HARD backend safety gate: it
+#     generates a program across every 4 goals x 3 experience levels x 2-6 days
+#     plus edge cases and fails if any prescription breaches a safety floor
+#     (reps<4 on Load, RIR below the exercise Min RIR or grid floor, %1RM>88, an
+#     advanced lift to a non-advanced user, a solo spotter lift without its cue)
+#     or leaves a required slot empty.
+#   • the deterministic safety-floor tests (test/safety) and the pure unit tests
+#     (test/unit) — no secrets/network, so they run inline here rather than only
+#     in the nightly backend-validation workflow.
+# Together this stops a future change silently reintroducing a safety breach or
+# regressing the pure domain logic.
 
 on:
   push:
@@ -29,3 +37,7 @@ jobs:
         run: npm run check
       - name: Profile sweep (safety-floor + required-slot gate)
         run: npm run sweep
+      - name: Safety-floor tests (deterministic, no secrets)
+        run: npm run test:safety
+      - name: Unit tests (pure domain)
+        run: npm run test:unit
