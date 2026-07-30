@@ -20,7 +20,10 @@ import { fileURLToPath } from 'node:url'
 import { readExerciseInfo } from './lib/parse-exercises.mjs'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
-const arg = (n, d) => { const i = process.argv.indexOf(`--${n}`); return i >= 0 && process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : d }
+const arg = (n, d) => {
+  const i = process.argv.indexOf(`--${n}`)
+  return i >= 0 && process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : d
+}
 const has = (n) => process.argv.includes(`--${n}`)
 const XLSX = arg('file', join(repoRoot, 'data', 'exercises', 'StrengthHub_Workout_Backend.xlsx'))
 const PROJECT = arg('project', process.env.GCLOUD_PROJECT || 'strengthhub-2ab33')
@@ -32,7 +35,9 @@ try {
   records = readExerciseInfo(XLSX)
 } catch (e) {
   console.error(`✖ Could not read workbook at ${XLSX}\n  ${e.message}`)
-  console.error('  Pass --file "C:/path/to/StrengthHub_Workout_Backend_v16.xlsx" or copy it to data/exercises/StrengthHub_Workout_Backend.xlsx')
+  console.error(
+    '  Pass --file "C:/path/to/StrengthHub_Workout_Backend_v16.xlsx" or copy it to data/exercises/StrengthHub_Workout_Backend.xlsx',
+  )
   process.exit(2)
 }
 
@@ -42,14 +47,24 @@ console.log(`  source: ${XLSX}`)
 console.log(`  ${records.length} exercises  (${withSteps} with how-to steps)`)
 for (const r of records.slice(0, 3)) console.log(`    ${r.id}  ${r.name}  — ${r.steps.length} steps`)
 
-if (!APPLY) { console.log('\nDry run only — re-run with --apply (and GOOGLE_APPLICATION_CREDENTIALS set) to write.'); process.exit(0) }
-if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) { console.error('\n✖ --apply needs GOOGLE_APPLICATION_CREDENTIALS pointing at a service-account JSON.'); process.exit(2) }
+if (!APPLY) {
+  console.log('\nDry run only — re-run with --apply (and GOOGLE_APPLICATION_CREDENTIALS set) to write.')
+  process.exit(0)
+}
+if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+  console.error('\n✖ --apply needs GOOGLE_APPLICATION_CREDENTIALS pointing at a service-account JSON.')
+  process.exit(2)
+}
 
 const { initializeApp, applicationDefault } = await import('firebase-admin/app')
 const { getFirestore, FieldValue } = await import('firebase-admin/firestore')
 const db = getFirestore(initializeApp({ credential: applicationDefault(), projectId: PROJECT }))
 
-function chunk(a, n) { const o = []; for (let i = 0; i < a.length; i += n) o.push(a.slice(i, i + n)); return o }
+function chunk(a, n) {
+  const o = []
+  for (let i = 0; i < a.length; i += n) o.push(a.slice(i, i + n))
+  return o
+}
 
 // Documents are keyed by the exercise NAME (readable in the console). The app
 // keys off the `id` field inside each doc, so the doc id can be anything.

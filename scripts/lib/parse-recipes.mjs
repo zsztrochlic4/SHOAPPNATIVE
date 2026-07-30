@@ -17,7 +17,12 @@ const CATEGORIES = new Set(['Breakfast', 'Lunch', 'Dinner', 'Snack', 'Sweet'])
 function readZip(path) {
   const buf = readFileSync(path)
   let eocd = -1
-  for (let i = buf.length - 22; i >= 0; i--) { if (buf.readUInt32LE(i) === 0x06054b50) { eocd = i; break } }
+  for (let i = buf.length - 22; i >= 0; i--) {
+    if (buf.readUInt32LE(i) === 0x06054b50) {
+      eocd = i
+      break
+    }
+  }
   if (eocd < 0) throw new Error(`not a valid .xlsx/zip: ${path}`)
   const count = buf.readUInt16LE(eocd + 10)
   let p = buf.readUInt32LE(eocd + 16)
@@ -40,24 +45,37 @@ function readZip(path) {
   }
   return files
 }
-const dec = (s) => String(s)
-  .replace(/&#x([0-9A-Fa-f]+);/g, (_, h) => String.fromCodePoint(parseInt(h, 16)))
-  .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(+d))
-  .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&')
-function colToIdx(ref) { const m = ref.match(/^([A-Z]+)/)[1]; let n = 0; for (const c of m) n = n * 26 + (c.charCodeAt(0) - 64); return n - 1 }
+const dec = (s) =>
+  String(s)
+    .replace(/&#x([0-9A-Fa-f]+);/g, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(+d))
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&')
+function colToIdx(ref) {
+  const m = ref.match(/^([A-Z]+)/)[1]
+  let n = 0
+  for (const c of m) n = n * 26 + (c.charCodeAt(0) - 64)
+  return n - 1
+}
 function sheetRows(files, sheetFile) {
   let ss = []
   const ssBuf = files['xl/sharedStrings.xml']
   if (ssBuf) {
     const sx = ssBuf.toString('utf8')
-    ss = [...sx.matchAll(/<si>(.*?)<\/si>/gs)].map((m) => [...m[1].matchAll(/<t[^>]*>(.*?)<\/t>/gs)].map((x) => x[1]).join(''))
+    ss = [...sx.matchAll(/<si>(.*?)<\/si>/gs)].map((m) =>
+      [...m[1].matchAll(/<t[^>]*>(.*?)<\/t>/gs)].map((x) => x[1]).join(''),
+    )
   }
   const xml = (files[`xl/worksheets/${sheetFile}`] || Buffer.alloc(0)).toString('utf8')
   const rows = []
   for (const rm of xml.matchAll(/<row[^>]*>(.*?)<\/row>/gs)) {
     const cells = []
     for (const cm of rm[1].matchAll(/<c ([^>]*?)(?:\/>|>(.*?)<\/c>)/gs)) {
-      const attrs = cm[1], body = cm[2] || ''
+      const attrs = cm[1],
+        body = cm[2] || ''
       const ref = (attrs.match(/r="([A-Z]+\d+)"/) || [])[1]
       const t = (attrs.match(/t="([^"]+)"/) || [])[1]
       let v = ''
@@ -78,10 +96,27 @@ function sheetFileFor(files, name, fallback) {
   return target || fallback
 }
 
-const num = (v) => { const n = parseInt(String(v ?? '').replace(/[^\d.-]/g, ''), 10); return Number.isFinite(n) ? n : 0 }
-const lines = (v) => String(v ?? '').split('\n').map((s) => s.trim()).filter(Boolean)
-const semis = (v) => String(v ?? '').split(';').map((s) => s.trim()).filter(Boolean)
-const slug = (s) => 'bm-' + String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60)
+const num = (v) => {
+  const n = parseInt(String(v ?? '').replace(/[^\d.-]/g, ''), 10)
+  return Number.isFinite(n) ? n : 0
+}
+const lines = (v) =>
+  String(v ?? '')
+    .split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean)
+const semis = (v) =>
+  String(v ?? '')
+    .split(';')
+    .map((s) => s.trim())
+    .filter(Boolean)
+const slug = (s) =>
+  'bm-' +
+  String(s)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 60)
 const FALLBACK_IMG = {
   Breakfast: 'https://images.pexels.com/photos/704971/pexels-photo-704971.jpeg?auto=compress&cs=tinysrgb&w=600',
   Lunch: 'https://images.pexels.com/photos/1640777/pexels-photo-1640777.jpeg?auto=compress&cs=tinysrgb&w=600',
@@ -111,9 +146,12 @@ function toRecipe(r) {
     steps: lines(r[11]),
     tags,
   }
-  const flavour = (r[8] || '').trim(); if (flavour) rec.flavour = flavour
-  const cookOnce = (r[12] || '').trim(); if (cookOnce) rec.cookOnce = cookOnce
-  const timeDisplay = (r[15] || '').trim(); if (timeDisplay) rec.timeDisplay = timeDisplay
+  const flavour = (r[8] || '').trim()
+  if (flavour) rec.flavour = flavour
+  const cookOnce = (r[12] || '').trim()
+  if (cookOnce) rec.cookOnce = cookOnce
+  const timeDisplay = (r[15] || '').trim()
+  if (timeDisplay) rec.timeDisplay = timeDisplay
   if (vegan) rec.vegan = true
   return rec
 }
@@ -129,13 +167,23 @@ export function readWorkbook(xlsxPath) {
   try {
     const depRows = sheetRows(files, sheetFileFor(files, 'Firebase Deprecations', 'sheet3.xml'))
     deprecations = depRows
-      .map((r) => ({ id: (r[0] || '').trim(), name: (r[1] || '').trim(), category: (r[2] || '').trim(), decision: (r[3] || '').trim(), replacement: (r[4] || '').trim() }))
+      .map((r) => ({
+        id: (r[0] || '').trim(),
+        name: (r[1] || '').trim(),
+        category: (r[2] || '').trim(),
+        decision: (r[3] || '').trim(),
+        replacement: (r[4] || '').trim(),
+      }))
       .filter((d) => /^bm-/.test(d.id))
-  } catch { /* no deprecations tab */ }
+  } catch {
+    /* no deprecations tab */
+  }
 
-  const seen = new Set(); const problems = []
+  const seen = new Set()
+  const problems = []
   for (const r of recipes) {
-    if (seen.has(r.id)) problems.push(`duplicate id ${r.id}`); seen.add(r.id)
+    if (seen.has(r.id)) problems.push(`duplicate id ${r.id}`)
+    seen.add(r.id)
     if (!r.ingredients.length) problems.push(`${r.id}: no ingredients`)
     if (!r.steps.length) problems.push(`${r.id}: no steps`)
   }

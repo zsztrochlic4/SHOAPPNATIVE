@@ -30,12 +30,35 @@ import { writeFileSync } from 'node:fs'
 // Mirrors firestore.rules + docs/security/DATA_SCHEMA.md. Keep in sync.
 
 const ROOT_ALLOWED_KEYS = new Set([
-  'profile', 'settings', 'mealPlan', 'postComments', 'nutritionTags', 'foods',
-  'program', 'posts', 'leaderboard', 'challenges', 'badges', 'events', 'groups',
-  'partners', 'myMeals', 'templates', 'workoutStartedKeys', 'nutritionAskedKeys',
-  'beginnerProgress', 'coachUsage', 'integrations', 'plannedPeriods',
-  'backendUser', 'generatedProgram', 'workoutInstances', 'programStatus',
-  'demo', 'v', 'updatedAt',
+  'profile',
+  'settings',
+  'mealPlan',
+  'postComments',
+  'nutritionTags',
+  'foods',
+  'program',
+  'posts',
+  'leaderboard',
+  'challenges',
+  'badges',
+  'events',
+  'groups',
+  'partners',
+  'myMeals',
+  'templates',
+  'workoutStartedKeys',
+  'nutritionAskedKeys',
+  'beginnerProgress',
+  'coachUsage',
+  'integrations',
+  'plannedPeriods',
+  'backendUser',
+  'generatedProgram',
+  'workoutInstances',
+  'programStatus',
+  'demo',
+  'v',
+  'updatedAt',
 ])
 
 const FORBIDDEN_TOKEN_KEYS = new Set(['accessToken', 'refreshToken', 'expiresAt'])
@@ -43,9 +66,20 @@ const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/
 const PLATFORMS = new Set(['ios', 'android', 'web', 'windows', 'macos'])
 
 const SUBCOLLECTIONS = [
-  'sessions', 'weights', 'habits', 'meals', 'activities', 'foodReviews', 'chat',
-  'coachThread', 'notifications', 'programs', 'workout_instances', 'set_logs',
-  'progression_state', 'pushTokens',
+  'sessions',
+  'weights',
+  'habits',
+  'meals',
+  'activities',
+  'foodReviews',
+  'chat',
+  'coachThread',
+  'notifications',
+  'programs',
+  'workout_instances',
+  'set_logs',
+  'progression_state',
+  'pushTokens',
 ]
 
 const strlen = (v) => (typeof v === 'string' ? [...v].length : 0)
@@ -84,16 +118,19 @@ function auditRoot(uid, data) {
   }
   // free-text caps
   const p = data.profile || {}
-  if (strlen(p.motivation) > 2000) add(uid, `users/${uid}`, 'oversize', `profile.motivation ${strlen(p.motivation)}>2000`)
+  if (strlen(p.motivation) > 2000)
+    add(uid, `users/${uid}`, 'oversize', `profile.motivation ${strlen(p.motivation)}>2000`)
   if (strlen(p.injuries) > 2000) add(uid, `users/${uid}`, 'oversize', `profile.injuries ${strlen(p.injuries)}>2000`)
   if (strlen(p.name) > 200) add(uid, `users/${uid}`, 'oversize', `profile.name ${strlen(p.name)}>200`)
   const b = data.backendUser || {}
   if (strlen(b.notes) > 4000) add(uid, `users/${uid}`, 'oversize', `backendUser.notes ${strlen(b.notes)}>4000`)
-  if (strlen(b.motivation) > 2000) add(uid, `users/${uid}`, 'oversize', `backendUser.motivation ${strlen(b.motivation)}>2000`)
+  if (strlen(b.motivation) > 2000)
+    add(uid, `users/${uid}`, 'oversize', `backendUser.motivation ${strlen(b.motivation)}>2000`)
   // nested tokens (integrations etc.)
   scanForTokens(uid, `users/${uid}`, data)
   // premium sanity (should be false/absent for a client doc)
-  if (p.premium === true) add(uid, `users/${uid}`, 'premium-true', 'profile.premium is true (should be Zone B entitlement)')
+  if (p.premium === true)
+    add(uid, `users/${uid}`, 'premium-true', 'profile.premium is true (should be Zone B entitlement)')
 }
 
 function auditEntry(uid, col, id, d) {
@@ -101,7 +138,8 @@ function auditEntry(uid, col, id, d) {
   const idFields = { sessions: 'id', meals: 'id', activities: 'id', chat: 'id', coachThread: 'id', notifications: 'id' }
   const dateCols = new Set(['weights', 'habits', 'foodReviews'])
 
-  if (idFields[col] && d[idFields[col]] !== id) add(uid, path, 'id-mismatch', `${idFields[col]}="${d[idFields[col]]}" != docId`)
+  if (idFields[col] && d[idFields[col]] !== id)
+    add(uid, path, 'id-mismatch', `${idFields[col]}="${d[idFields[col]]}" != docId`)
   if (dateCols.has(col)) {
     if (d.dateKey !== id) add(uid, path, 'id-mismatch', `dateKey="${d.dateKey}" != docId`)
     if (!DATE_KEY.test(id)) add(uid, path, 'bad-datekey', `docId "${id}" not YYYY-MM-DD`)
@@ -112,13 +150,20 @@ function auditEntry(uid, col, id, d) {
   if (col === 'programs' && d.program_id !== id) add(uid, path, 'id-mismatch', `program_id != docId`)
   if (col === 'workout_instances' && d.instance_id !== id) add(uid, path, 'id-mismatch', `instance_id != docId`)
   if (col === 'set_logs' && d.log_id !== id) add(uid, path, 'id-mismatch', `log_id != docId`)
-  if (col === 'progression_state' && id !== `${uid}_${d.exercise_id}`) add(uid, path, 'id-mismatch', `docId != uid_exerciseId`)
+  if (col === 'progression_state' && id !== `${uid}_${d.exercise_id}`)
+    add(uid, path, 'id-mismatch', `docId != uid_exerciseId`)
   if (col === 'pushTokens') {
     if (d.token !== id) add(uid, path, 'id-mismatch', `token != docId`)
     if (!PLATFORMS.has(d.platform)) add(uid, path, 'bad-enum', `platform="${d.platform}"`)
   }
   // text caps
-  const caps = { chat: ['text', 8000], coachThread: ['body', 8000], foodReviews: ['text', 4000], notifications: ['body', 1000], activities: ['note', 1000] }
+  const caps = {
+    chat: ['text', 8000],
+    coachThread: ['body', 8000],
+    foodReviews: ['text', 4000],
+    notifications: ['body', 1000],
+    activities: ['note', 1000],
+  }
   if (caps[col]) {
     const [f, max] = caps[col]
     if (strlen(d[f]) > max) add(uid, path, 'oversize', `${f} ${strlen(d[f])}>${max}`)
@@ -139,7 +184,9 @@ async function main() {
     process.exit(2)
   }
   if (!process.env.GOOGLE_APPLICATION_CREDENTIALS && !process.env.FIREBASE_CONFIG) {
-    console.error('✖ No credentials. Set GOOGLE_APPLICATION_CREDENTIALS to a service-account JSON that can read Firestore.')
+    console.error(
+      '✖ No credentials. Set GOOGLE_APPLICATION_CREDENTIALS to a service-account JSON that can read Firestore.',
+    )
     process.exit(2)
   }
 
@@ -177,8 +224,15 @@ async function main() {
     writeFileSync(JSON_OUT, JSON.stringify({ project: PROJECT, scanned: usersSnap.size, findings }, null, 2))
     console.log(`\nfull findings → ${JSON_OUT}`)
   }
-  console.log(findings.length ? '\n✖ NOT clean — migrate the above before deploying hardened rules.' : '\n✔ Clean — safe to deploy the hardened rules.')
+  console.log(
+    findings.length
+      ? '\n✖ NOT clean — migrate the above before deploying hardened rules.'
+      : '\n✔ Clean — safe to deploy the hardened rules.',
+  )
   process.exit(findings.length ? 1 : 0)
 }
 
-main().catch((e) => { console.error('audit failed:', e); process.exit(2) })
+main().catch((e) => {
+  console.error('audit failed:', e)
+  process.exit(2)
+})
