@@ -24,7 +24,10 @@ import { fileURLToPath } from 'node:url'
 import { readWorkbook, countByCategory } from './lib/parse-recipes.mjs'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
-const arg = (n, d) => { const i = process.argv.indexOf(`--${n}`); return i >= 0 && process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : d }
+const arg = (n, d) => {
+  const i = process.argv.indexOf(`--${n}`)
+  return i >= 0 && process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : d
+}
 const has = (n) => process.argv.includes(`--${n}`)
 const XLSX = arg('file', join(repoRoot, 'data', 'recipes', 'StrengthHub_Recipe_Template.xlsx'))
 const PROJECT = arg('project', process.env.GCLOUD_PROJECT || 'strengthhub-2ab33')
@@ -32,14 +35,21 @@ const APPLY = has('apply')
 const BATCH = 400
 
 const { recipes, deprecations, problems } = readWorkbook(XLSX)
-if (problems.length) { console.error('✖ recipe problems:\n  ' + problems.join('\n  ')); process.exit(1) }
+if (problems.length) {
+  console.error('✖ recipe problems:\n  ' + problems.join('\n  '))
+  process.exit(1)
+}
 
 // Retired ids to DELETE (from the deprecations tab), minus any that are still active.
 const activeIds = new Set(recipes.map((r) => r.id))
 const retiredIds = deprecations.filter((d) => !activeIds.has(d.id)).map((d) => d.id)
 
 console.log(`▶ Recipe upload to "${PROJECT}" — ${APPLY ? 'APPLY' : 'DRY RUN'}`)
-console.log(`  active recipes: ${recipes.length}  (${Object.entries(countByCategory(recipes)).map(([k, v]) => `${k}:${v}`).join(' ')})`)
+console.log(
+  `  active recipes: ${recipes.length}  (${Object.entries(countByCategory(recipes))
+    .map(([k, v]) => `${k}:${v}`)
+    .join(' ')})`,
+)
 console.log(`  retired ids to delete: ${retiredIds.length}`)
 
 if (!APPLY) {
@@ -57,10 +67,17 @@ const { getFirestore, FieldValue } = await import('firebase-admin/firestore')
 const app = initializeApp({ credential: applicationDefault(), projectId: PROJECT })
 const db = getFirestore(app)
 
-function chunk(a, n) { const o = []; for (let i = 0; i < a.length; i += n) o.push(a.slice(i, i + n)); return o }
+function chunk(a, n) {
+  const o = []
+  for (let i = 0; i < a.length; i += n) o.push(a.slice(i, i + n))
+  return o
+}
 
 // Active recipes: upsert, and clear any leftover `deprecated` field from prior runs.
-const activeDocs = recipes.map((r) => ({ id: r.id, data: { ...r, deprecated: FieldValue.delete(), updatedAt: FieldValue.serverTimestamp() } }))
+const activeDocs = recipes.map((r) => ({
+  id: r.id,
+  data: { ...r, deprecated: FieldValue.delete(), updatedAt: FieldValue.serverTimestamp() },
+}))
 
 let written = 0
 for (const part of chunk(activeDocs, BATCH)) {
@@ -81,5 +98,7 @@ for (const part of chunk(retiredIds, BATCH)) {
 }
 
 const total = (await db.collection('recipes').count().get()).data().count
-console.log(`\n✔ Uploaded ${activeDocs.length} recipes, deleted ${deleted} retired docs. Collection now has ${total} docs.`)
+console.log(
+  `\n✔ Uploaded ${activeDocs.length} recipes, deleted ${deleted} retired docs. Collection now has ${total} docs.`,
+)
 process.exit(0)

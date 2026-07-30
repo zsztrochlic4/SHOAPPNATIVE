@@ -22,17 +22,28 @@ import { readExercises, folderFor } from './lib/exercises-list.mjs'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 const NAME_BY_ID = Object.fromEntries(readExercises().map((e) => [e.id, e.name]))
-const arg = (n, d) => { const i = process.argv.indexOf(`--${n}`); return i >= 0 && process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : d }
+const arg = (n, d) => {
+  const i = process.argv.indexOf(`--${n}`)
+  return i >= 0 && process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : d
+}
 const has = (n) => process.argv.includes(`--${n}`)
 const DIR = arg('dir', join(repoRoot, 'data', 'exercise-media'))
 const BUCKET = arg('bucket', process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET || 'strengthhub-2ab33.firebasestorage.app')
 const APPLY = has('apply')
 
 const CT = {
-  '.mp4': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm', '.m4v': 'video/x-m4v',
-  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.avif': 'image/avif',
+  '.mp4': 'video/mp4',
+  '.mov': 'video/quicktime',
+  '.webm': 'video/webm',
+  '.m4v': 'video/x-m4v',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.webp': 'image/webp',
+  '.avif': 'image/avif',
 }
-const publicUrl = (dest) => `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/${encodeURIComponent(dest)}?alt=media`
+const publicUrl = (dest) =>
+  `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/${encodeURIComponent(dest)}?alt=media`
 
 let files = []
 try {
@@ -48,7 +59,10 @@ const items = []
 const skipped = []
 for (const f of files) {
   const ext = extname(f).toLowerCase()
-  if (!CT[ext]) { skipped.push(`${f} (unsupported type)`); continue }
+  if (!CT[ext]) {
+    skipped.push(`${f} (unsupported type)`)
+    continue
+  }
   const id = basename(f, ext)
   const folder = folderFor(NAME_BY_ID[id] ?? id) // name-based folder; falls back to id
   const kind = ext.match(/mp4|mov|webm|m4v/) ? 'video' : 'image'
@@ -63,8 +77,14 @@ console.log(`  ${items.length} file(s) to upload${skipped.length ? `, ${skipped.
 for (const it of items) console.log(`    ${it.kind.padEnd(5)} ${it.file}  →  exercise "${it.id}"`)
 for (const s of skipped) console.log(`    skip  ${s}`)
 
-if (!items.length) { console.log('\nNothing to upload — drop files into the folder first.'); process.exit(0) }
-if (!APPLY) { console.log('\nDry run only — re-run with --apply (and GOOGLE_APPLICATION_CREDENTIALS set) to upload.'); process.exit(0) }
+if (!items.length) {
+  console.log('\nNothing to upload — drop files into the folder first.')
+  process.exit(0)
+}
+if (!APPLY) {
+  console.log('\nDry run only — re-run with --apply (and GOOGLE_APPLICATION_CREDENTIALS set) to upload.')
+  process.exit(0)
+}
 
 if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
   console.error('\n✖ --apply needs GOOGLE_APPLICATION_CREDENTIALS pointing at a service-account JSON.')
@@ -78,7 +98,10 @@ const bucket = getStorage(app).bucket()
 
 let done = 0
 for (const it of items) {
-  await bucket.upload(join(DIR, it.file), { destination: it.dest, metadata: { contentType: it.contentType, cacheControl: 'public, max-age=86400' } })
+  await bucket.upload(join(DIR, it.file), {
+    destination: it.dest,
+    metadata: { contentType: it.contentType, cacheControl: 'public, max-age=86400' },
+  })
   done++
   console.log(`  ✓ ${it.file}  →  ${publicUrl(it.dest)}`)
 }
