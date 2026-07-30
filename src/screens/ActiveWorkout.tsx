@@ -22,6 +22,7 @@ import type { LoggedSetInput } from '../backend/runtime/logging'
 import { fmtWeightNum, weightUnit, fmtVolume, fmtWeight, toKg } from '../lib/format'
 import { palette } from '../theme'
 import type { Units, WorkoutSession } from '../store/types'
+import { isTimeSession, nextCircuitCursor, circuitRestSec } from './quickCircuit'
 
 /* This follow-along flow is a dark, full-immersion surface (like the design's
  * dark default and the previous implementation), so it pins the dark palette
@@ -89,26 +90,6 @@ function nextUndoneCursor(s: WorkoutSession, fromExIdx: number): Cursor | null {
   return null
 }
 
-/** True when this is a time-based circuit (bodyweight quick workout). */
-function isTimeSession(s: WorkoutSession): boolean {
-  return s.exercises.some((e) => e.measure === 'time')
-}
-
-/**
- * Circuit advance for time sessions: run round-major (finish every station at the
- * current set index — one round — before moving to the next). Each `set` index is
- * a round. Returns the next not-done station, preferring the current round.
- */
-function nextCircuitCursor(s: WorkoutSession, exIdx: number, setIdx: number): Cursor | null {
-  const maxSets = Math.max(0, ...s.exercises.map((e) => e.sets.length))
-  // Rest of the current round (later stations).
-  for (let i = exIdx + 1; i < s.exercises.length; i++) if (!s.exercises[i].sets[setIdx]?.done) return { exIdx: i, setIdx }
-  // Later rounds, from the first station.
-  for (let sj = setIdx + 1; sj < maxSets; sj++) for (let i = 0; i < s.exercises.length; i++) if (!s.exercises[i].sets[sj]?.done) return { exIdx: i, setIdx: sj }
-  // Anything missed earlier in the current round (e.g. resumed out of order).
-  for (let i = 0; i <= exIdx; i++) if (!s.exercises[i].sets[setIdx]?.done) return { exIdx: i, setIdx }
-  return null
-}
 
 function mmss(total: number): string {
   const m = Math.floor(Math.max(0, total) / 60)
@@ -341,15 +322,9 @@ export default function ActiveWorkout({ open, onClose, onComplete, params }: { o
     const timed = isTimeSession(next)
     const upcoming = timed ? nextCircuitCursor(next, exIdx, setIdx) : nextUndoneCursor(next, exIdx)
     if (!upcoming) { setMode('list'); return }
-    // Time circuits rest per-station within a round, and the longer round rest
-    // when the next station starts a fresh round; lifting sessions derive from id.
-    const doneEx = session!.exercises[exIdx]
-    const roundBoundary = upcoming.setIdx > setIdx
-    const secs = timed
-      ? roundBoundary
-        ? session!.roundRestSec ?? 60
-        : doneEx.restSec ?? 15
-      : restSecondsFor(doneEx.defId)
+    // Time circuits rest per-station within a round, and the longer round rest when
+    // the next station starts a fresh round; lifting sessions derive from the id.
+    const secs = timed ? circuitRestSec(next, exIdx, setIdx, upcoming) : restSecondsFor(session!.exercises[exIdx].defId)
     setCursor(upcoming); setRestTotal(secs); setRestRemaining(secs); setWorkElapsed(0); setMode('rest')
   }
   function skipRest() { setWorkElapsed(0); setMode('work') }
