@@ -7,6 +7,7 @@ import { Icon } from '../components/Icon'
 import { ProgressRing, ProgressBar, ScreenHeader, SectionHeader } from '../components/ui'
 import { AppModal, IS_WEB, WEB_SCREEN } from '../components/WebFrame'
 import { useStore } from '../store/store'
+import { ensureFullHistory } from '../store/historySync'
 import { useNav } from '../nav'
 import { dayKey, weekday } from '../lib/date'
 import { fmtWeight, fmtWeightNum, weightUnit, weightVal } from '../lib/format'
@@ -26,6 +27,11 @@ export default function Progress() {
   const units = state.settings.units
   const p = state.profile
   const [range, setRange] = useState<'4 Weeks' | '12 Weeks'>('4 Weeks')
+
+  // This screen renders all-time charts/stats. Cold start only loads a recent
+  // window of history (cloudRepo LOAD_POLICY), so pull the older remainder in
+  // now; the merge is additive and repopulates these stats a beat later.
+  useEffect(() => { ensureFullHistory() }, [])
 
   const w = weightStats(state)
   const sp = strengthProgress(state)

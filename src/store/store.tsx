@@ -29,12 +29,19 @@ import type { StoredProgram, ProgramStatus } from '../backend/runtime/activate'
 import { sessionFromInstance, fullWeekday } from './programSession'
 import { sessionForDay } from './selectors'
 import { plannedPeriods, toPlannedAbsence } from './periods'
+import { mergeById, type HistoryEntry } from './historyMerge'
+
+/** The append-heavy slices that load lazily under the bounded-read model. */
+export type WindowedHistory = Partial<
+  Pick<AppState, 'sessions' | 'meals' | 'activities' | 'chat' | 'coachThread' | 'notifications'>
+>
 
 const STORAGE_KEY = 'sho.state.v1'
 
 /* ------------------------------ Actions ------------------------------ */
 export type Action =
   | { type: 'HYDRATE'; state: AppState }
+  | { type: 'MERGE_HISTORY'; history: WindowedHistory }
   | { type: 'SET_SETTINGS'; patch: Partial<Settings> }
   | { type: 'SET_PROFILE'; patch: Partial<Profile> }
   | { type: 'COMPLETE_ONBOARDING'; profile: Partial<Profile>; backendUser?: UserDoc; generatedProgram?: StoredProgram | null; programStatus?: ProgramStatus | null; workoutInstances?: WorkoutInstanceDoc[] }
@@ -135,6 +142,24 @@ function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case 'HYDRATE':
       return action.state
+
+    // Lazily-fetched older history merged into the windowed slices (Phase C).
+    // The current (recent) copy wins on any id collision so a just-made edit is
+    // never clobbered by the fetch; the merge is additive and loss-free.
+    case 'MERGE_HISTORY': {
+      const h = action.history
+      const merge = <T extends HistoryEntry>(cur: T[] | undefined, older: T[] | undefined): T[] =>
+        older ? mergeById(cur ?? [], older) : cur ?? []
+      return {
+        ...state,
+        sessions: merge(state.sessions, h.sessions),
+        meals: merge(state.meals, h.meals),
+        activities: merge(state.activities, h.activities),
+        chat: merge(state.chat, h.chat),
+        coachThread: merge(state.coachThread, h.coachThread),
+        notifications: merge(state.notifications, h.notifications),
+      }
+    }
 
     case 'SET_SETTINGS':
       return { ...state, settings: { ...state.settings, ...action.patch } }

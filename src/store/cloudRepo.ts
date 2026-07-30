@@ -1,8 +1,9 @@
 import {
-  doc, collection, getDoc, getDocs, writeBatch, setDoc, serverTimestamp,
+  doc, collection, getDoc, getDocs, query, orderBy, limit, writeBatch, setDoc, serverTimestamp,
 } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { sanitizeForPersist, sanitizeEntry } from '../lib/sanitize'
+import { mergeById } from './historyMerge'
 import type { AppState } from './types'
 
 /**
@@ -59,6 +60,37 @@ const SUBCOLLECTIONS = {
 type SubKey = keyof typeof SUBCOLLECTIONS
 const SUB_KEYS = Object.keys(SUBCOLLECTIONS) as SubKey[]
 
+/**
+ * Cold-start read policy per subcollection (Phase C — bounded reads).
+ *
+ * The naive "load every doc on sign-in" degrades for the most engaged users: a
+ * year in, a cold open reads thousands of documents (slow + costly). So the
+ * genuinely unbounded, many-per-day collections load only their most recent
+ * `RECENT_DOCS` on sign-in; the older remainder loads lazily on demand
+ * (loadRemainingHistory), only when an all-time screen needs it.
+ *
+ *   'full'  — load every doc now (tiny, ~1 doc/day; feeds always-on stats like
+ *             the streak's 400-day look-back and the weight chart).
+ *   'window'— load only the most recent RECENT_DOCS (orderBy dateKey desc);
+ *             the rest is fetched later by loadRemainingHistory.
+ *
+ * Ordering only ever uses the single `dateKey` field, so Firestore's automatic
+ * single-field index covers it — no composite index is required.
+ */
+const RECENT_DOCS = 300
+const LOAD_POLICY: Record<SubKey, 'full' | 'window'> = {
+  weights: 'full',
+  habits: 'full',
+  foodReviews: 'full',
+  sessions: 'window',
+  meals: 'window',
+  activities: 'window',
+  chat: 'window',
+  coachThread: 'window',
+  notifications: 'window',
+}
+const WINDOWED_KEYS = SUB_KEYS.filter((k) => LOAD_POLICY[k] === 'window')
+
 /** Slices kept on-device only (e.g. anything too large for a Firestore doc).
  *  Currently none — every slice syncs. */
 const LOCAL_ONLY: (keyof AppState)[] = []
@@ -74,8 +106,20 @@ export interface LoadedState {
    * legacy single-document account). Used as the diff baseline for the first
    * save so a legacy account migrates its embedded arrays into subcollections
    * exactly once, then rewrites the root doc without them.
+   *
+   * NOTE (Phase C): for a WINDOWED collection this holds only the recent window
+   * that was loaded, NOT the full server contents. That is safe for the
+   * diff-save: it can only *delete* a doc that is in the baseline but not in
+   * current state, and un-loaded older docs are in neither — so they are never
+   * touched. See loadRemainingHistory + CloudSync.ensureFullHistory.
    */
   baseline: Partial<AppState>
+  /**
+   * True for each WINDOWED collection whose server contents may exceed the
+   * recent window that was loaded (i.e. older docs remain to be fetched lazily).
+   * Empty/all-false means everything is already loaded.
+   */
+  partial: Partial<Record<SubKey, boolean>>
 }
 
 /** Drop `undefined` values (Firestore rejects them) via a plain-data round-trip. */
@@ -137,9 +181,15 @@ export async function loadUserState(uid: string): Promise<LoadedState | null> {
   if (!db) return null
 
   const rootRef = doc(db, COL, uid)
+  // FULL collections load in one unbounded read; WINDOWED collections load only
+  // the most recent RECENT_DOCS (newest first) so a cold start stays bounded.
   const [rootSnap, ...subSnaps] = await Promise.all([
     getDoc(rootRef),
-    ...SUB_KEYS.map((k) => getDocs(collection(db!, COL, uid, k))),
+    ...SUB_KEYS.map((k) =>
+      LOAD_POLICY[k] === 'window'
+        ? getDocs(query(collection(db!, COL, uid, k), orderBy('dateKey', 'desc'), limit(RECENT_DOCS)))
+        : getDocs(collection(db!, COL, uid, k)),
+    ),
   ])
 
   if (!rootSnap.exists()) return null
@@ -149,17 +199,53 @@ export async function loadUserState(uid: string): Promise<LoadedState | null> {
 
   const state: Record<string, unknown> = { ...root }
   const baseline: Record<string, unknown> = {}
+  const partial: Partial<Record<SubKey, boolean>> = {}
 
   SUB_KEYS.forEach((k, i) => {
-    const fromSub = subSnaps[i].docs.map((d) => d.data())
+    const snap = subSnaps[i]
+    // Windowed reads come back newest-first; normalise to a stable chronological
+    // order (dateKey asc) so array order never depends on the load path.
+    const fromSub =
+      LOAD_POLICY[k] === 'window'
+        ? mergeById(snap.docs.map((d) => d.data() as { id?: string; dateKey?: string }), [])
+        : snap.docs.map((d) => d.data())
     baseline[k] = fromSub
     // Legacy accounts still hold these arrays inside the root doc; fall back to
     // them so no data is lost, and let the next save migrate them out.
     const legacy = Array.isArray(root[k]) ? (root[k] as unknown[]) : []
     state[k] = fromSub.length ? fromSub : legacy
+    // A windowed collection that filled the window may have older docs waiting.
+    if (LOAD_POLICY[k] === 'window' && snap.size >= RECENT_DOCS) partial[k] = true
   })
 
-  return { state: state as Partial<AppState>, baseline: baseline as Partial<AppState> }
+  return {
+    state: state as Partial<AppState>,
+    baseline: baseline as Partial<AppState>,
+    partial,
+  }
+}
+
+/**
+ * Fetch the FULL contents of every WINDOWED collection — used on demand when an
+ * all-time screen (e.g. Progress) needs the complete history that the bounded
+ * cold-start load deliberately skipped. Returns one array per windowed key.
+ *
+ * The caller (CloudSync.ensureFullHistory) merges these into the store and the
+ * save baseline together via `mergeById`, so the recent window and the older
+ * remainder are unioned with no loss and no spurious deletes.
+ */
+export async function loadRemainingHistory(
+  uid: string,
+): Promise<Partial<Record<SubKey, unknown[]>>> {
+  if (!db) return {}
+  const snaps = await Promise.all(
+    WINDOWED_KEYS.map((k) => getDocs(collection(db!, COL, uid, k))),
+  )
+  const out: Partial<Record<SubKey, unknown[]>> = {}
+  WINDOWED_KEYS.forEach((k, i) => {
+    out[k] = snaps[i].docs.map((d) => d.data())
+  })
+  return out
 }
 
 /**
