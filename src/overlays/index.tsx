@@ -16,6 +16,8 @@ import { Avatar } from '../components/Avatar'
 import { LogoMark } from '../components/Logo'
 import { Icon } from '../components/Icon'
 import { Chip } from '../components/ui'
+import { PressableScale } from '../components/PressableScale'
+import { thud } from '../lib/haptics'
 import { useStore } from '../store/store'
 import { useAuth } from '../auth/AuthProvider'
 import { useToast } from '../components/Toast'
@@ -931,6 +933,7 @@ export function QuickWorkoutsSheet({ open, onClose }: Props) {
   // NOTE: this is the interim mapping — the full time-based auto-countdown player
   // (per-station work/rest countdown) is a scoped follow-up.
   function startQuick(q: (typeof QUICK_WORKOUTS)[number]) {
+    thud() // committing to a session — a firmer confirm than the button's press tick
     const rounds = q.rounds.length
     const stations = q.rounds[0]?.stations ?? []
     const items = stations.map((s) => ({
@@ -996,10 +999,10 @@ export function QuickWorkoutsSheet({ open, onClose }: Props) {
                   </View>
                 ))}
               </View>
-              <Pressable onPress={() => startQuick(q)} className="mt-3 flex-row items-center justify-center gap-1.5 rounded-full bg-accent-blue py-2 active:opacity-90">
+              <PressableScale onPress={() => startQuick(q)} haptic={false} scaleTo={0.97} containerStyle={{ marginTop: 12 }} className="flex-row items-center justify-center gap-1.5 rounded-full bg-accent-blue py-2.5">
                 <Play size={12} color="#fff" fill="#fff" />
                 <Text className="text-[13.5px] font-bold text-white">Start {q.minutes} min session</Text>
-              </Pressable>
+              </PressableScale>
             </View>
           )
         })}
