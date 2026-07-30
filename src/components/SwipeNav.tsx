@@ -4,7 +4,7 @@ import { GestureDetector } from 'react-native-gesture-handler'
 import Animated, { useAnimatedStyle, interpolate, Extrapolation } from 'react-native-reanimated'
 import { Menu, MessageCircle } from 'lucide-react-native'
 import { useColors } from '../theme'
-import { useHorizontalSwipe } from '../lib/useHorizontalSwipe'
+import { useHorizontalSwipe, SWIPE_COMMIT_RATIO } from '../lib/useHorizontalSwipe'
 import { IS_WEB, WEB_SCREEN } from './WebFrame'
 
 /**
@@ -34,7 +34,7 @@ export function SwipeNav({
     onSwipeLeft: onOpenCoach,
   })
 
-  const commit = (width || 402) * 0.32
+  const commit = (width || 402) * SWIPE_COMMIT_RATIO
   // Left pill fades / slides in as the content is pulled right.
   const leftStyle = useAnimatedStyle(() => ({
     opacity: interpolate(dragX.value, [0, commit], [0, 1], Extrapolation.CLAMP),
