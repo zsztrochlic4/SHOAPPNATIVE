@@ -6061,5 +6061,199 @@ export const EXERCISES: Exercise[] = [
     ],
     "commonMistake": "Setting the seat too low, which cramps the knees over a long ride.",
     "safetyNote": "The gentlest cardio option, safe for most limitations. Still stop on chest pain, dizziness or breathlessness (S06)."
+  },
+  // --- Added from the 8×12-minute bodyweight workout spreadsheet (data/quick-workouts/8x12min.xlsx) ---
+  // These four bodyweight moves are not yet in workbook v16; back-port them into the
+  // "Exercise Database" sheet on the next regen so this generated file and the workbook reconverge.
+  // supported:false keeps them low-priority in the program generator (they exist for the
+  // 12-minute quick workouts + the exercise browser/detail overlay, not the main split).
+  {
+    "id": "BK16",
+    "name": "Prone Lat Pull-Down",
+    "muscleGroup": "Back",
+    "primaryMuscles": "Lats, lower traps",
+    "movementPattern": "Vertical Pull",
+    "substitutionGroup": [
+      "Back",
+      "Vertical Pull"
+    ],
+    "type": "Isolation",
+    "equipmentTier": "Bodyweight",
+    "equipment": "None",
+    "skillLevel": "Beginner",
+    "unilateral": false,
+    "loadable": false,
+    "prescriptionClass": "Rep",
+    "primaryGoalFit": "General Fitness",
+    "minRir": 0,
+    "failureAllowed": true,
+    "spotterRecommended": false,
+    "requiredEquipmentTags": [
+      "none"
+    ],
+    "optionalEquipmentTags": [],
+    "impactLevel": "Low",
+    "supported": false,
+    "active": true,
+    "measurementType": "reps",
+    "loadUnit": "bodyweight",
+    "stressRegions": [
+      "shoulder",
+      "lower_back"
+    ],
+    "substitutionIds": [],
+    "substitutionCount": 0,
+    "bodyRegion": "upper",
+    "whyInDatabase": "Trains the lats and lower traps from the floor with no equipment, so a back or posture slot always has a bodyweight option.",
+    "whatItDoes": "A controlled floor drill that trains the lats and shoulder blades by pulling the elbows toward the ribs.",
+    "steps": [
+      "Lie face down with your arms stretched overhead and thumbs pointing up",
+      "Lift the hands slightly and pull the elbows down toward your ribs",
+      "Reach the arms long again without shrugging the shoulders"
+    ],
+    "commonMistake": "Arching the lower back or rushing the movement instead of pulling from the upper back.",
+    "safetyNote": "Bodyweight posture drill. Move smoothly and stop on sharp or joint pain; swap to Prone Reverse Snow Angel."
+  },
+  {
+    "id": "BK17",
+    "name": "Seated Towel Row Isometric",
+    "muscleGroup": "Back",
+    "primaryMuscles": "Lats, rhomboids, mid traps",
+    "movementPattern": "Horizontal Pull",
+    "substitutionGroup": [
+      "Back",
+      "Horizontal Pull"
+    ],
+    "type": "Isolation",
+    "equipmentTier": "Bodyweight",
+    "equipment": "Towel",
+    "skillLevel": "Beginner",
+    "unilateral": false,
+    "loadable": false,
+    "prescriptionClass": "Time",
+    "primaryGoalFit": "General Fitness",
+    "minRir": 0,
+    "failureAllowed": true,
+    "spotterRecommended": false,
+    "requiredEquipmentTags": [
+      "none"
+    ],
+    "optionalEquipmentTags": [],
+    "impactLevel": "Low",
+    "supported": false,
+    "active": true,
+    "measurementType": "duration",
+    "loadUnit": "seconds",
+    "stressRegions": [
+      "shoulder",
+      "lower_back"
+    ],
+    "substitutionIds": [],
+    "substitutionCount": 0,
+    "bodyRegion": "upper",
+    "whyInDatabase": "A rowing pattern with nothing but a towel, giving upper-back work when no bands, bars or cables are available.",
+    "whatItDoes": "A seated row hold where the feet press into a towel while the arms pull back, creating controllable resistance.",
+    "steps": [
+      "Sit tall with the knees slightly bent and loop a towel around both feet",
+      "Pull the elbows back while pressing the feet forward into the towel",
+      "Hold moderate tension, breathe normally, then relax before repeating"
+    ],
+    "commonMistake": "Holding the breath, rounding the shoulders or pulling at maximum effort.",
+    "safetyNote": "Isometric hold at moderate effort. Breathe normally and stop on sharp or joint pain; swap to Prone Reverse Snow Angel."
+  },
+  {
+    "id": "BK18",
+    "name": "Prone Reverse Snow Angel",
+    "muscleGroup": "Back",
+    "primaryMuscles": "Rear delts, mid traps, rhomboids",
+    "movementPattern": "Horizontal Pull",
+    "substitutionGroup": [
+      "Back",
+      "Horizontal Pull"
+    ],
+    "type": "Isolation",
+    "equipmentTier": "Bodyweight",
+    "equipment": "None",
+    "skillLevel": "Beginner",
+    "unilateral": false,
+    "loadable": false,
+    "prescriptionClass": "Rep",
+    "primaryGoalFit": "General Fitness",
+    "minRir": 0,
+    "failureAllowed": true,
+    "spotterRecommended": false,
+    "requiredEquipmentTags": [
+      "none"
+    ],
+    "optionalEquipmentTags": [],
+    "impactLevel": "Low",
+    "supported": false,
+    "active": true,
+    "measurementType": "reps",
+    "loadUnit": "bodyweight",
+    "stressRegions": [
+      "shoulder",
+      "lower_back"
+    ],
+    "substitutionIds": [],
+    "substitutionCount": 0,
+    "bodyRegion": "upper",
+    "whyInDatabase": "Rear-delt and scapular posture work from the floor with no equipment, backing up the prone lat pull-down so a posture slot always has a swap.",
+    "whatItDoes": "A floor-based upper-back exercise that trains the shoulder blades, rear delts and posture muscles.",
+    "steps": [
+      "Lie face down with your arms beside your body and palms facing the floor",
+      "Lift your hands slightly and sweep the arms in a wide arc overhead",
+      "Return slowly while keeping the neck relaxed and shoulder blades controlled"
+    ],
+    "commonMistake": "Shrugging the shoulders and arching the lower back to create movement.",
+    "safetyNote": "Bodyweight posture drill. Keep the neck relaxed and stop on sharp or joint pain; swap to Prone Y-T-W Raise."
+  },
+  {
+    "id": "FB15",
+    "name": "Step Jack",
+    "muscleGroup": "Full Body & Conditioning",
+    "primaryMuscles": "Full body",
+    "movementPattern": "Conditioning",
+    "substitutionGroup": [
+      "Full Body & Conditioning",
+      "Conditioning"
+    ],
+    "type": "Compound",
+    "equipmentTier": "Bodyweight",
+    "equipment": "None",
+    "skillLevel": "Beginner",
+    "unilateral": false,
+    "loadable": false,
+    "prescriptionClass": "Interval",
+    "primaryGoalFit": "Fat Loss",
+    "minRir": 0,
+    "failureAllowed": true,
+    "spotterRecommended": false,
+    "requiredEquipmentTags": [
+      "none"
+    ],
+    "optionalEquipmentTags": [],
+    "impactLevel": "Low",
+    "supported": false,
+    "active": true,
+    "measurementType": "interval",
+    "loadUnit": "rounds",
+    "stressRegions": [
+      "knee",
+      "ankle",
+      "hip"
+    ],
+    "substitutionIds": [],
+    "substitutionCount": 0,
+    "bodyRegion": "lower",
+    "whyInDatabase": "The lowest-impact conditioning movement in the database, a joint-friendly stand-in for the jumping jack.",
+    "whatItDoes": "A low impact jumping jack. The same warm-up and cardio effect with one foot always on the floor.",
+    "steps": [
+      "Stand with your feet together and arms at your sides",
+      "Step one foot out to the side as you raise your arms overhead",
+      "Step back in and repeat, alternating sides in a steady rhythm"
+    ],
+    "commonMistake": "Rushing so it turns into a jump instead of a controlled step.",
+    "safetyNote": "Low impact conditioning. Stop on sharp or joint pain and swap to Jumping Jack."
   }
 ]
