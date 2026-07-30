@@ -37,6 +37,7 @@
     "@firebase/rules-unit-testing": "^5.0.1",
     "@types/react": "~19.2.2",
     "babel-preset-expo": "~57.0.0",
+    "firebase-admin": "^14.2.0",
     "prettier": "^3.8.4",
     "tailwindcss": "^3.4.19",
     "typescript": "~6.0.3"
@@ -69,7 +70,9 @@
     "recipes:upload": "node scripts/upload-recipes.mjs",
     "media:upload": "node scripts/upload-exercise-media.mjs",
     "media:folders": "node scripts/create-exercise-folders.mjs",
-    "exercises:upload": "node scripts/upload-exercises.mjs"
+    "exercises:upload": "node scripts/upload-exercises.mjs",
+    "workouts:build": "node scripts/build-quick-workouts.mjs",
+    "workouts:upload": "node scripts/upload-workouts.mjs"
   },
   "private": true
 }

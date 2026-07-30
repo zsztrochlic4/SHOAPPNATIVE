@@ -925,15 +925,19 @@ export function QuickWorkoutsSheet({ open, onClose }: Props) {
 
   // Turn a quick workout into a loggable session and open the same guided
   // follow-along (timer, rest, form) used for prescribed and custom workouts.
-  // Bodyweight moves seed at 0 kg; each gets a synthetic id so the technique
-  // sheet falls back to the generic form guide rather than opening blank.
+  // Each round repeats the same 4 timed stations, so we seed one loggable entry
+  // per unique station with targetSets = round count. Stations reference real
+  // exercise ids (QD09, CH04…), so the technique sheet shows the proper card.
+  // NOTE: this is the interim mapping — the full time-based auto-countdown player
+  // (per-station work/rest countdown) is a scoped follow-up.
   function startQuick(q: (typeof QUICK_WORKOUTS)[number]) {
-    const items = q.exercises.map((name, i) => ({
-      defId: `quick-${q.id}-${i}`,
-      name,
+    const rounds = q.rounds.length
+    const items = (q.rounds[0]?.stations ?? []).map((s) => ({
+      defId: s.exerciseId,
+      name: s.name,
       image: imageForMuscle('Full Body & Conditioning'),
-      targetSets: 3,
-      targetReps: '12-15',
+      targetSets: rounds,
+      targetReps: s.repHint ?? `${s.workSec}s`,
     }))
     const base = buildCustomSession(q.name, items, todayKey)
     const session = { ...base, focus: q.focus, durationMin: q.minutes, calories: Math.round(q.minutes * 9), accent: 'blue' as const }
@@ -941,36 +945,52 @@ export function QuickWorkoutsSheet({ open, onClose }: Props) {
     nav.open('activeWorkout', { sessionId: session.id })
   }
 
+  const levelStyle = (level: string) =>
+    level === 'Beginner'
+      ? { text: 'text-brand-400', bg: 'bg-brand-400/15' }
+      : level === 'Advanced'
+        ? { text: 'text-accent-orange', bg: 'bg-accent-orange/15' }
+        : { text: 'text-accent-blue', bg: 'bg-accent-blue/15' }
+
   return (
     <Sheet open={open} onClose={onClose} full>
       <Text className="text-[25px] font-extrabold tracking-[-0.03em] leading-[1.15] text-white">12-Minute Bodyweight Exercises</Text>
-      <Text className="mt-2.5 text-[13.5px] leading-5 text-white/55">Quick, no-equipment workouts when you're short on time.</Text>
+      <Text className="mt-2.5 text-[13.5px] leading-5 text-white/55">Quick, no-equipment workouts when you're short on time. Ordered easiest first.</Text>
       <View className="mt-4 gap-2.5">
-        {QUICK_WORKOUTS.map((q) => (
-          <View key={q.id} className="rounded-[20px] border border-white/5 bg-white/[0.03] p-4">
-            <View className="flex-row items-start justify-between gap-3">
-              <View className="min-w-0 flex-1">
-                <Text className="text-[15px] font-bold leading-tight text-white">{q.name}</Text>
-                <Text className="mt-0.5 text-[12px] text-white/50">{q.focus} · {q.exercises.length} exercises</Text>
-              </View>
-              <View className="shrink-0 items-end">
-                <Text className="text-[22px] font-extrabold leading-none text-accent-blue">{q.minutes}</Text>
-                <Text className="mt-[3px] text-[9.5px] font-bold uppercase tracking-wider text-white/35">minutes</Text>
-              </View>
-            </View>
-            <View className="mt-3 flex-row flex-wrap gap-1.5">
-              {q.exercises.map((e) => (
-                <View key={e} className="rounded-full bg-white/[0.06] px-2.5 py-1">
-                  <Text className="text-[11.5px] text-white/65">{e}</Text>
+        {QUICK_WORKOUTS.map((q) => {
+          const stations = q.rounds[0]?.stations ?? []
+          const lvl = levelStyle(q.level)
+          return (
+            <View key={q.id} className="rounded-[20px] border border-white/5 bg-white/[0.03] p-4">
+              <View className="flex-row items-start justify-between gap-3">
+                <View className="min-w-0 flex-1">
+                  <View className={`mb-1.5 self-start rounded-full px-2 py-0.5 ${lvl.bg}`}>
+                    <Text className={`text-[9.5px] font-bold uppercase tracking-wider ${lvl.text}`}>{q.level}</Text>
+                  </View>
+                  <Text className="text-[15px] font-bold leading-tight text-white">{q.name}</Text>
+                  <Text className="mt-0.5 text-[12px] text-white/50">{q.focus}</Text>
+                  <Text className="mt-1 text-[11px] text-white/40">{q.rounds.length} rounds · {stations.length} exercises</Text>
                 </View>
-              ))}
+                <View className="shrink-0 items-end">
+                  <Text className="text-[22px] font-extrabold leading-none text-accent-blue">{q.minutes}</Text>
+                  <Text className="mt-[3px] text-[9.5px] font-bold uppercase tracking-wider text-white/35">minutes</Text>
+                </View>
+              </View>
+              <View className="mt-3 flex-row flex-wrap gap-1.5">
+                {stations.map((s) => (
+                  <View key={s.exerciseId} className="flex-row items-center gap-1 rounded-full bg-white/[0.06] px-2.5 py-1">
+                    <Text className="text-[11.5px] text-white/65">{s.name}</Text>
+                    <Text className="text-[11.5px] font-semibold text-white/40">· {s.workSec}s</Text>
+                  </View>
+                ))}
+              </View>
+              <Pressable onPress={() => startQuick(q)} className="mt-3 flex-row items-center justify-center gap-1.5 rounded-full bg-accent-blue py-2 active:opacity-90">
+                <Play size={12} color="#fff" fill="#fff" />
+                <Text className="text-[13.5px] font-bold text-white">Start {q.minutes} min session</Text>
+              </Pressable>
             </View>
-            <Pressable onPress={() => startQuick(q)} className="mt-3 flex-row items-center justify-center gap-1.5 rounded-full bg-accent-blue py-2 active:opacity-90">
-              <Play size={12} color="#fff" fill="#fff" />
-              <Text className="text-[13.5px] font-bold text-white">Start {q.minutes} min session</Text>
-            </Pressable>
-          </View>
-        ))}
+          )
+        })}
       </View>
     </Sheet>
   )

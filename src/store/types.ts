@@ -454,12 +454,49 @@ export interface Group {
   joined: boolean
 }
 
+/** Difficulty tier shown on a quick workout (drives the beginner→advanced order). */
+export type WorkoutLevel = 'Beginner' | 'Intermediate' | 'Advanced'
+
+/** One timed station within a quick-workout round (a bodyweight move, not a lift). */
+export interface QuickStation {
+  /** Canonical exercise DB id (e.g. 'QD09', 'CH04', 'BK16'). */
+  exerciseId: string
+  /** Display name, denormalised so the list renders offline. */
+  name: string
+  /** Working time in seconds (the timer shows the full station length). */
+  workSec: number
+  /** Transition rest after this station, in seconds (10–15s). */
+  restSec: number
+  /** Optional rep target inside the working time, e.g. '5-6 reps/side', '6-8 reps'. */
+  repHint?: string
+  /** Per-side move: prompt "switch sides halfway". */
+  perSide?: boolean
+}
+
+/** One round of a quick workout. Round 1 is the build round; a full rest follows rounds 1 & 2. */
+export interface QuickRound {
+  round: number
+  /** Round 1: move at a controlled pace, focus on technique, do not push to the limit. */
+  build?: boolean
+  stations: QuickStation[]
+  /** Full rest after this round, in seconds (60s after rounds 1 & 2; absent on the last). */
+  roundRestSec?: number
+}
+
+/**
+ * A 12-minute bodyweight quick workout: 3 rounds of 4 timed stations. Time-based
+ * (seconds), not weight×reps. Rendered in the "12-Minute Bodyweight Exercises" sheet,
+ * ordered by `order` (beginner → advanced).
+ */
 export interface QuickWorkout {
   id: string
   name: string
-  minutes: number
+  level: WorkoutLevel
+  /** Beginner→advanced display order (1-based). */
+  order: number
   focus: string
-  exercises: string[]
+  minutes: number
+  rounds: QuickRound[]
 }
 
 /** Recipe categories used to filter the Eats browser. */

@@ -9,6 +9,7 @@ import type {
   QuickWorkout,
 } from '../store/types'
 import { BUDGET_MEALS_SEED } from './recipes.generated'
+import { QUICK_WORKOUTS_SEED } from './quickWorkouts.generated'
 
 /* Pexels imagery */
 export const img = {
@@ -322,12 +323,9 @@ export const FOODS: FoodItem[] = [
 export const foodById = (id: string) => FOODS.find((f) => f.id === id)
 
 /* ------------------------ Quick workouts ------------------------- */
-export const QUICK_WORKOUTS: QuickWorkout[] = [
-  { id: 'q-dorm', name: 'Dorm Room Pump', minutes: 15, focus: 'Full body · no equipment', exercises: ['Push-Ups', 'Bodyweight Squats', 'Plank', 'Mountain Climbers'] },
-  { id: 'q-core', name: 'Express Core', minutes: 10, focus: 'Abs · core', exercises: ['Plank', 'Leg Raises', 'Bicycle Crunches', 'Russian Twists'] },
-  { id: 'q-upper', name: 'Quick Upper', minutes: 20, focus: 'Chest · back · arms', exercises: ['Push-Ups', 'Pull-Ups', 'Pike Push-Ups', 'Dips'] },
-  { id: 'q-mobility', name: 'Desk Recovery', minutes: 8, focus: 'Mobility · stretch', exercises: ['Cat-Cow', 'Hip Openers', 'Shoulder Rolls', 'Hamstring Stretch'] },
-]
+/* The 8×12-minute bodyweight workouts, generated from the workout spreadsheet
+ * (data/quick-workouts/8x12min.xlsx) and pre-sorted beginner → advanced. */
+export const QUICK_WORKOUTS: QuickWorkout[] = QUICK_WORKOUTS_SEED
 
 /* Universities for the leaderboard flavour */
 export const UNIVERSITIES = [
