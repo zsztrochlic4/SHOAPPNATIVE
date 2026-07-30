@@ -932,7 +932,8 @@ export function QuickWorkoutsSheet({ open, onClose }: Props) {
   // (per-station work/rest countdown) is a scoped follow-up.
   function startQuick(q: (typeof QUICK_WORKOUTS)[number]) {
     const rounds = q.rounds.length
-    const items = (q.rounds[0]?.stations ?? []).map((s) => ({
+    const stations = q.rounds[0]?.stations ?? []
+    const items = stations.map((s) => ({
       defId: s.exerciseId,
       name: s.name,
       image: imageForMuscle('Full Body & Conditioning'),
@@ -940,7 +941,18 @@ export function QuickWorkoutsSheet({ open, onClose }: Props) {
       targetReps: s.repHint ?? `${s.workSec}s`,
     }))
     const base = buildCustomSession(q.name, items, todayKey)
-    const session = { ...base, focus: q.focus, durationMin: q.minutes, calories: Math.round(q.minutes * 9), accent: 'blue' as const }
+    // Attach the time-based station data so the player runs a countdown circuit:
+    // each `set` index is a round; the work phase counts durationSec down and
+    // auto-advances, resting restSec between stations and roundRestSec between rounds.
+    const exercises = base.exercises.map((e, i) => ({
+      ...e,
+      measure: 'time' as const,
+      durationSec: stations[i]?.workSec ?? 0,
+      restSec: stations[i]?.restSec ?? 15,
+      perSide: !!stations[i]?.perSide,
+    }))
+    const roundRestSec = q.rounds.find((r) => r.roundRestSec)?.roundRestSec ?? 60
+    const session = { ...base, exercises, focus: q.focus, durationMin: q.minutes, calories: Math.round(q.minutes * 9), accent: 'blue' as const, roundRestSec }
     dispatch({ type: 'SAVE_SESSION', session })
     nav.open('activeWorkout', { sessionId: session.id })
   }

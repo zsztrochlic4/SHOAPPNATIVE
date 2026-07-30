@@ -89,6 +89,27 @@ function nextUndoneCursor(s: WorkoutSession, fromExIdx: number): Cursor | null {
   return null
 }
 
+/** True when this is a time-based circuit (bodyweight quick workout). */
+function isTimeSession(s: WorkoutSession): boolean {
+  return s.exercises.some((e) => e.measure === 'time')
+}
+
+/**
+ * Circuit advance for time sessions: run round-major (finish every station at the
+ * current set index — one round — before moving to the next). Each `set` index is
+ * a round. Returns the next not-done station, preferring the current round.
+ */
+function nextCircuitCursor(s: WorkoutSession, exIdx: number, setIdx: number): Cursor | null {
+  const maxSets = Math.max(0, ...s.exercises.map((e) => e.sets.length))
+  // Rest of the current round (later stations).
+  for (let i = exIdx + 1; i < s.exercises.length; i++) if (!s.exercises[i].sets[setIdx]?.done) return { exIdx: i, setIdx }
+  // Later rounds, from the first station.
+  for (let sj = setIdx + 1; sj < maxSets; sj++) for (let i = 0; i < s.exercises.length; i++) if (!s.exercises[i].sets[sj]?.done) return { exIdx: i, setIdx: sj }
+  // Anything missed earlier in the current round (e.g. resumed out of order).
+  for (let i = 0; i <= exIdx; i++) if (!s.exercises[i].sets[setIdx]?.done) return { exIdx: i, setIdx }
+  return null
+}
+
 function mmss(total: number): string {
   const m = Math.floor(Math.max(0, total) / 60)
   const s = String(Math.max(0, total) % 60).padStart(2, '0')
@@ -176,6 +197,8 @@ export default function ActiveWorkout({ open, onClose, onComplete, params }: { o
   const [started, setStarted] = useState(false)
   const [totalElapsed, setTotalElapsed] = useState(0)
   const [workElapsed, setWorkElapsed] = useState(0)
+  // Time-based stations count DOWN from durationSec and auto-advance at 0.
+  const [workRemaining, setWorkRemaining] = useState(0)
   const [restRemaining, setRestRemaining] = useState(0)
   const [restTotal, setRestTotal] = useState(120)
   const [goalOpen, setGoalOpen] = useState(false)
@@ -193,7 +216,7 @@ export default function ActiveWorkout({ open, onClose, onComplete, params }: { o
   useEffect(() => {
     if (!open) return
     setMode('list'); setCursor({ exIdx: 0, setIdx: 0 }); setStarted(false)
-    setTotalElapsed(0); setWorkElapsed(0); setRestRemaining(0)
+    setTotalElapsed(0); setWorkElapsed(0); setWorkRemaining(0); setRestRemaining(0)
     setGoalOpen(false); setExpanded(null); setShowHow(false); setConfirmEnd(false)
     finishPRRef.current = null; finishStatsRef.current = null
     // Opening the workout counts as starting it for today's dashboard tick.
@@ -215,6 +238,29 @@ export default function ActiveWorkout({ open, onClose, onComplete, params }: { o
     const t = setInterval(() => setWorkElapsed((e) => e + 1), 1000)
     return () => clearInterval(t)
   }, [open, mode, cursor])
+
+  // Seed the time-station countdown whenever a work phase begins.
+  useEffect(() => {
+    if (mode !== 'work') return
+    const ex = session?.exercises[cursor.exIdx]
+    if (ex?.measure === 'time') setWorkRemaining(ex.durationSec ?? 0)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, cursor.exIdx, cursor.setIdx])
+
+  // Time-station countdown: tick down, cue the switch-sides half-way point and the
+  // final 3s, then auto-log + advance to rest at zero (no "tap when done").
+  useEffect(() => {
+    if (!open || mode !== 'work') return
+    const ex = session?.exercises[cursor.exIdx]
+    if (ex?.measure !== 'time') return
+    if (workRemaining <= 0) { logSet(); return }
+    const dur = ex.durationSec ?? 0
+    if (ex.perSide && dur > 0 && workRemaining === Math.round(dur / 2)) tick()
+    if (workRemaining <= 3) restTick()
+    const t = setTimeout(() => setWorkRemaining((r) => r - 1), 1000)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, mode, workRemaining, cursor.exIdx])
 
   // Rest clock — counts down; a rising tick in the final 3s, a beep + GO at zero.
   useEffect(() => {
@@ -286,15 +332,24 @@ export default function ActiveWorkout({ open, onClose, onComplete, params }: { o
   // Finish the current set → log it, then rest before the next (or back to list).
   function logSet() {
     thud()
-    const { exIdx } = cursor
+    const { exIdx, setIdx } = cursor
     const exercises = session!.exercises.map((ex, i) =>
-      i !== exIdx ? ex : { ...ex, sets: ex.sets.map((s, j) => (j === cursor.setIdx ? { ...s, done: true } : s)) },
+      i !== exIdx ? ex : { ...ex, sets: ex.sets.map((s, j) => (j === setIdx ? { ...s, done: true } : s)) },
     )
     const next = { ...session!, exercises }
     patch(next)
-    const upcoming = nextUndoneCursor(next, exIdx)
+    const timed = isTimeSession(next)
+    const upcoming = timed ? nextCircuitCursor(next, exIdx, setIdx) : nextUndoneCursor(next, exIdx)
     if (!upcoming) { setMode('list'); return }
-    const secs = restSecondsFor(session!.exercises[exIdx].defId)
+    // Time circuits rest per-station within a round, and the longer round rest
+    // when the next station starts a fresh round; lifting sessions derive from id.
+    const doneEx = session!.exercises[exIdx]
+    const roundBoundary = upcoming.setIdx > setIdx
+    const secs = timed
+      ? roundBoundary
+        ? session!.roundRestSec ?? 60
+        : doneEx.restSec ?? 15
+      : restSecondsFor(doneEx.defId)
     setCursor(upcoming); setRestTotal(secs); setRestRemaining(secs); setWorkElapsed(0); setMode('rest')
   }
   function skipRest() { setWorkElapsed(0); setMode('work') }
@@ -409,6 +464,10 @@ export default function ActiveWorkout({ open, onClose, onComplete, params }: { o
             recWeight={fmtWeight(recWeightKg, units, units === 'imperial' ? 0 : 1)}
             reps={cursorSet.reps}
             remaining={s.remaining}
+            timeMode={cursorEx.measure === 'time'}
+            workRemaining={workRemaining}
+            durationSec={cursorEx.durationSec ?? 0}
+            perSide={!!cursorEx.perSide}
             detail={detailFor(cursorEx.defId)}
             showHow={showHow}
             onOpenHow={() => setShowHow(true)}
@@ -633,10 +692,17 @@ function ExerciseCard({ ex, idx, c, units, isActive, isOptional, expanded, onTog
   const firstUndone = ex.sets.findIndex((x: any) => !x.done)
   const muscle = muscleFor(ex.defId, ex.name)
   const detail = detailFor(ex.defId)
+  const timeMode = ex.measure === 'time'
   const weights = ex.sets.map((x: any) => x.weightKg)
   const same = weights.length > 0 && weights.every((w: number) => w === weights[0])
   const u = weightUnit(units)
-  const lastLine = ex.sets.length === 0 ? '—' : same
+  // Time stations summarise as "40s × 3 rounds"; lifting sets as "weight × reps".
+  const metaLine = timeMode
+    ? `${muscle} · ${ex.targetSets} rounds · ${ex.durationSec ?? 0}s${ex.perSide ? '/side' : ''}`
+    : `${muscle} · ${ex.targetSets} sets · ${ex.targetReps} reps`
+  const lastLine = ex.sets.length === 0 ? '—' : timeMode
+    ? `${ex.durationSec ?? 0}s${ex.perSide ? '/side' : ''} × ${ex.sets.length} ${ex.sets.length === 1 ? 'round' : 'rounds'}`
+    : same
     ? `${fmtWeightNum(weights[0], units, units === 'imperial' ? 0 : 1)} ${u} × ${ex.sets.map((x: any) => x.reps).join(', ')}`
     : ex.sets.map((x: any) => `${fmtWeightNum(x.weightKg, units, units === 'imperial' ? 0 : 1)}${u}×${x.reps}`).join(', ')
 
@@ -678,14 +744,14 @@ function ExerciseCard({ ex, idx, c, units, isActive, isOptional, expanded, onTog
               </View>
             )}
           </View>
-          <Text style={{ marginTop: 3, fontSize: 12, fontWeight: '500', color: dim(0.45) }}>{muscle} · {ex.targetSets} sets · {ex.targetReps} reps</Text>
+          <Text style={{ marginTop: 3, fontSize: 12, fontWeight: '500', color: dim(0.45) }}>{metaLine}</Text>
           <Text style={{ marginTop: 5, fontSize: 12, lineHeight: 16.8 }}>
             <Text style={{ color: dim(0.35) }}>Last: </Text>
             <Text style={{ color: dim(0.7), fontWeight: '500' }}>{lastLine}</Text>
           </Text>
           <View style={{ marginTop: 9, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Dots dots={dots} />
-            <Text style={{ marginLeft: 4, fontSize: 11.5, fontWeight: '700', color: dim(0.4) }}>{doneCount}/{ex.sets.length} sets</Text>
+            <Text style={{ marginLeft: 4, fontSize: 11.5, fontWeight: '700', color: dim(0.4) }}>{doneCount}/{ex.sets.length} {timeMode ? 'rounds' : 'sets'}</Text>
           </View>
 
           <View style={{ marginTop: 11, flexDirection: 'row', gap: 8 }}>
@@ -735,18 +801,28 @@ function ExpandedForm({ ex, idx, c, units, detail, onAdjWeight, onAdjReps, onTog
         <Text style={{ fontSize: 12, lineHeight: 17.4, color: dim(0.7) }}><Text style={{ color: c.accentOrange, fontWeight: '700' }}>Avoid · </Text>{detail.commonMistake}</Text>
       </View>
 
-      <Text style={{ marginTop: 15, fontSize: 11, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase', color: dim(0.35) }}>Log manually</Text>
+      <Text style={{ marginTop: 15, fontSize: 11, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase', color: dim(0.35) }}>{ex.measure === 'time' ? 'Rounds' : 'Log manually'}</Text>
       <View style={{ marginTop: 9, gap: 8 }}>
-        {ex.sets.map((st: any, j: number) => (
-          <View key={j} style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
-            <Text style={{ width: 16, fontSize: 12, fontWeight: '700', color: dim(0.4) }}>{j + 1}</Text>
-            <Stepper c={c} value={`${fmtWeightNum(st.weightKg, units, units === 'imperial' ? 0 : 1)}`} unit={u} onDown={() => onAdjWeight(idx, j, -1)} onUp={() => onAdjWeight(idx, j, 1)} />
-            <Stepper c={c} value={`${st.reps}`} unit="reps" onDown={() => onAdjReps(idx, j, -1)} onUp={() => onAdjReps(idx, j, 1)} />
-            <PressableScale haptic={false} scaleTo={0.9} onPress={() => onToggleSet(idx, j)} className="items-center justify-center" style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: st.done ? c.brand400 : 'transparent', borderWidth: 2, borderColor: st.done ? c.brand400 : dim(0.2) }}>
-              {st.done && <Check size={15} strokeWidth={3.4} color="#0a0a0b" />}
-            </PressableScale>
-          </View>
-        ))}
+        {ex.sets.map((st: any, j: number) =>
+          ex.measure === 'time' ? (
+            <View key={j} style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
+              <Text style={{ width: 16, fontSize: 12, fontWeight: '700', color: dim(0.4) }}>{j + 1}</Text>
+              <Text style={{ flex: 1, fontSize: 13, fontWeight: '600', color: dim(0.6) }}>Round {j + 1} · {ex.durationSec ?? 0}s{ex.perSide ? '/side' : ''}</Text>
+              <PressableScale haptic={false} scaleTo={0.9} onPress={() => onToggleSet(idx, j)} className="items-center justify-center" style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: st.done ? c.brand400 : 'transparent', borderWidth: 2, borderColor: st.done ? c.brand400 : dim(0.2) }}>
+                {st.done && <Check size={15} strokeWidth={3.4} color="#0a0a0b" />}
+              </PressableScale>
+            </View>
+          ) : (
+            <View key={j} style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
+              <Text style={{ width: 16, fontSize: 12, fontWeight: '700', color: dim(0.4) }}>{j + 1}</Text>
+              <Stepper c={c} value={`${fmtWeightNum(st.weightKg, units, units === 'imperial' ? 0 : 1)}`} unit={u} onDown={() => onAdjWeight(idx, j, -1)} onUp={() => onAdjWeight(idx, j, 1)} />
+              <Stepper c={c} value={`${st.reps}`} unit="reps" onDown={() => onAdjReps(idx, j, -1)} onUp={() => onAdjReps(idx, j, 1)} />
+              <PressableScale haptic={false} scaleTo={0.9} onPress={() => onToggleSet(idx, j)} className="items-center justify-center" style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: st.done ? c.brand400 : 'transparent', borderWidth: 2, borderColor: st.done ? c.brand400 : dim(0.2) }}>
+                {st.done && <Check size={15} strokeWidth={3.4} color="#0a0a0b" />}
+              </PressableScale>
+            </View>
+          ),
+        )}
       </View>
     </Animated.View>
   )
@@ -768,13 +844,18 @@ function Stepper({ c, value, unit, onDown, onUp }: { c: any; value: string; unit
 }
 
 /* ============================ Work ============================ */
-function WorkScreen({ colors: c, ex, cursor, exTotal, rail, elapsedStr, sessionStr, recWeight, reps, remaining, detail, showHow, onOpenHow, onCloseHow, onDecReps, onIncReps, onBack, onLogSet }: any) {
+function WorkScreen({ colors: c, ex, cursor, exTotal, rail, elapsedStr, sessionStr, recWeight, reps, remaining, timeMode, workRemaining, durationSec, perSide, detail, showHow, onOpenHow, onCloseHow, onDecReps, onIncReps, onBack, onLogSet }: any) {
   const dim = (o: number) => `rgba(255,255,255,${o})`
   const dots: Dot[] = ex.sets.map((st: any, j: number) => ({
     bg: st.done ? c.brand400 : j === cursor.setIdx ? 'transparent' : dim(0.12),
     border: st.done ? 'transparent' : j === cursor.setIdx ? c.brand400 : 'transparent',
   }))
   const doneLabel = remaining <= 1 ? 'Done, finish set' : 'Done, start rest'
+  // Time-based circuit station: a big countdown that auto-advances at zero, with a
+  // round label and (for per-side moves) a switch-sides cue at the half-way point.
+  const roundLabel = `Round ${cursor.setIdx + 1} of ${ex.sets.length} · Station ${cursor.exIdx + 1} of ${exTotal}`
+  const halfway = perSide && durationSec > 0 && workRemaining <= Math.round(durationSec / 2)
+  const workSub = perSide ? (halfway ? 'Switch sides now' : 'Switch sides halfway') : ex.targetReps ? `Aim for ${ex.targetReps}` : 'Hold to the buzzer'
 
   return (
     <ScreenIn>
@@ -795,7 +876,7 @@ function WorkScreen({ colors: c, ex, cursor, exTotal, rail, elapsedStr, sessionS
       {/* context */}
       <View style={{ paddingHorizontal: 24, paddingTop: 16, alignItems: 'center' }}>
         <Text style={{ fontSize: 11, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', color: c.brand400, textAlign: 'center' }}>
-          Exercise {cursor.exIdx + 1} of {exTotal} · Set {cursor.setIdx + 1} of {ex.sets.length}
+          {timeMode ? roundLabel : `Exercise ${cursor.exIdx + 1} of ${exTotal} · Set ${cursor.setIdx + 1} of ${ex.sets.length}`}
         </Text>
         <Text style={{ marginTop: 5, fontSize: 25, fontWeight: '800', letterSpacing: -0.5, lineHeight: 27.5, color: c.fg, textAlign: 'center' }}>{ex.name}</Text>
         <View style={{ marginTop: 9 }}><Dots dots={dots} size={9} /></View>
@@ -813,36 +894,44 @@ function WorkScreen({ colors: c, ex, cursor, exTotal, rail, elapsedStr, sessionS
           </Svg>
           <View style={{ alignItems: 'center' }}>
             <Text style={{ fontSize: 13, fontWeight: '800', letterSpacing: 4, textTransform: 'uppercase', color: c.brand400 }}>Work</Text>
-            <Text style={{ marginTop: 6, fontSize: 62, fontWeight: '800', letterSpacing: -1, lineHeight: 62, color: c.fg, fontVariant: ['tabular-nums'] }}>{elapsedStr}</Text>
-            <Text style={{ marginTop: 8, fontSize: 13, fontWeight: '600', color: dim(0.4) }}>Aim for {ex.targetReps} reps</Text>
+            <Text style={{ marginTop: 6, fontSize: 62, fontWeight: '800', letterSpacing: -1, lineHeight: 62, color: timeMode && workRemaining <= 3 ? c.accentOrange : c.fg, fontVariant: ['tabular-nums'] }}>{timeMode ? mmss(workRemaining) : elapsedStr}</Text>
+            <Text style={{ marginTop: 8, fontSize: 13, fontWeight: '600', color: timeMode && halfway && perSide ? c.brand400 : dim(0.4) }}>{timeMode ? workSub : `Aim for ${ex.targetReps} reps`}</Text>
           </View>
         </View>
       </View>
 
-      {/* recommended weight + reps stepper */}
-      <View style={{ paddingHorizontal: 20, alignItems: 'center' }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: dim(0.06), borderWidth: 1, borderColor: dim(0.08), borderRadius: 999, paddingVertical: 7, paddingHorizontal: 14 }}>
-          <Text style={{ fontSize: 12.5, fontWeight: '600', color: dim(0.55) }}>Recommended</Text>
-          <Text style={{ fontSize: 12.5, fontWeight: '800', color: c.brand400 }}>{recWeight}</Text>
+      {/* recommended weight + reps stepper (rep-based sets only) */}
+      {!timeMode && (
+        <View style={{ paddingHorizontal: 20, alignItems: 'center' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: dim(0.06), borderWidth: 1, borderColor: dim(0.08), borderRadius: 999, paddingVertical: 7, paddingHorizontal: 14 }}>
+            <Text style={{ fontSize: 12.5, fontWeight: '600', color: dim(0.55) }}>Recommended</Text>
+            <Text style={{ fontSize: 12.5, fontWeight: '800', color: c.brand400 }}>{recWeight}</Text>
+          </View>
+          <Text style={{ marginTop: 18, fontSize: 11, fontWeight: '700', letterSpacing: 2, textTransform: 'uppercase', color: dim(0.4) }}>Reps done</Text>
+          <View style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 26 }}>
+            <PressableScale onPress={onDecReps} scaleTo={0.9} className="items-center justify-center rounded-full" style={{ width: 52, height: 52, backgroundColor: dim(0.08) }}>
+              <Minus size={22} color={c.fg} />
+            </PressableScale>
+            <Text style={{ minWidth: 64, textAlign: 'center', fontSize: 46, fontWeight: '800', color: c.fg, fontVariant: ['tabular-nums'], lineHeight: 48 }}>{reps}</Text>
+            <PressableScale onPress={onIncReps} scaleTo={0.9} className="items-center justify-center rounded-full" style={{ width: 52, height: 52, backgroundColor: c.brand400 }}>
+              <Plus size={22} color="#0a0a0b" />
+            </PressableScale>
+          </View>
         </View>
-        <Text style={{ marginTop: 18, fontSize: 11, fontWeight: '700', letterSpacing: 2, textTransform: 'uppercase', color: dim(0.4) }}>Reps done</Text>
-        <View style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 26 }}>
-          <PressableScale onPress={onDecReps} scaleTo={0.9} className="items-center justify-center rounded-full" style={{ width: 52, height: 52, backgroundColor: dim(0.08) }}>
-            <Minus size={22} color={c.fg} />
-          </PressableScale>
-          <Text style={{ minWidth: 64, textAlign: 'center', fontSize: 46, fontWeight: '800', color: c.fg, fontVariant: ['tabular-nums'], lineHeight: 48 }}>{reps}</Text>
-          <PressableScale onPress={onIncReps} scaleTo={0.9} className="items-center justify-center rounded-full" style={{ width: 52, height: 52, backgroundColor: c.brand400 }}>
-            <Plus size={22} color="#0a0a0b" />
-          </PressableScale>
-        </View>
-      </View>
+      )}
 
-      {/* done / start rest CTA */}
+      {/* CTA: rep sets tap to log; time stations auto-advance, so this only skips ahead */}
       <View style={{ paddingHorizontal: 20, paddingTop: 18, paddingBottom: 26 }}>
-        <PressableScale onPress={onLogSet} haptic={false} scaleTo={0.97} className="w-full flex-row items-center justify-center rounded-full" style={{ gap: 10, padding: 19, backgroundColor: c.brand400 }}>
-          <Check size={20} strokeWidth={3} color="#0a0a0b" />
-          <Text style={{ fontSize: 16, fontWeight: '800', letterSpacing: 0.4, textTransform: 'uppercase', color: '#0a0a0b' }}>{doneLabel}</Text>
-        </PressableScale>
+        {timeMode ? (
+          <PressableScale onPress={onLogSet} haptic={false} scaleTo={0.97} className="w-full flex-row items-center justify-center rounded-full" style={{ gap: 8, paddingVertical: 15, borderWidth: 1, borderColor: dim(0.14), backgroundColor: dim(0.05) }}>
+            <Text style={{ fontSize: 14, fontWeight: '700', letterSpacing: 0.3, textTransform: 'uppercase', color: dim(0.8) }}>Done early · skip to rest</Text>
+          </PressableScale>
+        ) : (
+          <PressableScale onPress={onLogSet} haptic={false} scaleTo={0.97} className="w-full flex-row items-center justify-center rounded-full" style={{ gap: 10, padding: 19, backgroundColor: c.brand400 }}>
+            <Check size={20} strokeWidth={3} color="#0a0a0b" />
+            <Text style={{ fontSize: 16, fontWeight: '800', letterSpacing: 0.4, textTransform: 'uppercase', color: '#0a0a0b' }}>{doneLabel}</Text>
+          </PressableScale>
+        )}
       </View>
 
       {showHow && <HowToDialog c={c} ex={ex} detail={detail} onClose={onCloseHow} />}
@@ -959,9 +1048,15 @@ function RestScreen({ colors: c, blue, units, remaining, total, rail, nextEx, ne
             {nextEx.image ? <Image source={{ uri: nextEx.image }} resizeMode="cover" style={{ width: '100%', height: '100%' }} /> : <Dumbbell size={20} color="rgba(255,255,255,0.4)" />}
           </View>
           <View>
-            <Text style={{ fontSize: 10.5, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', color: dim(0.4) }}>Up next · Set {nextCursor.setIdx + 1} of {nextEx.sets.length}</Text>
+            <Text style={{ fontSize: 10.5, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', color: dim(0.4) }}>
+              {nextEx.measure === 'time' ? `Up next · Round ${nextCursor.setIdx + 1} of ${nextEx.sets.length}` : `Up next · Set ${nextCursor.setIdx + 1} of ${nextEx.sets.length}`}
+            </Text>
             <Text style={{ fontSize: 15, fontWeight: '700', lineHeight: 17.25, color: c.fg }}>{nextEx.name}</Text>
-            <Text style={{ fontSize: 12.5, fontWeight: '700', color: c.brand400 }}>{fmtWeightNum(nextSet.weightKg, units, units === 'imperial' ? 0 : 1)} {u} × {nextSet.reps}</Text>
+            <Text style={{ fontSize: 12.5, fontWeight: '700', color: c.brand400 }}>
+              {nextEx.measure === 'time'
+                ? `${nextEx.durationSec ?? 0}s${nextEx.perSide ? ' · switch sides' : ''}`
+                : `${fmtWeightNum(nextSet.weightKg, units, units === 'imperial' ? 0 : 1)} ${u} × ${nextSet.reps}`}
+            </Text>
           </View>
         </View>
       </View>
@@ -997,8 +1092,12 @@ function GoScreen({ colors: c, units, nextEx, nextCursor, nextSet, onStart }: an
     <Animated.View style={{ flex: 1, opacity: v, transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] }) }] }}>
       <Pressable onPress={() => { thud(); onStart() }} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.brand400 }}>
         <Text style={{ fontSize: 92, fontWeight: '800', letterSpacing: -3, lineHeight: 83, color: ink }}>GO</Text>
-        <Text style={{ marginTop: 14, fontSize: 24, fontWeight: '800', color: ink }}>{fmtWeightNum(nextSet.weightKg, units, units === 'imperial' ? 0 : 1)} {u} × {nextSet.reps}</Text>
-        <Text style={{ marginTop: 4, fontSize: 13, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase', color: 'rgba(10,10,11,0.62)' }}>{nextEx.name} · Set {nextCursor.setIdx + 1}</Text>
+        <Text style={{ marginTop: 14, fontSize: 24, fontWeight: '800', color: ink }}>
+          {nextEx.measure === 'time'
+            ? `${nextEx.durationSec ?? 0}s${nextEx.perSide ? ' · switch sides' : ''}`
+            : `${fmtWeightNum(nextSet.weightKg, units, units === 'imperial' ? 0 : 1)} ${u} × ${nextSet.reps}`}
+        </Text>
+        <Text style={{ marginTop: 4, fontSize: 13, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase', color: 'rgba(10,10,11,0.62)' }}>{nextEx.name} · {nextEx.measure === 'time' ? `Round ${nextCursor.setIdx + 1}` : `Set ${nextCursor.setIdx + 1}`}</Text>
         <Text style={{ position: 'absolute', bottom: 56, fontSize: 13, fontWeight: '700', color: 'rgba(10,10,11,0.5)' }}>Tap to begin</Text>
       </Pressable>
     </Animated.View>
