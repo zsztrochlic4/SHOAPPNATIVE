@@ -288,6 +288,15 @@ export interface LoggedExercise {
   targetSets: number
   targetReps: string
   sets: SetLog[]
+  /** Time-based station (bodyweight quick workouts): the work phase counts this
+   *  many seconds down and auto-advances to rest, instead of tap-to-log reps. */
+  measure?: 'time'
+  /** Working seconds for a time station (the hold/interval length). */
+  durationSec?: number
+  /** Transition rest after this station within a round, in seconds (10–15s). */
+  restSec?: number
+  /** Per-side move: prompt "switch sides halfway" during the hold. */
+  perSide?: boolean
 }
 
 export interface WorkoutSession {
@@ -308,6 +317,10 @@ export interface WorkoutSession {
   /** Accent for the guided logger. Bodyweight "quick" sessions run in blue to match
    *  their blue entry point in the Workout section; everything else stays brand green. */
   accent?: 'brand' | 'blue'
+  /** Circuit sessions (time-based quick workouts): full rest between rounds, in
+   *  seconds (60s). Each `set` index across the exercises is one round; the player
+   *  runs them round-major and rests this long when a new round begins. */
+  roundRestSec?: number
 }
 
 /**
