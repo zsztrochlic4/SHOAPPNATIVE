@@ -1,5 +1,5 @@
 {
-  "_comment": "Firestore/dataset expectations contract for the static SHO datasets. validate-data-sync.mjs fails if the live source drifts from these counts or breaks integrity, so any dataset change is a deliberate, reviewed manifest update. Seeded to the ACTUAL repo counts on 2026-07-27. NOTE: the original request referenced a 98-exercise workbook and a 150-meal database; the live source currently holds 117 exercises (113 + 4 added from the 8×12-minute bodyweight workout spreadsheet) and 50 budget meals + 36 food-KB items — update these numbers (and the datasets) if the larger workbook/meal DB lands.",
+  "_comment": "Firestore/dataset expectations contract for the static SHO datasets. validate-data-sync.mjs fails if the live source drifts from these counts or breaks integrity, so any dataset change is a deliberate, reviewed manifest update. Seeded to the ACTUAL repo counts on 2026-07-27. NOTE: the original request referenced a 98-exercise workbook and a 150-meal database; the live source currently holds 117 exercises (113 + 4 added from the 8×12-minute bodyweight workout spreadsheet) and 278 budget meals + 36 food-KB items — update these numbers (and the datasets) if the larger workbook/meal DB lands.",
   "datasets": {
     "exercises": {
       "source": "src/backend/data/exercises.ts",
@@ -12,9 +12,10 @@
       }
     },
     "budget_meals": {
-      "source": "src/data/catalog.ts",
-      "export": "BUDGET_MEALS",
-      "count": 50,
+      "_comment": "The 50-meal seed grew into the generated recipe DB. catalog.ts re-exports BUDGET_MEALS = BUDGET_MEALS_SEED, so we validate the real inline literal in recipes.generated.ts (the static-array reader can't follow a re-export).",
+      "source": "src/data/recipes.generated.ts",
+      "export": "BUDGET_MEALS_SEED",
+      "count": 278,
       "id_field": "id",
       "required_fields": ["id", "name", "category", "kcal", "ingredients", "steps"],
       "enum_fields": {
