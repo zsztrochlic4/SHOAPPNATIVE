@@ -6101,8 +6101,13 @@ export const EXERCISES: Exercise[] = [
       "shoulder",
       "lower_back"
     ],
-    "substitutionIds": [],
-    "substitutionCount": 0,
+    "substitutionIds": [
+      "BK18",
+      "SH10",
+      "BK11",
+      "BK15"
+    ],
+    "substitutionCount": 4,
     "bodyRegion": "upper",
     "whyInDatabase": "Trains the lats and lower traps from the floor with no equipment, so a back or posture slot always has a bodyweight option.",
     "whatItDoes": "A controlled floor drill that trains the lats and shoulder blades by pulling the elbows toward the ribs.",
@@ -6148,8 +6153,13 @@ export const EXERCISES: Exercise[] = [
       "shoulder",
       "lower_back"
     ],
-    "substitutionIds": [],
-    "substitutionCount": 0,
+    "substitutionIds": [
+      "BK18",
+      "BK07",
+      "BK14",
+      "BK16"
+    ],
+    "substitutionCount": 4,
     "bodyRegion": "upper",
     "whyInDatabase": "A rowing pattern with nothing but a towel, giving upper-back work when no bands, bars or cables are available.",
     "whatItDoes": "A seated row hold where the feet press into a towel while the arms pull back, creating controllable resistance.",
@@ -6195,8 +6205,13 @@ export const EXERCISES: Exercise[] = [
       "shoulder",
       "lower_back"
     ],
-    "substitutionIds": [],
-    "substitutionCount": 0,
+    "substitutionIds": [
+      "SH10",
+      "BK16",
+      "SH05",
+      "SH06"
+    ],
+    "substitutionCount": 4,
     "bodyRegion": "upper",
     "whyInDatabase": "Rear-delt and scapular posture work from the floor with no equipment, backing up the prone lat pull-down so a posture slot always has a swap.",
     "whatItDoes": "A floor-based upper-back exercise that trains the shoulder blades, rear delts and posture muscles.",
@@ -6243,8 +6258,12 @@ export const EXERCISES: Exercise[] = [
       "ankle",
       "hip"
     ],
-    "substitutionIds": [],
-    "substitutionCount": 0,
+    "substitutionIds": [
+      "FB08",
+      "FB10",
+      "FB04"
+    ],
+    "substitutionCount": 3,
     "bodyRegion": "lower",
     "whyInDatabase": "The lowest-impact conditioning movement in the database, a joint-friendly stand-in for the jumping jack.",
     "whatItDoes": "A low impact jumping jack. The same warm-up and cardio effect with one foot always on the floor.",

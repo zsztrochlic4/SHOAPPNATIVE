@@ -3798,5 +3798,20 @@ export const SUBSTITUTIONS: Substitution[] = [
     "substituteId": "FB13",
     "priority": 4,
     "matchType": "like_for_like"
-  }
+  },
+  { "key": "BK16-BK18", "exerciseId": "BK16", "substituteId": "BK18", "priority": 1, "matchType": "same_muscle_group" },
+  { "key": "BK16-SH10", "exerciseId": "BK16", "substituteId": "SH10", "priority": 2, "matchType": "same_muscle_group" },
+  { "key": "BK16-BK11", "exerciseId": "BK16", "substituteId": "BK11", "priority": 3, "matchType": "like_for_like" },
+  { "key": "BK16-BK15", "exerciseId": "BK16", "substituteId": "BK15", "priority": 4, "matchType": "same_muscle_group" },
+  { "key": "BK17-BK18", "exerciseId": "BK17", "substituteId": "BK18", "priority": 1, "matchType": "same_muscle_group" },
+  { "key": "BK17-BK07", "exerciseId": "BK17", "substituteId": "BK07", "priority": 2, "matchType": "like_for_like" },
+  { "key": "BK17-BK14", "exerciseId": "BK17", "substituteId": "BK14", "priority": 3, "matchType": "like_for_like" },
+  { "key": "BK17-BK16", "exerciseId": "BK17", "substituteId": "BK16", "priority": 4, "matchType": "same_muscle_group" },
+  { "key": "BK18-SH10", "exerciseId": "BK18", "substituteId": "SH10", "priority": 1, "matchType": "like_for_like" },
+  { "key": "BK18-BK16", "exerciseId": "BK18", "substituteId": "BK16", "priority": 2, "matchType": "same_muscle_group" },
+  { "key": "BK18-SH05", "exerciseId": "BK18", "substituteId": "SH05", "priority": 3, "matchType": "same_muscle_group" },
+  { "key": "BK18-SH06", "exerciseId": "BK18", "substituteId": "SH06", "priority": 4, "matchType": "same_muscle_group" },
+  { "key": "FB15-FB08", "exerciseId": "FB15", "substituteId": "FB08", "priority": 1, "matchType": "like_for_like" },
+  { "key": "FB15-FB10", "exerciseId": "FB15", "substituteId": "FB10", "priority": 2, "matchType": "same_muscle_group" },
+  { "key": "FB15-FB04", "exerciseId": "FB15", "substituteId": "FB04", "priority": 3, "matchType": "same_muscle_group" }
 ]
