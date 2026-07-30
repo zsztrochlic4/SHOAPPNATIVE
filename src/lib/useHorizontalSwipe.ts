@@ -3,6 +3,10 @@ import { Gesture } from 'react-native-gesture-handler'
 import { useSharedValue, withSpring, runOnJS, type SharedValue } from 'react-native-reanimated'
 import { tick, thud } from './haptics'
 
+/** Fraction of the width the finger must travel to commit a swipe. Shared so the
+ *  edge affordance (SwipeNav) reveals in lock-step with the actual commit line. */
+export const SWIPE_COMMIT_RATIO = 0.32
+
 export type HorizontalSwipeConfig = {
   /** Reference width used for the commit distance and rubber-band cap. */
   width: number
@@ -42,7 +46,7 @@ export function useHorizontalSwipe(cfg: HorizontalSwipeConfig): HorizontalSwipe 
   // Whether we've buzzed for crossing the commit line on the current drag.
   const crossed = useSharedValue(false)
 
-  const { width, onSwipeRight, onSwipeLeft, enabled = true, distanceRatio = 0.32, velocity = 0.4 } = cfg
+  const { width, onSwipeRight, onSwipeLeft, enabled = true, distanceRatio = SWIPE_COMMIT_RATIO, velocity = 0.4 } = cfg
 
   const gesture = useMemo(() => {
     const commit = width * distanceRatio
