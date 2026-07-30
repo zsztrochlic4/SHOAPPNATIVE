@@ -80,7 +80,14 @@ export async function savePushToken(uid: string, token: string): Promise<void> {
   try {
     await setDoc(
       doc(db, 'users', uid, 'pushTokens', token),
-      { token, platform: Platform.OS, updatedAt: new Date().toISOString() },
+      {
+        token,
+        platform: Platform.OS,
+        updatedAt: new Date().toISOString(),
+        // Device UTC offset in minutes (e.g. AEST = +600) so the server-side
+        // sender can honour this device's quiet hours in its local time.
+        utcOffsetMinutes: -new Date().getTimezoneOffset(),
+      },
       { merge: true },
     )
   } catch {

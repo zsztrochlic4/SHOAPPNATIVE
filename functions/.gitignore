@@ -1,6 +1,8 @@
 # Cloud Functions build + deps (never committed)
 node_modules/
-lib/
+# Anchored to the functions root so it only ignores the COMPILED output
+# (functions/lib), NOT the source directory functions/src/lib.
+/lib/
 *.log
 .env
 .env.*

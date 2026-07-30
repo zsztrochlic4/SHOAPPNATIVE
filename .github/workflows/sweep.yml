@@ -9,9 +9,10 @@ name: Code gate (typecheck · domain checks · sweep · tests)
 #     (reps<4 on Load, RIR below the exercise Min RIR or grid floor, %1RM>88, an
 #     advanced lift to a non-advanced user, a solo spotter lift without its cue)
 #     or leaves a required slot empty.
-#   • the deterministic safety-floor tests (test/safety) and the pure unit tests
-#     (test/unit) — no secrets/network, so they run inline here rather than only
-#     in the nightly backend-validation workflow.
+#   • the deterministic safety-floor tests (test/safety), the pure unit tests
+#     (test/unit), and the Cloud Functions unit tests (functions/test) — no
+#     secrets/network, so they run inline here rather than only in the nightly
+#     backend-validation workflow.
 # Together this stops a future change silently reintroducing a safety breach or
 # regressing the pure domain logic.
 
@@ -41,3 +42,7 @@ jobs:
         run: npm run test:safety
       - name: Unit tests (pure domain)
         run: npm run test:unit
+      - name: Backend (Cloud Functions) unit tests
+        run: |
+          npm --prefix functions ci
+          npm --prefix functions test
