@@ -1,4 +1,4 @@
-import type { AppState, Units, HabitDay, StatTimeframe, WeightEntry } from '../store/types'
+import type { AppState, Units, HabitDay, StatTimeframe, WeightEntry, ProgressLiftPeriod } from '../store/types'
 import { weightStats, streakStats, regularWorkoutsInRange, oneRMSeries } from '../store/selectors'
 import type { AccentKey } from '../store/periods'
 import { fluidUnit, fmtFluid, fmtWeight, fmtWeightNum, weightUnit, weightVal } from './format'
@@ -355,4 +355,284 @@ export function buildChartData(s: AppState, metricId: string, days: number, unit
     deltaGood: delta >= 0, isWeight: false,
     domain: vals.length ? [Math.floor(Math.min(...vals) - 5), Math.ceil(Math.max(...vals) + 5)] : undefined,
   }
+}
+
+/* ================================================================== */
+/*  Progress dashboard: featured composition card, quick stats,        */
+/*  ranked tracked lifts, and BMI — all computed from live store data. */
+/*  (1:1 port of the "Progress Dashboard" design's cardData/QUICK/EXDB) */
+/* ================================================================== */
+
+/** Segment / stat colour role; the screen resolves these to theme colours. */
+export type ProgressColor = 'brand' | 'blue' | 'orange' | 'muted' | 'fg' | 'danger'
+
+export interface ProgressSegment { label: string; pct: number; color: ProgressColor; valueLabel: string; dim?: boolean }
+export interface ProgressStat { label: string; value: string; accent: boolean; align: 'left' | 'center' | 'right' }
+export interface ProgressMini { label: string; pct: number; on: boolean; last: boolean }
+export interface ProgressFeatured {
+  title: string
+  value: string
+  unit: string
+  deltaText: string
+  deltaGood: boolean
+  deltaNote: string
+  verdict: { label: string; warn: boolean }
+  segments: ProgressSegment[]
+  stats: ProgressStat[]
+  isWeight: boolean
+  mini7?: ProgressMini[]
+}
+
+const TF_DAYS: Record<StatTimeframe, number> = { '7 days': 7, '4 weeks': 28, '3 months': 90 }
+const TF_WORD: Record<StatTimeframe, string> = { '7 days': '7 days', '4 weeks': '4 weeks', '3 months': '3 months' }
+const TF_CAP: Record<StatTimeframe, string> = { '7 days': 'last 7 days', '4 weeks': 'last 4 weeks', '3 months': 'last 3 months' }
+
+/** The Progress featured/quick window (Settings, default '4 weeks'). */
+export function progressTimeframe(s: AppState): StatTimeframe {
+  const tf = s.settings.progressTimeframe
+  return tf && STAT_TIMEFRAMES.includes(tf) ? tf : '4 weeks'
+}
+
+const seg = (label: string, pct: number, color: ProgressColor, valueLabel: string, dim = false): ProgressSegment => ({ label, pct: Math.max(0, pct), color, valueLabel, dim })
+const stat = (label: string, value: string, align: ProgressStat['align'], accent = false): ProgressStat => ({ label, value, align, accent })
+
+/** Eating-quality verdict word from an average score. */
+function eatVerdict(avg: number): string {
+  return avg >= 85 ? 'Excellent' : avg >= 70 ? 'Strong' : avg >= 55 ? 'Balanced' : avg >= 40 ? 'Mixed' : 'Needs work'
+}
+
+/**
+ * The featured composition card for whatever metric drives the top of Progress.
+ * Mirrors the design's `cardData()` but reads real weights / habits / nutrition
+ * tags / est-1RM series instead of seeded values.
+ */
+export function progressFeatured(s: AppState, metricId: string, tf: StatTimeframe, units: Units): ProgressFeatured {
+  const days = TF_DAYS[tf]
+  const deltaNote = `vs previous ${TF_WORD[tf]}`
+
+  /* -------------------------------- nutrition ------------------------------- */
+  if (metricId === 'nutrition') {
+    const map = s.nutritionTags ?? {}
+    let g = 0, nz = 0, soft = 0, sum = 0, cnt = 0, best = 0, total = 0
+    let first: number | null = null, last: number | null = null
+    for (let d = days - 1; d >= 0; d--) {
+      total++
+      const tags = map[dayKey(d)]
+      if (!Array.isArray(tags) || tags.length === 0) continue
+      const sc = eatingScore(tags)
+      sum += sc; cnt++; if (sc > best) best = sc
+      if (first === null) first = sc; last = sc
+      for (const t of tags) { const tone = tagById(t)?.tone; if (tone === 'good') g++; else if (tone === 'soft') soft++; else nz++ }
+    }
+    const avg = cnt ? Math.round(sum / cnt) : 0
+    const tot = Math.max(1, g + nz + soft)
+    const gp = Math.round((100 * g) / tot), sp = Math.round((100 * soft) / tot), np = 100 - gp - sp
+    const cur = last == null ? avg : last
+    const delta = (last ?? 0) - (first ?? 0)
+    return {
+      title: 'Eating quality', value: String(cur), unit: '/100',
+      deltaText: `${delta >= 0 ? '↑' : '↓'} ${Math.abs(delta)}`, deltaGood: delta >= 0, deltaNote,
+      verdict: { label: eatVerdict(avg), warn: avg < 55 },
+      segments: [seg('Balanced choices', gp, 'brand', `${gp}%`), seg('Neutral', np, 'blue', `${np}%`), seg('Indulgent', sp, 'orange', `${sp}%`)],
+      stats: [stat('Average', String(avg), 'left'), stat('Check-ins', `${cnt} / ${total}`, 'center'), stat('Best', String(best), 'right', true)],
+      isWeight: false,
+    }
+  }
+
+  /* ---------------------------- steps / water / sleep ----------------------- */
+  if (metricId === 'steps' || metricId === 'water' || metricId === 'sleep') {
+    const p = s.profile
+    const conf = metricId === 'steps'
+      ? { goal: p.stepTarget, get: (h: HabitDay) => h.steps, fmt: (v: number) => Math.round(v).toLocaleString(), unit: '', goalLabel: p.stepTarget.toLocaleString() }
+      : metricId === 'water'
+        ? { goal: p.waterTargetL, get: (h: HabitDay) => h.waterL, fmt: (v: number) => fmtFluid(v, units).split(' ')[0], unit: fluidUnit(units), goalLabel: fmtFluid(p.waterTargetL, units) }
+        : { goal: p.sleepTargetH, get: (h: HabitDay) => h.sleepH, fmt: (v: number) => round1(v).toFixed(1), unit: 'h', goalLabel: `${p.sleepTargetH} h` }
+    const byKey = new Map(s.habits.map((h) => [h.dateKey, h]))
+    const logged: number[] = []
+    let cur = 0, firstLogged: number | null = null
+    for (let d = days - 1; d >= 0; d--) {
+      const h = byKey.get(dayKey(d))
+      if (!h) continue
+      const v = conf.get(h)
+      if (v <= 0) continue
+      logged.push(v); if (firstLogged === null) firstLogged = v; cur = v
+    }
+    const n = logged.length
+    const avg = n ? logged.reduce((a, b) => a + b, 0) / n : 0
+    const bestV = n ? Math.max(...logged) : 0
+    const delta = cur - (firstLogged ?? cur)
+    let on = 0, close = 0, under = 0
+    for (const v of logged) { const r = conf.goal ? v / conf.goal : 0; if (r >= 1) on++; else if (r >= 0.85) close++; else under++ }
+    const days7 = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+    const last7 = Array.from({ length: 7 }, (_, i) => byKey.get(dayKey(6 - i))).map((h) => (h ? conf.get(h) : 0))
+    const mmx = Math.max(...last7, conf.goal || 1)
+    const mini7: ProgressMini[] = last7.map((v, i) => ({ label: days7[i], pct: v > 0 ? Math.max(8, Math.round((v / mmx) * 100)) : 0, on: conf.goal > 0 && v >= conf.goal, last: i === 6 }))
+    const vl = avg >= conf.goal ? 'On track' : avg >= conf.goal * 0.85 ? 'Nearly there' : 'Below goal'
+    return {
+      title: metricId === 'steps' ? 'Daily steps' : metricId === 'water' ? 'Water' : 'Sleep', value: conf.fmt(cur), unit: conf.unit,
+      deltaText: `${delta >= 0 ? '↑' : '↓'} ${conf.fmt(Math.abs(delta))}`, deltaGood: delta >= 0, deltaNote,
+      verdict: { label: vl, warn: avg < conf.goal },
+      segments: [seg('On goal', n ? Math.round((100 * on) / n) : 0, 'brand', `${on}d`), seg('Close', n ? Math.round((100 * close) / n) : 0, 'blue', `${close}d`), seg('Under', n ? Math.round((100 * under) / n) : 0, 'orange', `${under}d`)],
+      stats: [stat('Average', conf.fmt(avg) + (conf.unit ? ` ${conf.unit}` : ''), 'left'), stat('Best', conf.fmt(bestV), 'center'), stat('Goal', conf.goalLabel, 'right', true)],
+      isWeight: false, mini7,
+    }
+  }
+
+  /* --------------------------------- weight --------------------------------- */
+  if (metricId === 'weight') {
+    const w = weightStats(s)
+    const start = s.profile.startWeightKg, target = s.profile.goalWeightKg, cur = w.current
+    const losing = target <= start
+    const span = Math.max(0.1, Math.abs(start - target))
+    const moved = losing ? start - cur : cur - start
+    const remain = losing ? Math.max(0, cur - target) : Math.max(0, target - cur)
+    const movedC = Math.max(0, moved)
+    const delta = cur - start
+    const good = losing ? delta <= 0 : delta >= 0
+    return {
+      title: 'Body weight', value: fmtWeightNum(cur, units), unit: weightUnit(units),
+      deltaText: `${delta <= 0 ? '↓' : '↑'} ${fmtWeight(Math.abs(delta), units, 1)}`, deltaGood: good, deltaNote,
+      verdict: { label: good ? 'On track' : 'Off track', warn: !good },
+      segments: [
+        seg(losing ? 'Lost so far' : 'Gained so far', Math.round((100 * movedC) / span), 'brand', fmtWeight(Math.abs(moved), units, 1)),
+        seg('To target', Math.round((100 * remain) / span), 'blue', fmtWeight(remain, units, 1)),
+      ],
+      stats: [stat('Start', fmtWeightNum(start, units, 1), 'left'), stat('Current', fmtWeightNum(cur, units, 1), 'center', true), stat('Target', fmtWeightNum(target, units, 1), 'right')],
+      isWeight: true,
+    }
+  }
+
+  /* ---------------------------------- lift ---------------------------------- */
+  const series = oneRMSeries(s, metricId)
+  const cutoff = dayKey(days)
+  const inWin = series.filter((x) => x.dateKey >= cutoff)
+  const fromKg = inWin[0]?.kg ?? series[0]?.kg ?? 0
+  const nowKg = series.at(-1)?.kg ?? 0
+  const pctV = fromKg > 0 ? Math.round(((nowKg - fromKg) / fromKg) * 100) : 0
+  const goalKg = Math.round(fromKg * 1.2)
+  const gained = Math.max(0, nowKg - fromKg)
+  const remain = Math.max(0, goalKg - nowKg)
+  const lspan = Math.max(1, goalKg - fromKg)
+  const vl = pctV >= 10 ? 'Strong gains' : pctV >= 6 ? 'Improving' : 'Holding'
+  const u = weightUnit(units)
+  return {
+    title: exById(metricId)?.name ?? 'Strength', value: String(Math.round(weightVal(nowKg, units))), unit: u,
+    deltaText: `↑ ${pctV}%`, deltaGood: true, deltaNote,
+    verdict: { label: vl, warn: false },
+    segments: [
+      seg('Gained', Math.round((100 * gained) / lspan), 'brand', `+${Math.round(weightVal(gained, units))}${u}`),
+      seg('To +20% goal', Math.round((100 * remain) / lspan), 'muted', `${Math.round(weightVal(remain, units))}${u}`, true),
+    ],
+    stats: [stat('Start', `${Math.round(weightVal(fromKg, units))}${u}`, 'left'), stat('Now', `${Math.round(weightVal(nowKg, units))}${u}`, 'center', true), stat('Change', `+${pctV}%`, 'right', true)],
+    isWeight: false,
+  }
+}
+
+/* ----------------------------- Quick stats -------------------------------- */
+export interface ProgressQuick { id: string; label: string; icon: string }
+export const PROGRESS_QUICK: ProgressQuick[] = [
+  { id: 'strength', label: 'Strength', icon: 'trending' },
+  { id: 'workouts', label: 'Workouts', icon: 'dumbbell' },
+  { id: 'steps', label: 'Steps', icon: 'footprints' },
+  { id: 'sleep', label: 'Sleep', icon: 'bed' },
+  { id: 'water', label: 'Water', icon: 'droplet' },
+  { id: 'weight', label: 'Body weight', icon: 'scale' },
+  { id: 'nutrition', label: 'Eating quality', icon: 'leaf' },
+]
+const QUICK_ORDER = PROGRESS_QUICK.map((q) => q.id)
+export const DEFAULT_PROGRESS_QUICK = ['strength', 'workouts', 'sleep']
+export const MAX_PROGRESS_QUICK = 3
+
+export function progressQuickIds(s: AppState): string[] {
+  const ids = s.settings.progressQuickStats
+  return ids && ids.length ? ids : DEFAULT_PROGRESS_QUICK
+}
+
+/** The quick-stat id the featured card already represents (so it's dropped from the row). */
+export function featuredQuickId(metricId: string): string {
+  return metricId === 'steps' || metricId === 'water' || metricId === 'sleep' || metricId === 'weight' || metricId === 'nutrition' ? metricId : 'strength'
+}
+
+function avgEatingQuality(s: AppState, days: number): number {
+  const map = s.nutritionTags ?? {}
+  let sum = 0, cnt = 0
+  for (let d = days - 1; d >= 0; d--) { const t = map[dayKey(d)]; if (Array.isArray(t) && t.length) { sum += eatingScore(t); cnt++ } }
+  return cnt ? Math.round(sum / cnt) : 0
+}
+
+export function progressQuickValue(s: AppState, id: string, tf: StatTimeframe, units: Units): { value: string; cap: string } {
+  const days = TF_DAYS[tf]
+  switch (id) {
+    case 'strength': { const g = strengthGainPct(s, days - 1, 0); return { value: `${g < 0 ? '' : '+'}${Math.round(g)}%`, cap: TF_CAP[tf] } }
+    case 'workouts': return { value: String(regularWorkoutsInRange(s, days - 1, 0)), cap: TF_CAP[tf] }
+    case 'steps': { const v = habitAvg(s, (h) => h.steps, days - 1, 0); return { value: v ? Math.round(v).toLocaleString() : '--', cap: 'avg / day' } }
+    case 'sleep': { const v = habitAvg(s, (h) => h.sleepH, days - 1, 0); return { value: v ? `${round1(v).toFixed(1)}h` : '--', cap: 'avg / night' } }
+    case 'water': { const v = habitAvg(s, (h) => h.waterL, days - 1, 0); return { value: v ? fmtFluid(v, units) : '--', cap: 'avg / day' } }
+    case 'weight': { const w = weightStats(s); return { value: `${fmtWeightNum(w.current, units, 1)}${weightUnit(units)}`, cap: 'current' } }
+    case 'nutrition': { const v = avgEatingQuality(s, days); return { value: v ? String(v) : '--', cap: 'avg / 100' } }
+    default: return { value: '--', cap: '' }
+  }
+}
+
+/** The (≤3) quick cards to show: the user's picks minus the featured metric, filled from the pool. */
+export function progressQuickCards(s: AppState, metricId: string, tf: StatTimeframe, units: Units) {
+  const fq = featuredQuickId(metricId)
+  const chosen = progressQuickIds(s)
+  let disp = chosen.filter((id) => id !== fq)
+  for (const id of QUICK_ORDER) { if (disp.length >= MAX_PROGRESS_QUICK) break; if (id !== fq && !disp.includes(id)) disp.push(id) }
+  disp = disp.slice(0, MAX_PROGRESS_QUICK)
+  return disp.map((id) => {
+    const meta = PROGRESS_QUICK.find((q) => q.id === id)!
+    const { value, cap } = progressQuickValue(s, id, tf, units)
+    return { id, label: meta.label, icon: meta.icon, value, cap }
+  })
+}
+
+/* --------------------------- Tracked lifts -------------------------------- */
+const LIFT_PERIOD_DAYS: Record<ProgressLiftPeriod, number> = { '4 weeks': 28, '3 months': 90, '6 months': 182 }
+export const PROGRESS_LIFT_PERIODS: ProgressLiftPeriod[] = ['4 weeks', '3 months', '6 months']
+export const DEFAULT_TRACKED_LIFTS = ['bench', 'squat', 'deadlift', 'ohp']
+
+export function progressTrackedIds(s: AppState): string[] {
+  const ids = s.settings.progressTrackedIds
+  return (ids && ids.length ? ids : DEFAULT_TRACKED_LIFTS).filter((id) => !!exById(id))
+}
+
+export function progressLiftPeriod(s: AppState): ProgressLiftPeriod {
+  const p = s.settings.progressLiftPeriod
+  return p && PROGRESS_LIFT_PERIODS.includes(p) ? p : '4 weeks'
+}
+
+export interface TrackedLift { id: string; name: string; muscle: string; image: string; from: number; now: number; gainPct: number }
+
+/** Ranked est-1RM gain over the trend window for each tracked lift that has data. */
+export function progressTrackedLifts(s: AppState, ids: string[], period: ProgressLiftPeriod, units: Units): TrackedLift[] {
+  const cutoff = dayKey(LIFT_PERIOD_DAYS[period])
+  const rows: TrackedLift[] = []
+  for (const id of ids) {
+    const series = oneRMSeries(s, id)
+    if (series.length === 0) continue
+    const inWin = series.filter((x) => x.dateKey >= cutoff)
+    const from = inWin[0]?.kg ?? series[0].kg
+    const now = series.at(-1)!.kg
+    const gainPct = from > 0 ? Math.max(0, Math.round(((now - from) / from) * 100)) : 0
+    const def = exById(id)
+    rows.push({ id, name: def?.name ?? id, muscle: def?.muscle ?? '', image: def?.image ?? '', from: Math.round(weightVal(from, units)), now: Math.round(weightVal(now, units)), gainPct })
+  }
+  return rows.sort((a, b) => b.gainPct - a.gainPct)
+}
+
+/* -------------------------------- BMI ------------------------------------- */
+export interface BmiInfo { bmi: number; label: string; color: ProgressColor; needlePct: number }
+export function bmiInfo(s: AppState): BmiInfo | null {
+  const h = s.profile.heightCm
+  const cur = weightStats(s).current
+  if (!h || h <= 0 || !cur || cur <= 0) return null
+  const m = h / 100
+  const bmi = cur / (m * m)
+  const label = bmi < 18.5 ? 'Underweight' : bmi < 25 ? 'Healthy' : bmi < 30 ? 'Overweight' : 'Obese'
+  const color: ProgressColor = bmi < 18.5 ? 'blue' : bmi < 25 ? 'brand' : bmi < 30 ? 'orange' : 'danger'
+  // The gradient spans BMI 15→33 (matches the design's segment flexes), needle clamped.
+  const needlePct = Math.max(0, Math.min(100, ((bmi - 15) / 18) * 100))
+  return { bmi: Math.round(bmi * 10) / 10, label, color, needlePct }
 }
