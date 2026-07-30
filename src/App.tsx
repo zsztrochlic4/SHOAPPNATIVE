@@ -21,6 +21,7 @@ import { setSoundEnabled } from './lib/sound'
 import { initBudgetMeals } from './data/recipes'
 import { initExerciseInfo } from './data/exerciseInfo'
 import { Skeleton, SkeletonLines } from './components/Skeleton'
+import { OfflineBanner } from './components/OfflineBanner'
 import Dashboard from './screens/Dashboard'
 import Workout from './screens/Workout'
 import Nutrition from './screens/Nutrition'
@@ -274,6 +275,8 @@ function ThemedRoot() {
       <ToastProvider>
         <AuthGate />
       </ToastProvider>
+      {/* App-wide ambient offline indicator, above content and overlays. */}
+      <OfflineBanner />
     </View>
   )
 }
