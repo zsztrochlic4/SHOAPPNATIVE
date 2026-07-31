@@ -1,7 +1,7 @@
 import { onCall, HttpsError, type CallableRequest } from 'firebase-functions/v2/https'
 import { getFirestore } from 'firebase-admin/firestore'
 import { randomUUID } from 'node:crypto'
-import { requireOwner } from './lib/guards'
+import { requireOwner, auditAppCheck, APP_CHECK_ENFORCED } from './lib/guards'
 import { sendToAudience, type Audience, type SendResult } from './lib/send'
 import type { PushCategory } from './lib/notify'
 
@@ -42,8 +42,9 @@ interface SendNotificationInput {
 }
 
 export const sendNotification = onCall<SendNotificationInput>(
-  { enforceAppCheck: false, timeoutSeconds: 300, memory: '512MiB' },
+  { enforceAppCheck: APP_CHECK_ENFORCED, timeoutSeconds: 300, memory: '512MiB' },
   async (req: CallableRequest<SendNotificationInput>): Promise<SendResult> => {
+    auditAppCheck(req, 'sendNotification')
     requireOwner(req)
 
     const d = req.data ?? ({} as SendNotificationInput)

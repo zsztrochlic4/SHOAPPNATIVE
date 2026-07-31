@@ -2,7 +2,7 @@ import { onCall, HttpsError, type CallableRequest } from 'firebase-functions/v2/
 import { getFirestore, FieldValue } from 'firebase-admin/firestore'
 import { getStorage } from 'firebase-admin/storage'
 import { getAuth } from 'firebase-admin/auth'
-import { requireAuth } from './lib/guards'
+import { requireAuth, auditAppCheck, APP_CHECK_ENFORCED } from './lib/guards'
 
 /**
  * Complete, authoritative account deletion (DEVELOPMENT_PLAN.md Phase B).
@@ -16,8 +16,9 @@ import { requireAuth } from './lib/guards'
  * is unreachable; this is the preferred, complete path.
  */
 export const deleteAccount = onCall(
-  { enforceAppCheck: false, timeoutSeconds: 300, memory: '512MiB' },
+  { enforceAppCheck: APP_CHECK_ENFORCED, timeoutSeconds: 300, memory: '512MiB' },
   async (req: CallableRequest): Promise<{ ok: true }> => {
+    auditAppCheck(req, 'deleteAccount')
     const uid = requireAuth(req)
     const db = getFirestore()
 
