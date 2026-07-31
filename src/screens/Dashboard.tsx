@@ -15,6 +15,7 @@ import { useStore } from '../store/store'
 import { useNav } from '../nav'
 import { currentWeekKeys, todayKey, longDate, shortDate, fromKey, currentHour } from '../lib/date'
 import { fmtFluid, fmtWeightNum, weightUnit, fmtVolume } from '../lib/format'
+import { prefersReducedMotion } from '../lib/a11y'
 import {
   todayHabit, habitForDay, todaySession, sessionForDay, activitiesForDay,
   unreadChat, streakStats, foodReviewForDay, weeklyIndex, nutritionTagsForDay,
@@ -163,7 +164,7 @@ export default function Dashboard() {
           <Menu size={24} color={colors.fg} />
         </Pressable>
         <Wordmark size="sm" />
-        <Pressable onPress={() => nav.open('coachChat')} className="relative h-10 w-10 items-center justify-center rounded-xl active:opacity-70">
+        <Pressable onPress={() => nav.open('coachChat')} accessibilityRole="button" accessibilityLabel={unread > 0 ? `Open coach, ${unread} unread` : 'Open coach'} className="relative h-10 w-10 items-center justify-center rounded-xl active:opacity-70">
           <MessageCircle size={23} color={colors.fg} />
           {unread > 0 && <View className="absolute right-2 top-2 h-2 w-2 rounded-full bg-brand-400" style={{ borderWidth: 2, borderColor: colors.ink900 }} />}
         </Pressable>
@@ -438,6 +439,7 @@ export default function Dashboard() {
 function StreakChip({ days, atRisk, onPress }: { days: number; atRisk: boolean; onPress: () => void }) {
   const flicker = useRef(new Animated.Value(0)).current
   useEffect(() => {
+    if (prefersReducedMotion()) return // hold the flame still for reduce-motion users
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(flicker, { toValue: 1, duration: 620, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
@@ -631,12 +633,12 @@ function FoodCheckIn({ tags, colors, onTag }: { tags: string[]; colors: ThemeCol
 function PastStepper({ onDec, onInc, colors }: { onDec: () => void; onInc: () => void; colors: ThemeColors }) {
   return (
     <View className="flex-row items-center" style={{ gap: 8 }}>
-      <PressableScale onPress={onDec} scaleTo={0.9}>
+      <PressableScale onPress={onDec} scaleTo={0.9} hitSlop={8} accessibilityRole="button" accessibilityLabel="Decrease">
         <View style={{ width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.06)' }}>
           <Text style={{ fontSize: 20, lineHeight: 23, color: colors.fg }}>−</Text>
         </View>
       </PressableScale>
-      <PressableScale onPress={onInc} scaleTo={0.9}>
+      <PressableScale onPress={onInc} scaleTo={0.9} hitSlop={8} accessibilityRole="button" accessibilityLabel="Increase">
         <View style={{ width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: `${colors.brand400}2e` }}>
           <Text style={{ fontSize: 20, lineHeight: 23, color: colors.brand400 }}>+</Text>
         </View>

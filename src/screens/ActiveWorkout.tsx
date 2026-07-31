@@ -23,6 +23,7 @@ import { fmtWeightNum, weightUnit, fmtVolume, fmtWeight, toKg } from '../lib/for
 import { palette } from '../theme'
 import type { Units, WorkoutSession } from '../store/types'
 import { isTimeSession, nextCircuitCursor, circuitRestSec, switchSidesAtSec } from './quickCircuit'
+import { prefersReducedMotion } from '../lib/a11y'
 
 /* This follow-along flow is a dark, full-immersion surface (like the design's
  * dark default and the previous implementation), so it pins the dark palette
@@ -52,8 +53,6 @@ function rgbaOf(hex: string, o: number): string {
  * ==========================================================================*/
 
 const USE_NATIVE = Platform.OS !== 'web'
-const prefersReducedMotion = () =>
-  typeof window !== 'undefined' && (window as any).matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
 /* Compound lifts rest longer than isolation work. No rest field exists in the
  * data model, so derive a sensible default from the exercise id. */

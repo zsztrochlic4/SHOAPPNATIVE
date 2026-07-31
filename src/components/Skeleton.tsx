@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { Animated, Easing, View, type DimensionValue } from 'react-native'
 import { IS_WEB } from './WebFrame'
+import { prefersReducedMotion } from '../lib/a11y'
 
 /**
  * A single shimmering placeholder block. Loading states use these arranged to
@@ -21,6 +22,10 @@ export function Skeleton({
 }) {
   const v = useRef(new Animated.Value(0)).current
   useEffect(() => {
+    if (prefersReducedMotion()) {
+      v.setValue(0.7) // steady mid opacity — a calm placeholder, no shimmer
+      return
+    }
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(v, { toValue: 1, duration: 800, easing: Easing.inOut(Easing.quad), useNativeDriver: !IS_WEB }),
