@@ -20,6 +20,17 @@
 nutrition calc, meal-scan parser, under-18 + refer-by-default safety). Full
 typecheck clean.
 
+> **Update — 31 July 2026:** the suite has grown to **128 unit + 29 safety
+> tests** (root) plus **13 functions tests**, all green, with the generator
+> sweep at 85/85 zero breaches, `validate:data` 3/3, and `lint` passing — the
+> whole gate runs on every PR. New coverage since this report: quick-workout
+> parser + circuit logic (incl. single-round / per-side / cursor-priority edge
+> cases), the workout Firestore overlay (clamps a bad cloud doc so it can't reach
+> the player), the "Download my data" serialiser, extra Progress-chart /
+> history-merge edge cases, and App Check posture guards. New features landed:
+> the 12-minute quick-workout player + live overlay, in-app data export, an
+> accessibility/reduced-motion pass, and the App Check monitor scaffolding.
+
 ## Feature-by-feature
 
 | Area | Result | Notes |

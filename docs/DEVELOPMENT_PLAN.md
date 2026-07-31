@@ -6,6 +6,39 @@ work already shipped this cycle and focuses on what to do next.
 
 ---
 
+## Status update — 31 July 2026
+
+Most of the roadmap below has landed. Current state:
+
+- **Phase A — done.** CI gate runs unit + safety + functions tests on every PR;
+  offline indicator shipped + cold-offline open verified; pure-domain tests
+  broadened substantially (see the Test Report — 128 unit + 29 safety).
+  *Owner-only remainder:* store submission + EAS Update channels.
+- **Phase B — done & deployed.** Trusted Cloud Functions backend live
+  (`analyzeMeal` server-side, `deleteAccount` admin purge, `ping`, owner-gated
+  `sendNotification`). **App Check Option B**: monitor-before-enforce scaffolding
+  is in (`APP_CHECK_ENFORCED` flag + `auditAppCheck`) — see `docs/APP_CHECK.md`;
+  the console flip is owner-only.
+- **Phase C — done & merged.** Bounded cold-start reads + lazy history + a
+  client-owned workout-summary projection back the all-time charts. No composite
+  index needed (single-field `dateKey` order).
+- **Phase D — done & deployed.** Owner-gated push sender with quiet-hours,
+  batching, idempotency, and audit. *Owner-only remainder:* the admin portal +
+  real device/APNs/FCM creds.
+- **Quick workouts (new):** 8× 12-minute bodyweight workouts with a time-based
+  countdown player, plus a live Firestore `workouts` overlay so they're editable
+  without a release.
+- **Privacy:** in-app account deletion **and** "Download my data" export now both
+  ship (`docs/PRIVACY.md` / `docs/DATA_SAFETY.md` updated).
+
+Still gated / owner-only: **Coach (Phase E)** — unchanged, stays off until the
+server-side move + validated classifier + professional sign-off. **Meal scan
+(Phase F)** — real + server-side, but still an honest estimate pending an AUS
+nutrition DB + dietitian review. **Phase G** — a11y/reduced-motion pass started
+(Dashboard + player + skeletons); Sentry/analytics still open.
+
+---
+
 ## 1. Architecture as it stands today
 
 **It's a client-only app talking directly to Firebase's managed services.** There
