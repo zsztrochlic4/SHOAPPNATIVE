@@ -22,7 +22,7 @@ import type { LoggedSetInput } from '../backend/runtime/logging'
 import { fmtWeightNum, weightUnit, fmtVolume, fmtWeight, toKg } from '../lib/format'
 import { palette } from '../theme'
 import type { Units, WorkoutSession } from '../store/types'
-import { isTimeSession, nextCircuitCursor, circuitRestSec } from './quickCircuit'
+import { isTimeSession, nextCircuitCursor, circuitRestSec, switchSidesAtSec } from './quickCircuit'
 
 /* This follow-along flow is a dark, full-immersion surface (like the design's
  * dark default and the previous implementation), so it pins the dark palette
@@ -236,7 +236,7 @@ export default function ActiveWorkout({ open, onClose, onComplete, params }: { o
     if (ex?.measure !== 'time') return
     if (workRemaining <= 0) { logSet(); return }
     const dur = ex.durationSec ?? 0
-    if (ex.perSide && dur > 0 && workRemaining === Math.round(dur / 2)) tick()
+    if (ex.perSide && workRemaining === switchSidesAtSec(dur)) tick()
     if (workRemaining <= 3) restTick()
     const t = setTimeout(() => setWorkRemaining((r) => r - 1), 1000)
     return () => clearTimeout(t)
@@ -829,7 +829,7 @@ function WorkScreen({ colors: c, ex, cursor, exTotal, rail, elapsedStr, sessionS
   // Time-based circuit station: a big countdown that auto-advances at zero, with a
   // round label and (for per-side moves) a switch-sides cue at the half-way point.
   const roundLabel = `Round ${cursor.setIdx + 1} of ${ex.sets.length} · Station ${cursor.exIdx + 1} of ${exTotal}`
-  const halfway = perSide && durationSec > 0 && workRemaining <= Math.round(durationSec / 2)
+  const halfway = perSide && durationSec > 0 && workRemaining <= switchSidesAtSec(durationSec)
   const workSub = perSide ? (halfway ? 'Switch sides now' : 'Switch sides halfway') : ex.targetReps ? `Aim for ${ex.targetReps}` : 'Hold to the buzzer'
 
   return (
@@ -869,7 +869,7 @@ function WorkScreen({ colors: c, ex, cursor, exTotal, rail, elapsedStr, sessionS
           </Svg>
           <View style={{ alignItems: 'center' }}>
             <Text style={{ fontSize: 13, fontWeight: '800', letterSpacing: 4, textTransform: 'uppercase', color: c.brand400 }}>Work</Text>
-            <Text style={{ marginTop: 6, fontSize: 62, fontWeight: '800', letterSpacing: -1, lineHeight: 62, color: timeMode && workRemaining <= 3 ? c.accentOrange : c.fg, fontVariant: ['tabular-nums'] }}>{timeMode ? mmss(workRemaining) : elapsedStr}</Text>
+            <Text accessibilityLabel={timeMode ? `${workRemaining} seconds left` : undefined} style={{ marginTop: 6, fontSize: 62, fontWeight: '800', letterSpacing: -1, lineHeight: 62, color: timeMode && workRemaining <= 3 ? c.accentOrange : c.fg, fontVariant: ['tabular-nums'] }}>{timeMode ? mmss(workRemaining) : elapsedStr}</Text>
             <Text style={{ marginTop: 8, fontSize: 13, fontWeight: '600', color: timeMode && halfway && perSide ? c.brand400 : dim(0.4) }}>{timeMode ? workSub : `Aim for ${ex.targetReps} reps`}</Text>
           </View>
         </View>
@@ -884,11 +884,11 @@ function WorkScreen({ colors: c, ex, cursor, exTotal, rail, elapsedStr, sessionS
           </View>
           <Text style={{ marginTop: 18, fontSize: 11, fontWeight: '700', letterSpacing: 2, textTransform: 'uppercase', color: dim(0.4) }}>Reps done</Text>
           <View style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 26 }}>
-            <PressableScale onPress={onDecReps} scaleTo={0.9} className="items-center justify-center rounded-full" style={{ width: 52, height: 52, backgroundColor: dim(0.08) }}>
+            <PressableScale onPress={onDecReps} scaleTo={0.9} accessibilityRole="button" accessibilityLabel="Decrease reps" className="items-center justify-center rounded-full" style={{ width: 52, height: 52, backgroundColor: dim(0.08) }}>
               <Minus size={22} color={c.fg} />
             </PressableScale>
-            <Text style={{ minWidth: 64, textAlign: 'center', fontSize: 46, fontWeight: '800', color: c.fg, fontVariant: ['tabular-nums'], lineHeight: 48 }}>{reps}</Text>
-            <PressableScale onPress={onIncReps} scaleTo={0.9} className="items-center justify-center rounded-full" style={{ width: 52, height: 52, backgroundColor: c.brand400 }}>
+            <Text accessibilityLabel={`${reps} reps done`} style={{ minWidth: 64, textAlign: 'center', fontSize: 46, fontWeight: '800', color: c.fg, fontVariant: ['tabular-nums'], lineHeight: 48 }}>{reps}</Text>
+            <PressableScale onPress={onIncReps} scaleTo={0.9} accessibilityRole="button" accessibilityLabel="Increase reps" className="items-center justify-center rounded-full" style={{ width: 52, height: 52, backgroundColor: c.brand400 }}>
               <Plus size={22} color="#0a0a0b" />
             </PressableScale>
           </View>
@@ -898,7 +898,7 @@ function WorkScreen({ colors: c, ex, cursor, exTotal, rail, elapsedStr, sessionS
       {/* CTA: rep sets tap to log; time stations auto-advance, so this only skips ahead */}
       <View style={{ paddingHorizontal: 20, paddingTop: 18, paddingBottom: 26 }}>
         {timeMode ? (
-          <PressableScale onPress={onLogSet} haptic={false} scaleTo={0.97} className="w-full flex-row items-center justify-center rounded-full" style={{ gap: 8, paddingVertical: 15, borderWidth: 1, borderColor: dim(0.14), backgroundColor: dim(0.05) }}>
+          <PressableScale onPress={onLogSet} haptic={false} scaleTo={0.97} accessibilityRole="button" accessibilityLabel="Done early, skip to rest" className="w-full flex-row items-center justify-center rounded-full" style={{ gap: 8, paddingVertical: 15, borderWidth: 1, borderColor: dim(0.14), backgroundColor: dim(0.05) }}>
             <Text style={{ fontSize: 14, fontWeight: '700', letterSpacing: 0.3, textTransform: 'uppercase', color: dim(0.8) }}>Done early · skip to rest</Text>
           </PressableScale>
         ) : (

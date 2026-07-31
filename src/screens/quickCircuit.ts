@@ -40,3 +40,15 @@ export function circuitRestSec(s: WorkoutSession, doneExIdx: number, fromSetIdx:
   const roundBoundary = upcoming.setIdx > fromSetIdx
   return roundBoundary ? s.roundRestSec ?? 60 : s.exercises[doneExIdx].restSec ?? 15
 }
+
+/**
+ * The countdown value (seconds REMAINING) at which a per-side move switches sides —
+ * the half-way point of the hold. Single source of truth for both the switch cue
+ * haptic (fires once when the countdown equals this) and the "Switch sides now"
+ * label (shown once the countdown is at or below it). Returns 0 for a non-positive
+ * duration so a bad value never trips the cue.
+ */
+export function switchSidesAtSec(durationSec: number): number {
+  if (!(durationSec > 0)) return 0
+  return Math.round(durationSec / 2)
+}
