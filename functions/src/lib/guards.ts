@@ -1,8 +1,34 @@
 import { getApps, initializeApp } from 'firebase-admin/app'
 import { HttpsError, type CallableRequest } from 'firebase-functions/v2/https'
+import * as logger from 'firebase-functions/logger'
 
 // Initialise the Admin SDK exactly once (functions may share a warm instance).
 if (getApps().length === 0) initializeApp()
+
+/**
+ * Single switch for App Check enforcement across every callable (Blocker #4 /
+ * Option B). Kept OFF until the app is attesting: turning it on before the client
+ * sends App Check tokens would reject the live app's own calls (e.g. the meal
+ * scan). Rollout is monitor-then-enforce — see docs/APP_CHECK.md:
+ *   1. ship `auditAppCheck` (this file) and watch the logs until essentially all
+ *      real traffic carries a token,
+ *   2. flip this to `true` and redeploy. One line, one place, easy to roll back.
+ */
+export const APP_CHECK_ENFORCED = false
+
+/**
+ * Soft App Check observability, safe to run while enforcement is OFF. When a call
+ * arrives WITHOUT a verified App Check token it logs a structured warning (so the
+ * owner can confirm real clients attest before flipping `APP_CHECK_ENFORCED`), but
+ * it never rejects. Returns whether a token was present. Once enforcement is on,
+ * `enforceAppCheck` rejects untokened calls before the handler and this becomes a
+ * quiet confirmation.
+ */
+export function auditAppCheck(req: CallableRequest, label: string): boolean {
+  const present = !!req.app
+  if (!present) logger.warn('appcheck.missing', { fn: label, enforced: APP_CHECK_ENFORCED })
+  return present
+}
 
 /**
  * Require a signed-in Firebase user. Returns their uid, or throws so the client

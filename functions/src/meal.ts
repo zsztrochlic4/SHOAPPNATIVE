@@ -1,7 +1,7 @@
 import { onCall, HttpsError, type CallableRequest } from 'firebase-functions/v2/https'
 import { defineSecret } from 'firebase-functions/params'
 import { GoogleGenerativeAI } from '@google/generative-ai'
-import { requireAuth } from './lib/guards'
+import { requireAuth, auditAppCheck, APP_CHECK_ENFORCED } from './lib/guards'
 import { enforceDailyLimit } from './lib/rateLimit'
 import { MEAL_SCAN_PROMPT, parseMealAnalysis, type MealAnalysis } from './lib/mealParse'
 
@@ -35,8 +35,9 @@ interface AnalyzeMealInput {
 // sign-in + a per-user rate limit rather than enforcing App Check. Server-side
 // Play Integrity / App Attest verification (Option B) is a later enhancement.
 export const analyzeMeal = onCall<AnalyzeMealInput>(
-  { enforceAppCheck: false, timeoutSeconds: 30, memory: '512MiB', secrets: [GEMINI_API_KEY] },
+  { enforceAppCheck: APP_CHECK_ENFORCED, timeoutSeconds: 30, memory: '512MiB', secrets: [GEMINI_API_KEY] },
   async (req: CallableRequest<AnalyzeMealInput>): Promise<MealAnalysis> => {
+    auditAppCheck(req, 'analyzeMeal')
     const uid = requireAuth(req)
 
     const image = req.data?.image
