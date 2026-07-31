@@ -56,6 +56,8 @@ Overarching questions:
 - **Is all user data encrypted in transit?** → **Yes.**
 - **Do you provide a way to request that data be deleted?** → **Yes** — in-app
   and via **info@strengthhubonline.com**. (Provide that in the form.)
+- **Can users request a copy / export of their data?** → **Yes** — in-app via
+  **Settings → Download my data** (exports profile + logs as JSON).
 
 **Declare these data types** (all: *Collected = Yes*, *Shared = No*, *Purpose =
 App functionality / Account management*):
