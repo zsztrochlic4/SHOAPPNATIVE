@@ -72,3 +72,21 @@ test('entries without an id are ignored (never crash)', () => {
   const out = mergeById(recent, [])
   assert.deepEqual(out.map((x) => x.id), ['a'])
 })
+
+test('an edit that moves an entry to a new dateKey re-sorts to the new position', () => {
+  // Same id in both, but the recent copy carries a later dateKey (the user edited
+  // the log date). The winner is the recent copy, so it sorts by the NEW date.
+  const older = [e('x', '2026-01-01'), e('y', '2026-03-01')]
+  const recent = [e('x', '2026-06-01')]
+  const out = mergeById(recent, older)
+  assert.deepEqual(out.map((v) => v.id), ['y', 'x']) // x moved after y
+  assert.equal(out.find((v) => v.id === 'x').dateKey, '2026-06-01')
+})
+
+test('a custom idOf keys the union by any field, not just `id`', () => {
+  const recent = [{ ref: 'r1', dateKey: '2026-02-01' }]
+  const older = [{ ref: 'r1', dateKey: '2026-01-01' }, { ref: 'r2', dateKey: '2026-01-15' }]
+  const out = mergeById(recent, older, (x) => x.ref)
+  assert.deepEqual(out.map((v) => v.ref), ['r2', 'r1'])
+  assert.equal(out.find((v) => v.ref === 'r1').dateKey, '2026-02-01') // recent wins
+})
