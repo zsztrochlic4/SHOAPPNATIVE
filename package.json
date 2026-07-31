@@ -67,6 +67,7 @@
     "validate:firestore": "node scripts/firestore-seed.js",
     "audit:schema": "node scripts/audit-production-schema.mjs",
     "validate:holdouts": "node scripts/validate-safety-holdouts.mjs",
+    "validate:coach": "tsc -p tsconfig.sweep.json && node scripts/validate-coach-router.mjs",
     "recipes:build": "node scripts/build-recipes.mjs",
     "recipes:upload": "node scripts/upload-recipes.mjs",
     "media:upload": "node scripts/upload-exercise-media.mjs",
