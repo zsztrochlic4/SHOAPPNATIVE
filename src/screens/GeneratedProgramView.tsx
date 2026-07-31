@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { View, Text, Pressable } from 'react-native'
-import { ShieldCheck, HeartPulse, Info, Clock3, ChevronDown } from 'lucide-react-native'
+import { View, Text, Pressable, Linking } from 'react-native'
+import { ShieldCheck, HeartPulse, Info, Clock3, ChevronDown, Mail } from 'lucide-react-native'
 import { Chip } from '../components/ui'
 import { brand } from '../theme'
 import type { StoredProgram, ProgramStatus } from '../backend/runtime/activate'
@@ -11,7 +11,9 @@ import type { StoredProgram, ProgramStatus } from '../backend/runtime/activate'
 
 type Tone = 'brand' | 'warn' | 'danger'
 
-function holdingCopy(reason: string | null): { title: string; body: string; tone: Tone } {
+const SUPPORT_EMAIL = 'info@strengthhubonline.com'
+
+function holdingCopy(reason: string | null): { title: string; body: string; tone: Tone; support?: boolean } {
   const r = reason ?? ''
   if (r === 'awaiting_professional_signoff' || r.startsWith('signoff'))
     return {
@@ -24,12 +26,14 @@ function holdingCopy(reason: string | null): { title: string; body: string; tone
       tone: 'danger',
       title: 'Please seek medical advice first',
       body: 'Based on your answers, we can’t build a program right now. Please speak with a doctor or qualified health professional before training. Your answers are saved so you can return once you’ve been cleared.',
+      support: true,
     }
   if (r === 'screening_require_clearance')
     return {
       tone: 'warn',
       title: 'One quick clearance step',
-      body: 'One of your answers means we’d like a health professional to give you the go-ahead before we build your program. Once you’ve been cleared, we’ll unlock it here.',
+      body: 'One of your answers means we’d like a health professional to give you the go-ahead before we build your program. Once you’ve been cleared, contact us and we’ll unlock it.',
+      support: true,
     }
   if (r === 'age_under_18')
     return {
@@ -53,6 +57,7 @@ function holdingCopy(reason: string | null): { title: string; body: string; tone
     tone: 'warn',
     title: 'We hit a snag',
     body: 'We couldn’t build your program just now. Please try again in a moment.',
+    support: true,
   }
 }
 
@@ -63,7 +68,7 @@ const TONE_STYLE: Record<Tone, { ring: string; bg: string; color: string }> = {
 }
 
 export function ProgramHolding({ status }: { status: ProgramStatus }) {
-  const { title, body, tone } = holdingCopy(status.reason)
+  const { title, body, tone, support } = holdingCopy(status.reason)
   const st = TONE_STYLE[tone]
   const IconCmp = tone === 'brand' ? ShieldCheck : tone === 'danger' ? HeartPulse : Info
   return (
@@ -73,6 +78,20 @@ export function ProgramHolding({ status }: { status: ProgramStatus }) {
       </View>
       <Text className="mt-5 text-center text-xl font-extrabold text-white">{title}</Text>
       <Text className="mt-2.5 max-w-[320px] text-center text-[14px] leading-6 text-white/60">{body}</Text>
+      {support && (
+        // A blocked/held user shouldn't be at a dead end — give them a way to reach
+        // a human. (Re-screening after clearance stays a manual, human-in-the-loop
+        // step by design, so it never bypasses the safety gate.)
+        <Pressable
+          onPress={() => void Linking.openURL(`mailto:${SUPPORT_EMAIL}`)}
+          accessibilityRole="link"
+          accessibilityLabel={`Email support at ${SUPPORT_EMAIL}`}
+          className="mt-6 flex-row items-center gap-2 rounded-full border border-white/12 bg-white/5 px-4 py-2.5 active:opacity-80"
+        >
+          <Mail size={14} color="rgba(255,255,255,0.7)" />
+          <Text className="text-[13px] font-semibold text-white/80">Contact us</Text>
+        </Pressable>
+      )}
     </View>
   )
 }
