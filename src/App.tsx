@@ -20,6 +20,7 @@ import { themeVars, useThemeName, brand, cssVars } from './theme'
 import { setSoundEnabled } from './lib/sound'
 import { initBudgetMeals } from './data/recipes'
 import { initExerciseInfo } from './data/exerciseInfo'
+import { initQuickWorkouts } from './data/quickWorkouts'
 import { Skeleton, SkeletonLines } from './components/Skeleton'
 import { OfflineBanner } from './components/OfflineBanner'
 import Dashboard from './screens/Dashboard'
@@ -256,6 +257,7 @@ function ThemedRoot() {
   useEffect(() => {
     void initBudgetMeals()
     void initExerciseInfo()
+    void initQuickWorkouts()
   }, [])
 
   // On web, RN-Web modals (menu, sheets, full-screen views) portal to <body>,
