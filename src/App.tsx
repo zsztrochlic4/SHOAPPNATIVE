@@ -5,6 +5,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar'
 import '../global.css'
 import { WebPreviewFrame, IS_WEB } from './components/WebFrame'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { BottomNav } from './components/BottomNav'
 import { SwipeNav } from './components/SwipeNav'
 import { StoreProvider, useStore } from './store/store'
@@ -343,11 +344,13 @@ export default function App() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <WebPreviewFrame>
         <SafeAreaProvider>
-          <StoreProvider>
-            <AuthProvider>
-              <ThemedRoot />
-            </AuthProvider>
-          </StoreProvider>
+          <ErrorBoundary>
+            <StoreProvider>
+              <AuthProvider>
+                <ThemedRoot />
+              </AuthProvider>
+            </StoreProvider>
+          </ErrorBoundary>
         </SafeAreaProvider>
       </WebPreviewFrame>
     </GestureHandlerRootView>
