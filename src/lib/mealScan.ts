@@ -11,17 +11,22 @@ export type { MealAnalysis, MealFood, Confidence, Rec } from './mealScanParse'
  * (DEVELOPMENT_PLAN.md Phase B / §4.4), so a modified client can no longer reach
  * the model directly. The photo is analysed and not stored.
  *
- * Secured by sign-in + rate limiting (the app's Firebase JS SDK can't do native
- * App Check — §4.3); server-side Play Integrity is a later enhancement.
+ * Secured by sign-in + a per-user daily rate limit. App Check is scaffolded in
+ * monitor mode (see docs/APP_CHECK.md); enforcement is an owner flip.
  *
- * Throws when Firebase isn't configured (demo mode) or the call fails; the UI
- * then offers manual logging.
+ * Bounded by a client timeout so a hung backend can't leave the user waiting
+ * forever — on timeout (or any failure) it throws and the UI offers manual
+ * logging. Also throws when Firebase isn't configured (demo mode).
  */
 export async function analyzeMealPhoto(base64: string, mimeType = 'image/jpeg'): Promise<MealAnalysis> {
   if (!firebaseEnabled || !functions) throw new Error('Meal scan is not configured')
   if (!base64) throw new Error('No image data')
 
-  const call = httpsCallable<{ image: string; mimeType: string }, MealAnalysis>(functions, 'analyzeMeal')
+  // 35s ceiling — just above the function's own 30s timeout, so a stuck request
+  // fails fast with a clear error instead of hanging the scanner UI.
+  const call = httpsCallable<{ image: string; mimeType: string }, MealAnalysis>(functions, 'analyzeMeal', {
+    timeout: 35_000,
+  })
   const res = await call({ image: base64, mimeType })
   return res.data
 }

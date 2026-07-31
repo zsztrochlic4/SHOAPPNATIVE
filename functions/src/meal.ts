@@ -23,6 +23,7 @@ const GEMINI_API_KEY = defineSecret('GEMINI_API_KEY')
 const MODEL = 'gemini-2.5-flash-lite'
 const MAX_SCANS_PER_DAY = 40
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // ~5 MB decoded
+const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp'])
 
 interface AnalyzeMealInput {
   /** Base64-encoded photo, no `data:` prefix. */
@@ -30,10 +31,9 @@ interface AnalyzeMealInput {
   mimeType?: string
 }
 
-// App Check note (DEVELOPMENT_PLAN.md §4.3): the app uses the Firebase JS SDK on
-// mobile, which cannot produce a native App Check token, so we secure this with
-// sign-in + a per-user rate limit rather than enforcing App Check. Server-side
-// Play Integrity / App Attest verification (Option B) is a later enhancement.
+// Secured by sign-in + a per-user daily rate limit. App Check is scaffolded in
+// monitor mode (auditAppCheck below; enforceAppCheck follows the APP_CHECK_ENFORCED
+// flag) — see docs/APP_CHECK.md.
 export const analyzeMeal = onCall<AnalyzeMealInput>(
   { enforceAppCheck: APP_CHECK_ENFORCED, timeoutSeconds: 30, memory: '512MiB', secrets: [GEMINI_API_KEY] },
   async (req: CallableRequest<AnalyzeMealInput>): Promise<MealAnalysis> => {
@@ -49,6 +49,9 @@ export const analyzeMeal = onCall<AnalyzeMealInput>(
       throw new HttpsError('invalid-argument', 'That image is too large.')
     }
     const mimeType = typeof req.data.mimeType === 'string' ? req.data.mimeType : 'image/jpeg'
+    if (!ALLOWED_MIME.has(mimeType)) {
+      throw new HttpsError('invalid-argument', 'Unsupported image type.')
+    }
 
     // Cost/abuse guard — per user, per day.
     await enforceDailyLimit('meal', uid, MAX_SCANS_PER_DAY)
