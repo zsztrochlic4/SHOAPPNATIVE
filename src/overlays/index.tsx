@@ -7,7 +7,7 @@ import {
   Bell, Moon, Sun, GraduationCap, Wallet, RotateCcw, Trash2, Camera, Trophy,
   Flame, Search, ScanLine, Plus, Check, Share2, ChevronRight, User, Sparkles, Dumbbell,
   Droplet, Footprints, BedDouble, Leaf, Play, Award, BellRing,
-  HeartPulse, Activity, Zap, Minus, X, LogOut, Volume2,
+  HeartPulse, Activity, Zap, Minus, X, LogOut, Volume2, Download,
 } from 'lucide-react-native'
 import { Sheet, EmptyState } from '../components/Sheet'
 import { AppModal, DEVICE, IS_WEB } from '../components/WebFrame'
@@ -26,6 +26,9 @@ import { FOODS } from '../data/catalog'
 import { useQuickWorkouts } from '../data/quickWorkouts'
 import type { QuickWorkout } from '../store/types'
 import { buildCustomSession, imageForMuscle } from '../store/programSession'
+import { collectUserExport } from '../store/cloudRepo'
+import { serializeUserExport, splitLocalState, buildExportFilename } from '../lib/dataExport'
+import { deliverExport } from '../lib/exportDeliver'
 import { pick, makeRng } from '../lib/rng'
 import { requestPushPermission, resolveNotifPrefs } from '../lib/notifications'
 import { todayKey, relativeLabel, shortDate, fromKey } from '../lib/date'
@@ -177,7 +180,8 @@ function GoalRow({ label, unit, children }: { label: string; unit: string; child
 export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: () => void }) {
   const { state, dispatch } = useStore()
   const toast = useToast()
-  const { enabled: authEnabled, deleteAccount } = useAuth()
+  const { enabled: authEnabled, deleteAccount, user } = useAuth()
+  const [exporting, setExporting] = useState(false)
   const { notificationsEnabled } = state.settings
   const soundEnabled = state.settings.soundEnabled ?? true
   const lang = state.settings.language ?? 'en'
@@ -208,6 +212,28 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
       setDeleting(false)
     }
   }
+  // "Download my data" — the privacy/GDPR companion to account deletion. Pulls the
+  // COMPLETE cloud history when signed in (unwindowed), else exports the local
+  // state as-is; both go through the same deterministic serialiser. Non-destructive.
+  async function onExportData() {
+    if (exporting) return
+    setExporting(true)
+    try {
+      const uid = user?.uid
+      const payload =
+        authEnabled && uid
+          ? { ...(await collectUserExport(uid)), source: 'cloud' as const }
+          : splitLocalState(state as unknown as Record<string, unknown>)
+      const json = serializeUserExport(payload)
+      await deliverExport(buildExportFilename(), json)
+      toast('Your data export is ready')
+    } catch {
+      toast('Could not prepare your export. Please try again.')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   const currentLang = LANGUAGES.find((l) => l.code === lang) ?? LANGUAGES[0]
 
   const NATIVE = Platform.OS === 'ios' || Platform.OS === 'android'
@@ -323,6 +349,19 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
           <View className="flex-1">
             <Text className="font-bold text-red-300">{confirmingClear ? 'Tap again to wipe everything' : t('settings.clear')}</Text>
             <Text className="text-[12px] text-white/50">{confirmingClear ? 'Erases your data and restarts onboarding' : t('settings.clearSub')}</Text>
+          </View>
+        </Pressable>
+        <Pressable
+          onPress={onExportData}
+          disabled={exporting}
+          accessibilityRole="button"
+          accessibilityLabel="Download my data"
+          className={`w-full flex-row items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 active:opacity-90 ${exporting ? 'opacity-60' : ''}`}
+        >
+          <Download size={18} color="rgba(255,255,255,0.7)" />
+          <View className="flex-1">
+            <Text className="font-bold text-white/85">{exporting ? 'Preparing…' : 'Download my data'}</Text>
+            <Text className="text-[12px] text-white/50">Export your profile and logs as a JSON file</Text>
           </View>
         </Pressable>
         {authEnabled && (

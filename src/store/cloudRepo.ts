@@ -152,15 +152,18 @@ function chunk<T>(items: T[], size: number): T[][] {
  * Call this BEFORE deleting the Auth user, while the owner is still authenticated
  * (the delete rules require `isOwner()`).
  */
+/** Every per-user subcollection defined in firestore.rules — the complete set that
+ *  a full account wipe removes and a full data export reads. Kept in one place so
+ *  deletion and export can never drift out of sync. */
+const ALL_SUBCOLLECTIONS = [
+  'sessions', 'weights', 'habits', 'meals', 'activities', 'foodReviews',
+  'chat', 'coachThread', 'notifications', 'workoutSummaries', 'programs',
+  'workout_instances', 'set_logs', 'progression_state', 'pushTokens',
+] as const
+
 export async function deleteUserData(uid: string): Promise<void> {
   if (!db || !uid || uid === 'local') return
-  // Every per-user subcollection defined in firestore.rules.
-  const subs = [
-    'sessions', 'weights', 'habits', 'meals', 'activities', 'foodReviews',
-    'chat', 'coachThread', 'notifications', 'workoutSummaries', 'programs',
-    'workout_instances', 'set_logs', 'progression_state', 'pushTokens',
-  ]
-  for (const sub of subs) {
+  for (const sub of ALL_SUBCOLLECTIONS) {
     const snap = await getDocs(collection(db, COL, uid, sub))
     for (const group of chunk(snap.docs, BATCH_LIMIT)) {
       const batch = writeBatch(db)
@@ -175,6 +178,30 @@ export async function deleteUserData(uid: string): Promise<void> {
     /* Rules may reject the scrub (e.g. a set premium flag); the root becomes
        unreadable once the Auth account is gone, and the backend cleanup finishes it. */
   }
+}
+
+/**
+ * Gather a signed-in user's COMPLETE cloud data for "Download my data": the root
+ * profile document plus every per-user subcollection read in full (no windowing —
+ * an export must be complete, and it is a rare, explicit, user-initiated action).
+ * Returns the raw shape for src/lib/dataExport.ts to normalise + serialise. Safe
+ * no-op shape when Firebase is unconfigured / no uid (caller falls back to local).
+ */
+export async function collectUserExport(
+  uid: string,
+): Promise<{ profile: Record<string, unknown>; collections: Record<string, unknown[]> }> {
+  const empty = { profile: {}, collections: {} }
+  if (!db || !uid || uid === 'local') return empty
+  const rootSnap = await getDoc(doc(db, COL, uid))
+  const profile = rootSnap.exists() ? { ...(rootSnap.data() as Record<string, unknown>) } : {}
+  const collections: Record<string, unknown[]> = {}
+  await Promise.all(
+    ALL_SUBCOLLECTIONS.map(async (sub) => {
+      const snap = await getDocs(collection(db!, COL, uid, sub))
+      if (snap.size) collections[sub] = snap.docs.map((d) => d.data())
+    }),
+  )
+  return { profile, collections }
 }
 
 /**

@@ -114,6 +114,8 @@ that we hold, except where we are required to keep certain records by law.
 You can:
 - **Access and correct** your information — most of it is editable directly in
   the app.
+- **Download your data** — from **Settings → Download my data**, export your
+  profile and logs as a JSON file to keep or move elsewhere.
 - **Delete your account and data** — you can request deletion from within the
   app or by emailing **info@strengthhubonline.com**. When you delete your
   account, we remove your login and associated personal data.
