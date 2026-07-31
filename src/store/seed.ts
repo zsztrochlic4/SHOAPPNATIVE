@@ -3,14 +3,12 @@ import { dayKey, todayKey } from '../lib/date'
 import {
   BASE_WEIGHTS,
   EXERCISES,
-  FOODS,
   PARTNER_CANDIDATES,
   PROGRAM,
   REP_TARGETS,
   SET_TARGETS,
   SPLIT_ROTATION,
   exById,
-  foodById,
   img,
 } from '../data/catalog'
 import type {
@@ -25,7 +23,6 @@ import type {
   LeaderUser,
   LoggedActivity,
   LoggedExercise,
-  LoggedMeal,
   PlannedMeal,
   Post,
   PostComment,
@@ -33,7 +30,7 @@ import type {
   WorkoutSession,
 } from './types'
 
-export const SCHEMA_VERSION = 10
+export const SCHEMA_VERSION = 11
 const DAYS = 40 // 0..38 completed history, 39 = today (in progress)
 
 /* round to nearest 2.5 (plate increments) */
@@ -110,44 +107,6 @@ function buildSession(rng: () => number, i: number, completed: boolean, forcePro
     exercises,
     completed,
   }
-}
-
-function buildMeals(rng: () => number, i: number): LoggedMeal[] {
-  const dateKey = dayKey(DAYS - 1 - i)
-  const slots: { meal: LoggedMeal['meal']; ids: string[] }[] = [
-    { meal: 'Breakfast', ids: ['f-oats', 'f-eggs', 'f-bagel', 'f-shake'] },
-    { meal: 'Lunch', ids: ['f-chicken', 'f-burrito', 'f-tuna', 'f-pasta'] },
-    { meal: 'Snack', ids: ['f-yogurt', 'f-apple', 'f-banana', 'f-pbsand'] },
-    { meal: 'Dinner', ids: ['f-salmon', 'f-pasta', 'f-noodles', 'f-tuna'] },
-  ]
-  return slots.map((s, idx) => {
-    const food = foodById(pick(rng, s.ids))!
-    return {
-      id: `m-${i}-${idx}`,
-      dateKey,
-      meal: s.meal,
-      name: food.name,
-      qty: 1,
-      kcal: food.kcal,
-      p: food.p,
-      c: food.c,
-      f: food.f,
-    }
-  })
-}
-
-/* Today's exact meals: matches the Nutrition mockup numbers */
-function todaysMeals(): LoggedMeal[] {
-  const ids: [LoggedMeal['meal'], string][] = [
-    ['Breakfast', 'f-oats'],
-    ['Lunch', 'f-chicken'],
-    ['Snack', 'f-yogurt'],
-    ['Dinner', 'f-salmon'],
-  ]
-  return ids.map(([meal, id], idx) => {
-    const food = foodById(id)!
-    return { id: `m-today-${idx}`, dateKey: todayKey, meal, name: food.name, qty: 1, kcal: food.kcal, p: food.p, c: food.c, f: food.f }
-  })
 }
 
 export function buildSeed(): AppState {
@@ -281,11 +240,6 @@ export function buildSeed(): AppState {
     sessions.push(todaySession)
   }
 
-  /* -------- meals -------- */
-  const meals: LoggedMeal[] = []
-  for (let i = 0; i < DAYS - 1; i++) meals.push(...buildMeals(rng, i))
-  meals.push(...todaysMeals())
-
   /* -------- posts (campus scoped) -------- */
   const posts: Post[] = [
     { id: 'post-1', authorId: 'you', author: 'Alex M.', dateKey: dayKey(0), time: '2h ago', text: 'New bench best today. 92.5kg for 3, and it finally felt light. Forty days of just turning up.', image: img.postPR, likes: 24, comments: 8, liked: false, bookmarked: false, kudos: 16, gaveKudos: false, pr: { lift: 'Bench Press', weight: '92.5kg' }, scope: 'campus' },
@@ -364,7 +318,6 @@ export function buildSeed(): AppState {
     settings: { units: 'metric', theme: 'dark', notificationsEnabled: true, soundEnabled: true, language: 'en', connections: {} },
     weights,
     habits,
-    meals,
     foodReviews: [],
     activities,
     mealPlan,
@@ -391,7 +344,6 @@ export function buildSeed(): AppState {
         read: true,
       },
     ],
-    foods: FOODS,
     sessions,
     program: PROGRAM,
     posts,
@@ -420,7 +372,6 @@ export function emptyState(): AppState {
     profile: { ...s.profile, onboarded: false },
     weights: [],
     habits: [],
-    meals: [],
     foodReviews: [],
     activities: [],
     mealPlan: [],
@@ -439,4 +390,4 @@ export function emptyState(): AppState {
 }
 
 /* re-export catalog refs commonly used alongside seed data */
-export { EXERCISES, FOODS, PROGRAM }
+export { EXERCISES, PROGRAM }

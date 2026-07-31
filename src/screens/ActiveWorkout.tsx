@@ -12,6 +12,7 @@ import { tick, thud } from '../lib/haptics'
 import { beep, restTick, successChime } from '../lib/sound'
 import { TechniqueClip } from '../components/TechniqueClip'
 import { useStore } from '../store/store'
+import { useNav } from '../nav'
 import { todaySession, sessionProgress, streakStats, workoutsThisWeek } from '../store/selectors'
 import { examState, examTrim, nextSetRecommendation } from '../store/training'
 import { prForSession, type PR } from '../store/coach'
@@ -156,9 +157,23 @@ function ScreenIn({ children, style }: { children: React.ReactNode; style?: any 
 
 export default function ActiveWorkout({ open, onClose, onComplete, params }: { open: boolean; onClose: () => void; onComplete?: () => void; params?: Record<string, unknown> }) {
   const { state, dispatch } = useStore()
+  const nav = useNav()
   // Where the finish celebration returns to (dashboard). Cancelling mid-workout
   // still uses `onClose` (back to the Workout tab).
   const finishClose = onComplete ?? onClose
+
+  // Offer the "share this PR to your cohort" sheet from the finish screen when the
+  // session set a real personal best (finishPRRef). Swaps this overlay for the
+  // celebration sheet, prefilled with the lift; its own share posts to the feed.
+  function shareFinishPr() {
+    const pr = finishPRRef.current
+    if (!pr) return
+    nav.open('prCelebration', {
+      lift: pr.name,
+      weight: fmtWeight(pr.weightKg, units, units === 'imperial' ? 0 : 1),
+      reps: pr.reps,
+    })
+  }
   const units = state.settings.units
 
   // A custom / template-launched session is opened by explicit id; everything
@@ -496,6 +511,7 @@ export default function ActiveWorkout({ open, onClose, onComplete, params }: { o
             stats={finishStatsRef.current}
             pr={finishPRRef.current}
             onDone={finishClose}
+            onSharePr={shareFinishPr}
           />
         )}
       </SafeAreaView>
@@ -1090,7 +1106,7 @@ const RAYS: { deg: number; accent: 'brand' | 'yellow' }[] = [
   { deg: 309, accent: 'brand' },
 ]
 
-function FinishSheet({ colors: c, units, name, firstName, streakN, weekDone, weekTarget, stats, pr, onDone }: any) {
+function FinishSheet({ colors: c, units, name, firstName, streakN, weekDone, weekTarget, stats, pr, onDone, onSharePr }: any) {
   const dim = (o: number) => `rgba(255,255,255,${o})`
   const insets = useSafeAreaInsets()
 
@@ -1197,7 +1213,13 @@ function FinishSheet({ colors: c, units, name, firstName, streakN, weekDone, wee
           <FinishStat value={stats ? String(stats.sets) : '0'} label="Sets" c={c} />
         </Animated.View>
 
-        <PressableScale onPress={onDone} className="items-center rounded-full" style={{ marginTop: 20, height: 48, justifyContent: 'center', backgroundColor: c.brand400 }}>
+        {pr && onSharePr && (
+          <PressableScale onPress={onSharePr} className="flex-row items-center justify-center rounded-full" style={{ marginTop: 20, height: 48, gap: 8, backgroundColor: rgbaOf(c.accentYellow, 0.14), borderWidth: 1, borderColor: rgbaOf(c.accentYellow, 0.28) }}>
+            <Star size={15} color={c.accentYellow} fill={c.accentYellow} />
+            <Text style={{ fontSize: 15, fontWeight: '800', color: c.accentYellow }}>Share this PR</Text>
+          </PressableScale>
+        )}
+        <PressableScale onPress={onDone} className="items-center rounded-full" style={{ marginTop: pr && onSharePr ? 10 : 20, height: 48, justifyContent: 'center', backgroundColor: c.brand400 }}>
           <Text style={{ fontSize: 15, fontWeight: '800', color: c.ink900 }}>Continue</Text>
         </PressableScale>
       </Animated.View>

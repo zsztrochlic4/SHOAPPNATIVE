@@ -49,7 +49,6 @@ const SUBCOLLECTIONS = {
   sessions: (e: any) => e.id as string,
   weights: (e: any) => e.dateKey as string,
   habits: (e: any) => e.dateKey as string,
-  meals: (e: any) => e.id as string,
   activities: (e: any) => e.id as string,
   foodReviews: (e: any) => e.dateKey as string,
   chat: (e: any) => e.id as string,
@@ -88,7 +87,6 @@ const LOAD_POLICY: Record<SubKey, 'full' | 'window'> = {
   // stay windowed without the charts losing history.
   workoutSummaries: 'full',
   sessions: 'window',
-  meals: 'window',
   activities: 'window',
   chat: 'window',
   coachThread: 'window',

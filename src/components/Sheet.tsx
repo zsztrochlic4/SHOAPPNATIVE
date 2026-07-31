@@ -15,6 +15,8 @@ import Reanimated, {
   Easing as ReEasing,
 } from 'react-native-reanimated'
 import { AppModal, IS_WEB, WEB_SCREEN } from './WebFrame'
+import { BottomSheet } from './BottomSheet'
+import { SheetHeader } from './SheetHeader'
 
 // Menu → detail transition: 280ms ease-out, both directions — a short slide
 // crossfaded with opacity (see MenuDetailPanel), calm enough to read as a clean,
@@ -74,53 +76,32 @@ export function Sheet({
   }
 
   return (
-    <AppModal visible={open} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-        <Pressable
-          accessibilityLabel="Close"
-          onPress={onClose}
-          style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)' }}
-        />
-        <View
-          className={full ? 'bg-ink-900' : 'rounded-t-3xl border-t border-white/10 bg-ink-900'}
-          // `full` = a genuine full-screen surface (chat, builders): fill the device
-          // screen edge-to-edge. Otherwise a bottom sheet capped at 88%.
-          style={{ height: full ? height : undefined, maxHeight: full ? height : height * 0.88 }}
-        >
-          <View className="px-5 pb-2 pt-4">
-            {!full && (
-              <View
-                style={{ position: 'absolute', left: '50%', top: 8, marginLeft: -20, height: 4, width: 40, borderRadius: 999 }}
-                className="bg-white/20"
-              />
-            )}
-            <View className="flex-row items-center justify-between">
-              <Text className="text-lg font-bold text-white">{title}</Text>
-              <Pressable
-                onPress={onClose}
-                hitSlop={8}
-                className="h-8 w-8 items-center justify-center rounded-full bg-white/10"
-              >
-                <X size={18} color={colors.fg} />
-              </Pressable>
-            </View>
-          </View>
-          <ScrollView
-            className="flex-1 px-5"
-            // On web the modal's flex chain leaves this unbounded, so it grows to
-            // its content and won't scroll. Cap it to the card's inner height
-            // (sheet height minus the ~56px header) so overflow scrolls. Native
-            // keeps flex-1.
-            style={IS_WEB ? { maxHeight: (full ? height : height * 0.88) - 56 } : undefined}
-            contentContainerStyle={{ paddingBottom: 32 + insets.bottom }}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            {children}
-          </ScrollView>
-        </View>
-      </View>
-    </AppModal>
+    // `full` = a genuine full-screen surface (chat, builders): fill the device
+    // screen edge-to-edge. Otherwise a bottom sheet capped at 88%. Motion,
+    // scrim and dismiss are owned by the shared BottomSheet shell so every sheet
+    // opens/closes with the same feel (and honours reduce-motion).
+    <BottomSheet
+      open={open}
+      onClose={onClose}
+      maxHeightFrac={full ? 1 : 0.88}
+      panelClassName={full ? 'bg-ink-900' : 'rounded-t-3xl border-t border-white/10 bg-ink-900'}
+      panelStyle={full ? { height } : undefined}
+    >
+      <SheetHeader title={title} onClose={onClose} handle={!full} />
+      <ScrollView
+        className="flex-1 px-5"
+        // On web the modal's flex chain leaves this unbounded, so it grows to
+        // its content and won't scroll. Cap it to the card's inner height
+        // (sheet height minus the ~56px header) so overflow scrolls. Native
+        // keeps flex-1.
+        style={IS_WEB ? { maxHeight: (full ? height : height * 0.88) - 56 } : undefined}
+        contentContainerStyle={{ paddingBottom: 32 + insets.bottom }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {children}
+      </ScrollView>
+    </BottomSheet>
   )
 }
 
@@ -183,15 +164,7 @@ function MenuDetailPanel({
         className="flex-1 bg-ink-900"
         style={[{ paddingTop: insets.top }, animStyle, IS_WEB ? { flex: 1, minHeight: 0 } : null]}
       >
-        <View className="flex-row items-center gap-1 px-3 py-2.5">
-          <Pressable onPress={onBack} hitSlop={8} accessibilityLabel="Back to menu" className="h-9 w-9 items-center justify-center rounded-full active:opacity-70">
-            <ChevronLeft size={24} color={colors.fg} />
-          </Pressable>
-          <Text numberOfLines={1} className="flex-1 text-[17px] font-bold text-white">{title}</Text>
-          <Pressable onPress={onDashboard} hitSlop={8} accessibilityLabel="Close to dashboard" className="h-9 w-9 items-center justify-center rounded-full bg-white/10 active:opacity-70">
-            <X size={18} color={colors.fg} />
-          </Pressable>
-        </View>
+        <SheetHeader title={title} onBack={onBack} onClose={onDashboard} closeLabel="Close to dashboard" />
         <ScrollView
           className="flex-1 px-5"
           style={IS_WEB ? { maxHeight: height - 56, minHeight: 0 } : undefined}

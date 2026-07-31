@@ -4,9 +4,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
 import { LinearGradient } from 'expo-linear-gradient'
 import {
-  Bell, Moon, Sun, GraduationCap, Wallet, RotateCcw, Trash2, Camera, Trophy,
-  Flame, Search, ScanLine, Plus, Check, Share2, ChevronRight, User, Sparkles, Dumbbell,
-  Droplet, Footprints, BedDouble, Leaf, Play, Award, BellRing,
+  Bell, Moon, Sun, GraduationCap, RotateCcw, Trash2, Camera, Trophy,
+  Flame, Plus, Check, Share2, ChevronRight, User, Sparkles, Dumbbell,
+  Droplet, Footprints, BedDouble, Leaf, Play, Award, BellRing, Salad,
   HeartPulse, Activity, Zap, Minus, X, LogOut, Volume2, Download,
 } from 'lucide-react-native'
 import { Sheet, EmptyState } from '../components/Sheet'
@@ -22,14 +22,12 @@ import { useStore } from '../store/store'
 import { useAuth } from '../auth/AuthProvider'
 import { useToast } from '../components/Toast'
 import { useNav } from '../nav'
-import { FOODS } from '../data/catalog'
 import { useQuickWorkouts } from '../data/quickWorkouts'
 import type { QuickWorkout } from '../store/types'
 import { buildCustomSession, imageForMuscle } from '../store/programSession'
 import { collectUserExport } from '../store/cloudRepo'
 import { serializeUserExport, splitLocalState, buildExportFilename } from '../lib/dataExport'
 import { deliverExport } from '../lib/exportDeliver'
-import { pick, makeRng } from '../lib/rng'
 import { requestPushPermission, resolveNotifPrefs } from '../lib/notifications'
 import { todayKey, relativeLabel, shortDate, fromKey } from '../lib/date'
 import {
@@ -44,7 +42,7 @@ import { ActivityIcon } from '../components/ActivityIcon'
 import { activePeriod, upcomingPeriods } from '../store/periods'
 import { translator, LANGUAGES, type Language } from '../lib/i18n'
 import { shareText } from '../lib/share'
-import type { MealName, Units, Theme, NotificationPrefs } from '../store/types'
+import type { Units, Theme, NotificationPrefs } from '../store/types'
 import { brand, accent } from '../theme'
 
 type Props = { open: boolean; onClose: () => void; params?: Record<string, unknown> }
@@ -526,6 +524,7 @@ export function MenuDrawer({ open, onClose }: { open: boolean; onClose: () => vo
               first
               badge={unread > 0 ? <View className="h-5 min-w-[20px] items-center justify-center rounded-full bg-brand-400 px-1.5"><Text className="text-[11px] font-bold text-black">{unread}</Text></View> : undefined}
             />
+            <MenuRow icon={<Salad size={17} color={brand[400]} />} title="Easy recipes" sub="Tasty, simple, cheap meals" onPress={go('budgetEats')} />
           </MenuSection>
 
           {/* Settings opened out inline — no header, so it reads as one continuous
@@ -619,140 +618,6 @@ export function ProfileSheet({ open, onClose }: Props) {
         {state.profile.newToGym && <LinkRow icon={<Leaf size={18} color={brand[400]} />} title="New to the gym" sub="Your first 90 days" onPress={() => nav.open('beginner')} />}
         <LinkRow icon={<User size={18} color="rgba(255,255,255,0.7)" />} title="Settings" sub="Units, theme and data" onPress={() => nav.open('settings')} />
       </View>
-    </Sheet>
-  )
-}
-
-/* ============================ Add Food ============================ */
-export function AddFoodSheet({ open, onClose, params }: Props) {
-  const { state, dispatch } = useStore()
-  const toast = useToast()
-  const [meal, setMeal] = useState<MealName>((params?.meal as MealName) || 'Snack')
-  const [q, setQ] = useState('')
-  const [budgetOnly, setBudgetOnly] = useState(state.profile.budgetMode)
-  const [scanned, setScanned] = useState<string | null>(null)
-
-  const results = useMemo(() => {
-    return FOODS.filter((f) => f.name.toLowerCase().includes(q.toLowerCase())).filter((f) => (budgetOnly ? f.budget : true))
-  }, [q, budgetOnly])
-
-  function add(foodId: string) {
-    const f = FOODS.find((x) => x.id === foodId)!
-    dispatch({ type: 'ADD_MEAL', meal: { meal, name: f.name, qty: 1, kcal: f.kcal, p: f.p, c: f.c, f: f.f } })
-    toast(`Added to ${meal}`)
-    onClose()
-  }
-
-  function scan() {
-    // simulate a barcode scan resolving to a product
-    const f = pick(makeRng(Date.now() % 100000), FOODS.filter((x) => x.barcode))
-    setScanned(f.id)
-    setQ('')
-  }
-
-  return (
-    <Sheet open={open} onClose={onClose} title="Add food">
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-1 mb-3" contentContainerStyle={{ gap: 8, paddingHorizontal: 4 }}>
-        {(['Breakfast', 'Lunch', 'Snack', 'Dinner'] as MealName[]).map((m) => (
-          <Pressable key={m} onPress={() => setMeal(m)} className={`shrink-0 rounded-full px-4 py-1.5 active:opacity-90 ${meal === m ? 'bg-brand-400' : 'bg-ink-700'}`}>
-            <Text className={`text-sm font-semibold ${meal === m ? 'text-black' : 'text-white/60'}`}>{m}</Text>
-          </Pressable>
-        ))}
-      </ScrollView>
-
-      <View className="mb-3 flex-row gap-2">
-        <View className="flex-1 flex-row items-center gap-2 rounded-xl border border-white/8 bg-ink-800 px-3">
-          <Search size={18} color="rgba(255,255,255,0.4)" />
-          <TextInput
-            value={q}
-            onChangeText={(v) => { setQ(v); setScanned(null) }}
-            placeholder="Search foods…"
-            placeholderTextColor="rgba(148,148,148,0.6)"
-            className="flex-1 bg-transparent py-3 text-sm text-white"
-          />
-        </View>
-        <Pressable onPress={scan} className="h-[46px] w-[46px] items-center justify-center rounded-xl bg-brand-400 active:opacity-90">
-          <ScanLine size={20} color="#000" />
-        </Pressable>
-      </View>
-
-      <View className="mb-3 flex-row">
-        <Pressable onPress={() => setBudgetOnly((b) => !b)} className={`flex-row items-center gap-1.5 rounded-full px-3 py-1.5 active:opacity-90 ${budgetOnly ? 'bg-brand-400/20' : 'bg-ink-700'}`}>
-          <Wallet size={13} color={budgetOnly ? brand[400] : 'rgba(255,255,255,0.55)'} />
-          <Text className={`text-xs font-semibold ${budgetOnly ? 'text-brand-400' : 'text-white/55'}`}>Budget meals {budgetOnly ? 'on' : 'off'}</Text>
-        </Pressable>
-      </View>
-
-      {scanned && (
-        <View className="mb-3 rounded-2xl border border-brand-400/30 bg-brand-400/10 p-3">
-          <Text className="mb-1 text-[12px] font-semibold text-brand-400">✓ Barcode matched</Text>
-          <FoodRow id={scanned} onAdd={add} />
-        </View>
-      )}
-
-      <View className="gap-2">
-        {results.map((f) => (
-          <FoodRow key={f.id} id={f.id} onAdd={add} />
-        ))}
-        {results.length === 0 && <Text className="py-6 text-center text-sm text-white/40">No foods found.</Text>}
-      </View>
-    </Sheet>
-  )
-}
-
-function FoodRow({ id, onAdd }: { id: string; onAdd: (id: string) => void }) {
-  const f = FOODS.find((x) => x.id === id)!
-  return (
-    <Pressable onPress={() => onAdd(id)} className="w-full flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-3 active:opacity-90">
-      <View className="min-w-0 flex-1">
-        <Text numberOfLines={1} className="font-bold leading-tight text-white">{f.name}</Text>
-        <Text className="text-[12px] text-white/45">{f.serving} · {f.kcal} kcal · {f.p}P {f.c}C {f.f}F</Text>
-      </View>
-      {f.budget && <Wallet size={14} color={brand[400]} />}
-      <View className="h-7 w-7 items-center justify-center rounded-full bg-brand-400"><Plus size={16} strokeWidth={3} color="#000" /></View>
-    </Pressable>
-  )
-}
-
-/* ============================ Log Weight ============================ */
-export function LogWeightSheet({ open, onClose }: Props) {
-  const { state, dispatch } = useStore()
-  const toast = useToast()
-  const units = state.settings.units
-  const current = weightStats(state).current
-  const [val, setVal] = useState(() => fmtWeightNum(current, units, 1))
-
-  function save() {
-    const kg = toKg(parseFloat(val) || current, units)
-    dispatch({ type: 'LOG_WEIGHT', kg: Math.round(kg * 10) / 10 })
-    toast('Weight logged')
-    onClose()
-  }
-
-  const num = weightVal(current, units)
-  return (
-    <Sheet open={open} onClose={onClose} title="Log weight">
-      <Text className="text-[13px] text-white/50">Today · {relativeLabel(todayKey)}</Text>
-      <View className="mt-6 flex-row items-end justify-center gap-2">
-        <TextInput
-          autoFocus
-          keyboardType="decimal-pad"
-          value={val}
-          onChangeText={(v) => setVal(v.replace(/[^\d.]/g, ''))}
-          className="w-40 border-b-2 border-brand-400 bg-transparent pb-2 text-center text-5xl font-extrabold text-white"
-        />
-        <Text className="pb-3 text-xl font-bold text-white/50">{weightUnit(units)}</Text>
-      </View>
-      <View className="mt-4 flex-row justify-center gap-2">
-        {[-0.5, -0.1, 0.1, 0.5].map((d) => (
-          <Pressable key={d} onPress={() => setVal((v) => (Math.round(((parseFloat(v) || num) + d) * 10) / 10).toFixed(1))} className="rounded-full bg-ink-700 px-3 py-1.5 active:opacity-80">
-            <Text className="text-sm font-semibold text-white">{d > 0 ? `+${d}` : d}</Text>
-          </Pressable>
-        ))}
-      </View>
-      <Pressable onPress={save} className="btn-primary mt-8 w-full active:opacity-90">
-        <Text className="font-semibold text-black">Save</Text>
-      </Pressable>
     </Sheet>
   )
 }

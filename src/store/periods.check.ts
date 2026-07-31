@@ -69,7 +69,7 @@ function makeState(over: Partial<AppState> = {}): AppState {
       createdAtKey: todayKey,
     },
     settings: { units: 'metric', theme: 'dark', notificationsEnabled: false },
-    weights: [], habits: [], meals: [], foodReviews: [], chat: [], foods: [], sessions: [],
+    weights: [], habits: [], foodReviews: [], chat: [], sessions: [],
     program: [
       { id: 'a', day: 'Mon', name: 'Push', focus: '', exerciseIds: [] },
       { id: 'b', day: 'Wed', name: 'Pull', focus: '', exerciseIds: [] },

@@ -191,33 +191,6 @@ export interface HabitDay {
   workout: boolean
 }
 
-export interface FoodItem {
-  id: string
-  name: string
-  brand?: string
-  serving: string
-  kcal: number
-  p: number
-  c: number
-  f: number
-  barcode?: string
-  budget?: boolean
-  /** rough cost per serving, in local currency units */
-  cost?: number
-}
-
-export interface LoggedMeal {
-  id: string
-  dateKey: string
-  meal: MealName
-  name: string
-  qty: number
-  kcal: number
-  p: number
-  c: number
-  f: number
-}
-
 /** A free-text "what I ate today" entry plus the coach's computed quality score. */
 export interface FoodReview {
   dateKey: string
@@ -597,7 +570,6 @@ export interface AppState {
   settings: Settings
   weights: WeightEntry[]
   habits: HabitDay[]
-  meals: LoggedMeal[]
   foodReviews: FoodReview[]
   chat: ChatMessage[]
   /** self-logged activities (optional for older saves) */
@@ -608,7 +580,6 @@ export interface AppState {
   postComments?: PostComment[]
   /** quick "how did eating go" tag ids chosen per day, keyed by dateKey */
   nutritionTags?: Record<string, string[]>
-  foods: FoodItem[]
   sessions: WorkoutSession[]
   /** Compact per-completed-session projections backing the all-time Progress
    *  charts (Phase C Option B). Maintained client-side; see workoutSummary.ts. */

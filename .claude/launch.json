@@ -12,6 +12,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["expo", "start", "--web", "--port", "8090"],
       "port": 8090
+    },
+    {
+      "name": "web-debug",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["expo", "start", "--web", "--port", "8096"],
+      "port": 8096
     }
   ]
 }

@@ -9,6 +9,7 @@ import { ActivityIcon } from '../components/ActivityIcon'
 import { Card } from '../components/ui'
 import { MuscleMapCard, MuscleFigures } from '../components/MuscleMapCard'
 import { AppModal, IS_WEB, WEB_SCREEN } from '../components/WebFrame'
+import { BottomSheet as SheetShell } from '../components/BottomSheet'
 import { PressableScale } from '../components/PressableScale'
 import { IndexGauge } from '../components/IndexGauge'
 import { useStore } from '../store/store'
@@ -659,41 +660,22 @@ function DayEditorSheet({ open, onClose, dateKey, dayLabel, goals, tags, workout
   colors: ThemeColors
   dispatch: (action: any) => void // eslint-disable-line @typescript-eslint/no-explicit-any
 }) {
-  const win = useWindowDimensions()
-  const screenH = IS_WEB ? WEB_SCREEN.height : win.height
   const insets = useSafeAreaInsets()
-  const [render, setRender] = useState(open)
-  const [panelH, setPanelH] = useState(560)
-  const progress = useRef(new Animated.Value(0)).current
-
-  useEffect(() => {
-    if (open) {
-      setRender(true)
-      Animated.timing(progress, { toValue: 1, duration: 440, easing: SHEET_EASE, useNativeDriver: Platform.OS !== 'web' }).start()
-    } else if (render) {
-      Animated.timing(progress, { toValue: 0, duration: 320, easing: SHEET_EASE, useNativeDriver: Platform.OS !== 'web' }).start(({ finished }) => { if (finished) setRender(false) })
-    }
-  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const round = (v: number) => Math.round(v * 100) / 100
   const measures = goals.filter((g): g is Extract<Goal, { kind: 'measure' }> => g.kind === 'measure')
 
   return (
-    <AppModal visible={render} transparent animationType="none" onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-        <Animated.View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.55)', opacity: progress }}>
-          <Pressable accessibilityLabel="Close" onPress={onClose} style={{ flex: 1 }} />
-        </Animated.View>
-
-        <Animated.View
-          onLayout={(e) => setPanelH(e.nativeEvent.layout.height)}
-          style={{
-            maxHeight: screenH * 0.86, backgroundColor: colors.ink800,
-            borderTopLeftRadius: 28, borderTopRightRadius: 28,
-            shadowColor: '#000', shadowOpacity: 0.55, shadowRadius: 40, shadowOffset: { width: 0, height: -12 }, elevation: 24,
-            transform: [{ translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [panelH, 0] }) }],
-          }}
-        >
+    <SheetShell
+      open={open}
+      onClose={onClose}
+      maxHeightFrac={0.86}
+      panelStyle={{
+        backgroundColor: colors.ink800,
+        borderTopLeftRadius: 28, borderTopRightRadius: 28,
+        shadowColor: '#000', shadowOpacity: 0.55, shadowRadius: 40, shadowOffset: { width: 0, height: -12 }, elevation: 24,
+      }}
+    >
           <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 6 }}>
             <View style={{ width: 38, height: 4, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'center', marginBottom: 12 }} />
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -770,9 +752,7 @@ function DayEditorSheet({ open, onClose, dateKey, dayLabel, goals, tags, workout
               </View>
             </PressableScale>
           </View>
-        </Animated.View>
-      </View>
-    </AppModal>
+    </SheetShell>
   )
 }
 
@@ -1000,26 +980,12 @@ function DonePill({ colors, onPress }: { colors: ThemeColors; onPress?: () => vo
 }
 
 function UpdateTodaySheet({ open, onClose, goals, doneCount, total, colors }: { open: boolean; onClose: () => void; goals: Goal[]; doneCount: number; total: number; colors: ThemeColors }) {
-  const win = useWindowDimensions()
-  const screenH = IS_WEB ? WEB_SCREEN.height : win.height
   const insets = useSafeAreaInsets()
-  const [render, setRender] = useState(open)
-  const [panelH, setPanelH] = useState(520)
   const [expanded, setExpanded] = useState<string | null>(null)
   // Remembers where a goal was before "Mark done", so undo can put it back.
   const prev = useRef<Record<string, number>>({})
-  const progress = useRef(new Animated.Value(0)).current
-
-  useEffect(() => {
-    if (open) {
-      setRender(true)
-      Animated.timing(progress, { toValue: 1, duration: 440, easing: SHEET_EASE, useNativeDriver: Platform.OS !== 'web' }).start()
-    } else if (render) {
-      Animated.timing(progress, { toValue: 0, duration: 320, easing: SHEET_EASE, useNativeDriver: Platform.OS !== 'web' }).start(({ finished }) => {
-        if (finished) { setRender(false); setExpanded(null) }
-      })
-    }
-  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Collapse any expanded stepper once the sheet is dismissed.
+  useEffect(() => { if (!open) setExpanded(null) }, [open])
 
   const markDone = (g: Goal) => {
     if (g.kind !== 'measure') return
@@ -1036,28 +1002,21 @@ function UpdateTodaySheet({ open, onClose, goals, doneCount, total, colors }: { 
   }
 
   return (
-    <AppModal visible={render} transparent animationType="none" onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-        {/* Dim backdrop — the dashboard stays visible behind the sheet. */}
-        <Animated.View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.55)', opacity: progress }}>
-          <Pressable accessibilityLabel="Close" onPress={onClose} style={{ flex: 1 }} />
-        </Animated.View>
-
-        <Animated.View
-          onLayout={(e) => setPanelH(e.nativeEvent.layout.height)}
-          style={{
-            maxHeight: screenH * 0.84,
-            backgroundColor: colors.ink800,
-            borderTopLeftRadius: 28,
-            borderTopRightRadius: 28,
-            shadowColor: '#000',
-            shadowOpacity: 0.55,
-            shadowRadius: 40,
-            shadowOffset: { width: 0, height: -12 },
-            elevation: 24,
-            transform: [{ translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [panelH, 0] }) }],
-          }}
-        >
+    <SheetShell
+      open={open}
+      onClose={onClose}
+      maxHeightFrac={0.84}
+      panelStyle={{
+        backgroundColor: colors.ink800,
+        borderTopLeftRadius: 28,
+        borderTopRightRadius: 28,
+        shadowColor: '#000',
+        shadowOpacity: 0.55,
+        shadowRadius: 40,
+        shadowOffset: { width: 0, height: -12 },
+        elevation: 24,
+      }}
+    >
           <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 6 }}>
             <View style={{ width: 38, height: 4, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'center', marginBottom: 12 }} />
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -1093,9 +1052,7 @@ function UpdateTodaySheet({ open, onClose, goals, doneCount, total, colors }: { 
               </View>
             </PressableScale>
           </View>
-        </Animated.View>
-      </View>
-    </AppModal>
+    </SheetShell>
   )
 }
 

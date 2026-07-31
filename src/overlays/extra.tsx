@@ -39,6 +39,7 @@ import { relativeLabel, todayKey } from '../lib/date'
 import { CHART_METRICS, MAX_DASHBOARD_STATS, STAT_METRICS, STAT_TIMEFRAMES, dashboardStatIds, dashboardTimeframe, progressMetricId } from '../lib/metrics'
 import { brand, useColors, accentFor, type AccentKey } from '../theme'
 import { AppModal, IS_WEB, WEB_SCREEN } from '../components/WebFrame'
+import { BottomSheet as SheetShell } from '../components/BottomSheet'
 import { thud } from '../lib/haptics'
 import type { ReactNode } from 'react'
 import type { CoachKind, TemplateExercise, ChatMessage } from '../store/types'
@@ -1064,22 +1065,8 @@ export function CustomizeSheet({ open, onClose, params }: Props) {
     }
   }
 
-  // Bottom-sheet slide (the design's `cs_up`), kept mounted through the exit.
-  const [render, setRender] = useState(open)
-  const [panelH, setPanelH] = useState(560)
-  const progress = useRef(new Animated.Value(0)).current
-  useEffect(() => {
-    if (open) {
-      setRender(true)
-      setQuery('')
-      Animated.timing(progress, { toValue: 1, duration: 360, easing: CUST_EASE, useNativeDriver: !IS_WEB }).start()
-    } else if (render) {
-      Animated.timing(progress, { toValue: 0, duration: 260, easing: CUST_EASE, useNativeDriver: !IS_WEB }).start(({ finished }) => {
-        if (finished) setRender(false)
-      })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open])
+  // Reset the exercise search whenever the sheet (re)opens.
+  useEffect(() => { if (open) setQuery('') }, [open])
 
   const tabStyle = (on: boolean) => ({
     flex: 1, alignItems: 'center' as const, paddingVertical: isProgress ? 10 : 9, borderRadius: 10,
@@ -1087,24 +1074,18 @@ export function CustomizeSheet({ open, onClose, params }: Props) {
   })
 
   return (
-    <AppModal visible={render} transparent animationType="none" onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-        <Animated.View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.55)', opacity: progress }}>
-          <Pressable accessibilityLabel="Close" onPress={onClose} style={{ flex: 1 }} />
-        </Animated.View>
-
-        <Animated.View
-          onLayout={(e) => setPanelH(e.nativeEvent.layout.height)}
-          style={{
-            maxHeight: screenH * 0.92,
-            backgroundColor: colors.ink800,
-            borderTopLeftRadius: 28, borderTopRightRadius: 28,
-            paddingHorizontal: isProgress ? 20 : 18, paddingTop: 10, paddingBottom: 22 + insets.bottom,
-            shadowColor: '#000', shadowOpacity: 0.55, shadowRadius: 60, shadowOffset: { width: 0, height: -24 }, elevation: 24,
-            transform: [{ translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [panelH, 0] }) }],
-          }}
-        >
-          <View style={{ width: 38, height: 5, borderRadius: 3, backgroundColor: `${colors.fg}33`, alignSelf: 'center', marginTop: 0, marginBottom: 16 }} />
+    <SheetShell
+      open={open}
+      onClose={onClose}
+      maxHeightFrac={0.92}
+      panelStyle={{
+        backgroundColor: colors.ink800,
+        borderTopLeftRadius: 28, borderTopRightRadius: 28,
+        paddingHorizontal: isProgress ? 20 : 18, paddingTop: 10, paddingBottom: 22 + insets.bottom,
+        shadowColor: '#000', shadowOpacity: 0.55, shadowRadius: 60, shadowOffset: { width: 0, height: -24 }, elevation: 24,
+      }}
+    >
+      <View style={{ width: 38, height: 5, borderRadius: 3, backgroundColor: `${colors.fg}33`, alignSelf: 'center', marginTop: 0, marginBottom: 16 }} />
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <Text style={{ fontSize: isProgress ? 22 : 19, fontWeight: '800', letterSpacing: -0.22, color: colors.fg }}>Customise</Text>
             <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Done">
@@ -1238,9 +1219,7 @@ export function CustomizeSheet({ open, onClose, params }: Props) {
               </>
             )}
           </ScrollView>
-        </Animated.View>
-      </View>
-    </AppModal>
+    </SheetShell>
   )
 }
 

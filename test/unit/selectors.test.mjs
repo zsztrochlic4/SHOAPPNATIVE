@@ -9,7 +9,6 @@ import assert from 'node:assert/strict'
 import { dayKey } from '../../.sweep-out/lib/date.js'
 import {
   weightStats,
-  nutritionForDay,
   streakStats,
   weeklyIndex,
   habitConsistency7d,
@@ -30,7 +29,6 @@ const base = {
   profile: PROFILE,
   habits: [],
   weights: [],
-  meals: [],
   sessions: [],
   activities: [],
   foodReviews: [],
@@ -72,30 +70,6 @@ test('weightStats: with no entries falls back to the profile start weight', () =
   const w = weightStats(st())
   assert.equal(w.current, 80)
   assert.equal(w.delta, 0)
-})
-
-/* ----------------------------- nutritionForDay ----------------------------- */
-
-test('nutritionForDay: sums macros scaled by qty and clamps remaining', () => {
-  const key = '2026-05-05'
-  const s = st({ meals: [
-    { dateKey: key, meal: 'Breakfast', name: 'Oats', qty: 2, kcal: 300, p: 10, c: 50, f: 5 },
-    { dateKey: key, meal: 'Lunch', name: 'Chicken', qty: 1, kcal: 600, p: 50, c: 40, f: 20 },
-    { dateKey: '2026-05-04', meal: 'Dinner', name: 'Other day', qty: 1, kcal: 999, p: 1, c: 1, f: 1 },
-  ] })
-  const n = nutritionForDay(s, key)
-  assert.equal(n.kcal, 1200) // 300*2 + 600
-  assert.equal(n.p, 70) //      10*2 + 50
-  assert.equal(n.c, 140) //     50*2 + 40
-  assert.equal(n.f, 30) //      5*2 + 20
-  assert.equal(n.remaining, 800) // 2000 - 1200
-  assert.equal(n.meals.length, 2) // other day excluded
-})
-
-test('nutritionForDay: over target clamps remaining at 0, never negative', () => {
-  const key = '2026-05-06'
-  const s = st({ meals: [{ dateKey: key, meal: 'Lunch', name: 'Feast', qty: 1, kcal: 2500, p: 0, c: 0, f: 0 }] })
-  assert.equal(nutritionForDay(s, key).remaining, 0)
 })
 
 /* ------------------------------- streakStats ------------------------------- */

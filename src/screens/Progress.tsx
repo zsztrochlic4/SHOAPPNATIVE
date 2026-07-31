@@ -11,6 +11,7 @@ import {
 import { Icon } from '../components/Icon'
 import { SectionHeader } from '../components/ui'
 import { AppModal, IS_WEB, WEB_SCREEN } from '../components/WebFrame'
+import { BottomSheet as SheetShell } from '../components/BottomSheet'
 import { useStore } from '../store/store'
 import { ensureFullHistory } from '../store/historySync'
 import { useNav } from '../nav'
@@ -347,51 +348,29 @@ function CompositionBar({ segments, colors }: { segments: ProgressFeatured['segm
 }
 
 /* ================================================================== */
-/*  Reusable bottom sheet shell                                        */
+/*  Reusable bottom sheet shell — surface only; motion + scrim come      */
+/*  from the shared BottomSheet so it matches every other sheet.         */
 /* ================================================================== */
 function BottomSheet({
   open, onClose, colors, children, maxHeightFrac = 0.92,
 }: {
   open: boolean; onClose: () => void; colors: Palette; children: React.ReactNode; maxHeightFrac?: number
 }) {
-  const win = useWindowDimensions()
-  const screenH = IS_WEB ? WEB_SCREEN.height : win.height
   const insets = useSafeAreaInsets()
-  const [render, setRender] = useState(open)
-  const [panelH, setPanelH] = useState(560)
-  const progress = useRef(new Animated.Value(0)).current
-  const EASE = Easing.bezier(0.22, 1, 0.36, 1)
-
-  useEffect(() => {
-    if (open) {
-      setRender(true)
-      Animated.timing(progress, { toValue: 1, duration: 380, easing: EASE, useNativeDriver: !IS_WEB }).start()
-    } else if (render) {
-      Animated.timing(progress, { toValue: 0, duration: 260, easing: EASE, useNativeDriver: !IS_WEB }).start(({ finished }) => { if (finished) setRender(false) })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open])
-
   return (
-    <AppModal visible={render} transparent animationType="none" onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-        <Animated.View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.55)', opacity: progress }}>
-          <Pressable accessibilityLabel="Close" onPress={onClose} style={{ flex: 1 }} />
-        </Animated.View>
-        <Animated.View
-          onLayout={(e) => setPanelH(e.nativeEvent.layout.height)}
-          style={{
-            maxHeight: screenH * maxHeightFrac, backgroundColor: colors.ink800,
-            borderTopLeftRadius: 28, borderTopRightRadius: 28,
-            paddingBottom: insets.bottom,
-            shadowColor: '#000', shadowOpacity: 0.55, shadowRadius: 60, shadowOffset: { width: 0, height: -24 }, elevation: 24,
-            transform: [{ translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [panelH, 0] }) }],
-          }}
-        >
-          {children}
-        </Animated.View>
-      </View>
-    </AppModal>
+    <SheetShell
+      open={open}
+      onClose={onClose}
+      maxHeightFrac={maxHeightFrac}
+      panelStyle={{
+        backgroundColor: colors.ink800,
+        borderTopLeftRadius: 28, borderTopRightRadius: 28,
+        paddingBottom: insets.bottom,
+        shadowColor: '#000', shadowOpacity: 0.55, shadowRadius: 60, shadowOffset: { width: 0, height: -24 }, elevation: 24,
+      }}
+    >
+      {children}
+    </SheetShell>
   )
 }
 

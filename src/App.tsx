@@ -19,6 +19,7 @@ import { ToastProvider } from './components/Toast'
 import { NavProvider, type Overlay } from './nav'
 import { themeVars, useThemeName, brand, cssVars } from './theme'
 import { setSoundEnabled } from './lib/sound'
+import { TAB_CLEARANCE } from './lib/layout'
 import { initBudgetMeals } from './data/recipes'
 import { initExerciseInfo } from './data/exerciseInfo'
 import { initQuickWorkouts } from './data/quickWorkouts'
@@ -35,7 +36,6 @@ import {
   NotificationsSheet,
   SettingsSheet,
   MenuDrawer,
-  LogWeightSheet,
   LogHabitSheet,
   CreatePostSheet,
   LeaderboardSheet,
@@ -190,7 +190,7 @@ function Shell() {
     <ScrollView
       key={tab}
       className="flex-1"
-      contentContainerStyle={{ paddingBottom: insets.bottom + 112 }}
+      contentContainerStyle={{ paddingBottom: insets.bottom + TAB_CLEARANCE }}
       showsVerticalScrollIndicator={false}
     >
       <Screen />
@@ -219,7 +219,6 @@ function Shell() {
       <NotificationsSheet open={overlay === 'notifications'} onClose={nav.close} />
       <SettingsSheet open={overlay === 'settings'} onClose={nav.close} />
       <MenuDrawer open={menuOpen} onClose={nav.closeMenu} />
-      <LogWeightSheet open={overlay === 'logWeight'} onClose={nav.close} />
       <LogHabitSheet open={overlay === 'logHabit'} onClose={nav.close} params={params} />
       <CreatePostSheet open={overlay === 'createPost'} onClose={nav.close} />
       <LeaderboardSheet open={overlay === 'leaderboard'} onClose={nav.close} />

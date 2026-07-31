@@ -13,7 +13,6 @@ import type {
   IntegrationState,
   LoggedActivity,
   LoggedExercise,
-  LoggedMeal,
   PlannedMeal,
   PlannedPeriod,
   Post,
@@ -34,7 +33,7 @@ import { summarizeSession, buildAllSummaries } from './workoutSummary'
 
 /** The append-heavy slices that load lazily under the bounded-read model. */
 export type WindowedHistory = Partial<
-  Pick<AppState, 'sessions' | 'meals' | 'activities' | 'chat' | 'coachThread' | 'notifications'>
+  Pick<AppState, 'sessions' | 'activities' | 'chat' | 'coachThread' | 'notifications'>
 >
 
 const STORAGE_KEY = 'sho.state.v1'
@@ -53,8 +52,6 @@ export type Action =
   | { type: 'PATCH_TODAY_HABIT'; patch: Partial<{ steps: number; sleepH: number; mindsetMin: number; waterL: number }> }
   | { type: 'PATCH_HABIT'; dateKey: string; patch: Partial<{ steps: number; sleepH: number; mindsetMin: number; waterL: number }> }
   | { type: 'SET_WORKOUT_DONE'; dateKey: string; done: boolean }
-  | { type: 'ADD_MEAL'; meal: Omit<LoggedMeal, 'id' | 'dateKey'> }
-  | { type: 'REMOVE_MEAL'; id: string }
   | { type: 'ADD_ACTIVITY'; activity: Omit<LoggedActivity, 'id' | 'dateKey' | 'time'> }
   | { type: 'REMOVE_ACTIVITY'; id: string }
   | { type: 'TOGGLE_ACTIVITY_WEEKLY'; id: string }
@@ -168,7 +165,6 @@ function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         sessions: merge(state.sessions, h.sessions),
-        meals: merge(state.meals, h.meals),
         activities: merge(state.activities, h.activities),
         chat: merge(state.chat, h.chat),
         coachThread: merge(state.coachThread, h.coachThread),
@@ -258,14 +254,6 @@ function reducer(state: AppState, action: Action): AppState {
       const sessions = state.sessions.map((s) => (s.dateKey === action.dateKey ? { ...s, completed: action.done } : s))
       return { ...state, workoutStartedKeys: [...keys], habits, sessions }
     }
-
-    case 'ADD_MEAL': {
-      const meal: LoggedMeal = { ...action.meal, id: `m-${Date.now()}`, dateKey: todayKey }
-      return { ...state, meals: [...state.meals, meal] }
-    }
-
-    case 'REMOVE_MEAL':
-      return { ...state, meals: state.meals.filter((m) => m.id !== action.id) }
 
     case 'ADD_ACTIVITY': {
       const activity: LoggedActivity = { ...action.activity, id: `act-${Date.now()}`, dateKey: todayKey, time: nowTime() }

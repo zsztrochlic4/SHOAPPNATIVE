@@ -6,7 +6,6 @@ export type Overlay =
   | 'activeWorkout'
   | 'createSession'
   | 'customize'
-  | 'logWeight'
   | 'logHabit'
   | 'logActivity'
   | 'createPost'

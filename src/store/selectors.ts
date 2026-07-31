@@ -124,15 +124,6 @@ function isNextDay(a: string, b: string) {
 }
 
 /* -------------------------- Nutrition -------------------------- */
-export function nutritionForDay(s: AppState, key: string = todayKey) {
-  const dayMeals = s.meals.filter((m) => m.dateKey === key)
-  const kcal = dayMeals.reduce((a, m) => a + m.kcal * m.qty, 0)
-  const p = dayMeals.reduce((a, m) => a + m.p * m.qty, 0)
-  const c = dayMeals.reduce((a, m) => a + m.c * m.qty, 0)
-  const f = dayMeals.reduce((a, m) => a + m.f * m.qty, 0)
-  return { kcal, p, c, f, meals: dayMeals, remaining: Math.max(0, s.profile.calorieTarget - kcal) }
-}
-
 export function foodReviewForDay(s: AppState, key: string = todayKey) {
   return s.foodReviews.find((r) => r.dateKey === key) ?? null
 }
