@@ -12,5 +12,5 @@
     "types": ["node"],
     "rootDir": "src"
   },
-  "include": ["src/backend/**/*.ts", "src/store/types.ts", "src/store/historyMerge.ts", "src/store/workoutSummary.ts", "src/store/selectors.ts", "src/screens/quickCircuit.ts", "src/data/quickWorkoutsOverlay.ts", "src/lib/dataExport.ts", "src/lib/reportError.ts", "src/lib/i18n.ts", "src/lib/sanitize.ts", "src/lib/quietHours.ts", "src/lib/date.ts", "src/lib/nutritionCoach.ts", "src/lib/mealScanParse.ts", "src/data/nutrition.ts", "src/backend/coach/responseSchema.ts"]
+  "include": ["src/backend/**/*.ts", "src/store/types.ts", "src/store/historyMerge.ts", "src/store/workoutSummary.ts", "src/store/saveRetry.ts", "src/store/selectors.ts", "src/screens/quickCircuit.ts", "src/data/quickWorkoutsOverlay.ts", "src/lib/dataExport.ts", "src/lib/reportError.ts", "src/lib/i18n.ts", "src/lib/sanitize.ts", "src/lib/quietHours.ts", "src/lib/date.ts", "src/lib/nutritionCoach.ts", "src/lib/mealScanParse.ts", "src/data/nutrition.ts", "src/backend/coach/responseSchema.ts"]
 }

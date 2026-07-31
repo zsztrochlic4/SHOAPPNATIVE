@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
+import { AppState as RNAppState } from 'react-native'
 import { useAuth } from '../auth/AuthProvider'
 import { useStore, type WindowedHistory } from './store'
 import { resetSharedCoachSession } from '../lib/coachSafety'
 import { loadUserState, loadRemainingHistory, saveUserState } from './cloudRepo'
+import { saveBackoffMs, MAX_SAVE_RETRIES } from './saveRetry'
 import { mergeById, type HistoryEntry } from './historyMerge'
 import { registerEnsureFullHistory } from './historySync'
 import { SCHEMA_VERSION } from './seed'
@@ -146,18 +148,77 @@ export function CloudSync() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // ── Durable save (debounced, retried, flushed on background) ───────────────
+  const savingRef = useRef(false)
+  const savePendingRef = useRef(false)
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const retryAttemptRef = useRef(0)
+  const clearRetry = () => {
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current)
+      retryTimerRef.current = null
+    }
+  }
+  // Reassigned each render so timers/listeners always run the latest closure via
+  // the stable ref. Reads live refs, so it never captures stale user/state.
+  const saveNowRef = useRef<() => void>(() => {})
+  saveNowRef.current = () => {
+    const u = userRef.current
+    // Don't write mid-merge: state and baseline are briefly being reconciled.
+    if (!u || !syncedRef.current || hydratingHistoryRef.current) return
+    if (savingRef.current) {
+      savePendingRef.current = true // a change landed during a save — save again after
+      return
+    }
+    const snapshot = stateRef.current
+    savingRef.current = true
+    saveUserState(u.uid, snapshot, savedRef.current)
+      .then(() => {
+        savedRef.current = snapshot
+        retryAttemptRef.current = 0
+        clearRetry()
+      })
+      .catch(() => {
+        // The last edit may be the final one — without a retry a transient failure
+        // would silently lose it. Retry with capped backoff (reset by the next edit).
+        if (!retryTimerRef.current && retryAttemptRef.current < MAX_SAVE_RETRIES) {
+          const delay = saveBackoffMs(retryAttemptRef.current)
+          retryAttemptRef.current += 1
+          retryTimerRef.current = setTimeout(() => {
+            retryTimerRef.current = null
+            saveNowRef.current()
+          }, delay)
+        }
+      })
+      .finally(() => {
+        savingRef.current = false
+        if (savePendingRef.current) {
+          savePendingRef.current = false
+          saveNowRef.current() // flush the change that arrived during the save
+        }
+      })
+  }
+
+  // Debounced save on every change.
   useEffect(() => {
     if (!user || !synced) return
-    const id = setTimeout(() => {
-      // Don't write mid-merge: state and baseline are briefly being reconciled.
-      if (hydratingHistoryRef.current) return
-      const snapshot = state
-      saveUserState(user.uid, snapshot, savedRef.current)
-        .then(() => { savedRef.current = snapshot })
-        .catch(() => { /* transient write error, retried on next change */ })
-    }, 800)
+    retryAttemptRef.current = 0 // a fresh edit restarts the backoff budget
+    const id = setTimeout(() => saveNowRef.current(), 800)
     return () => clearTimeout(id)
   }, [state, synced, user])
+
+  // Flush immediately when the app backgrounds (OS suspend / tab hidden) so a
+  // pending debounced or previously-failed save isn't lost. Works on web too
+  // (RN-Web maps visibilitychange → 'background').
+  useEffect(() => {
+    const sub = RNAppState.addEventListener('change', (s) => {
+      if (s === 'background' || s === 'inactive') saveNowRef.current()
+    })
+    return () => {
+      sub.remove()
+      clearRetry()
+    }
+  }, [])
 
   return null
 }
