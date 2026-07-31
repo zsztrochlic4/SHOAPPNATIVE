@@ -29,7 +29,7 @@ import { ACTIVE_EXERCISES, type Exercise } from '../backend/data'
 import { nextSetRecommendation } from '../store/training'
 import { coachThreadView } from '../store/coach'
 import { coachReply } from '../lib/coachChat'
-import { askCoach } from '../lib/coachApi'
+import { askCoachServer } from '../lib/coachServer'
 import { coachContext, coachOperational, COACH_PREVIEW, coachPrecheckAsync, guardOutgoing, newSafetySession } from '../lib/coachSafety'
 import { SafetyContactButtons } from '../components/SafetyContactButtons'
 import { CoachSafetyStrip } from '../components/CoachSafetyStrip'
@@ -619,11 +619,22 @@ export function CoachChatSheet({ open, onClose }: Props) {
     dispatch({ type: 'BUMP_COACH_USAGE' })
     setTyping(true)
     try {
-      // Real coach (via Firebase AI Logic), then the post-response validator.
-      const reply = await askCoach(state, msg)
-      dispatch({ type: 'PUSH_CHAT', role: 'coach', text: guardOutgoing(reply, pre.decision, ctx, safety.current) })
+      // TRUSTED BACKEND coach: the server re-runs the precheck (authoritative), the
+      // model call, and the validator, so a modified client can't bypass safety
+      // (§4.4). It may BLOCK even though the client's fast precheck allowed the turn.
+      const res = await askCoachServer({
+        message: msg,
+        recent,
+        isAustralia: ctx.isAustralia,
+        affectedRegions: ctx.affectedRegions,
+        engineExcludedExerciseIds: ctx.engineExcludedExerciseIds,
+        screeningOutcome: ctx.screeningOutcome,
+        usage: state.coachUsage,
+      })
+      // Server already ran guardOutgoing; blocked replies carry crisis buttons.
+      dispatch({ type: 'PUSH_CHAT', role: 'coach', text: res.text, ...(res.blocked ? { buttons: res.buttons } : {}) })
     } catch {
-      // Fallback to the on-device rules engine — SAME guardrails, same validator.
+      // Backend unavailable / gated off → on-device rules engine, SAME guardrails + validator.
       dispatch({ type: 'PUSH_CHAT', role: 'coach', text: guardOutgoing(coachReply(state, msg), pre.decision, ctx, safety.current) })
     } finally {
       setTyping(false)

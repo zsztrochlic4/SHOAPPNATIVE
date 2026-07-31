@@ -7,10 +7,11 @@
   },
   "main": "lib/index.js",
   "scripts": {
-    "build": "tsc",
+    "sync-shared": "node scripts/sync-shared.mjs",
+    "build": "npm run sync-shared && tsc",
     "build:watch": "tsc --watch",
-    "typecheck": "tsc --noEmit",
-    "test": "npm run build && node --test test/*.test.mjs",
+    "typecheck": "npm run sync-shared && tsc --noEmit",
+    "test": "npm run build && node --test test/*.test.mjs && node lib/_shared/backend/coach/safety/runCoachSafetyTests.js",
     "serve": "npm run build && firebase emulators:start --only functions",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log"
