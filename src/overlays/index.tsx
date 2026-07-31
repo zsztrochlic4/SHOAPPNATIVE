@@ -22,7 +22,9 @@ import { useStore } from '../store/store'
 import { useAuth } from '../auth/AuthProvider'
 import { useToast } from '../components/Toast'
 import { useNav } from '../nav'
-import { FOODS, QUICK_WORKOUTS } from '../data/catalog'
+import { FOODS } from '../data/catalog'
+import { useQuickWorkouts } from '../data/quickWorkouts'
+import type { QuickWorkout } from '../store/types'
 import { buildCustomSession, imageForMuscle } from '../store/programSession'
 import { pick, makeRng } from '../lib/rng'
 import { requestPushPermission, resolveNotifPrefs } from '../lib/notifications'
@@ -924,6 +926,8 @@ export function LeaderboardSheet({ open, onClose }: Props) {
 export function QuickWorkoutsSheet({ open, onClose }: Props) {
   const { dispatch } = useStore()
   const nav = useNav()
+  // Seed shows instantly; a Firestore `workouts` overlay (if present) refreshes it.
+  const quickWorkouts = useQuickWorkouts()
 
   // Turn a quick workout into a loggable session and open the same guided
   // follow-along (timer, rest, form) used for prescribed and custom workouts.
@@ -932,7 +936,7 @@ export function QuickWorkoutsSheet({ open, onClose }: Props) {
   // exercise ids (QD09, CH04…), so the technique sheet shows the proper card.
   // NOTE: this is the interim mapping — the full time-based auto-countdown player
   // (per-station work/rest countdown) is a scoped follow-up.
-  function startQuick(q: (typeof QUICK_WORKOUTS)[number]) {
+  function startQuick(q: QuickWorkout) {
     thud() // committing to a session — a firmer confirm than the button's press tick
     const rounds = q.rounds.length
     const stations = q.rounds[0]?.stations ?? []
@@ -972,7 +976,7 @@ export function QuickWorkoutsSheet({ open, onClose }: Props) {
       <Text className="text-[25px] font-extrabold tracking-[-0.03em] leading-[1.15] text-white">12-Minute Bodyweight Exercises</Text>
       <Text className="mt-2.5 text-[13.5px] leading-5 text-white/55">Quick, no-equipment workouts when you're short on time. Ordered easiest first.</Text>
       <View className="mt-4 gap-2.5">
-        {QUICK_WORKOUTS.map((q) => {
+        {quickWorkouts.map((q) => {
           const stations = q.rounds[0]?.stations ?? []
           const lvl = levelStyle(q.level)
           return (
