@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react'
-
-const prefersReducedMotion = () =>
-  typeof window !== 'undefined' && (window as any).matchMedia?.('(prefers-reduced-motion: reduce)').matches
+import { prefersReducedMotion } from './a11y'
 
 /**
  * Animate a number from 0 up to `target` on mount (and whenever `target`
