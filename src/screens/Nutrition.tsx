@@ -176,6 +176,7 @@ function TickPop({ children }: { children: ReactNode }) {
  * ignores the opening tap so the sheet can't immediately re-close. */
 function Dropdown({ value, placeholder, options, onSelect }: { value: string; placeholder?: string; options: { value: string; label: string }[]; onSelect: (v: string) => void }) {
   const [open, setOpen] = useState(false)
+  const c = useColors()
   const guard = useRef(0)
   const current = options.find((o) => o.value === value)
   const openMenu = () => { guard.current = Date.now(); setOpen(true) }
@@ -184,7 +185,7 @@ function Dropdown({ value, placeholder, options, onSelect }: { value: string; pl
     <View>
       <Pressable onPress={openMenu} className="flex-row items-center justify-between rounded-[13px] bg-ink-700 px-3.5 py-3 active:opacity-80">
         <Text numberOfLines={1} className={`flex-1 text-[14px] font-semibold ${current ? 'text-white' : 'text-white/45'}`}>{current?.label ?? placeholder}</Text>
-        <ChevronDown size={18} color="rgba(255,255,255,0.5)" style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
+        <ChevronDown size={18} color={alpha(c.fg, 0.5)} style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
       </Pressable>
       <AppModal visible={open} transparent animationType="none" onRequestClose={() => setOpen(false)}>
         <Pressable onPress={dismiss} className="flex-1 justify-end" style={{ backgroundColor: 'rgba(0,0,0,0.55)' }}>
@@ -199,10 +200,10 @@ function Dropdown({ value, placeholder, options, onSelect }: { value: string; pl
                     key={o.value}
                     onPress={() => { onSelect(o.value); setOpen(false) }}
                     className="flex-row items-center justify-between rounded-xl px-3.5 py-3 active:opacity-80"
-                    style={{ backgroundColor: on ? alpha('#7ED957', 0.12) : 'transparent', marginTop: i === 0 ? 0 : 2 }}
+                    style={{ backgroundColor: on ? alpha(c.brand400, 0.12) : 'transparent', marginTop: i === 0 ? 0 : 2 }}
                   >
-                    <Text className="text-[15px] font-semibold" style={{ color: on ? '#7ED957' : '#fff' }}>{o.label}</Text>
-                    {on && <Check size={17} color="#7ED957" strokeWidth={3} />}
+                    <Text className="text-[15px] font-semibold" style={{ color: on ? c.brand400 : c.fg }}>{o.label}</Text>
+                    {on && <Check size={17} color={c.brand400} strokeWidth={3} />}
                   </Pressable>
                 )
               })}
@@ -252,6 +253,22 @@ export default function Nutrition() {
 
 function toneColor(tone: TagTone, c: ReturnType<typeof useColors>): string {
   return tone === 'good' ? c.brand400 : tone === 'neutral' ? c.accentBlue : c.accentOrange
+}
+
+/**
+ * Resolve a dark-theme accent literal (the ones baked into the static guide /
+ * scan data constants) against the live palette so it flips with the theme.
+ * Unknown colours pass through unchanged.
+ */
+function tint(hex: string, c: ReturnType<typeof useColors>): string {
+  switch (hex.toLowerCase()) {
+    case '#7ed957': return c.brand400
+    case '#3b82f6': return c.accentBlue
+    case '#f5a524': return c.accentOrange
+    case '#8b5cf6': return c.accentPurple
+    case '#f87171': return c.danger
+    default: return hex
+  }
 }
 
 /* ============================ Overview ============================ */
@@ -367,7 +384,7 @@ function OverviewTab() {
       {/* Scanner */}
       <View className="overflow-hidden rounded-[20px] border border-white/[0.06] bg-ink-800 p-3.5">
         <View className="flex-row items-center gap-2.5">
-          <View className="h-9 w-9 items-center justify-center rounded-xl" style={{ backgroundColor: alpha('#7ED957', 0.12) }}>
+          <View className="h-9 w-9 items-center justify-center rounded-xl" style={{ backgroundColor: alpha(c.brand400, 0.12) }}>
             <Camera size={18} color={c.brand400} />
           </View>
           <View className="min-w-0 flex-1">
@@ -384,7 +401,7 @@ function OverviewTab() {
             </Pressable>
             <View className="mt-3 flex-row items-center justify-center gap-4">
               <Pressable onPress={() => pick('library')} className="flex-row items-center gap-1.5 active:opacity-70">
-                <Upload size={14} color="rgba(255,255,255,0.6)" />
+                <Upload size={14} color={alpha(c.fg, 0.6)} />
                 <Text className="text-[14px] font-semibold text-white/70">Upload from library</Text>
               </Pressable>
               <View className="h-[3px] w-[3px] rounded-full bg-white/25" />
@@ -397,7 +414,7 @@ function OverviewTab() {
 
         {scan === 'result' && notFood && (
           <View className="mt-3 items-center gap-2 rounded-[15px] border border-white/[0.06] bg-white/[0.03] px-4 py-6">
-            <View className="h-11 w-11 items-center justify-center rounded-full" style={{ backgroundColor: alpha('#f87171', 0.14) }}><X size={22} color="#f87171" strokeWidth={2.6} /></View>
+            <View className="h-11 w-11 items-center justify-center rounded-full" style={{ backgroundColor: alpha(c.danger, 0.14) }}><X size={22} color={c.danger} strokeWidth={2.6} /></View>
             <Text className="text-[14px] font-extrabold text-white">That doesn’t look like food</Text>
             <Text className="max-w-[240px] text-center text-[12px] leading-[1.5] text-white/50">Point the camera at a meal or drink and try again.</Text>
             <Pressable onPress={retake} className="mt-1 rounded-xl bg-white/[0.06] px-5 py-2.5 active:opacity-80"><Text className="text-[13px] font-bold text-white">Try again</Text></Pressable>
@@ -418,8 +435,8 @@ function OverviewTab() {
               <Image source={{ uri: scanImg }} resizeMode="cover" className="h-[50px] w-[50px] rounded-xl bg-ink-700" />
               <View className="min-w-0 flex-1">
                 <View className="flex-row items-center gap-1.5">
-                  <View className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: conf.color }} />
-                  <Text className="text-[10.5px] font-extrabold" style={{ color: conf.color }}>{result.sample ? 'Demo sample' : conf.label}</Text>
+                  <View className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: tint(conf.color, c) }} />
+                  <Text className="text-[10.5px] font-extrabold" style={{ color: tint(conf.color, c) }}>{result.sample ? 'Demo sample' : conf.label}</Text>
                 </View>
                 <View className="mt-0.5 flex-row items-center gap-2">
                   <TextInput
@@ -427,7 +444,7 @@ function OverviewTab() {
                     onChangeText={setNameEdit}
                     className="min-w-0 flex-1 p-0 text-[14.5px] font-extrabold text-white"
                   />
-                  <Pencil size={14} color="rgba(255,255,255,0.35)" />
+                  <Pencil size={14} color={alpha(c.fg, 0.35)} />
                 </View>
               </View>
             </View>
@@ -460,14 +477,14 @@ function OverviewTab() {
 
             <View className="mt-3 rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2.5">
               <View className="flex-row items-center gap-2">
-                <View className="h-2 w-2 rounded-full" style={{ backgroundColor: rec.color }} />
-                <Text className="text-[12px] font-extrabold" style={{ color: rec.color }}>{rec.label}</Text>
+                <View className="h-2 w-2 rounded-full" style={{ backgroundColor: tint(rec.color, c) }} />
+                <Text className="text-[12px] font-extrabold" style={{ color: tint(rec.color, c) }}>{rec.label}</Text>
               </View>
               <Text className="mt-1.5 text-[12px] leading-[1.5] text-white/65">{result.note}</Text>
             </View>
 
             {logPick ? (
-              <View className="mt-3 rounded-[13px] border p-3" style={{ borderColor: alpha('#7ED957', 0.28), backgroundColor: alpha('#7ED957', 0.06) }}>
+              <View className="mt-3 rounded-[13px] border p-3" style={{ borderColor: alpha(c.brand400, 0.28), backgroundColor: alpha(c.brand400, 0.06) }}>
                 <Text className="mb-2 text-[11px] font-extrabold uppercase tracking-wide text-white/60">Log to {todayShort()}. Which meal?</Text>
                 <View className="flex-row gap-1.5">
                   {SLOTS.map((sl) => (
@@ -482,7 +499,7 @@ function OverviewTab() {
                   <Pressable onPress={() => setLogPick(true)} className="flex-[2] items-center rounded-xl bg-brand-400 py-2.5 active:opacity-90"><Text className="text-[13.5px] font-extrabold text-black">Add to today's log</Text></Pressable>
                   <Pressable onPress={retake} className="flex-1 items-center rounded-xl bg-white/[0.06] py-2.5 active:opacity-80"><Text className="text-[13.5px] font-bold text-white">Retake</Text></Pressable>
                 </View>
-                <Pressable onPress={saveToMeals} className="mt-2 flex-row items-center justify-center gap-1.5 rounded-xl border py-2.5 active:opacity-80" style={{ borderColor: alpha('#7ED957', 0.28), backgroundColor: alpha('#7ED957', 0.1) }}>
+                <Pressable onPress={saveToMeals} className="mt-2 flex-row items-center justify-center gap-1.5 rounded-xl border py-2.5 active:opacity-80" style={{ borderColor: alpha(c.brand400, 0.28), backgroundColor: alpha(c.brand400, 0.1) }}>
                   <Plus size={15} color={c.brand400} strokeWidth={2.4} />
                   <Text className="text-[13px] font-bold text-brand-400">Save to My Meals</Text>
                 </Pressable>
@@ -493,7 +510,7 @@ function OverviewTab() {
 
         {scan === 'logged' && (
           <View className="items-center gap-2.5 px-3 pb-3.5 pt-5">
-            <View className="h-14 w-14 items-center justify-center rounded-full" style={{ backgroundColor: alpha('#7ED957', 0.16) }}><Check size={30} color={c.brand400} strokeWidth={3} /></View>
+            <View className="h-14 w-14 items-center justify-center rounded-full" style={{ backgroundColor: alpha(c.brand400, 0.16) }}><Check size={30} color={c.brand400} strokeWidth={3} /></View>
             <Text className="text-[14.5px] font-extrabold text-white">{loggedMsg.title}</Text>
             <Text className="text-[12px] text-white/50">{loggedMsg.sub}</Text>
           </View>
@@ -504,28 +521,28 @@ function OverviewTab() {
       <View className="mt-4 rounded-[22px] border border-white/5 bg-ink-800 px-[18px] py-5">
         <View className="items-center">
           <Text className="text-[18px] font-extrabold tracking-tight text-white">How did your eating today go?</Text>
-          <Text className="mt-1 text-[13px] font-semibold" style={{ color: alpha('#7ED957', 0.9) }}>{tagCountLabel}</Text>
+          <Text className="mt-1 text-[13px] font-semibold" style={{ color: alpha(c.brand400, 0.9) }}>{tagCountLabel}</Text>
         </View>
         <View className="mt-4 flex-row flex-wrap" style={{ gap: 9 }}>
           {NUTRITION_TAGS.map((t) => {
             const on = selected.includes(t.id)
-            const tint = toneColor(t.tone, c)
+            const accent = toneColor(t.tone, c)
             return (
               <Pressable
                 key={t.id}
                 onPress={() => dispatch({ type: 'TOGGLE_NUTRITION_TAG', tag: t.id })}
-                style={{ width: '48%', paddingVertical: 13, paddingHorizontal: 12, gap: 9, backgroundColor: on ? alpha(tint, 0.16) : 'rgba(255,255,255,0.05)', boxShadow: on ? `inset 0 0 0 1.5px ${alpha(tint, 0.55)}` : undefined }}
+                style={{ width: '48%', paddingVertical: 13, paddingHorizontal: 12, gap: 9, backgroundColor: on ? alpha(accent, 0.16) : alpha(c.fg, 0.05), boxShadow: on ? `inset 0 0 0 1.5px ${alpha(accent, 0.55)}` : undefined }}
                 className="flex-row items-center rounded-[14px] active:opacity-80"
               >
                 <Text className="text-[19px] leading-none">{t.emoji}</Text>
-                <Text className="min-w-0 flex-1 text-[13px] font-semibold leading-[1.15]" style={{ color: on ? tint : 'rgba(255,255,255,0.75)' }}>{t.label}</Text>
+                <Text className="min-w-0 flex-1 text-[13px] font-semibold leading-[1.15]" style={{ color: on ? accent : alpha(c.fg, 0.75) }}>{t.label}</Text>
                 {on && <TickPop><View className="h-[17px] w-[17px] items-center justify-center rounded-full bg-brand-400"><Check size={10} color="#0a0a0b" strokeWidth={3.6} /></View></TickPop>}
               </Pressable>
             )
           })}
         </View>
         <View className="mt-3.5 flex-row items-center justify-center gap-1.5">
-          <LayoutGrid size={13} color="rgba(255,255,255,0.38)" />
+          <LayoutGrid size={13} color={alpha(c.fg, 0.38)} />
           <Text className="text-[11.5px] text-white/40">These show on the Dashboard.</Text>
         </View>
       </View>
@@ -535,6 +552,7 @@ function OverviewTab() {
 
 function ScanAnalyzing({ img }: { img: string }) {
   const scan = useRef(new Animated.Value(0)).current
+  const c = useColors()
   useEffect(() => {
     const loop = Animated.loop(Animated.sequence([
       Animated.timing(scan, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
@@ -549,10 +567,10 @@ function ScanAnalyzing({ img }: { img: string }) {
       {!!img && <Image source={{ uri: img }} resizeMode="cover" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />}
       <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(10,10,11,0.45)' }} />
       <Animated.View style={{ position: 'absolute', left: '6%', right: '6%', height: 2, transform: [{ translateY }] }}>
-        <LinearGradient colors={['transparent', '#7ED957', 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ flex: 1, borderRadius: 2 }} />
+        <LinearGradient colors={['transparent', c.brand400, 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ flex: 1, borderRadius: 2 }} />
       </Animated.View>
       <View className="absolute inset-0 items-center justify-center gap-2.5">
-        <ActivityIndicator color="#7ED957" />
+        <ActivityIndicator color={c.brand400} />
         <Text className="text-[12.5px] font-bold text-white">Analyzing your plate…</Text>
       </View>
     </View>
@@ -584,7 +602,7 @@ function RecipesTab({ onOpenRecipe, onAddMeal }: { onOpenRecipe: (m: BudgetMeal 
       {/* My meals */}
       <View className="mb-2.5 flex-row items-center justify-between">
         <Text className="text-[12px] font-extrabold uppercase tracking-[1.4px] text-white/40">My meals</Text>
-        <Pressable onPress={onAddMeal} className="flex-row items-center gap-1.5 rounded-full px-3 py-1.5 active:opacity-80" style={{ backgroundColor: alpha('#7ED957', 0.14) }}>
+        <Pressable onPress={onAddMeal} className="flex-row items-center gap-1.5 rounded-full px-3 py-1.5 active:opacity-80" style={{ backgroundColor: alpha(c.brand400, 0.14) }}>
           <Plus size={13} color={c.brand400} strokeWidth={2.6} />
           <Text className="text-[12px] font-bold text-brand-400">Add a meal</Text>
         </Pressable>
@@ -627,8 +645,8 @@ function RecipesTab({ onOpenRecipe, onAddMeal }: { onOpenRecipe: (m: BudgetMeal 
 
       {/* Search */}
       <View className="mt-3 flex-row items-center gap-2.5 rounded-[14px] border border-white/[0.08] bg-ink-800 px-3.5">
-        <Search size={16} color="rgba(255,255,255,0.35)" />
-        <TextInput value={query} onChangeText={(t) => { setQuery(t); bump() }} placeholder="Search recipes…" placeholderTextColor="rgba(255,255,255,0.3)" className="flex-1 py-2.5 text-[14px] text-white" />
+        <Search size={16} color={alpha(c.fg, 0.35)} />
+        <TextInput value={query} onChangeText={(t) => { setQuery(t); bump() }} placeholder="Search recipes…" placeholderTextColor={alpha(c.fg, 0.3)} className="flex-1 py-2.5 text-[14px] text-white" />
       </View>
 
       <Text className="mt-4 text-[12px] font-extrabold uppercase tracking-[1.6px] text-white/35">{countLabel}</Text>
@@ -648,7 +666,7 @@ function RecipesTab({ onOpenRecipe, onAddMeal }: { onOpenRecipe: (m: BudgetMeal 
                   <Text className="text-[12px] font-bold text-brand-400">{m.timeDisplay ?? `${m.minutes} min`}</Text>
                 </View>
               </View>
-              <ChevronRight size={18} color="rgba(255,255,255,0.3)" />
+              <ChevronRight size={18} color={alpha(c.fg, 0.3)} />
             </Pressable>
           ))}
         </View>
@@ -780,16 +798,16 @@ function MealPlanTab() {
 
         <PlanLabel>Suggested meals</PlanLabel>
         <View className="flex-row items-center gap-2.5 rounded-[13px] bg-ink-700 px-3.5">
-          <Search size={16} color="rgba(255,255,255,0.35)" />
-          <TextInput value={planSearch} onChangeText={setPlanSearch} placeholder="Search easy recipes worth cooking…" placeholderTextColor="rgba(255,255,255,0.3)" className="flex-1 py-2.5 text-[14px] text-white" />
+          <Search size={16} color={alpha(c.fg, 0.35)} />
+          <TextInput value={planSearch} onChangeText={setPlanSearch} placeholder="Search easy recipes worth cooking…" placeholderTextColor={alpha(c.fg, 0.3)} className="flex-1 py-2.5 text-[14px] text-white" />
         </View>
         {suggested.length > 0 && (
           <View className="mt-2 gap-1.5">
             {suggested.map((m) => {
               const on = meal === m.name
               return (
-                <Pressable key={m.id} onPress={() => setMeal(m.name)} className="flex-row items-center justify-between gap-2 rounded-[11px] px-3 py-2.5 active:opacity-80" style={{ backgroundColor: on ? alpha('#7ED957', 0.14) : 'rgba(255,255,255,0.03)', borderWidth: 1, borderColor: on ? alpha('#7ED957', 0.5) : 'rgba(255,255,255,0.08)' }}>
-                  <Text className="text-[13px] font-semibold" style={{ color: on ? c.brand400 : 'rgba(255,255,255,0.82)' }}>{m.name}</Text>
+                <Pressable key={m.id} onPress={() => setMeal(m.name)} className="flex-row items-center justify-between gap-2 rounded-[11px] px-3 py-2.5 active:opacity-80" style={{ backgroundColor: on ? alpha(c.brand400, 0.14) : alpha(c.fg, 0.03), borderWidth: 1, borderColor: on ? alpha(c.brand400, 0.5) : alpha(c.fg, 0.08) }}>
+                  <Text className="text-[13px] font-semibold" style={{ color: on ? c.brand400 : alpha(c.fg, 0.82) }}>{m.name}</Text>
                   {on && <Check size={16} color={c.brand400} strokeWidth={3} />}
                 </Pressable>
               )
@@ -807,8 +825,8 @@ function MealPlanTab() {
           {QUICK.map((q) => {
             const on = sameSet(chosen, q.set)
             return (
-              <Pressable key={q.label} onPress={() => setDays(on ? [] : q.set.slice())} className="flex-1 items-center rounded-[11px] py-2.5 active:opacity-80" style={{ backgroundColor: on ? alpha('#7ED957', 0.16) : 'rgba(255,255,255,0.05)', boxShadow: on ? `inset 0 0 0 1.5px ${alpha('#7ED957', 0.55)}` : undefined }}>
-                <Text className="text-[12.5px] font-bold" style={{ color: on ? c.brand400 : 'rgba(255,255,255,0.78)' }}>{q.label}</Text>
+              <Pressable key={q.label} onPress={() => setDays(on ? [] : q.set.slice())} className="flex-1 items-center rounded-[11px] py-2.5 active:opacity-80" style={{ backgroundColor: on ? alpha(c.brand400, 0.16) : alpha(c.fg, 0.05), boxShadow: on ? `inset 0 0 0 1.5px ${alpha(c.brand400, 0.55)}` : undefined }}>
+                <Text className="text-[12.5px] font-bold" style={{ color: on ? c.brand400 : alpha(c.fg, 0.78) }}>{q.label}</Text>
               </Pressable>
             )
           })}
@@ -817,8 +835,8 @@ function MealPlanTab() {
           {PLAN_DAYS.map((d) => {
             const on = days.includes(d)
             return (
-              <Pressable key={d} onPress={() => toggleDay(d)} className="flex-row items-center gap-1.5 rounded-[11px] px-3.5 py-2 active:opacity-80" style={{ minWidth: 62, justifyContent: 'center', backgroundColor: on ? alpha('#7ED957', 0.16) : 'rgba(255,255,255,0.05)', boxShadow: on ? `inset 0 0 0 1.5px ${alpha('#7ED957', 0.55)}` : undefined }}>
-                <Text className="text-[13px] font-bold" style={{ color: on ? c.brand400 : 'rgba(255,255,255,0.78)' }}>{d}</Text>
+              <Pressable key={d} onPress={() => toggleDay(d)} className="flex-row items-center gap-1.5 rounded-[11px] px-3.5 py-2 active:opacity-80" style={{ minWidth: 62, justifyContent: 'center', backgroundColor: on ? alpha(c.brand400, 0.16) : alpha(c.fg, 0.05), boxShadow: on ? `inset 0 0 0 1.5px ${alpha(c.brand400, 0.55)}` : undefined }}>
+                <Text className="text-[13px] font-bold" style={{ color: on ? c.brand400 : alpha(c.fg, 0.78) }}>{d}</Text>
                 {on && <Check size={13} color={c.brand400} strokeWidth={3.2} />}
               </Pressable>
             )
@@ -864,7 +882,7 @@ function MealPlanTab() {
                     <View key={it.id} className="flex-row items-center gap-3">
                       <Text className="w-[66px] text-[10.5px] font-extrabold uppercase tracking-wide text-brand-400">{it.slot}</Text>
                       <Text numberOfLines={1} className="min-w-0 flex-1 text-[13px] text-white/80">{it.name}</Text>
-                      <Pressable onPress={() => dispatch({ type: 'REMOVE_PLANNED_MEAL', id: it.id })} className="h-7 w-7 items-center justify-center rounded-full bg-white/5 active:opacity-70"><Trash2 size={13} color="rgba(255,255,255,0.45)" /></Pressable>
+                      <Pressable onPress={() => dispatch({ type: 'REMOVE_PLANNED_MEAL', id: it.id })} className="h-7 w-7 items-center justify-center rounded-full bg-white/5 active:opacity-70"><Trash2 size={13} color={alpha(c.fg, 0.45)} /></Pressable>
                     </View>
                   ))}
                 </View>
@@ -875,8 +893,8 @@ function MealPlanTab() {
       </View>
 
       {/* Coach note */}
-      <View className="mt-4 flex-row items-center gap-2.5 rounded-[16px] px-4 py-3.5" style={{ backgroundColor: alpha('#7ED957', 0.06) }}>
-        <View className="h-[34px] w-[34px] items-center justify-center rounded-xl" style={{ backgroundColor: alpha('#7ED957', 0.14) }}><MessageCircle size={17} color={c.brand400} /></View>
+      <View className="mt-4 flex-row items-center gap-2.5 rounded-[16px] px-4 py-3.5" style={{ backgroundColor: alpha(c.brand400, 0.06) }}>
+        <View className="h-[34px] w-[34px] items-center justify-center rounded-xl" style={{ backgroundColor: alpha(c.brand400, 0.14) }}><MessageCircle size={17} color={c.brand400} /></View>
         <Text className="flex-1 text-[13px] leading-[1.45] text-white/70">Ask your coach to review your meal plan.</Text>
       </View>
     </ScrollView>
@@ -935,8 +953,8 @@ function GuideTab() {
     >
       {/* Coach header — pins to the top of the guide while it scrolls (design's sticky
           bar). Native: stickyHeaderIndices above. Web: CSS position:sticky (WEB_STICKY). */}
-      <View className="flex-row items-center gap-[11px]" style={[{ marginHorizontal: -20, paddingHorizontal: 18, paddingVertical: 8, backgroundColor: '#111113', borderBottomWidth: 1, borderBottomColor: '#222225' }, WEB_STICKY]}>
-        <View className="h-8 w-8 items-center justify-center rounded-[11px]" style={{ backgroundColor: alpha('#7ED957', 0.14) }}><MessageCircle size={16} color={c.brand400} /></View>
+      <View className="flex-row items-center gap-[11px]" style={[{ marginHorizontal: -20, paddingHorizontal: 18, paddingVertical: 8, backgroundColor: c.ink800, borderBottomWidth: 1, borderBottomColor: c.ink600 }, WEB_STICKY]}>
+        <View className="h-8 w-8 items-center justify-center rounded-[11px]" style={{ backgroundColor: alpha(c.brand400, 0.14) }}><MessageCircle size={16} color={c.brand400} /></View>
         <View className="min-w-0 flex-1">
           <Text className="text-[13.5px] font-extrabold leading-[1.1] text-white">Got a question?</Text>
           <Text className="mt-px text-[12px] text-white/70">Ask your coach from the Dashboard</Text>
@@ -952,17 +970,17 @@ function GuideTab() {
 
       <View className="mt-3.5 flex-row items-center justify-center gap-2.5">
         <Text className="text-[20px]">🥑</Text>
-        <Text className="text-[13px] font-semibold text-white/60">Add a small amount of <Text onPress={() => { setPlate(3); setPlateEx(false) }} className="font-bold" style={{ color: active.slice === 'fat' ? '#a98bf5' : '#8B5CF6' }}>healthy fat</Text> on the side</Text>
+        <Text className="text-[13px] font-semibold text-white/60">Add a small amount of <Text onPress={() => { setPlate(3); setPlateEx(false) }} className="font-bold" style={{ color: c.accentPurple }}>healthy fat</Text> on the side</Text>
       </View>
 
       <View className="mt-6 flex-row flex-wrap" style={{ gap: 9 }}>
         {PLATE.map((p, i) => {
           const on = plate === i
           return (
-            <Pressable key={p.slice} onPress={() => { setPlate(i); setPlateEx(false) }} style={{ width: '48%', paddingVertical: 11, paddingHorizontal: 12, gap: 9, backgroundColor: on ? alpha(p.color, 0.16) : 'rgba(255,255,255,0.05)', boxShadow: on ? `inset 0 0 0 1.5px ${alpha(p.color, 0.42)}` : undefined }} className="flex-row items-center rounded-[14px] active:opacity-80">
-              <Text className="min-w-[18px] text-center text-[15px] font-black" style={{ color: p.color }}>{p.portion || p.icon}</Text>
-              <Text className="min-w-0 flex-1 text-[12.5px] font-semibold leading-[1.15]" style={{ color: on ? p.color : 'rgba(255,255,255,0.82)' }}>{p.title}</Text>
-              {on && <Check size={15} color={p.color} strokeWidth={3.2} />}
+            <Pressable key={p.slice} onPress={() => { setPlate(i); setPlateEx(false) }} style={{ width: '48%', paddingVertical: 11, paddingHorizontal: 12, gap: 9, backgroundColor: on ? alpha(tint(p.color, c), 0.16) : alpha(c.fg, 0.05), boxShadow: on ? `inset 0 0 0 1.5px ${alpha(tint(p.color, c), 0.42)}` : undefined }} className="flex-row items-center rounded-[14px] active:opacity-80">
+              <Text className="min-w-[18px] text-center text-[15px] font-black" style={{ color: tint(p.color, c) }}>{p.portion || p.icon}</Text>
+              <Text className="min-w-0 flex-1 text-[12.5px] font-semibold leading-[1.15]" style={{ color: on ? tint(p.color, c) : alpha(c.fg, 0.82) }}>{p.title}</Text>
+              {on && <Check size={15} color={tint(p.color, c)} strokeWidth={3.2} />}
             </Pressable>
           )
         })}
@@ -971,12 +989,12 @@ function GuideTab() {
       {/* Feature card */}
       <View className="mt-3.5 rounded-2xl bg-white/[0.035] px-4 py-4">
         <Fade key={active.slice}>
-          <View className="flex-row items-center gap-2"><View className="h-[9px] w-[9px] rounded-full" style={{ backgroundColor: active.color }} /><Text className="text-[15px] font-extrabold text-white">{active.title}</Text></View>
+          <View className="flex-row items-center gap-2"><View className="h-[9px] w-[9px] rounded-full" style={{ backgroundColor: tint(active.color, c) }} /><Text className="text-[15px] font-extrabold text-white">{active.title}</Text></View>
           <Text className="mt-1.5 text-[13px] leading-[1.55] text-white/70">{active.desc}</Text>
         </Fade>
         <Pressable onPress={() => setPlateEx((v) => !v)} className="mt-2.5 flex-row items-center gap-1 active:opacity-70">
-          <Text className="text-[11.5px] font-bold" style={{ color: active.color }}>See examples</Text>
-          <ChevronRight size={13} color={active.color} strokeWidth={2.6} style={{ transform: [{ rotate: plateEx ? '90deg' : '0deg' }] }} />
+          <Text className="text-[11.5px] font-bold" style={{ color: tint(active.color, c) }}>See examples</Text>
+          <ChevronRight size={13} color={tint(active.color, c)} strokeWidth={2.6} style={{ transform: [{ rotate: plateEx ? '90deg' : '0deg' }] }} />
         </Pressable>
         {plateEx && (
           <Rise>
@@ -993,8 +1011,8 @@ function GuideTab() {
       <View className="flex-row flex-wrap gap-2.5">
         {PORTIONS.map((p) => (
           <View key={p.hand} style={{ width: '47.5%' }} className="rounded-2xl border border-white/[0.06] bg-ink-800 p-3.5">
-            <View className="h-11 w-11 items-center justify-center rounded-full" style={{ backgroundColor: alpha(p.color, 0.16) }}><Text className="text-[24px]">{p.emoji}</Text></View>
-            <View className="mt-2.5 flex-row items-center gap-1.5"><Text className="text-[14.5px] font-extrabold text-white">{p.hand}</Text><Text className="text-[12px] font-bold" style={{ color: p.color }}>· {p.title}</Text></View>
+            <View className="h-11 w-11 items-center justify-center rounded-full" style={{ backgroundColor: alpha(tint(p.color, c), 0.16) }}><Text className="text-[24px]">{p.emoji}</Text></View>
+            <View className="mt-2.5 flex-row items-center gap-1.5"><Text className="text-[14.5px] font-extrabold text-white">{p.hand}</Text><Text className="text-[12px] font-bold" style={{ color: tint(p.color, c) }}>· {p.title}</Text></View>
             <Text className="mt-1 text-[12.5px] leading-[1.4] text-white/55">{p.desc}</Text>
           </View>
         ))}
@@ -1004,8 +1022,8 @@ function GuideTab() {
       <View className="mb-2.5 mt-8 flex-row items-center gap-2.5"><Text className="text-[19px]">🥗</Text><Text className="text-[19px] font-extrabold tracking-tight text-white">Eat more, and less, of</Text></View>
       <View className="gap-2.5">
         {TIERS.map((t) => (
-          <View key={t.title} className="rounded-2xl bg-ink-800 px-4 py-3.5" style={{ borderLeftWidth: 3, borderLeftColor: t.color }}>
-            <Text className="text-[15px] font-extrabold" style={{ color: t.color }}>{t.title}</Text>
+          <View key={t.title} className="rounded-2xl bg-ink-800 px-4 py-3.5" style={{ borderLeftWidth: 3, borderLeftColor: tint(t.color, c) }}>
+            <Text className="text-[15px] font-extrabold" style={{ color: tint(t.color, c) }}>{t.title}</Text>
             <Text className="mt-1 text-[12.5px] leading-[1.5] text-white/60">{t.desc}</Text>
             <View className="mt-2.5 flex-row flex-wrap gap-1.5">{t.items.map((it) => <View key={it} className="rounded-full bg-white/5 px-3 py-1.5"><Text className="text-[11px] text-white/70">{it}</Text></View>)}</View>
           </View>
@@ -1017,7 +1035,7 @@ function GuideTab() {
       <Text className="mb-3 mt-1 text-[13px] leading-[1.5] text-white/55">Small habits that make healthy eating easier.</Text>
       {PRINCIPLES.map((p) => (
         <View key={p.title} className="flex-row items-start gap-3.5 border-t border-white/[0.06] py-3.5">
-          <View className="h-[38px] w-[38px] items-center justify-center rounded-full" style={{ backgroundColor: alpha('#7ED957', 0.12) }}><Text className="text-[18px]">{p.emoji}</Text></View>
+          <View className="h-[38px] w-[38px] items-center justify-center rounded-full" style={{ backgroundColor: alpha(c.brand400, 0.12) }}><Text className="text-[18px]">{p.emoji}</Text></View>
           <View className="min-w-0 flex-1"><Text className="text-[14px] font-extrabold text-white">{p.title}</Text><Text className="mt-0.5 text-[12.5px] leading-[1.5] text-white/60">{p.text}</Text></View>
         </View>
       ))}
@@ -1028,17 +1046,17 @@ function GuideTab() {
         {LESSONS.map((l) => {
           const open = lesson === l.id
           return (
-            <View key={l.id} {...({ dataSet: { lessonId: l.id } } as any)} onLayout={(e) => { rowY.current[l.id] = e.nativeEvent.layout.y }} className="overflow-hidden rounded-[14px]" style={{ backgroundColor: open ? alpha('#7ED957', 0.05) : 'transparent', borderLeftWidth: open ? 3 : 0, borderLeftColor: c.brand400 }}>
+            <View key={l.id} {...({ dataSet: { lessonId: l.id } } as any)} onLayout={(e) => { rowY.current[l.id] = e.nativeEvent.layout.y }} className="overflow-hidden rounded-[14px]" style={{ backgroundColor: open ? alpha(c.brand400, 0.05) : 'transparent', borderLeftWidth: open ? 3 : 0, borderLeftColor: c.brand400 }}>
               <Pressable onPress={() => toggleLesson(l.id)} className="flex-row items-center gap-3 px-3 py-3.5 active:opacity-80">
-                <View className="h-10 w-10 items-center justify-center rounded-full" style={{ backgroundColor: alpha('#7ED957', 0.12) }}><Text className="text-[19px]">{l.emoji}</Text></View>
+                <View className="h-10 w-10 items-center justify-center rounded-full" style={{ backgroundColor: alpha(c.brand400, 0.12) }}><Text className="text-[19px]">{l.emoji}</Text></View>
                 <View className="min-w-0 flex-1"><Text className="text-[14.5px] font-extrabold text-white">{l.title}</Text><Text numberOfLines={1} className="mt-px text-[12px] text-white/60">{l.summary}</Text></View>
-                <ChevronDown size={18} color={open ? c.brand400 : 'rgba(255,255,255,0.35)'} style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
+                <ChevronDown size={18} color={open ? c.brand400 : alpha(c.fg, 0.35)} style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
               </Pressable>
               {open && (
                 <LessonReveal>
                   <View className="gap-2.5 pb-4 pl-[54px] pr-3.5">
                     {l.body.map((para, i) => <Text key={i} className="text-[13px] leading-[1.65] text-white/70">{para}</Text>)}
-                    <View className="mt-0.5 rounded-xl px-3.5 py-3" style={{ backgroundColor: alpha('#7ED957', 0.1) }}>
+                    <View className="mt-0.5 rounded-xl px-3.5 py-3" style={{ backgroundColor: alpha(c.brand400, 0.1) }}>
                       <Text className="mb-1 text-[11px] font-extrabold uppercase tracking-wide text-brand-400">Key takeaway</Text>
                       <Text className="text-[13px] leading-[1.55] text-white/85">{l.takeaway}</Text>
                     </View>
@@ -1063,19 +1081,20 @@ const PATH_TRANSITION = (typeof document !== 'undefined'
 
 function BalancedPlate({ selected, onSelect }: { selected: PlateSlice['slice']; onSelect: (i: number) => void }) {
   const fill = (key: string) => (selected === key ? 1 : 0.4)
-  const stroke = (key: string) => (selected === key ? 'rgba(255,255,255,0.75)' : '#131316')
+  const c = useColors()
+  const stroke = (key: string) => (selected === key ? alpha(c.fg, 0.75) : c.ink700)
   const sw = (key: string) => (selected === key ? 3 : 2.5)
   return (
     <View style={{ width: 236, height: 236, alignSelf: 'center' }}>
       <Svg viewBox="0 0 200 200" width={236} height={236}>
-        <Path onPress={() => onSelect(0)} {...PATH_TRANSITION} d="M100,100 L100,188 A88,88 0 0 1 100,12 Z" fill="#7ED957" fillOpacity={fill('veg')} stroke={stroke('veg')} strokeWidth={sw('veg')} />
-        <Path onPress={() => onSelect(1)} {...PATH_TRANSITION} d="M100,100 L100,12 A88,88 0 0 1 188,100 Z" fill="#3B82F6" fillOpacity={fill('protein')} stroke={stroke('protein')} strokeWidth={sw('protein')} />
-        <Path onPress={() => onSelect(2)} {...PATH_TRANSITION} d="M100,100 L188,100 A88,88 0 0 1 100,188 Z" fill="#F5A524" fillOpacity={fill('carbs')} stroke={stroke('carbs')} strokeWidth={sw('carbs')} />
-        <Circle cx="100" cy="100" r="96" fill="none" stroke="rgba(255,255,255,0.16)" strokeWidth="1.5" />
-        <SvgText x="50" y="107" textAnchor="middle" fontSize="27" fontWeight="800" fill="#fff">½</SvgText>
-        <SvgText x="140" y="64" textAnchor="middle" fontSize="19" fontWeight="800" fill="#fff">¼</SvgText>
-        <SvgText x="140" y="150" textAnchor="middle" fontSize="19" fontWeight="800" fill="#fff">¼</SvgText>
-        <Circle cx="100" cy="100" r="27" fill="#131316" />
+        <Path onPress={() => onSelect(0)} {...PATH_TRANSITION} d="M100,100 L100,188 A88,88 0 0 1 100,12 Z" fill={c.brand400} fillOpacity={fill('veg')} stroke={stroke('veg')} strokeWidth={sw('veg')} />
+        <Path onPress={() => onSelect(1)} {...PATH_TRANSITION} d="M100,100 L100,12 A88,88 0 0 1 188,100 Z" fill={c.accentBlue} fillOpacity={fill('protein')} stroke={stroke('protein')} strokeWidth={sw('protein')} />
+        <Path onPress={() => onSelect(2)} {...PATH_TRANSITION} d="M100,100 L188,100 A88,88 0 0 1 100,188 Z" fill={c.accentOrange} fillOpacity={fill('carbs')} stroke={stroke('carbs')} strokeWidth={sw('carbs')} />
+        <Circle cx="100" cy="100" r="96" fill="none" stroke={alpha(c.fg, 0.16)} strokeWidth="1.5" />
+        <SvgText x="50" y="107" textAnchor="middle" fontSize="27" fontWeight="800" fill={c.fg}>½</SvgText>
+        <SvgText x="140" y="64" textAnchor="middle" fontSize="19" fontWeight="800" fill={c.fg}>¼</SvgText>
+        <SvgText x="140" y="150" textAnchor="middle" fontSize="19" fontWeight="800" fill={c.fg}>¼</SvgText>
+        <Circle cx="100" cy="100" r="27" fill={c.ink800} />
       </Svg>
     </View>
   )
@@ -1122,7 +1141,7 @@ function RecipeModal({ meal, onClose, onEdit }: { meal: BudgetMeal | UserMeal | 
           ) : (
             <View className="flex-row items-start justify-between gap-3 px-[18px] pb-1 pt-[18px]">
               <View className="min-w-0 flex-1"><Text className="text-[19px] font-extrabold leading-tight text-white">{meal.name}</Text><Text className="mt-1.5 text-[13px] font-bold text-brand-300">{macros}</Text></View>
-              <Pressable onPress={onClose} className="h-8 w-8 items-center justify-center rounded-full bg-white/[0.06] active:opacity-80"><X size={16} color="#fff" /></Pressable>
+              <Pressable onPress={onClose} className="h-8 w-8 items-center justify-center rounded-full bg-white/[0.06] active:opacity-80"><X size={16} color={c.fg} /></Pressable>
             </View>
           )}
 
@@ -1130,7 +1149,7 @@ function RecipeModal({ meal, onClose, onEdit }: { meal: BudgetMeal | UserMeal | 
             {budget && !!budget.flavour && <Text className="text-[13.5px] leading-[1.5] text-white/65">{budget.flavour}</Text>}
             {budget && (
               <View className="flex-row flex-wrap gap-1.5">
-                {budget.tags.map((t) => <View key={t} className="rounded-full px-3 py-1" style={{ backgroundColor: alpha('#7ED957', 0.15) }}><Text className="text-[11px] font-bold text-brand-300">{t}</Text></View>)}
+                {budget.tags.map((t) => <View key={t} className="rounded-full px-3 py-1" style={{ backgroundColor: alpha(c.brand400, 0.15) }}><Text className="text-[11px] font-bold text-brand-300">{t}</Text></View>)}
                 <View className="rounded-full bg-white/[0.06] px-3 py-1"><Text className="text-[11px] font-bold text-white/60">{macros}</Text></View>
               </View>
             )}
@@ -1146,22 +1165,22 @@ function RecipeModal({ meal, onClose, onEdit }: { meal: BudgetMeal | UserMeal | 
             {budget && budget.steps.length > 0 && (
               <View>
                 <SectionHead>Method</SectionHead>
-                <View className="gap-2.5">{budget.steps.map((st, i) => <View key={i} className="flex-row items-start gap-2.5"><View className="h-6 w-6 items-center justify-center rounded-full" style={{ backgroundColor: alpha('#7ED957', 0.15) }}><Text className="text-[12px] font-extrabold text-brand-400">{i + 1}</Text></View><Text className="flex-1 text-[14px] leading-[1.5] text-white/80">{st}</Text></View>)}</View>
+                <View className="gap-2.5">{budget.steps.map((st, i) => <View key={i} className="flex-row items-start gap-2.5"><View className="h-6 w-6 items-center justify-center rounded-full" style={{ backgroundColor: alpha(c.brand400, 0.15) }}><Text className="text-[12px] font-extrabold text-brand-400">{i + 1}</Text></View><Text className="flex-1 text-[14px] leading-[1.5] text-white/80">{st}</Text></View>)}</View>
               </View>
             )}
             {budget?.cookOnce ? (
-              <View className="rounded-xl px-3.5 py-3" style={{ backgroundColor: alpha('#7ED957', 0.08) }}><Text className="text-[13px] leading-[1.5] text-white/75">💡 {budget.cookOnce}</Text></View>
+              <View className="rounded-xl px-3.5 py-3" style={{ backgroundColor: alpha(c.brand400, 0.08) }}><Text className="text-[13px] leading-[1.5] text-white/75">💡 {budget.cookOnce}</Text></View>
             ) : null}
           </ScrollView>
 
           <View className="flex-row gap-2.5 border-t border-white/[0.06] p-3">
             {um && (
               <>
-                <Pressable onPress={() => { dispatch({ type: 'REMOVE_MY_MEAL', id: um.id }); onClose(); toast('Meal deleted') }} className="items-center justify-center rounded-[13px] px-4 py-3 active:opacity-80" style={{ backgroundColor: alpha('#f87171', 0.12), borderWidth: 1, borderColor: alpha('#f87171', 0.3) }}><Trash2 size={15} color="#f87171" /></Pressable>
-                <Pressable onPress={() => onEdit(um)} className="flex-1 flex-row items-center justify-center gap-1.5 rounded-[13px] bg-white/[0.06] py-3 active:opacity-80"><Pencil size={15} color="#fff" /><Text className="text-[14px] font-bold text-white">Edit</Text></Pressable>
+                <Pressable onPress={() => { dispatch({ type: 'REMOVE_MY_MEAL', id: um.id }); onClose(); toast('Meal deleted') }} className="items-center justify-center rounded-[13px] px-4 py-3 active:opacity-80" style={{ backgroundColor: alpha(c.danger, 0.12), borderWidth: 1, borderColor: alpha(c.danger, 0.3) }}><Trash2 size={15} color={c.danger} /></Pressable>
+                <Pressable onPress={() => onEdit(um)} className="flex-1 flex-row items-center justify-center gap-1.5 rounded-[13px] bg-white/[0.06] py-3 active:opacity-80"><Pencil size={15} color={c.fg} /><Text className="text-[14px] font-bold text-white">Edit</Text></Pressable>
               </>
             )}
-            <Pressable onPress={copyRecipe} className="flex-1 flex-row items-center justify-center gap-2 rounded-[13px] py-3 active:opacity-80" style={{ backgroundColor: alpha('#7ED957', 0.15) }}><Share2 size={15} color={c.brand400} /><Text className="text-[14px] font-bold text-brand-400">Copy recipe</Text></Pressable>
+            <Pressable onPress={copyRecipe} className="flex-1 flex-row items-center justify-center gap-2 rounded-[13px] py-3 active:opacity-80" style={{ backgroundColor: alpha(c.brand400, 0.15) }}><Share2 size={15} color={c.brand400} /><Text className="text-[14px] font-bold text-brand-400">Copy recipe</Text></Pressable>
           </View>
         </Pressable>
       </Pressable>
@@ -1182,6 +1201,7 @@ function AddMealSheet({ open, editing, onClose }: { open: boolean; editing: User
   const [notes, setNotes] = useState('')
   const [kcal, setKcal] = useState('')
   const [pro, setPro] = useState('')
+  const c = useColors()
 
   useEffect(() => {
     if (!open) return
@@ -1225,26 +1245,26 @@ function AddMealSheet({ open, editing, onClose }: { open: boolean; editing: User
               <Text className="text-[18px] font-extrabold text-white">{editing ? 'Edit your meal' : 'Add your meal'}</Text>
               <Text className="mt-px text-[12px] text-white/50">{editing ? 'Update the details below.' : 'Save a recipe you cook often.'}</Text>
             </View>
-            <Pressable onPress={onClose} className="h-8 w-8 items-center justify-center rounded-full bg-white/[0.06] active:opacity-80"><X size={16} color="#fff" /></Pressable>
+            <Pressable onPress={onClose} className="h-8 w-8 items-center justify-center rounded-full bg-white/[0.06] active:opacity-80"><X size={16} color={c.fg} /></Pressable>
           </View>
           <ScrollView className="px-[18px]" contentContainerStyle={{ paddingBottom: 40, paddingTop: 12, gap: 14 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
             <Field label="Meal name">
-              <TextInput value={name} onChangeText={setName} placeholder="e.g. My chicken rice bowl" placeholderTextColor="rgba(255,255,255,0.3)" className="rounded-[12px] bg-ink-700 px-[13px] py-3 text-[14px] text-white" />
+              <TextInput value={name} onChangeText={setName} placeholder="e.g. My chicken rice bowl" placeholderTextColor={alpha(c.fg, 0.3)} className="rounded-[12px] bg-ink-700 px-[13px] py-3 text-[14px] text-white" />
             </Field>
             <Field label="Ingredients" optional>
-              <TextInput value={ing} onChangeText={setIng} multiline placeholder={'2 chicken breasts\n1 cup rice\nHandful of veg'} placeholderTextColor="rgba(255,255,255,0.3)" style={{ minHeight: 84, textAlignVertical: 'top' }} className="rounded-[12px] bg-ink-700 px-[13px] py-3 text-[14px] leading-[1.5] text-white" />
+              <TextInput value={ing} onChangeText={setIng} multiline placeholder={'2 chicken breasts\n1 cup rice\nHandful of veg'} placeholderTextColor={alpha(c.fg, 0.3)} style={{ minHeight: 84, textAlignVertical: 'top' }} className="rounded-[12px] bg-ink-700 px-[13px] py-3 text-[14px] leading-[1.5] text-white" />
             </Field>
             <Field label="Notes" optional>
-              <TextInput value={notes} onChangeText={setNotes} multiline placeholder="Anything worth remembering about this meal" placeholderTextColor="rgba(255,255,255,0.3)" style={{ minHeight: 64, textAlignVertical: 'top' }} className="rounded-[12px] bg-ink-700 px-[13px] py-3 text-[14px] leading-[1.5] text-white" />
+              <TextInput value={notes} onChangeText={setNotes} multiline placeholder="Anything worth remembering about this meal" placeholderTextColor={alpha(c.fg, 0.3)} style={{ minHeight: 64, textAlignVertical: 'top' }} className="rounded-[12px] bg-ink-700 px-[13px] py-3 text-[14px] leading-[1.5] text-white" />
             </Field>
             <View className="flex-row gap-2.5">
-              <View className="flex-1"><Field label="Calories" optional><TextInput value={kcal} onChangeText={setKcal} keyboardType="numeric" placeholder="645" placeholderTextColor="rgba(255,255,255,0.3)" className="rounded-[12px] bg-ink-700 px-[13px] py-3 text-[14px] text-white" /></Field></View>
-              <View className="flex-1"><Field label="Protein g" optional><TextInput value={pro} onChangeText={setPro} keyboardType="numeric" placeholder="48" placeholderTextColor="rgba(255,255,255,0.3)" className="rounded-[12px] bg-ink-700 px-[13px] py-3 text-[14px] text-white" /></Field></View>
+              <View className="flex-1"><Field label="Calories" optional><TextInput value={kcal} onChangeText={setKcal} keyboardType="numeric" placeholder="645" placeholderTextColor={alpha(c.fg, 0.3)} className="rounded-[12px] bg-ink-700 px-[13px] py-3 text-[14px] text-white" /></Field></View>
+              <View className="flex-1"><Field label="Protein g" optional><TextInput value={pro} onChangeText={setPro} keyboardType="numeric" placeholder="48" placeholderTextColor={alpha(c.fg, 0.3)} className="rounded-[12px] bg-ink-700 px-[13px] py-3 text-[14px] text-white" /></Field></View>
             </View>
           </ScrollView>
           <View className="flex-row gap-2.5 border-t border-white/[0.06] px-[18px] pb-5 pt-3">
             <Pressable onPress={onClose} className="flex-1 items-center rounded-[13px] bg-white/[0.06] py-3.5 active:opacity-80"><Text className="text-[14px] font-bold text-white">Cancel</Text></Pressable>
-            <Pressable onPress={save} disabled={!canSave} className="flex-[2] items-center rounded-[13px] py-3.5 active:opacity-90" style={{ backgroundColor: canSave ? '#7ED957' : alpha('#7ED957', 0.35) }}><Text className="text-[14px] font-extrabold text-black">{editing ? 'Save changes' : 'Save meal'}</Text></Pressable>
+            <Pressable onPress={save} disabled={!canSave} className="flex-[2] items-center rounded-[13px] py-3.5 active:opacity-90" style={{ backgroundColor: canSave ? c.brand400 : alpha(c.brand400, 0.35) }}><Text className="text-[14px] font-extrabold text-black">{editing ? 'Save changes' : 'Save meal'}</Text></Pressable>
           </View>
         </View>
       </KeyboardAvoidingView>
