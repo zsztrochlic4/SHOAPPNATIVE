@@ -4,6 +4,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 import { getFirestore } from 'firebase-admin/firestore'
 import { requireVerifiedUser } from './lib/guards'
 import { enforceDailyLimit } from './lib/rateLimit'
+import { coachKillSwitch } from './killSwitchRemote'
 
 // SINGLE SOURCE: the guardrails run here are the exact same code the app runs,
 // copied verbatim into _shared by scripts/sync-shared.mjs (never hand-edited).
@@ -154,6 +155,9 @@ function geminiModel(systemInstruction?: string) {
   })
 }
 
+// Warm the remote kill switch on cold start so the first request serves a fresh value.
+void coachKillSwitch.refresh()
+
 export const coachMessage = onCall<CoachMessageInput>(
   { enforceAppCheck: true, timeoutSeconds: 60, secrets: [GEMINI_API_KEY] },
   async (req: CallableRequest<CoachMessageInput>): Promise<CoachTurnResult> => {
@@ -178,7 +182,7 @@ export const coachMessage = onCall<CoachMessageInput>(
         return (r.response.text() ?? '').trim()
       },
       enforceLimit: (u) => enforceDailyLimit('coach', u, DAILY_COACH_LIMIT),
-      killSwitchEngaged: () => false, // server kill-switch read (config/coach) is an owner follow-up
+      killSwitchEngaged: () => coachKillSwitch.engaged(), // remote source: config/coach.killSwitch (Firestore)
       todayKey: new Date().toISOString().slice(0, 10),
     })
   },
