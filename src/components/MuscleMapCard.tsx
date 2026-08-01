@@ -3,6 +3,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native'
 import Svg, { Path, Ellipse, Rect, Line, G, Defs, RadialGradient, Stop, Circle } from 'react-native-svg'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Play } from 'lucide-react-native'
+import { useFonts, Poppins_600SemiBold } from '@expo-google-fonts/poppins'
 import { useColors, type Palette } from '../theme'
 import { exerciseView } from '../store/programSession'
 import { fromKey, todayKey } from '../lib/date'
@@ -327,6 +328,8 @@ export function MuscleMapCard({
   onPress: () => void
 }) {
   const c = useColors()
+  // Poppins for the CTA label only; falls back to the system font until it loads.
+  const [fontsLoaded] = useFonts({ Poppins_600SemiBold })
   const { active, secondary } = useMemo(() => deriveGroups(session), [session])
   const female = sex !== 'male'
   const Front = female ? FrontFemale : FrontMale
@@ -400,7 +403,7 @@ export function MuscleMapCard({
         </View>
 
         <Pressable onPress={onPress} className="btn-primary self-start active:opacity-90" style={{ paddingVertical: 7, paddingHorizontal: 16, backgroundColor: completed ? BRAND_700 : c.brand400 }}>
-          <Text style={{ fontSize: 16, fontWeight: '600', color: completed ? 'rgba(255,255,255,0.9)' : '#000' }}>{ctaLabel}</Text>
+          <Text style={{ fontSize: 16, fontWeight: '600', fontFamily: fontsLoaded ? 'Poppins_600SemiBold' : undefined, color: completed ? 'rgba(255,255,255,0.9)' : '#000' }}>{ctaLabel}</Text>
           {!completed && <Play size={14} color="#000" fill="#000" style={{ marginLeft: 8 }} />}
         </Pressable>
       </View>
