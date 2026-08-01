@@ -1,6 +1,6 @@
 # Privacy Policy — StrengthHub Online
 
-**Last updated: 29 July 2026**
+**Last updated: 1 August 2026**
 
 StrengthHub Online ("StrengthHub", "we", "us", "our") is a fitness, training and
 nutrition app for university students. This policy explains what information we
@@ -69,7 +69,7 @@ other apps or websites for advertising.
 
 ## 4. Artificial intelligence (AI) features
 
-Some features use Google's Gemini AI, provided through Firebase AI Logic:
+Some features use Google's Gemini AI:
 - **Meal photo scan:** the photo you submit is sent to Google's Gemini AI to
   estimate its nutrition. The result is an **estimate only** and is not a
   substitute for a nutrition label or professional dietary advice.
@@ -86,7 +86,7 @@ We share data only with the service providers that run the app for us, and only
 as needed to provide the service:
 - **Google Firebase** — authentication, cloud database and storage, and hosting
   (Google LLC / Google Cloud).
-- **Google Gemini (via Firebase AI Logic)** — to power the AI features described
+- **Google's Gemini AI** — to power the AI features described
   in section 4.
 
 These providers process data on our behalf under their own terms and security
