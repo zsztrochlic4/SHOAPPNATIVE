@@ -2,7 +2,7 @@ import { onCall, HttpsError, type CallableRequest } from 'firebase-functions/v2/
 import { defineSecret } from 'firebase-functions/params'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { getFirestore } from 'firebase-admin/firestore'
-import { requireVerifiedUser } from './lib/guards'
+import { requireVerifiedUser, APP_CHECK_ENFORCED } from './lib/guards'
 import { enforceDailyLimit } from './lib/rateLimit'
 import { coachKillSwitch } from './killSwitchRemote'
 
@@ -159,7 +159,10 @@ function geminiModel(systemInstruction?: string) {
 void coachKillSwitch.refresh()
 
 export const coachMessage = onCall<CoachMessageInput>(
-  { enforceAppCheck: true, timeoutSeconds: 60, secrets: [GEMINI_API_KEY] },
+  // App Check is enforced consistently with every other callable via APP_CHECK_ENFORCED (currently
+  // false, monitor-mode). This avoids the coach uniquely rejecting the native app (which does not yet
+  // attest); App Check is rolled out app-wide later per docs/APP_CHECK.md — the coach comes along then.
+  { enforceAppCheck: APP_CHECK_ENFORCED, timeoutSeconds: 60, secrets: [GEMINI_API_KEY] },
   async (req: CallableRequest<CoachMessageInput>): Promise<CoachTurnResult> => {
     const uid = requireVerifiedUser(req)
     const classify: ClassifierTransport = async (prompt) => {
