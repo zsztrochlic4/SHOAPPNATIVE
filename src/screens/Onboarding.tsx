@@ -18,7 +18,7 @@ import type { ReactNode } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   View, Text, Pressable, ScrollView, TextInput, Animated, Easing, PanResponder,
-  Platform, useWindowDimensions,
+  Platform, useWindowDimensions, ActivityIndicator,
   type NativeSyntheticEvent, type NativeScrollEvent, type ViewStyle, type TextStyle,
 } from 'react-native'
 import Svg, { Path, Line, Rect, Circle, Polygon, G, Text as SvgText } from 'react-native-svg'
@@ -26,6 +26,8 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useDispatch, useStore } from '../store/store'
 import { useAuth } from '../auth/AuthProvider'
+import { friendlyError } from '../auth/authErrors'
+import { auth } from '../lib/firebase'
 import { cssVars, useThemeName } from '../theme'
 import { tick, thud } from '../lib/haptics'
 import { todayKey } from '../lib/date'
@@ -885,7 +887,11 @@ export default function Onboarding() {
     // module (the ONLY place it's constructed), run the CC06 red-flag scan on the free
     // text, then derive the local Profile from it — one-directional, no write-back.
     // B2: date_of_birth is carried through and age is derived, never defaulted to 20.
-    const input = answersToInput(answers, user?.uid ?? 'local')
+    // Prefer the freshly-created account's uid: after signUp resolves,
+    // `auth.currentUser` is set synchronously, but the AuthProvider `user`
+    // context updates a tick later — so read it directly here.
+    const uid = auth?.currentUser?.uid ?? user?.uid ?? 'local'
+    const input = answersToInput(answers, uid)
     // M3 resolver: turn the loved/avoided exercise names into Exercise Database ids so the
     // generator honours them as preferred / excluded. Unmatched free text is dropped.
     const userDoc = buildUserDoc(input, {
@@ -910,10 +916,10 @@ export default function Onboarding() {
     })
     // Persist the canonical docs to Firestore immediately (no-op in demo mode, where the
     // store's AsyncStorage persistence covers it). The debounced CloudSync also writes them.
-    if (user?.uid) {
-      void writeBackendUser(user.uid, userDoc).catch(() => { /* retried by CloudSync */ })
+    if (uid !== 'local') {
+      void writeBackendUser(uid, userDoc).catch(() => { /* retried by CloudSync */ })
       if (activation.programDoc) {
-        void writeActiveProgram(user.uid, activation.programDoc, activation.instances)
+        void writeActiveProgram(uid, activation.programDoc, activation.instances)
           .catch(() => { /* retried by CloudSync */ })
       }
     }
@@ -930,7 +936,7 @@ export default function Onboarding() {
   else if (phase === 'terms') view = <Terms answers={answers} set={set} onBack={() => { setDir('back'); setPhase('flow'); setIndex(flow.length - 1) }} onContinue={() => { setDir('fwd'); setPhase('processing') }} />
   else if (phase === 'processing') view = <Processing onDone={() => { setDir('fwd'); setPhase('summary') }} />
   else if (phase === 'summary') view = <Summary answers={answers} onEdit={onEdit} onContinue={() => { setDir('fwd'); setPhase('account') }} onBack={() => { setDir('back'); setPhase('flow'); setIndex(flow.length - 1) }} />
-  else if (phase === 'account') view = <AccountCreate onComplete={finish} onBack={() => { setDir('back'); setPhase('summary') }} />
+  else if (phase === 'account') view = <AccountCreate name={answers.name} onComplete={finish} onBack={() => { setDir('back'); setPhase('summary') }} onLogin={() => { setDir('fwd'); setPhase('login') }} />
   else {
     viewKey = 'flow:' + step?.id
     view = <StepView step={step} answers={answers} set={set} header={header} onContinue={onContinue} onAdvance={advance} onRestart={restart} />
@@ -1713,22 +1719,66 @@ function Summary({ answers, onEdit, onContinue, onBack }: { answers: Answers; on
 
 /* ─────────────────────────────── account ─────────────────────────────────── */
 /**
- * In this repo the auth layer (AuthProvider / AuthScreen) owns real accounts and,
- * when Firebase is configured, the user has already signed in before onboarding.
- * So this saves the gathered profile — `onComplete` dispatches COMPLETE_ONBOARDING
- * — and hands off to the existing provider for a live Google sign-in when needed.
+ * Real account creation — the end of onboarding. When Firebase is configured
+ * (`enabled`) this creates a live Firebase account (email+password, or Google)
+ * using the name gathered earlier in the flow as the display name, then calls
+ * `onComplete` (→ COMPLETE_ONBOARDING) so the gathered profile is saved under the
+ * new uid. AuthGate then advances to the paywall.
+ *
+ * In demo mode (`!enabled`, e.g. the local preview) there is no auth backend, so
+ * every button just completes onboarding — the flow stays exactly as before and
+ * the screen keeps its email-only look.
  */
-function AccountCreate({ onComplete, onBack }: { onComplete: () => void; onBack: () => void }) {
+function AccountCreate({ name, onComplete, onBack, onLogin }: { name: string; onComplete: () => void; onBack: () => void; onLogin: () => void }) {
   const tok = useTok()
-  const { enabled, user, signInWithGoogle } = useAuth()
+  const { enabled, user, signUp, signInWithGoogle } = useAuth()
   const [email, setEmail] = useState('')
-  const google = async () => { tick(); try { if (enabled && !user) await signInWithGoogle() } catch { /* fall through to save */ } onComplete() }
-  const Social = ({ label, bg, fg, letter }: { label: string; bg: string; fg: string; letter?: string }) => (
-    <Pressable onPress={() => { tick(); onComplete() }} style={{ height: 52, borderRadius: 999, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: bg, borderWidth: bg === 'transparent' ? 1.5 : 0, borderColor: tok.rgb('--fg', 0.12) }}>
-      {letter ? <View style={{ width: 20, height: 20, borderRadius: 5, backgroundColor: fg === '#111' ? 'rgba(0,0,0,0.08)' : tok.rgb('--fg', 0.1), alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 12, fontWeight: '900', color: fg }}>{letter}</Text></View> : null}
-      <Text style={{ fontSize: 15.5, fontWeight: '700', color: fg }}>{label}</Text>
-    </Pressable>
-  )
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Create Account. Demo mode: straight through (mock). Real mode: create the
+  // Firebase account, then complete onboarding.
+  const createAccount = async () => {
+    if (!enabled) { thud(); onComplete(); return }
+    if (busy) return
+    setError(null)
+    if (!email.trim()) { setError('Please enter your email.'); return }
+    if (!password) { setError('Please choose a password (at least 6 characters).'); return }
+    setBusy(true)
+    try {
+      await signUp(email, password, name?.trim() || undefined)
+      thud()
+      onComplete()
+    } catch (e: unknown) {
+      const code = (e as { code?: string })?.code ?? ''
+      setError(friendlyError(code) || (e as Error)?.message || 'Couldn’t create your account.')
+      setBusy(false)
+    }
+  }
+
+  const google = async () => {
+    tick()
+    if (!enabled) { onComplete(); return }
+    if (busy) return
+    setError(null)
+    setBusy(true)
+    try {
+      if (!user) await signInWithGoogle()
+      onComplete()
+    } catch (e: unknown) {
+      const code = (e as { code?: string })?.code ?? ''
+      setError(friendlyError(code) || (e as Error)?.message || 'Couldn’t sign in with Google.')
+      setBusy(false)
+    }
+  }
+
+  const apple = () => {
+    tick()
+    if (!enabled) { onComplete(); return }
+    setError('Apple sign-in is coming soon — use email or Google for now.')
+  }
+
   return (
     <View style={{ flex: 1 }}>
       <TopBack onBack={onBack} label="Almost there" />
@@ -1739,24 +1789,35 @@ function AccountCreate({ onComplete, onBack }: { onComplete: () => void; onBack:
         <Reveal delay={300}>
           <Text style={{ fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', color: tok.rgb('--fg', 0.4), marginBottom: 8 }}>Email</Text>
           <View style={{ marginBottom: 12 }}><FocusInput value={email} onChangeText={setEmail} placeholder="you@university.ac.uk" keyboardType="email-address" autoCapitalize="none" /></View>
-          <Pressable onPress={() => { thud(); onComplete() }} style={{ height: 54, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: tok.rgb('--brand-400') }}><Text style={{ fontSize: 16, fontWeight: '700', color: '#08140a' }}>Create Account</Text></Pressable>
+          {enabled ? (
+            <>
+              <Text style={{ fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', color: tok.rgb('--fg', 0.4), marginBottom: 8 }}>Password</Text>
+              <View style={{ marginBottom: 12 }}><PasswordInput value={password} onChangeText={setPassword} /></View>
+            </>
+          ) : null}
+          {error ? <Text style={{ marginBottom: 12, fontSize: 13, lineHeight: 18, color: 'rgb(252,165,165)' }}>{error}</Text> : null}
+          <Pressable onPress={createAccount} disabled={busy} style={{ height: 54, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: tok.rgb('--brand-400'), opacity: busy ? 0.7 : 1 }}>
+            {busy ? <ActivityIndicator color="#08140a" /> : <Text style={{ fontSize: 16, fontWeight: '700', color: '#08140a' }}>Create Account</Text>}
+          </Pressable>
         </Reveal>
         <Reveal delay={380}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 18 }}>
             <View style={{ flex: 1, height: 1, backgroundColor: tok.rgb('--fg', 0.08) }} /><Text style={{ fontSize: 12.5, color: tok.rgb('--fg', 0.4) }}>or</Text><View style={{ flex: 1, height: 1, backgroundColor: tok.rgb('--fg', 0.08) }} />
           </View>
           <View style={{ gap: 10 }}>
-            <Pressable onPress={google} style={{ height: 52, borderRadius: 999, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#fff' }}>
+            <Pressable onPress={google} disabled={busy} style={{ height: 52, borderRadius: 999, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#fff', opacity: busy ? 0.7 : 1 }}>
               <View style={{ width: 20, height: 20, borderRadius: 5, backgroundColor: 'rgba(0,0,0,0.08)', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 12, fontWeight: '900', color: '#111' }}>G</Text></View>
               <Text style={{ fontSize: 15.5, fontWeight: '700', color: '#111' }}>Continue with Google</Text>
             </Pressable>
-            <Social label="Continue with Apple" bg={tok.rgb('--ink-700')} fg={tok.rgb('--fg')} />
+            <Pressable onPress={apple} style={{ height: 52, borderRadius: 999, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: tok.rgb('--ink-700') }}>
+              <Text style={{ fontSize: 15.5, fontWeight: '700', color: tok.rgb('--fg') }}>Continue with Apple</Text>
+            </Pressable>
           </View>
         </Reveal>
       </ScrollView>
       <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 26 }}>
         <Text style={{ fontSize: 14.5, color: tok.rgb('--fg', 0.5) }}>Already have an account? </Text>
-        <Pressable onPress={() => { tick(); onComplete() }} hitSlop={8}><Text style={{ fontSize: 14.5, fontWeight: '700', color: tok.rgb('--brand-300') }}>Log In</Text></Pressable>
+        <Pressable onPress={() => { tick(); onLogin() }} hitSlop={8}><Text style={{ fontSize: 14.5, fontWeight: '700', color: tok.rgb('--brand-300') }}>Log In</Text></Pressable>
       </View>
     </View>
   )
@@ -2081,12 +2142,32 @@ function Welcome({ onStart, onLogin }: { onStart: () => void; onLogin: () => voi
 
 function Login({ onBack }: { onBack: () => void }) {
   const tok = useTok()
-  const { signIn, resetPassword } = useAuth()
+  const { enabled, signIn, signInWithGoogle, resetPassword } = useAuth()
   const [email, setEmail] = useState('')
   const [pw, setPw] = useState('')
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
-  const submit = async () => { setBusy(true); try { await signIn(email, pw) } catch { /* auth listener handles success; errors surface in the real AuthScreen */ } finally { setBusy(false) } }
+  const [error, setError] = useState<string | null>(null)
+  const submit = async () => {
+    setError(null); setNotice(null); setBusy(true)
+    try {
+      await signIn(email, pw)
+      // On success the auth listener swaps this screen out automatically.
+    } catch (e: unknown) {
+      const code = (e as { code?: string })?.code ?? ''
+      setError(friendlyError(code) || (e as Error)?.message || 'Couldn’t log you in.')
+    } finally { setBusy(false) }
+  }
+  const google = async () => {
+    tick()
+    if (!enabled) return
+    setError(null); setNotice(null); setBusy(true)
+    try { await signInWithGoogle() }
+    catch (e: unknown) {
+      const code = (e as { code?: string })?.code ?? ''
+      setError((e as Error)?.message && code === '' ? (e as Error).message : friendlyError(code))
+    } finally { setBusy(false) }
+  }
   const forgot = async () => {
     setNotice(null)
     if (!email.trim()) { setNotice('Enter your email above first, then tap “Forgot password?”.'); return }
@@ -2102,7 +2183,7 @@ function Login({ onBack }: { onBack: () => void }) {
         <Reveal delay={60}><Text style={{ fontSize: 28, fontWeight: '800', letterSpacing: -0.5, color: tok.rgb('--fg') }}>Welcome back</Text></Reveal>
         <Reveal delay={120}><Text style={{ marginTop: 8, marginBottom: 22, fontSize: 15, color: tok.rgb('--fg', 0.55) }}>Log in to pick up where you left off.</Text></Reveal>
         <Reveal delay={160}>
-          <Pressable style={{ height: 52, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 11, backgroundColor: '#fff' }}>
+          <Pressable onPress={google} disabled={busy} style={{ height: 52, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 11, backgroundColor: '#fff', opacity: busy ? 0.7 : 1 }}>
             <View style={{ width: 20, height: 20, borderRadius: 5, backgroundColor: 'rgba(0,0,0,0.08)', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 12, fontWeight: '900', color: '#111' }}>G</Text></View>
             <Text style={{ fontSize: 15.5, fontWeight: '600', color: '#1f1f1f' }}>Continue with Google</Text>
           </Pressable>
@@ -2121,6 +2202,7 @@ function Login({ onBack }: { onBack: () => void }) {
           <PasswordInput value={pw} onChangeText={setPw} />
         </Reveal>
         <Reveal delay={340}><Pressable style={{ marginTop: 12 }} onPress={forgot} hitSlop={6}><Text style={{ color: tok.rgb('--brand-300'), fontSize: 14, fontWeight: '600' }}>Forgot password?</Text></Pressable></Reveal>
+        {error && <Text style={{ marginTop: 10, fontSize: 13, lineHeight: 18, color: 'rgb(252,165,165)' }}>{error}</Text>}
         {notice && <Text style={{ marginTop: 10, fontSize: 13, lineHeight: 18, color: tok.rgb('--fg', 0.6) }}>{notice}</Text>}
       </ScrollView>
       <ActionBar label={busy ? 'Logging in…' : 'Log In'} disabled={!(email && pw) || busy} onPress={submit} />

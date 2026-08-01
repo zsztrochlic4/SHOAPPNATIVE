@@ -12,6 +12,24 @@ export function todayHabit(s: AppState): HabitDay {
   return habitForDay(s, todayKey)
 }
 
+/**
+ * Whether the user may enter the app past the paywall. The single source of
+ * truth for the entitlement gate (see App.tsx AuthGate).
+ *
+ * - Demo / no backend (`firebaseEnabled === false`): always entitled, so the
+ *   preview and local demo never hit a paywall.
+ * - Real backend: a `trialing` or `active` subscription grants access. The
+ *   subscription is mirrored from the server-authoritative `entitlements/{uid}`
+ *   doc by BillingSync; `profile.premium` (a server-written display cache) is a
+ *   fallback so a returning user isn't briefly gated before the snapshot lands.
+ */
+export function isEntitled(s: AppState, firebaseEnabled: boolean): boolean {
+  if (!firebaseEnabled) return true
+  const status = s.subscription?.status
+  if (status === 'trialing' || status === 'active') return true
+  return s.profile.premium === true
+}
+
 /** The logged habit for any day, or a zeroed day if nothing was logged. */
 export function habitForDay(s: AppState, key: string = todayKey): HabitDay {
   return (

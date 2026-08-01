@@ -20,6 +20,7 @@ import type {
   PostComment,
   Profile,
   Settings,
+  Subscription,
   UserMeal,
   WorkoutSession,
   WorkoutTemplate,
@@ -46,6 +47,7 @@ export type Action =
   | { type: 'BUILD_WORKOUT_SUMMARIES' }
   | { type: 'SET_SETTINGS'; patch: Partial<Settings> }
   | { type: 'SET_PROFILE'; patch: Partial<Profile> }
+  | { type: 'SET_SUBSCRIPTION'; subscription: Subscription }
   | { type: 'COMPLETE_ONBOARDING'; profile: Partial<Profile>; backendUser?: UserDoc; generatedProgram?: StoredProgram | null; programStatus?: ProgramStatus | null; workoutInstances?: WorkoutInstanceDoc[] }
   | { type: 'START_PROGRAM_DAY'; dateKey: string }
   | { type: 'LOG_WEIGHT'; kg: number }
@@ -187,6 +189,11 @@ function reducer(state: AppState, action: Action): AppState {
 
     case 'SET_PROFILE':
       return { ...state, profile: { ...state.profile, ...action.patch } }
+
+    case 'SET_SUBSCRIPTION':
+      // Server-sourced (BillingSync ← entitlements/{uid}); local-only, never
+      // persisted to the cloud root (see cloudRepo LOCAL_ONLY).
+      return { ...state, subscription: action.subscription }
 
     case 'COMPLETE_ONBOARDING':
       return {

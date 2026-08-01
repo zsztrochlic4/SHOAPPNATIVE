@@ -98,7 +98,12 @@ const WINDOWED_KEYS = SUB_KEYS.filter((k) => LOAD_POLICY[k] === 'window')
 
 /** Slices kept on-device only (e.g. anything too large for a Firestore doc).
  *  Currently none — every slice syncs. */
-const LOCAL_ONLY: (keyof AppState)[] = []
+// Fields that live only on the device, never written to the user root doc.
+// `subscription` is server-authoritative in `entitlements/{uid}` (written by the
+// Stripe webhook) and mirrored into the store by BillingSync — persisting it to
+// the root would both duplicate the source of truth and be rejected by the
+// rules' `hasOnly(rootAllowedKeys())` guard.
+const LOCAL_ONLY: (keyof AppState)[] = ['subscription']
 
 /** Firestore allows 500 writes per batch; stay safely under it. */
 const BATCH_LIMIT = 400

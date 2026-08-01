@@ -592,6 +592,35 @@ export interface CoachMessage {
   cta?: { label: string; overlay: string }
 }
 
+/**
+ * Paid-entitlement state, mirrored from the server-authoritative
+ * `entitlements/{uid}` Firestore doc by BillingSync (never written by the
+ * client). Absent/`'none'` means non-premium. `trialing` and `active` both
+ * grant access; see `isEntitled` in selectors.ts. This field is local-only —
+ * it is never written back to the user root doc (see cloudRepo LOCAL_ONLY).
+ */
+export type SubscriptionStatus =
+  | 'none'
+  | 'trialing'
+  | 'active'
+  | 'past_due'
+  | 'canceled'
+  | 'incomplete'
+
+export interface Subscription {
+  status: SubscriptionStatus
+  /** Stripe price id backing the subscription (informational). */
+  plan?: string
+  /** Unix seconds — current period end (renewal/expiry). */
+  currentPeriodEnd?: number
+  /** Unix seconds — when the free trial ends. */
+  trialEnd?: number
+  /** Stripe customer id for this user (kept for the billing portal). */
+  stripeCustomerId?: string
+  /** Unix ms — when the webhook last wrote this record. */
+  updatedAt?: number
+}
+
 export interface AppState {
   profile: Profile
   settings: Settings
@@ -662,6 +691,9 @@ export interface AppState {
    *  40-day history lines up. Real onboarded users are false and run on live
    *  device time (see lib/date setLiveClock). */
   demo?: boolean
+  /** Paid-entitlement state, mirrored from `entitlements/{uid}` by BillingSync.
+   *  Local-only (never saved to the user root); the server doc is the truth. */
+  subscription?: Subscription
   /** schema version for migrations */
   v: number
 }

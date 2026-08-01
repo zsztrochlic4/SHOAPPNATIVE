@@ -77,12 +77,19 @@ export function CloudSync() {
           hasMoreRef.current = Object.values(loaded.partial).some(Boolean)
           dispatch({ type: 'HYDRATE', state: { ...stateRef.current, ...loaded.state } as AppState })
         } else if (loaded === null) {
-          // Brand-new account (no saved doc): start on a clean, un-onboarded
-          // state so they go through onboarding; their answers then save to the
-          // cloud. (A network error throws instead, landing in .catch below, so
-          // we never wipe a returning user's screen just because they're offline.)
+          // Brand-new account (no saved doc). Two cases:
+          //  - The account was created at the END of onboarding (the current
+          //    flow): the local state is already a real, onboarded user whose
+          //    freshly-gathered answers must be PUSHED to the cloud, not wiped.
+          //    Keep local and let the debounced save migrate it up.
+          //  - Otherwise (demo seed, or a not-yet-onboarded local state): reset
+          //    to a clean, un-onboarded state so they go through onboarding.
+          // (A network error throws instead, landing in .catch below, so we never
+          // wipe a returning user's screen just because they're offline.)
           savedRef.current = undefined
-          dispatch({ type: 'RESET_EMPTY' })
+          const local = stateRef.current
+          const localIsRealUser = local.profile?.onboarded === true && local.demo !== true
+          if (!localIsRealUser) dispatch({ type: 'RESET_EMPTY' })
         }
       })
       .catch(() => { /* offline / transient — keep local state, save later */ })

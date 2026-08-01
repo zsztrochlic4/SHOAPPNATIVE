@@ -10,9 +10,10 @@ import { BottomNav } from './components/BottomNav'
 import { SwipeNav } from './components/SwipeNav'
 import { StoreProvider, useStore } from './store/store'
 import { AuthProvider, useAuth } from './auth/AuthProvider'
-import { AuthScreen } from './auth/AuthScreen'
-import { WelcomeScreen } from './screens/Welcome'
+import { isEntitled } from './store/selectors'
 import { CloudSync } from './store/CloudSync'
+import { BillingSync } from './store/BillingSync'
+import { Paywall } from './screens/Paywall'
 import { IntegrationsAutoSync } from './components/Integrations'
 import { PushRegistration, NotificationsSync } from './components/PushRegistration'
 import { ToastProvider } from './components/Toast'
@@ -285,16 +286,26 @@ function ThemedRoot() {
 }
 
 /**
- * Decides between the welcome/login flow and the app. When Firebase isn't
- * configured (`enabled` false) this always falls through to the app, so the
- * preview and demo mode are untouched. When it is configured, signed-out users
- * land on the premium Welcome carousel, then sign up / log in; signed-in users
- * get the app plus the cloud-sync bridge.
+ * Routes between the onboarding front door, the paywall and the app.
+ *
+ * The onboarding screen is the single signed-out front door: it owns its own
+ * Welcome (Get Started / Log In), the question flow, real sign-up (at the
+ * "Save your personalised experience" step) and real log-in. So a signed-out
+ * real user, or anyone not yet onboarded, lands there.
+ *
+ * Once onboarded and signed in, the paywall gates the app until a trial or
+ * subscription is active (`isEntitled`). When Firebase isn't configured
+ * (`enabled` false — demo / preview) `isEntitled` is always true and there's no
+ * user, so it flows straight to the app, untouched.
+ *
+ * The signed-in cloud services (sync + entitlement listener) mount whenever a
+ * real session exists, independent of which screen shows — so entitlement keeps
+ * syncing while the user is on the paywall.
  */
 function AuthGate() {
   const { enabled, loading, user } = useAuth()
+  const { state, hydrated } = useStore()
   const insets = useSafeAreaInsets()
-  const [entry, setEntry] = useState<'welcome' | 'signup' | 'signin'>('welcome')
 
   if (enabled && loading) {
     return (
@@ -303,19 +314,46 @@ function AuthGate() {
       </View>
     )
   }
-  if (enabled && !user) {
-    if (entry === 'welcome') {
-      return <WelcomeScreen onSignUp={() => setEntry('signup')} onLogIn={() => setEntry('signin')} />
-    }
-    return <AuthScreen initialMode={entry} onBack={() => setEntry('welcome')} />
-  }
 
-  return (
+  // Defer to Shell's dashboard-shaped skeleton until the local store hydrates.
+  if (!hydrated) return <Shell />
+
+  const services = user ? (
     <>
       <CloudSync />
       <IntegrationsAutoSync />
       <PushRegistration />
       <NotificationsSync />
+      <BillingSync />
+    </>
+  ) : null
+
+  // Front door: signed-out real users, and anyone not yet onboarded.
+  const needsOnboarding = (enabled && !user) || !state.profile.onboarded
+  if (needsOnboarding) {
+    return (
+      <>
+        {services}
+        <View className="flex-1 bg-ink-900" style={{ paddingTop: insets.top }}>
+          <Onboarding />
+        </View>
+      </>
+    )
+  }
+
+  // Onboarded + signed in (or demo): gate on entitlement, then the app.
+  if (!isEntitled(state, enabled)) {
+    return (
+      <>
+        {services}
+        <Paywall />
+      </>
+    )
+  }
+
+  return (
+    <>
+      {services}
       <Shell />
     </>
   )
