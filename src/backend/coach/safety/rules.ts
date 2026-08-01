@@ -158,13 +158,26 @@ function selfHarmIntent(n: Norm): { hit: boolean; immediate: boolean } {
     hasRe(n, /\b(tonight|today|this (evening|minute|moment)|after this|after tonight|right now|now)\b/)
   const revealIntent = strongReveal && (endingOrMethod || decisionImminent)
 
-  const hit = lifeIntent || revealIntent || notExist
+  // Finality declaration ("this is it", "tonight is the night", "today is the day", "this is the end")
+  // carrying no explicit self-harm token — the A-class euphemism tail. Finality phrasing alone is common
+  // gym/achievement hype, so it is REQUIRED to co-occur with isolation or a goodbye, and is excluded when
+  // any fitness or ordinary-life-event context is present. Generalises to the euphemism, not a sentence.
+  const finalityDecl = has(n, 'this is it', 'tonight is it', 'today is it', 'this is the night',
+    'tonight is the night', 'today is the day', 'this is the end', 'the end for me', 'my time is up')
+  const isolationOrGoodbye = has(n, 'im alone', 'i m alone', 'im all alone', 'all alone', 'by myself',
+    'on my own', 'no one will', 'nobody will', 'goodbye', 'saying goodbye', 'this is goodbye')
+  const benignLifeEvent = has(n, ...FITNESS_TERMS) || has(n, 'quit smoking', 'propose', 'proposal', 'engaged',
+    'wedding', 'move out', 'moving out', 'moving to', 'new city', 'new place', 'relocat', 'new job', 'first day',
+    'graduat', 'interview', 'exam', 'test ', 'presentation', 'deadline', 'due date')
+  const finalityEuphemism = finalityDecl && isolationOrGoodbye && !benignLifeEvent
+
+  const hit = lifeIntent || revealIntent || notExist || finalityEuphemism
   // Escalate to 000 only with a self-reveal, a decision-to-act-now, or an explicit finality/method
   // marker — so a VAGUE euphemism floors at Lifeline, not an over-aggressive 000.
   const finality = has(n, 'it all', 'my life', 'everything', 'for good', 'once and for all', 'for the last time',
     'after tonight', 'after today', 'the pills', 'took the pills', 'taken the pills', 'step off', 'off the bridge') || wantsToDie(n)
   const imminence = hasRe(n, /\b(tonight|today|right now|this (evening|minute|moment)|after this|after tonight|for good|once and for all|doing it now|do it now)\b/)
-  const immediate = hit && imminence && (revealIntent || decisionImminent || finality)
+  const immediate = hit && imminence && (revealIntent || decisionImminent || finality || finalityEuphemism)
   return { hit, immediate }
 }
 
@@ -235,15 +248,24 @@ function hasFirstPersonDistress(n: Norm): boolean {
  * (The normaliser maps "suicide" → "suicidal".)
  */
 function isTopicalCrisisReference(n: Norm): boolean {
-  const drillName = has(n, 'suicidal sprint', 'suicidal sprints', 'suicidal drill', 'suicidal drills',
-    'suicidal run', 'suicidal runs', 'suicidal shuttle', 'suicidal shuttles')
+  // Named gym terminology that merely CONTAINS "suicide": the shuttle-run drill ("suicides") and the
+  // thumbless bench grip ("suicide grip"), plus the set/press/hold variants. Not a personal disclosure.
+  const gymTerm = has(n, 'suicidal sprint', 'suicidal sprints', 'suicidal drill', 'suicidal drills',
+    'suicidal run', 'suicidal runs', 'suicidal shuttle', 'suicidal shuttles', 'suicidal grip',
+    'suicidal grips', 'suicidal set', 'suicidal sets', 'suicidal press', 'suicidal hold')
   // academic verb/noun immediately (within ~40 chars) followed by the crisis term
   const studyOfTopic = hasRe(n,
-    /\b(research|researching|study|studying|studies|thesis|dissertation|essay|assignment|project|paper|degree|coursework|module|lecture|presentation|report|writing|analysing|analyzing|literature review)\b[a-z0-9 ]{0,40}\b(suicidal|self harm|self harming|eating disorder|eating disorders|anorexia|bulimia)\b/)
+    /\b(research|researching|study|studying|studies|thesis|dissertation|essay|assignment|project|paper|degree|coursework|module|lecture|tutorial|seminar|workshop|textbook|quiz|exam|curriculum|syllabus|revision|flashcard|flashcards|glossary|presentation|report|writing|analysing|analyzing|literature review)\b[a-z0-9 ]{0,40}\b(suicidal|self harm|self harming|eating disorder|eating disorders|anorexia|bulimia)\b/)
   // crisis term immediately followed by a topic-label suffix
   const topicLabel = hasRe(n,
     /\b(suicidal|self harm|eating disorder|eating disorders)\b[a-z0-9 ]{0,25}\b(prevention|awareness|risk factor|risk factors|statistics|rates|campaign|in athletes|in sport|in sports|programme|program|module)\b/)
-  if (!drillName && !studyOfTopic && !topicLabel) return false
+  // Definitional / meta-linguistic query ("what does <term> mean", "define <term>") — asking for the
+  // MEANING of a clinical term, not disclosing it. The verb wrapper keeps it off a real disclosure, and
+  // the first-person-distress guard below is the paramount backstop.
+  const definitional =
+    hasRe(n, /\b(what (does|do|is)|whats|define|definition of|meaning of|explain)\b[a-z0-9 ]{0,30}\b(suicidal|self harm|self harming|eating disorder|eating disorders|anorexia|bulimia)\b/) ||
+    hasRe(n, /\b(suicidal|self harm|eating disorder|eating disorders|anorexia|bulimia)\b[a-z0-9 ]{0,20}\b(mean|means|meaning|definition|defined)\b/)
+  if (!gymTerm && !studyOfTopic && !topicLabel && !definitional) return false
   return !hasFirstPersonDistress(n)
 }
 
@@ -293,6 +315,14 @@ const EMERGENCY_REDFLAG = ['chest pain', 'chest tightness', 'can t breathe', 'ca
 
 function detectMedicalEmergency(n: Norm): DetectorHit[] {
   if (has(n, ...EMERGENCY_REDFLAG)) return [hit('medical_emergency', 'emergency_red_flag')]
+  // Active self-injury co-occurring with an ACUTE physical sign (faintness, collapse, heavy bleeding) is
+  // a medical 000 emergency, not only the crisis-line referral (Jack C2: "hurt myself and feeling faint").
+  // Generalises to any self-harm term + acute-sign pairing, not a specific sentence.
+  if (has(n, 'hurt myself', 'hurting myself', 'cut myself', 'cutting myself', 'harmed myself', 'harming myself', 'self harm', 'self harmed') &&
+      has(n, 'faint', 'light headed', 'lightheaded', 'dizzy', 'passing out', 'pass out', 'blacking out', 'black out',
+        'lost a lot of blood', 'cant stop the bleeding', 'can t stop the bleeding', 'bleeding a lot', 'lots of blood',
+        'wont stop bleeding', 'won t stop bleeding', 'losing consciousness', 'about to pass out'))
+    return [hit('medical_emergency', 'self_harm_with_acute_sign')]
   // Heat illness: hot context + neuro/GI signs (spec §6).
   const hot = has(n, 'heatstroke', 'heat stroke', '40 degrees', '38 degrees', '39 degrees', '41 degrees',
     'in the heat', 'so hot', 'overheating', 'boiling hot')
@@ -338,6 +368,13 @@ function detectInjuryOverride(n: Norm): DetectorHit[] {
   return []
 }
 
+/** Non-emergency urgent musculoskeletal symptoms (spec §6 urgent-refer). Kept as a shared const so the
+ *  negation scoping (CATEGORY_TERMS.medical_urgent) uses the SAME vocabulary the detector fires on — a
+ *  negated symptom ("no swelling") is then suppressed instead of flagged. Previously the two lists had
+ *  drifted ('swollen' vs the fired 'swelling'), so an explicit denial slipped through. */
+const URGENT_SYMPTOM = ['swollen', 'swelling', 'sharp pain', 'stabbing pain', 'can t put weight',
+  'cant put weight', 'pain for a week', 'painful and swollen', 'been painful', 'really painful', 'badly hurt']
+
 function detectMedicalUrgent(n: Norm): DetectorHit[] {
   const out: DetectorHit[] = []
   // Rhabdomyolysis (spec §6): dark urine + muscle pain, or explicit term.
@@ -347,8 +384,7 @@ function detectMedicalUrgent(n: Norm): DetectorHit[] {
   if (has(n, 'concussion', 'knocked out', 'knock to the head', 'hit my head', 'banged my head', 'head knock', 'bang to the head'))
     out.push(hit('medical_urgent', 'possible_concussion'))
   // Injury / pain / swelling not otherwise an override or emergency (spec §6 urgent-refer).
-  if (has(n, 'swollen', 'swelling', 'sharp pain', 'stabbing pain', 'can t put weight', 'cant put weight',
-    'pain for a week', 'painful and swollen', 'been painful', 'really painful', 'badly hurt'))
+  if (has(n, ...URGENT_SYMPTOM))
     out.push(hit('medical_urgent', 'urgent_symptom'))
   return out
 }
@@ -474,8 +510,9 @@ function detectUnsafeTraining(n: Norm): DetectorHit[] {
     'override the safety', 'lift more than you said'))
     out.push(hit('unsafe_training', 'bypass_limit'))
   // Training while unwell / impaired (spec §15).
-  const unwell = has(n, 'fever', 'vomiting', 'throwing up', 'i m sick', 'im sick', 'really ill', 'flu',
-    'drunk', 'under the influence', 'high on', 'hungover', 'no sleep', 'haven t slept', 'havent slept')
+  const unwell = has(n, 'fever', 'vomiting', 'throwing up', 'i m sick', 'im sick', 'really ill',
+    'drunk', 'under the influence', 'high on', 'hungover', 'no sleep', 'haven t slept', 'havent slept') ||
+    hasRe(n, /\bflu\b/) // whole word only — must not substring-match "fluids"/"influence"/"fluent"
   const wantsSession = has(n, 'workout', 'session', 'train', 'give me a', 'want to train', 'still train')
   if (unwell && wantsSession) out.push(hit('unsafe_training', 'train_while_impaired'))
   if (has(n, 'painkiller', 'pain killer', 'panadol', 'ibuprofen', 'nurofen', 'stimulant') &&
@@ -583,7 +620,8 @@ function historicalResolved(n: Norm): boolean {
 /** Academic / research / quoted / news / hypothetical framing (general, cross-category). */
 function topicalFrame(n: Norm): boolean {
   return has(n, 'research', 'researching', 'studying', 'studies', 'thesis', 'dissertation', 'essay', 'assignment',
-    'project', 'coursework', 'lecture', 'presentation', 'literature review', 'my degree', 'my class', 'my course',
+    'project', 'coursework', 'lecture', 'tutorial', 'seminar', 'workshop', 'textbook', 'quiz', 'curriculum',
+    'syllabus', 'revision', 'flashcards', 'presentation', 'literature review', 'my degree', 'my class', 'my course',
     'my unit', 'for class', 'for uni', 'for university', 'for school', 'case study', 'case studies',
     'poster', 'reading about', 'statistics for', 'for an essay', 'news story', 'article', 'documentary', 'a quote',
     'a lyric', 'quoting', 'hypothetical', 'in a movie', 'in a book', 'for a project', 'writing a report on', 'covers')
@@ -657,7 +695,7 @@ const SCOPED: Partial<Record<SafetyCategory, ('third_party' | 'historical' | 'ne
 const CATEGORY_TERMS: Partial<Record<SafetyCategory, string[]>> = {
   medical_emergency: [...EMERGENCY_REDFLAG],
   medical_condition: [...CONDITIONS, 'asthma', 'diabetes', 'medication', 'medicine', 'condition'],
-  medical_urgent: ['concussion', 'knocked out', 'hit my head', 'rhabdo', 'swollen', 'injury', 'injured'],
+  medical_urgent: ['concussion', 'knocked out', 'hit my head', 'rhabdo', 'injury', 'injured', ...URGENT_SYMPTOM],
   steroids_ped: ['steroids', 'sarm', 'sarms', 'testosterone', 'ped', 'anabolic', 'cycle'],
   disordered_eating: ['eating disorder', 'eating disorders', 'anorexia', 'bulimia', 'purge', 'purging'],
   prescribed_medication: ['medication', 'medicine', 'meds', 'prescription', 'tablets', 'pills'],

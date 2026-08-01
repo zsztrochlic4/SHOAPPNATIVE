@@ -9,7 +9,7 @@
  */
 
 import type { CoachContext, DetectorHit, PersistentState, SafetyDecision, SafetySession } from './types'
-import { PERSISTENT_FOR } from './types'
+import { PERSISTENT_FOR, CATEGORY_TIER } from './types'
 import { engineExcludedExerciseIds } from './engineBridge'
 import { normalize, hasActiveCrisisSignal } from './rules'
 
@@ -59,6 +59,21 @@ export function isBareRetraction(text: string): boolean {
 }
 
 /**
+ * A MINIMISATION — downplaying a prior disclosure as exaggeration / drama / figure of speech ("just
+ * being dramatic", "was exaggerating", "didn't mean it literally"). It reattributes nothing and resolves
+ * nothing, so — like a bare retraction — it must NEVER clear an ACTIVE life-safety state (crisis /
+ * overdose / emergency). Jack A5: "forget I said that, was just being dramatic lol" after an imminent
+ * disclosure must not erase it. Some of these phrasings also sit in GENUINE_CORRECTION (they can still
+ * re-attribute BENIGN states); this predicate is what stops them downgrading an acute safety state.
+ */
+const MINIMISATION = ['being dramatic', 'was dramatic', 'over dramatic', 'overdramatic', 'being figurative',
+  'figure of speech', 'not literally', 'didnt mean it literally', 'didnt mean that literally', 'exaggerating',
+  'over exaggerating', 'overreacting', 'being silly', 'being stupid', 'attention seeking']
+export function isMinimisation(text: string): boolean {
+  return MINIMISATION.some((f) => p(text).includes(f))
+}
+
+/**
  * Re-evaluate a genuine contextual correction (spec §2/§18). Mutates the session to downgrade a
  * state only where the correction genuinely resolves it, and returns any replacement hits (e.g.
  * a first-person crisis that is actually about a roommate becomes a third-party case).
@@ -89,18 +104,24 @@ export function stateHits(session: SafetySession, text: string, ctx: CoachContex
   const active = new Set<PersistentState>([...session.active, ...session.carriedOver])
   const out: DetectorHit[] = []
 
-  // Crisis: not resumed by a bare retraction / minimisation (spec §2/§18 retraction rule).
-  if (active.has('crisis') && !isGenuineCorrection(text)) {
-    out.push({ category: 'crisis_concern', source: 'state', reason: 'crisis_state_persists' })
+  // Crisis: not resumed by a bare retraction / minimisation (spec §2/§18 retraction rule). A minimisation
+  // ("just being dramatic") never clears it even though it token-matches a genuine correction. When the
+  // prior disclosure was IMMEDIATE danger, persistence holds the EMERGENCY tier (Jack A5: "maintain the
+  // emergency tier"), not the softer Lifeline tier.
+  if (active.has('crisis') && (!isGenuineCorrection(text) || isMinimisation(text))) {
+    const wasImmediate = !!session.lastDecision && CATEGORY_TIER[session.lastDecision.category] >= CATEGORY_TIER.overdose_poisoning
+    out.push(wasImmediate
+      ? { category: 'immediate_danger', source: 'state', reason: 'immediate_state_persists' }
+      : { category: 'crisis_concern', source: 'state', reason: 'crisis_state_persists' })
   }
   // Overdose / medical emergency (Jack §2): an acute disclosure must NOT be cleared by a later bare
   // minimisation (a passing "I'm fine, ignore that"). It persists on ANY follow-up until a genuine
   // correction on full context clears it — exactly the crisis rule. The overdose/emergency escalation
   // in the router then re-derives the 000-vs-Poisons tier from the current turn's danger signals.
-  if (active.has('overdose') && !isGenuineCorrection(text)) {
+  if (active.has('overdose') && (!isGenuineCorrection(text) || isMinimisation(text))) {
     out.push({ category: 'overdose_poisoning', source: 'state', reason: 'overdose_state_persists' })
   }
-  if (active.has('emergency') && !isGenuineCorrection(text)) {
+  if (active.has('emergency') && (!isGenuineCorrection(text) || isMinimisation(text))) {
     out.push({ category: 'medical_emergency', source: 'state', reason: 'emergency_state_persists' })
   }
   // Under-18: coach remains unavailable until age eligibility is resolved (cross-session).
