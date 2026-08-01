@@ -18,7 +18,7 @@ import type { ReactNode } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   View, Text, Pressable, ScrollView, TextInput, Animated, Easing, PanResponder,
-  Platform, useWindowDimensions, ActivityIndicator,
+  Platform, useWindowDimensions, ActivityIndicator, Linking,
   type NativeSyntheticEvent, type NativeScrollEvent, type ViewStyle, type TextStyle,
 } from 'react-native'
 import Svg, { Path, Line, Rect, Circle, Polygon, G, Text as SvgText } from 'react-native-svg'
@@ -1565,13 +1565,17 @@ function Terms({ answers, set, onContinue, onBack }: { answers: Answers; set: Se
         <QHeader title="A quick acknowledgement" sub="One last thing before we build your experience." />
         <Reveal delay={160}>
           <CheckboxCard checked={checked} onToggle={() => set('terms', !checked)}>
-            <>I confirm I am <Text style={{ fontWeight: '700', color: tok.rgb('--fg') }}>18 or older</Text>, and I have read and agree to the Terms of Use. I acknowledge that StrengthHub provides general fitness and wellness information, <Text style={{ fontWeight: '700', color: tok.rgb('--fg') }}>not medical advice</Text>.</>
+            <>I confirm I am <Text style={{ fontWeight: '700', color: tok.rgb('--fg') }}>18 or older</Text>, and I have read and agree to the <Text style={{ fontWeight: '700', color: tok.rgb('--fg') }}>Terms of Use</Text> and <Text style={{ fontWeight: '700', color: tok.rgb('--fg') }}>Privacy Policy</Text>. I acknowledge that StrengthHub provides general fitness and wellness information, <Text style={{ fontWeight: '700', color: tok.rgb('--fg') }}>not medical advice</Text>.</>
           </CheckboxCard>
         </Reveal>
         <Reveal delay={230}>
           <View style={{ marginTop: 16 }}>
-            {['Terms of Use', 'Privacy Policy', 'Health & safety information'].map((l) => (
-              <Pressable key={l} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 2, borderBottomWidth: 1, borderBottomColor: tok.rgb('--fg', 0.05) }}>
+            {([
+              ['Terms of Use', 'https://strengthhubonline.com/terms'],
+              ['Privacy Policy', 'https://strengthhubonline.com/privacy'],
+              ['Health & safety information', 'https://strengthhubonline.com/health-safety'],
+            ] as const).map(([l, url]) => (
+              <Pressable key={l} accessibilityRole="link" onPress={() => { Linking.openURL(url).catch(() => {}) }} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 2, borderBottomWidth: 1, borderBottomColor: tok.rgb('--fg', 0.05) }}>
                 <Text style={{ fontSize: 14.5, fontWeight: '600', color: tok.rgb('--brand-300') }}>{l}</Text>
                 <Icon name="forward" size={16} stroke={2.2} color={tok.rgb('--fg', 0.3)} />
               </Pressable>
