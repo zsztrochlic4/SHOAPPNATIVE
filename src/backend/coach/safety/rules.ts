@@ -705,11 +705,35 @@ const CATEGORY_TERMS: Partial<Record<SafetyCategory, string[]>> = {
 }
 
 /** Decide whether a hit is suppressed by scoping, returning the rule name (or null to keep it). */
+/**
+ * A clearly benign, modest, quantified calorie adjustment relative to MAINTENANCE, with no disordered-
+ * eating signal or extreme marker — ordinary cut/bulk coaching, not DE (Jack R8 B10: "cutting about 150
+ * calories from maintenance for the next fortnight … keep protein steady"). Tightly bounded: it needs an
+ * explicit "… maintenance" reference (or an explicitly small/modest deficit/surplus) AND the absence of
+ * any DE signal, a bodyweight-target loss, or a restriction/extreme cue — so real DE never matches.
+ */
+function isBenignModestDeficit(n: Norm): boolean {
+  // A SMALL quantified amount (<=3 digits, so 150 matches but "1500 below maintenance" does not) tied to
+  // maintenance, OR an explicit small/modest qualifier. A bare "below maintenance" (which could be large)
+  // is deliberately NOT enough.
+  const modestQuantified =
+    hasRe(n, /\b\d{1,3}\s?(cal|cals|calorie|calories|kcal)\b[a-z ]{0,12}\b(from|below|under|off)\b[a-z ]{0,4}\bmaintenance\b/) ||
+    hasRe(n, /\b(from|below|under|off)\b[a-z ]{0,4}\bmaintenance\b[a-z ]{0,12}\b\d{1,3}\s?(cal|cals|calorie|calories|kcal)\b/)
+  const explicitlyModest = has(n, 'slight deficit', 'small deficit', 'modest deficit', 'mild deficit',
+    'small calorie deficit', 'mini cut', 'slight surplus', 'small surplus', 'lean bulk')
+  const extreme = has(n, ...DE_SIGNALS) ||
+    hasRe(n, /\b(lose|drop|shed)\b[a-z0-9 ]{0,12}\d+\s?(kg|kgs|kilo|kilos|pound|pounds|lb|lbs)\b/) ||
+    has(n, 'starving', 'not eating', 'barely eating', 'skip', 'skipping', 'crash', 'as fast as possible',
+      'hate my body', 'hate the way i look', 'very low', 'nothing all day', 'once a day', 'under 1000', 'under 1200')
+  return (modestQuantified || explicitlyModest) && !extreme
+}
+
 function suppressionRule(n: Norm, category: SafetyCategory): string | null {
   const rules = SCOPED[category]
   if (!rules) return null
   if (hasCurrentSafetySignal(n)) return null // PARAMOUNT: any live distress/intent/action blocks ALL suppression
   if (firstPersonPresent(n, category)) return null // current first-person disclosure of this category wins
+  if (category === 'disordered_eating' && isBenignModestDeficit(n)) return 'benign_modest_deficit'
   const terms = CATEGORY_TERMS[category] ?? []
   if (rules.includes('third_party') && subjectThirdParty(n, terms)) return 'third_party_subject'
   if (rules.includes('historical') && historicalResolved(n)) return 'historical_resolved'
@@ -788,7 +812,15 @@ export function hasImmediacy(text: string): boolean {
   // Intent-immediacy only. Deliberately NOT the bare adverbs "now"/"today", which fire on benign
   // context ("I'm safe now"); we require an explicit imminence phrase so the escalation can't
   // over-fire on incidental wording.
-  return hasRe(n, /\b(right now|tonight|this (minute|second|moment|evening)|about to|going to|gonna|planning to|plan to|have a plan)\b/)
+  // A hard time/act marker is immediacy on its own, even beside a hedge.
+  const hardMarker = hasRe(n, /\b(right now|tonight|this (minute|second|moment|evening)|about to|doing it now|do it now)\b/)
+  if (hardMarker) return true
+  // A NEGATED plan / intent ("not planning to", "no plan", "not going to do anything", "no intention")
+  // is the OPPOSITE of immediacy and must NOT escalate crisis→000 (Jack R8 F07: "i'm not planning to do
+  // anything and i'm sitting with my brother …"). Suppress plan-based immediacy when it is negated.
+  const negatedIntent = hasRe(n, /\b(not|no|dont|don t|never|havent|haven t|isnt|isn t|wont|won t|without)\b[a-z ]{0,10}\b(plan|planning|planned|going to|gonna|intend|intention|do anything|do it)\b/)
+  if (negatedIntent) return false
+  return hasRe(n, /\b(going to|gonna|planning to|plan to|have a plan)\b/)
 }
 
 /**
