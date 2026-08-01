@@ -11,11 +11,14 @@
  * signOff.ts). Enabling the workout generator must never enable the coach; the coach
  * is not part of that launch and gets reviewed and switched on separately.
  *
- * To turn the coach on AFTER its review: set `COACH_ENABLED = true` (ideally sourced
- * from a remote flag rather than a code edit) and confirm App Check is live.
+ * ENABLED 2026-08-01 after the independent clinical validation (Jack Dov, R8: 0 critical
+ * misses, 0 emergency under-routes, 0 crisis-tier false alarms) and the activation controls
+ * (named owners, kill switch verified, App Check aligned across the backend). Remote OFF stays
+ * available WITHOUT a redeploy via `config/coach.killSwitch` (see safety/killSwitch.ts +
+ * functions/src/killSwitchRemote.ts) — the kill switch is now the active off-switch.
  */
 
-export const COACH_ENABLED = false
+export const COACH_ENABLED = true
 
 /** True only when the coach has been deliberately enabled post-review. */
 export function coachAvailable(): boolean {

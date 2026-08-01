@@ -1,7 +1,8 @@
-// Server-side coach orchestration. The ENABLE GATE is verified via runCoachTurn
-// (throws coach_disabled); the guarded behaviour — a crisis never reaches the
-// model, an allowed turn does + is validated, the daily cap is honoured — is
-// verified via coachTurnCore with injected fakes, so nothing flips COACH_ENABLED.
+// Server-side coach orchestration. COACH_ENABLED is now ON (post-validation), so the remaining
+// off-switch is the remote kill switch: runCoachTurn proceeds when the gate is open and throws
+// coach_unavailable when the kill switch is engaged. The guarded behaviour — a crisis never reaches
+// the model, an allowed turn does + is validated, the daily cap is honoured — is verified via
+// coachTurnCore with injected fakes.
 //   npm --prefix functions run build && node --test functions/test/coach.test.mjs
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -24,9 +25,15 @@ const baseDeps = (over = {}) => {
   return { deps, replyCalls: () => replyCalls }
 }
 
-test('runCoachTurn refuses with coach_disabled while the gate is off (the release gate holds)', async () => {
+test('runCoachTurn proceeds past the enable gate (COACH_ENABLED is on)', async () => {
   const { deps } = baseDeps()
-  await assert.rejects(() => runCoachTurn('u1', { message: 'how do I squat?' }, deps), /coach_disabled/)
+  const out = await runCoachTurn('u1', { message: 'how do I squat?' }, deps)
+  assert.equal(out.blocked, false) // gate open + benign turn → coached (not coach_disabled)
+})
+
+test('runCoachTurn refuses with coach_unavailable when the remote kill switch is engaged', async () => {
+  const { deps } = baseDeps({ killSwitchEngaged: () => true })
+  await assert.rejects(() => runCoachTurn('u1', { message: 'how do I squat?' }, deps), /coach_unavailable/)
 })
 
 test('a crisis message is blocked by the safety floor and NEVER reaches the model', async () => {
