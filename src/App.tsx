@@ -1,5 +1,5 @@
 import { Activity, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { View, Text, ActivityIndicator, ScrollView, Animated, Easing } from 'react-native'
+import { View, Text, ScrollView, Animated, Easing } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar'
@@ -20,7 +20,7 @@ import { PushRegistration, NotificationsSync } from './components/PushRegistrati
 import { CompletionQueueSync } from './components/CompletionQueueSync'
 import { ToastProvider } from './components/Toast'
 import { NavProvider, type Overlay } from './nav'
-import { themeVars, useThemeName, brand, cssVars } from './theme'
+import { themeVars, useThemeName, cssVars } from './theme'
 import { setSoundEnabled } from './lib/sound'
 import { initBudgetMeals } from './data/recipes'
 import { initExerciseInfo } from './data/exerciseInfo'
@@ -349,9 +349,25 @@ function AuthGate() {
   const insets = useSafeAreaInsets()
 
   if (enabled && loading) {
+    // Branded bootstrap skeleton (audit F-037): the same dashboard-shaped
+    // placeholder Shell uses, so a cold start reads as "almost ready" instead
+    // of a generic full-screen spinner.
     return (
-      <View className="flex-1 items-center justify-center bg-ink-900" style={{ paddingTop: insets.top }}>
-        <ActivityIndicator color={brand[400]} size="large" />
+      <View className="flex-1 bg-ink-900 px-5" style={{ paddingTop: insets.top + 12 }}>
+        <View className="flex-row items-center justify-between">
+          <Skeleton width={40} height={40} radius={12} />
+          <Skeleton width={96} height={20} radius={6} />
+          <Skeleton width={40} height={40} radius={12} />
+        </View>
+        <View className="mt-6 items-center gap-3">
+          <Skeleton width={200} height={20} radius={6} />
+          <Skeleton width={228} height={116} radius={16} />
+          <Skeleton width={240} height={14} radius={6} />
+        </View>
+        <View className="mt-8 gap-3">
+          <Skeleton width="100%" height={150} radius={16} />
+          <View className="mt-2"><SkeletonLines count={3} /></View>
+        </View>
       </View>
     )
   }

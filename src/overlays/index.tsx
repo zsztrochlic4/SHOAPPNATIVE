@@ -342,25 +342,35 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
           <ChevronRight size={18} color="rgba(255,255,255,0.4)" style={{ transform: [{ rotate: langOpen ? '90deg' : '0deg' }] }} />
         </Pressable>
         {langOpen && (
-          <View className="mt-2 flex-row flex-wrap gap-2">
-            {LANGUAGES.map((l) => {
-              const active = l.code === lang
-              return (
-                <Pressable
-                  key={l.code}
-                  onPress={() => { setLang(l.code); setLangOpen(false) }}
-                  className={`flex-row items-center justify-between rounded-2xl border p-3 active:opacity-90 ${active ? 'border-brand-400 bg-brand-400/10' : 'border-white/8 bg-ink-800'}`}
-                  style={{ width: '48%' }}
-                >
-                  <View className="min-w-0 flex-1">
-                    <Text numberOfLines={1} className="font-bold leading-tight text-white" style={l.rtl ? { writingDirection: 'rtl' } : undefined}>{l.native}</Text>
-                    <Text className="text-[11px] text-white/45">{l.english}</Text>
-                  </View>
-                  {active && <Check size={16} strokeWidth={3} color={brand[400]} />}
-                </Pressable>
-              )
-            })}
-          </View>
+          <>
+            <View className="mt-2 flex-row flex-wrap gap-2">
+              {LANGUAGES.map((l) => {
+                const active = l.code === lang
+                return (
+                  <Pressable
+                    key={l.code}
+                    onPress={() => { setLang(l.code); setLangOpen(false) }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${l.english}${l.code !== 'en' ? ' (partial translation)' : ''}`}
+                    accessibilityState={{ selected: active }}
+                    className={`flex-row items-center justify-between rounded-2xl border p-3 active:opacity-90 ${active ? 'border-brand-400 bg-brand-400/10' : 'border-white/8 bg-ink-800'}`}
+                    style={{ width: '48%' }}
+                  >
+                    <View className="min-w-0 flex-1">
+                      <Text numberOfLines={1} className="font-bold leading-tight text-white" style={l.rtl ? { writingDirection: 'rtl' } : undefined}>{l.native}</Text>
+                      <Text className="text-[11px] text-white/45">{l.english}{l.code !== 'en' ? ' · partial' : ''}</Text>
+                    </View>
+                    {active && <Check size={16} strokeWidth={3} color={brand[400]} />}
+                  </Pressable>
+                )
+              })}
+            </View>
+            {/* Honesty over implication (audit F-030): today's translations
+                cover Settings only — say so instead of promising a translated app. */}
+            <Text className="mt-2 px-1 text-[11px] leading-4 text-white/35">
+              Translations are a preview and currently cover Settings only — the rest of the app remains in English for now.
+            </Text>
+          </>
         )}
       </Group>
 
