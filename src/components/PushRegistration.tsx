@@ -1,7 +1,12 @@
 import { useEffect, useRef } from 'react'
 import { useAuth } from '../auth/AuthProvider'
-import { useStore } from '../store/store'
-import { requestPushPermission, getPushToken, savePushToken, syncReminders } from '../lib/notifications'
+import { useStoreSelector } from '../store/store'
+import type { AppState } from '../store/types'
+import { getPushToken, savePushToken, syncReminders } from '../lib/notifications'
+
+const selectNotificationsEnabled = (state: AppState) => state.settings.notificationsEnabled
+const selectNotificationConsent = (state: AppState) => state.settings.notificationConsent ?? 'unknown'
+const selectNotificationPrefs = (state: AppState) => state.settings.notificationPrefs
 
 /**
  * Registers this device for notifications when a signed-in user has them enabled:
@@ -14,23 +19,23 @@ import { requestPushPermission, getPushToken, savePushToken, syncReminders } fro
  */
 export function PushRegistration() {
   const { user } = useAuth()
-  const { state } = useStore()
-  const enabled = state.settings.notificationsEnabled
+  const enabled = useStoreSelector(selectNotificationsEnabled)
+  const consent = useStoreSelector(selectNotificationConsent)
   // Guards against re-running for a (user, setting) pair we've already registered.
   const done = useRef<string | null>(null)
 
   useEffect(() => {
-    if (!user || !enabled) return
+    // Permission is requested only from the user's Settings toggle. This
+    // background bridge must never trigger an OS prompt on sign-in or launch.
+    if (!user || !enabled || consent !== 'granted') return
     const key = `${user.uid}:on`
     if (done.current === key) return
     done.current = key
     ;(async () => {
-      const granted = await requestPushPermission()
-      if (!granted) { done.current = null; return } // let a later enable retry
       const token = await getPushToken()
       if (token) await savePushToken(user.uid, token)
     })().catch(() => { done.current = null })
-  }, [user, enabled])
+  }, [user, enabled, consent])
 
   return null
 }
@@ -42,11 +47,11 @@ export function PushRegistration() {
  * of auth so reminders work for signed-out and demo users too.
  */
 export function NotificationsSync() {
-  const { state } = useStore()
-  const enabled = state.settings.notificationsEnabled
-  const prefs = state.settings.notificationPrefs
+  const enabled = useStoreSelector(selectNotificationsEnabled)
+  const consent = useStoreSelector(selectNotificationConsent)
+  const prefs = useStoreSelector(selectNotificationPrefs)
   useEffect(() => {
-    void syncReminders(!!enabled, prefs)
-  }, [enabled, prefs])
+    void syncReminders(!!enabled && consent === 'granted', prefs)
+  }, [enabled, consent, prefs])
   return null
 }

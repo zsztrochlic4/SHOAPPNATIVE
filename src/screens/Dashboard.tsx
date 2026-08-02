@@ -657,7 +657,7 @@ function DayEditorSheet({ open, onClose, dateKey, dayLabel, goals, tags, workout
   workoutDone: boolean
   isRestDay: boolean
   colors: ThemeColors
-  dispatch: (action: any) => void // eslint-disable-line @typescript-eslint/no-explicit-any
+  dispatch: (action: any) => void
 }) {
   const win = useWindowDimensions()
   const screenH = IS_WEB ? WEB_SCREEN.height : win.height

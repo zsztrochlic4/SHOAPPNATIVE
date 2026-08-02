@@ -1,5 +1,5 @@
-import { useRef, useState, type ReactNode } from 'react'
-import { View, Text, Pressable, Image, ScrollView, Animated, Easing } from 'react-native'
+import { memo, useCallback, useRef, useState, type ReactNode } from 'react'
+import { View, Text, Pressable, Image, ScrollView, FlatList, Animated, Easing, type ListRenderItemInfo } from 'react-native'
 import {
   Users, Heart, MessageCircle, Bookmark, ChevronRight, MoreHorizontal, CalendarClock,
   HeartHandshake, Award, UserPlus, Swords, TrendingUp,
@@ -8,7 +8,7 @@ import { Icon } from '../components/Icon'
 import { Avatar, AvatarStack } from '../components/Avatar'
 import { ProgressRing, ProgressBar, SegmentedTabs, ScreenHeader, SectionHeader, Chip } from '../components/ui'
 import { Hero } from '../components/Hero'
-import { useStore } from '../store/store'
+import { useDispatch, useStore } from '../store/store'
 import { useNav } from '../nav'
 import { img } from '../data/catalog'
 import { youRank } from '../store/selectors'
@@ -52,6 +52,8 @@ const SCOPES: { id: CommunityScope; label: (p: { university: string; dorm: strin
   { id: 'dorm', label: (p) => p.dorm },
   { id: 'society', label: (p) => p.society },
 ]
+const feedPostKey = (post: Post) => post.id
+const feedContentStyle = { gap: 12, paddingHorizontal: 20, paddingBottom: 4 }
 
 function FeedTab() {
   const { state, dispatch } = useStore()
@@ -63,6 +65,10 @@ function FeedTab() {
       : scope === 'society'
         ? state.challenges.find((c) => c.scope === 'society')
         : state.challenges.find((c) => c.joined && c.scope === 'campus')
+  const renderPost = useCallback(
+    ({ item }: ListRenderItemInfo<Post>) => <FeedCard post={item} />,
+    [],
+  )
 
   return (
     <>
@@ -94,9 +100,18 @@ function FeedTab() {
       </View>
 
       <SectionHeader title="What's happening" />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-5" contentContainerStyle={{ flexDirection: 'row', gap: 12, paddingHorizontal: 20, paddingBottom: 4 }}>
-        {state.posts.map((p) => <FeedCard key={p.id} post={p} onLike={() => dispatch({ type: 'TOGGLE_LIKE', postId: p.id })} onKudos={() => dispatch({ type: 'GIVE_KUDOS', postId: p.id })} onBookmark={() => dispatch({ type: 'TOGGLE_BOOKMARK', postId: p.id })} onComment={() => nav.open('postDetail', { postId: p.id })} />)}
-      </ScrollView>
+      <FlatList
+        horizontal
+        data={state.posts}
+        renderItem={renderPost}
+        keyExtractor={feedPostKey}
+        className="-mx-5"
+        contentContainerStyle={feedContentStyle}
+        showsHorizontalScrollIndicator={false}
+        initialNumToRender={3}
+        maxToRenderPerBatch={3}
+        windowSize={5}
+      />
 
       {featured && (
         <>
@@ -121,7 +136,13 @@ function FeedTab() {
   )
 }
 
-function FeedCard({ post: p, onLike, onKudos, onBookmark, onComment }: { post: Post; onLike: () => void; onKudos: () => void; onBookmark: () => void; onComment: () => void }) {
+const FeedCard = memo(function FeedCard({ post: p }: { post: Post }) {
+  const dispatch = useDispatch()
+  const nav = useNav()
+  const onLike = useCallback(() => dispatch({ type: 'TOGGLE_LIKE', postId: p.id }), [dispatch, p.id])
+  const onKudos = useCallback(() => dispatch({ type: 'GIVE_KUDOS', postId: p.id }), [dispatch, p.id])
+  const onBookmark = useCallback(() => dispatch({ type: 'TOGGLE_BOOKMARK', postId: p.id }), [dispatch, p.id])
+  const onComment = useCallback(() => nav.open('postDetail', { postId: p.id }), [nav, p.id])
   return (
     <View className="w-[268px] shrink-0 overflow-hidden rounded-2xl border border-white/5 bg-ink-800">
       <View className="flex-row items-center gap-2.5 p-3">
@@ -169,7 +190,7 @@ function FeedCard({ post: p, onLike, onKudos, onBookmark, onComment }: { post: P
       </View>
     </View>
   )
-}
+})
 
 /* A like/kudos button with an optimistic heart-burst. The tap registers
  * instantly (the reducer already toggled state) and a little pop of particles

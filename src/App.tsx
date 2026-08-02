@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { View, ActivityIndicator, ScrollView, Animated, Easing } from 'react-native'
+import { Activity, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { View, Text, ActivityIndicator, ScrollView, Animated, Easing } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar'
@@ -8,7 +8,8 @@ import { WebPreviewFrame, IS_WEB } from './components/WebFrame'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { BottomNav } from './components/BottomNav'
 import { SwipeNav } from './components/SwipeNav'
-import { StoreProvider, useStore } from './store/store'
+import { StoreProvider, useStore, useStoreMeta, useStoreSelector } from './store/store'
+import type { AppState } from './store/types'
 import { AuthProvider, useAuth } from './auth/AuthProvider'
 import { isEntitled } from './store/selectors'
 import { CloudSync } from './store/CloudSync'
@@ -66,6 +67,9 @@ const screens: Record<TabKey, React.ComponentType> = {
   progress: Progress,
   community: Community,
 }
+const TAB_KEYS = Object.keys(screens) as TabKey[]
+const selectSoundEnabled = (state: AppState) => state.settings.soundEnabled ?? true
+const selectOnboarded = (state: AppState) => state.profile.onboarded
 
 /**
  * Fades + slides each screen up by 10px when the active tab changes, mirroring
@@ -97,15 +101,27 @@ function ScreenFade({ tabKey, children }: { tabKey: string; children: React.Reac
 }
 
 function Shell() {
-  const { state, hydrated } = useStore()
+  const { hydrated, persistenceError } = useStoreMeta()
+  const onboarded = useStoreSelector(selectOnboarded)
   const insets = useSafeAreaInsets()
   const [tab, setTab] = useState<TabKey>('dashboard')
+  const [visitedTabs, setVisitedTabs] = useState<Set<TabKey>>(() => new Set(['dashboard']))
   const [overlay, setOverlay] = useState<Overlay | null>(null)
   const [params, setParams] = useState<Record<string, unknown>>({})
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuStack, setMenuStack] = useState(false)
 
-  const nav = {
+  const selectTab = useCallback((next: TabKey) => {
+    setVisitedTabs((visited) => {
+      if (visited.has(next)) return visited
+      const updated = new Set(visited)
+      updated.add(next)
+      return updated
+    })
+    setTab(next)
+  }, [])
+
+  const nav = useMemo(() => ({
     open: (o: Overlay, p: Record<string, unknown> = {}) => {
       setParams(p)
       setMenuStack(false)
@@ -121,7 +137,7 @@ function Shell() {
       setOverlay(null)
       setMenuStack(false)
       setMenuOpen(false)
-      setTab(t)
+      selectTab(t)
     },
     menuOpen,
     openMenu: () => setMenuOpen(true),
@@ -139,8 +155,9 @@ function Shell() {
       setOverlay(null)
       setMenuStack(false)
       setMenuOpen(false)
+      selectTab('dashboard')
     },
-  }
+  }), [menuOpen, menuStack, selectTab])
 
   if (!hydrated) {
     // A dashboard-shaped skeleton reads as "almost ready" rather than a lonely
@@ -170,7 +187,7 @@ function Shell() {
     )
   }
 
-  if (!state.profile.onboarded) {
+  if (!onboarded) {
     return (
       <NavProvider value={nav}>
         <View className="flex-1 bg-ink-900" style={{ paddingTop: insets.top }}>
@@ -180,75 +197,94 @@ function Shell() {
     )
   }
 
-  const Screen = screens[tab]
-
-  // Screens that own their scrolling (per-section scrollers, sticky headers)
-  // render directly; the rest ride this shared outer scroller.
-  const selfScroll = tab === 'nutrition'
-  const content = selfScroll ? (
-    <Screen />
-  ) : (
-    <ScrollView
-      key={tab}
-      className="flex-1"
-      contentContainerStyle={{ paddingBottom: insets.bottom + 112 }}
-      showsVerticalScrollIndicator={false}
-    >
+  const renderTab = (tabKey: TabKey) => {
+    const Screen = screens[tabKey]
+    // Nutrition and Workout own their scrolling (section scrollers, sticky
+    // controls, and virtualised lists); the remaining screens keep a dedicated
+    // outer scroller.
+    const content = tabKey === 'nutrition' || tabKey === 'workout' ? (
       <Screen />
-    </ScrollView>
-  )
+    ) : (
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ paddingBottom: insets.bottom + 112 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <Screen />
+      </ScrollView>
+    )
+    return tabKey === 'dashboard' ? (
+      <SwipeNav onOpenMenu={nav.openMenu} onOpenCoach={() => nav.open('coachChat')}>
+        {content}
+      </SwipeNav>
+    ) : content
+  }
+
+  // ActiveWorkout remains mounted so an in-progress timer survives temporarily
+  // closing its sheet. Every other overlay is instantiated only while active.
+  const overlayContent = (() => {
+    switch (overlay) {
+      case 'notifications': return <NotificationsSheet open onClose={nav.close} />
+      case 'settings': return <SettingsSheet open onClose={nav.close} />
+      case 'logWeight': return <LogWeightSheet open onClose={nav.close} />
+      case 'logHabit': return <LogHabitSheet open onClose={nav.close} params={params} />
+      case 'createPost': return <CreatePostSheet open onClose={nav.close} />
+      case 'leaderboard': return <LeaderboardSheet open onClose={nav.close} />
+      case 'quick': return <QuickWorkoutsSheet open onClose={nav.close} />
+      case 'badges': return <BadgesSheet open onClose={nav.close} />
+      case 'examMode': return <PlanAroundLifeSheet open onClose={nav.close} />
+      case 'coach': return <CoachSheet open onClose={nav.close} />
+      case 'coachChat': return <CoachChatSheet open onClose={nav.close} />
+      case 'beginner': return <BeginnerSheet open onClose={nav.close} />
+      case 'budgetEats': return <BudgetEatsSheet open onClose={nav.close} />
+      case 'exerciseDetail': return <ExerciseDetailSheet open onClose={nav.close} params={params} />
+      case 'partnerMatch': return <PartnerMatchSheet open onClose={nav.close} />
+      case 'prCelebration': return <PRCelebrationSheet open onClose={nav.close} params={params} />
+      case 'logActivity': return <LogActivitySheet open onClose={nav.close} />
+      case 'postDetail': return <PostDetailSheet open onClose={nav.close} params={params} />
+      case 'challengeDetail': return <ChallengeDetailSheet open onClose={nav.close} params={params} />
+      case 'customize': return <CustomizeSheet open onClose={nav.close} params={params} />
+      case 'createSession': return <CreateSessionSheet open onClose={nav.close} params={params} />
+      default: return null
+    }
+  })()
 
   return (
     <NavProvider value={nav}>
       <View className="flex-1 bg-ink-900" style={{ paddingTop: insets.top }}>
-        <ScreenFade tabKey={tab}>
-          {/* The dashboard adds edge-swipe → menu (L→R) / coach (R→L). Other
-              tabs render the scroller directly. */}
-          {tab === 'dashboard' ? (
-            <SwipeNav onOpenMenu={nav.openMenu} onOpenCoach={() => nav.open('coachChat')}>
-              {content}
-            </SwipeNav>
-          ) : (
-            content
-          )}
-        </ScreenFade>
-        <BottomNav active={tab} onChange={setTab} />
+        {persistenceError && onboarded && (
+          <View
+            accessibilityRole="alert"
+            className="border-b border-red-400/20 bg-red-500/10 px-5 py-2.5"
+          >
+            <Text className="text-center text-[12px] leading-4 text-red-100">
+              Saved data could not be loaded. It has not been overwritten; avoid resetting the app and contact support.
+            </Text>
+          </View>
+        )}
+        <View className="flex-1">
+          {TAB_KEYS.map((tabKey) => visitedTabs.has(tabKey) && (
+            <Activity key={tabKey} name={`tab-${tabKey}`} mode={tab === tabKey ? 'visible' : 'hidden'}>
+              <ScreenFade tabKey={tabKey}>{renderTab(tabKey)}</ScreenFade>
+            </Activity>
+          ))}
+        </View>
+        <BottomNav active={tab} onChange={selectTab} />
       </View>
 
       {/* Overlays */}
       <ActiveWorkout open={overlay === 'activeWorkout'} onClose={nav.close} onComplete={() => nav.goTab('dashboard')} params={params} />
-      <NotificationsSheet open={overlay === 'notifications'} onClose={nav.close} />
-      <SettingsSheet open={overlay === 'settings'} onClose={nav.close} />
       <MenuDrawer open={menuOpen} onClose={nav.closeMenu} />
-      <LogWeightSheet open={overlay === 'logWeight'} onClose={nav.close} />
-      <LogHabitSheet open={overlay === 'logHabit'} onClose={nav.close} params={params} />
-      <CreatePostSheet open={overlay === 'createPost'} onClose={nav.close} />
-      <LeaderboardSheet open={overlay === 'leaderboard'} onClose={nav.close} />
-      <QuickWorkoutsSheet open={overlay === 'quick'} onClose={nav.close} />
-      <BadgesSheet open={overlay === 'badges'} onClose={nav.close} />
-      <PlanAroundLifeSheet open={overlay === 'examMode'} onClose={nav.close} />
-      <CoachSheet open={overlay === 'coach'} onClose={nav.close} />
-      <CoachChatSheet open={overlay === 'coachChat'} onClose={nav.close} />
-      <BeginnerSheet open={overlay === 'beginner'} onClose={nav.close} />
-      <BudgetEatsSheet open={overlay === 'budgetEats'} onClose={nav.close} />
-      <ExerciseDetailSheet open={overlay === 'exerciseDetail'} onClose={nav.close} params={params} />
-      <PartnerMatchSheet open={overlay === 'partnerMatch'} onClose={nav.close} />
-      <PRCelebrationSheet open={overlay === 'prCelebration'} onClose={nav.close} params={params} />
-      <LogActivitySheet open={overlay === 'logActivity'} onClose={nav.close} />
-      <PostDetailSheet open={overlay === 'postDetail'} onClose={nav.close} params={params} />
-      <ChallengeDetailSheet open={overlay === 'challengeDetail'} onClose={nav.close} params={params} />
-      <CustomizeSheet open={overlay === 'customize'} onClose={nav.close} params={params} />
-      <CreateSessionSheet open={overlay === 'createSession'} onClose={nav.close} params={params} />
+      {overlayContent}
     </NavProvider>
   )
 }
 
 function ThemedRoot() {
   const name = useThemeName()
-  const { state } = useStore()
+  const soundOn = useStoreSelector(selectSoundEnabled)
 
   // Keep the (asset-free) sound engine in sync with Settings → "Sounds & cues".
-  const soundOn = state.settings.soundEnabled ?? true
   useEffect(() => {
     setSoundEnabled(soundOn)
   }, [soundOn])

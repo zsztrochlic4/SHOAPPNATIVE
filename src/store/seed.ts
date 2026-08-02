@@ -33,7 +33,7 @@ import type {
   WorkoutSession,
 } from './types'
 
-export const SCHEMA_VERSION = 10
+export const SCHEMA_VERSION = 11
 const DAYS = 40 // 0..38 completed history, 39 = today (in progress)
 
 /* round to nearest 2.5 (plate increments) */
@@ -361,7 +361,15 @@ export function buildSeed(): AppState {
 
   return {
     profile,
-    settings: { units: 'metric', theme: 'dark', notificationsEnabled: true, soundEnabled: true, language: 'en', connections: {} },
+    settings: {
+      units: 'metric',
+      theme: 'dark',
+      notificationsEnabled: false,
+      notificationConsent: 'unknown',
+      soundEnabled: true,
+      language: 'en',
+      connections: {},
+    },
     weights,
     habits,
     meals,

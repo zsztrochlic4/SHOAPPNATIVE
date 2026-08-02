@@ -50,10 +50,6 @@ export function Sheet({
   const colors = useColors()
   const nav = useNav()
 
-  if (bare) {
-    return <BarePanel open={open} onClose={onClose}>{children}</BarePanel>
-  }
-
   // Latch the presentation the moment the menu pushes this overlay, SYNCHRONOUSLY
   // during render (the "adjust state when a prop changes" pattern) — a post-render
   // effect would commit one frame of the bottom-sheet slide-up before switching to
@@ -64,6 +60,10 @@ export function Sheet({
   const wasOpen = useRef(false)
   if (open && !wasOpen.current && menuMode !== nav.menuStack) setMenuMode(nav.menuStack)
   wasOpen.current = open
+
+  if (bare) {
+    return <BarePanel open={open} onClose={onClose}>{children}</BarePanel>
+  }
 
   if (menuMode) {
     return (

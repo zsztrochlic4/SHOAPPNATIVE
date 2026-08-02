@@ -5,6 +5,7 @@ import type { StoredProgram, ProgramStatus } from '../backend/runtime/activate'
 
 export type Units = 'metric' | 'imperial'
 export type Theme = 'dark' | 'light'
+export type NotificationConsent = 'unknown' | 'granted' | 'denied'
 export type Goal = 'build-muscle' | 'lose-fat' | 'gain-strength' | 'stay-healthy'
 export type Experience = 'beginner' | 'intermediate' | 'advanced'
 export type Equipment = 'full-gym' | 'home-basic' | 'dorm-bodyweight'
@@ -143,6 +144,9 @@ export interface Settings {
   units: Units
   theme: Theme
   notificationsEnabled: boolean
+  /** Explicit OS permission provenance. Missing on legacy saves, which must be
+   *  treated as unknown rather than consent inferred from the old seeded flag. */
+  notificationConsent?: NotificationConsent
   /** Per-category notification preferences + quiet hours. Defaults applied when absent. */
   notificationPrefs?: NotificationPrefs
   /** Play the rest-timer beeps/tick and the workout-complete chime. Defaults on. */

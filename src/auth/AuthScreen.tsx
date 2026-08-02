@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { View, Text, TextInput, Pressable, ScrollView, ActivityIndicator } from 'react-native'
+import { View, Text, TextInput, Pressable, ScrollView, ActivityIndicator, Platform } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LogoMark } from '../components/Logo'
 import { PressableScale } from '../components/PressableScale'
@@ -126,19 +126,25 @@ export function AuthScreen({ initialMode = 'signin', onBack }: { initialMode?: '
           )}
         </PressableScale>
 
-        <View className="my-5 flex-row items-center gap-3">
-          <View className="h-px flex-1 bg-white/10" />
-          <Text className="text-[12px] text-white/35">or</Text>
-          <View className="h-px flex-1 bg-white/10" />
-        </View>
+        {Platform.OS === 'web' && (
+          <>
+            <View className="my-5 flex-row items-center gap-3">
+              <View className="h-px flex-1 bg-white/10" />
+              <Text className="text-[12px] text-white/35">or</Text>
+              <View className="h-px flex-1 bg-white/10" />
+            </View>
 
-        <PressableScale
-          onPress={google}
-          disabled={busy}
-          className={`w-full flex-row items-center justify-center gap-2 rounded-full border border-white/15 bg-ink-800 py-3 ${busy ? 'opacity-60' : ''}`}
-        >
-          <Text className="font-semibold text-white">Continue with Google</Text>
-        </PressableScale>
+            <PressableScale
+              onPress={google}
+              disabled={busy}
+              accessibilityRole="button"
+              accessibilityLabel="Continue with Google"
+              className={`w-full flex-row items-center justify-center gap-2 rounded-full border border-white/15 bg-ink-800 py-3 ${busy ? 'opacity-60' : ''}`}
+            >
+              <Text className="font-semibold text-white">Continue with Google</Text>
+            </PressableScale>
+          </>
+        )}
 
         <Pressable onPress={() => { setMode(isSignup ? 'signin' : 'signup'); setError(null); setNotice(null) }} className="mt-6 active:opacity-70">
           <Text className="text-center text-[14px] text-white/55">

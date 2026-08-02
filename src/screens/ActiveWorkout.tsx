@@ -188,8 +188,6 @@ export default function ActiveWorkout({ open, onClose, onComplete, params }: { o
 
   const finishStatsRef = useRef<{ time: number; volume: number; sets: number } | null>(null)
   const finishPRRef = useRef<PR | null>(null)
-  const finishTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
   const listScrollRef = useRef<ScrollView>(null)
 
   // Fresh guided state every time the surface opens.
@@ -201,7 +199,6 @@ export default function ActiveWorkout({ open, onClose, onComplete, params }: { o
     finishPRRef.current = null; finishStatsRef.current = null
     // Opening the workout counts as starting it for today's dashboard tick.
     if (session) dispatch({ type: 'MARK_WORKOUT_STARTED' })
-    return () => { if (finishTimer.current) clearTimeout(finishTimer.current) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
@@ -255,7 +252,6 @@ export default function ActiveWorkout({ open, onClose, onComplete, params }: { o
     if (restRemaining <= 3) restTick()
     const t = setTimeout(() => setRestRemaining((r) => r - 1), 1000)
     return () => clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, restRemaining])
 
   const exam = examState(state)

@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { View, Text, Pressable, Image, TextInput, StyleSheet, ScrollView } from 'react-native'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { View, Text, Pressable, Image, TextInput, StyleSheet, ScrollView, FlatList, type ListRenderItemInfo } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Path, Circle } from 'react-native-svg'
 import {
   Clock, Play, ChevronRight, ChevronDown, Check, Plus, Trash2, Activity, Repeat, RefreshCw,
@@ -9,7 +10,6 @@ import { Icon } from '../components/Icon'
 import { ActivityIcon } from '../components/ActivityIcon'
 import { ProgressBar, SegmentedTabs, ScreenHeader, Chip } from '../components/ui'
 import { MuscleMapCard } from '../components/MuscleMapCard'
-import { Skeleton } from '../components/Skeleton'
 import { useStore } from '../store/store'
 import { useNav } from '../nav'
 import { ACTIVE_EXERCISES } from '../backend/data'
@@ -28,16 +28,30 @@ const TABS = ['Today', 'Program', 'Exercises', 'History']
 
 export default function Workout() {
   const [tab, setTab] = useState('Today')
+  const insets = useSafeAreaInsets()
+  const contentStyle = useMemo(() => ({ paddingBottom: insets.bottom + 112 }), [insets.bottom])
   return (
-    <View className="px-5 pt-2">
-      <ScreenHeader title="Workout" />
-      <SegmentedTabs tabs={TABS} active={tab} onChange={setTab} />
-      <View className="mt-5">
-        {tab === 'Today' && <TodayTab />}
-        {tab === 'Program' && <ProgramTab />}
-        {tab === 'Exercises' && <ExercisesTab />}
-        {tab === 'History' && <HistoryTab />}
+    <View className="flex-1 pt-2">
+      <View className="px-5">
+        <ScreenHeader title="Workout" />
+        <SegmentedTabs tabs={TABS} active={tab} onChange={setTab} />
       </View>
+      {tab === 'Exercises' ? (
+        <ExercisesTab bottomInset={insets.bottom + 112} />
+      ) : tab === 'History' ? (
+        <HistoryTab bottomInset={insets.bottom + 112} />
+      ) : (
+        <ScrollView
+          className="flex-1"
+          contentContainerStyle={contentStyle}
+          showsVerticalScrollIndicator={false}
+        >
+          <View className="px-5 pt-5">
+            {tab === 'Today' && <TodayTab />}
+            {tab === 'Program' && <ProgramTab />}
+          </View>
+        </ScrollView>
+      )}
     </View>
   )
 }
@@ -356,13 +370,15 @@ function LegacyProgram() {
 // Preset muscle-group filters, in a natural push→pull→legs order (only those present are shown).
 const MUSCLE_ORDER = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Core', 'Quads', 'Hamstrings & Glutes', 'Calves', 'Full Body & Conditioning']
 
-function ExercisesTab() {
+type ExerciseLibraryItem = { id: string; name: string; muscle: string; image: string }
+
+const exerciseKey = (item: ExerciseLibraryItem) => item.id
+
+function ExercisesTab({ bottomInset }: { bottomInset: number }) {
   const nav = useNav()
   const { state } = useStore()
   const [q, setQ] = useState('')
   const [muscle, setMuscle] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
-  const loadTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   const beginnerDone = (state.beginnerProgress?.length ?? 0) >= BEGINNER_LESSONS.length
 
@@ -390,16 +406,25 @@ function ExercisesTab() {
     [q, muscle, all],
   )
 
-  // Brief skeleton on a filter change so the grid reshuffles with a settle, matching the design.
-  function pickMuscle(m: string | null) {
-    setMuscle(m)
-    setLoading(true)
-    clearTimeout(loadTimer.current)
-    loadTimer.current = setTimeout(() => setLoading(false), 380)
-  }
-  useEffect(() => () => clearTimeout(loadTimer.current), [])
+  const openExercise = useCallback((id: string) => {
+    nav.open('exerciseDetail', { defId: id, library: true })
+  }, [nav])
+  const renderExercise = useCallback(
+    ({ item }: ListRenderItemInfo<ExerciseLibraryItem>) => (
+      <ExerciseLibraryCard exercise={item} onOpen={openExercise} />
+    ),
+    [openExercise],
+  )
+  const clearFilters = useCallback(() => {
+    setQ('')
+    setMuscle(null)
+  }, [])
+  const listContentStyle = useMemo(
+    () => ({ paddingHorizontal: 20, paddingTop: 20, paddingBottom: bottomInset, gap: 12 }),
+    [bottomInset],
+  )
 
-  return (
+  const header = (
     <View>
       {/* Beginner guide — full card until finished, then a compact "revisit" row. */}
       {beginnerDone ? (
@@ -444,7 +469,7 @@ function ExercisesTab() {
           return (
             <Pressable
               key={m}
-              onPress={() => pickMuscle(on ? null : m)}
+              onPress={() => setMuscle(on ? null : m)}
               className={`flex-row items-center gap-1.5 rounded-full px-3.5 py-2 active:opacity-80 ${on ? 'bg-brand-400' : 'border border-white/10 bg-ink-800'}`}
             >
               <Text className={`text-[12.5px] font-semibold ${on ? 'text-black' : 'text-white/70'}`}>{m}</Text>
@@ -454,48 +479,69 @@ function ExercisesTab() {
         })}
       </ScrollView>
 
-      {/* Filter title + count / loading */}
+      {/* Filter title + result count */}
       <View className="mb-3 flex-row items-center justify-between px-0.5">
         <Text className="text-[12px] font-bold uppercase tracking-wider text-white/35">{muscle ?? 'All exercises'}</Text>
-        {loading ? (
-          <View className="flex-row items-center gap-1.5">
-            <RefreshCw size={12} color={brand[400]} />
-            <Text className="text-[12px] text-white/35">Loading</Text>
-          </View>
-        ) : (
-          <Text className="text-[12px] text-white/35">{filtered.length} of {all.length}</Text>
-        )}
+        <Text className="text-[12px] text-white/35">{filtered.length} of {all.length}</Text>
       </View>
 
-      {loading ? (
-        <View className="flex-row flex-wrap gap-3">
-          {['78%', '58%', '66%', '84%', '52%', '72%'].map((w, i) => (
-            <View key={i} className="flex-1 basis-[47%] overflow-hidden rounded-[20px] border border-white/5 bg-ink-800">
-              <Skeleton width="100%" height={92} radius={0} />
-              <View className="p-3">
-                <Skeleton width={w as `${number}%`} height={10} />
-                <View className="mt-2"><Skeleton width="42%" height={8} /></View>
-              </View>
-            </View>
-          ))}
-        </View>
-      ) : (
-        <View className="flex-row flex-wrap gap-3">
-          {filtered.map((e) => (
-            <Pressable key={e.id} onPress={() => nav.open('exerciseDetail', { defId: e.id, library: true })} className="flex-1 basis-[47%] overflow-hidden rounded-[20px] border border-white/5 bg-ink-800 active:opacity-90">
-              <ExerciseThumb uri={e.image} />
-              <View className="p-3">
-                <Text numberOfLines={1} className="text-[13px] font-bold text-white">{e.name}</Text>
-                <Text className="mt-0.5 text-[11.5px] text-white/45">{e.muscle}</Text>
-              </View>
-            </Pressable>
-          ))}
-          {filtered.length === 0 && <Text className="w-full py-9 text-center text-[13.5px] text-white/40">No exercises found.</Text>}
-        </View>
-      )}
     </View>
   )
+
+  return (
+    <FlatList
+      className="flex-1"
+      data={filtered}
+      renderItem={renderExercise}
+      keyExtractor={exerciseKey}
+      numColumns={2}
+      columnWrapperStyle={workoutListStyles.exerciseColumns}
+      contentContainerStyle={listContentStyle}
+      ListHeaderComponent={header}
+      ListEmptyComponent={(
+        <View className="items-center px-5 py-9">
+          <Search size={24} color="rgba(255,255,255,0.35)" />
+          <Text className="mt-3 text-center text-[14px] font-semibold text-white">No matching exercises</Text>
+          <Text className="mt-1 text-center text-[13px] leading-5 text-white/45">Try another muscle group or clear your search.</Text>
+          <Pressable onPress={clearFilters} className="mt-4 min-h-11 items-center justify-center rounded-full bg-brand-400 px-5 active:opacity-90">
+            <Text className="text-[13px] font-bold text-black">Clear filters</Text>
+          </Pressable>
+        </View>
+      )}
+      initialNumToRender={8}
+      maxToRenderPerBatch={8}
+      windowSize={7}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      showsVerticalScrollIndicator={false}
+    />
+  )
 }
+
+const ExerciseLibraryCard = memo(function ExerciseLibraryCard({
+  exercise,
+  onOpen,
+}: {
+  exercise: ExerciseLibraryItem
+  onOpen: (id: string) => void
+}) {
+  const handleOpen = useCallback(() => onOpen(exercise.id), [exercise.id, onOpen])
+  return (
+    <Pressable
+      onPress={handleOpen}
+      accessibilityRole="button"
+      accessibilityLabel={`${exercise.name}, ${exercise.muscle}`}
+      className="flex-1 overflow-hidden rounded-[20px] border border-white/5 bg-ink-800 active:opacity-90"
+      style={workoutListStyles.exerciseCard}
+    >
+      <ExerciseThumb uri={exercise.image} />
+      <View className="p-3">
+        <Text numberOfLines={1} className="text-[13px] font-bold text-white">{exercise.name}</Text>
+        <Text className="mt-0.5 text-[11.5px] text-white/45">{exercise.muscle}</Text>
+      </View>
+    </Pressable>
+  )
+})
 
 /* Exercise thumbnail with a consistent muscle-group fallback behind it, so a
  * slow or failed image reads as an intentional tile, never an empty grey box. */
@@ -520,6 +566,11 @@ function ExerciseThumb({ uri }: { uri: string }) {
 
 /* Tiny volume-trend sparkline — Strava-style glanceable context on each session
  * row, showing where that session sits in your recent volume trend. */
+const workoutListStyles = StyleSheet.create({
+  exerciseColumns: { gap: 12 },
+  exerciseCard: { maxWidth: '48.5%' },
+})
+
 function Sparkline({ values, activeIndex, color }: { values: number[]; activeIndex: number; color: string }) {
   const W = 56, H = 22
   if (values.length < 2 || activeIndex < 0) return null
@@ -540,15 +591,21 @@ type HistoryItem =
   | { kind: 'session'; id: string; dateKey: string; name: string; volumeKg: number; durationMin: number; exercises: import('../store/types').LoggedExercise[] }
   | { kind: 'activity'; id: string; dateKey: string; name: string; icon: string; minutes: number; calories: number; intensity: string; weekly?: boolean }
 
-function HistoryTab() {
+const historyKey = (item: HistoryItem) => `${item.kind}:${item.id}`
+
+function HistoryTab({ bottomInset }: { bottomInset: number }) {
   const { state, dispatch } = useStore()
+  const nav = useNav()
   const toast = useToast()
   const units = state.settings.units
   const [syncing, setSyncing] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
-  const anyConnected = Object.values(state.integrations ?? {}).some((i) => i.connected)
+  const anyConnected = useMemo(
+    () => Object.values(state.integrations ?? {}).some((i) => i.connected),
+    [state.integrations],
+  )
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     if (syncing) return
     setSyncing(true)
     try {
@@ -556,23 +613,38 @@ function HistoryTab() {
     } finally {
       setSyncing(false)
     }
-  }
+  }, [dispatch, state, syncing, toast])
   // Chronological volume series for the per-row sparkline, plus a lookup so each
   // session row can highlight its own point in the trend.
-  const chron = completedSessions(state).slice().sort((a, b) => a.dateKey.localeCompare(b.dateKey))
-  const volSeries = chron.map((s) => s.volumeKg)
-  const volIndex = new Map(chron.map((s, i) => [s.id, i]))
-  const sessions: HistoryItem[] = completedSessions(state).map((s) => ({ kind: 'session', id: s.id, dateKey: s.dateKey, name: s.name, volumeKg: s.volumeKg, durationMin: s.durationMin, exercises: s.exercises }))
-  const acts: HistoryItem[] = (state.activities ?? []).map((a) => ({ kind: 'activity', id: a.id, dateKey: a.dateKey, name: a.name, icon: a.icon, minutes: a.minutes, calories: a.calories, intensity: a.intensity, weekly: a.weekly }))
-  const history = [...sessions, ...acts].sort((a, b) => b.dateKey.localeCompare(a.dateKey)).slice(0, 30)
-
-  if (history.length === 0 && !anyConnected) {
-    return <Text className="py-8 text-center text-sm text-white/40">No history yet. Complete a workout or log an activity.</Text>
-  }
+  const { history, volSeries, volIndex } = useMemo(() => {
+    const completed = completedSessions(state)
+    const chron = completed.slice().sort((a, b) => a.dateKey.localeCompare(b.dateKey))
+    const volumes = chron.map((s) => s.volumeKg)
+    const indexes = new Map(chron.map((s, i) => [s.id, i]))
+    const sessions: HistoryItem[] = completed.map((s) => ({ kind: 'session', id: s.id, dateKey: s.dateKey, name: s.name, volumeKg: s.volumeKg, durationMin: s.durationMin, exercises: s.exercises }))
+    const acts: HistoryItem[] = (state.activities ?? []).map((a) => ({ kind: 'activity', id: a.id, dateKey: a.dateKey, name: a.name, icon: a.icon, minutes: a.minutes, calories: a.calories, intensity: a.intensity, weekly: a.weekly }))
+    return {
+      history: [...sessions, ...acts].sort((a, b) => b.dateKey.localeCompare(a.dateKey)),
+      volSeries: volumes,
+      volIndex: indexes,
+    }
+  }, [state])
+  const listContentStyle = useMemo(
+    () => ({ paddingHorizontal: 20, paddingTop: 20, paddingBottom: bottomInset, gap: 10 }),
+    [bottomInset],
+  )
 
   return (
-    <View className="gap-2.5">
-      {anyConnected && (
+    <FlatList
+      className="flex-1"
+      data={history}
+      keyExtractor={historyKey}
+      contentContainerStyle={listContentStyle}
+      showsVerticalScrollIndicator={false}
+      initialNumToRender={8}
+      maxToRenderPerBatch={8}
+      windowSize={7}
+      ListHeaderComponent={anyConnected ? (
         <Pressable
           onPress={refresh}
           disabled={syncing}
@@ -581,8 +653,18 @@ function HistoryTab() {
           <RefreshCw size={14} color={brand[400]} />
           <Text className="text-[13px] font-semibold text-brand-400">{syncing ? 'Syncing…' : 'Sync connected apps'}</Text>
         </Pressable>
+      ) : null}
+      ListEmptyComponent={(
+        <View className="items-center px-5 py-10">
+          <Dumbbell size={28} color="rgba(126,217,87,0.55)" />
+          <Text className="mt-3 text-center text-[15px] font-bold text-white">No workouts logged yet</Text>
+          <Text className="mt-1 max-w-[260px] text-center text-[13px] leading-5 text-white/45">Your first one is the hardest. Start with a session or add an activity you have already completed.</Text>
+          <Pressable onPress={() => nav.open('logActivity')} className="mt-4 min-h-11 items-center justify-center rounded-full bg-brand-400 px-5 active:opacity-90">
+            <Text className="text-[13px] font-bold text-black">Log an activity</Text>
+          </Pressable>
+        </View>
       )}
-      {history.map((h) => {
+      renderItem={({ item: h }) => {
         const open = openId === h.id
         return (
           <View key={h.id} className="overflow-hidden rounded-[20px] border border-white/5 bg-ink-800">
@@ -662,7 +744,7 @@ function HistoryTab() {
             )}
           </View>
         )
-      })}
-    </View>
+      }}
+    />
   )
 }

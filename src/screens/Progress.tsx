@@ -415,11 +415,14 @@ function DragList<T extends { id: string }>({
   const lift = useRef(new Animated.Value(0)).current
 
   // Keep local order in sync when the source list changes (add/remove/toggle).
-  const idsKey = items.map((i) => i.id).join(',')
-  useEffect(() => { setOrder(items.map((i) => i.id)); orderRef.current = items.map((i) => i.id) }, [idsKey])
+  useEffect(() => {
+    const nextOrder = items.map((i) => i.id)
+    setOrder(nextOrder)
+    orderRef.current = nextOrder
+  }, [items])
   useEffect(() => { orderRef.current = order }, [order])
 
-  const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [idsKey])
+  const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items])
 
   function makeHandle(id: string) {
     const responder = PanResponder.create({

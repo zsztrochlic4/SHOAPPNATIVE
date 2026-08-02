@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { View, Text, Pressable, ScrollView, Image, TextInput, Animated, Easing, ActivityIndicator, Platform, KeyboardAvoidingView, LayoutAnimation, UIManager } from 'react-native'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { View, Text, Pressable, ScrollView, FlatList, Image, TextInput, Animated, Easing, ActivityIndicator, Platform, KeyboardAvoidingView, LayoutAnimation, UIManager, type ListRenderItemInfo } from 'react-native'
 import Svg, { Path, Circle, Text as SvgText } from 'react-native-svg'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -10,7 +10,7 @@ import {
   Trash2, Pencil, Share2, MessageCircle, CalendarCheck, Upload, ChefHat, LayoutGrid,
 } from 'lucide-react-native'
 import { AppModal } from '../components/WebFrame'
-import { useStore } from '../store/store'
+import { useDispatch, useStore } from '../store/store'
 import { useToast } from '../components/Toast'
 import { useBudgetMeals } from '../data/recipes'
 import { NUTRITION_TAGS, type TagTone } from '../data/nutrition'
@@ -586,18 +586,21 @@ function RecipesTab({ onOpenRecipe, onAddMeal }: { onOpenRecipe: (m: BudgetMeal 
   const BUDGET_MEALS = useBudgetMeals()
   const [cat, setCat] = useState<(typeof CATS)[number]>('All')
   const [query, setQuery] = useState('')
-  const [loading, setLoading] = useState(false)
-  const loadT = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-
-  const bump = () => { setLoading(true); clearTimeout(loadT.current); loadT.current = setTimeout(() => setLoading(false), 340) }
-  useEffect(() => () => clearTimeout(loadT.current), [])
 
   const q = query.trim().toLowerCase()
-  const filtered = BUDGET_MEALS.filter((m) => (cat === 'All' || m.category === cat) && (!q || m.name.toLowerCase().includes(q) || (m.flavour ?? '').toLowerCase().includes(q)))
-  const countLabel = loading ? 'Finding recipes…' : `${filtered.length} ${filtered.length === 1 ? 'recipe' : 'recipes'}`
+  const filtered = useMemo(
+    () => BUDGET_MEALS.filter((m) => (cat === 'All' || m.category === cat) && (!q || m.name.toLowerCase().includes(q) || (m.flavour ?? '').toLowerCase().includes(q))),
+    [BUDGET_MEALS, cat, q],
+  )
+  const countLabel = `${filtered.length} ${filtered.length === 1 ? 'recipe' : 'recipes'}`
+  const renderRecipe = useCallback(
+    ({ item }: ListRenderItemInfo<BudgetMeal>) => <BudgetRecipeRow meal={item} onOpen={onOpenRecipe} accentColor={c.brand400} />,
+    [c.brand400, onOpenRecipe],
+  )
+  const listContentStyle = useMemo(() => ({ paddingBottom: scrollPad.paddingBottom }), [scrollPad.paddingBottom])
 
-  return (
-    <ScrollView className="flex-1" contentContainerStyle={scrollPad} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets>
+  const header = (
+    <View>
 
       {/* My meals */}
       <View className="mb-2.5 flex-row items-center justify-between">
@@ -636,7 +639,7 @@ function RecipesTab({ onOpenRecipe, onAddMeal }: { onOpenRecipe: (m: BudgetMeal 
         {CATS.map((cc) => {
           const active = cat === cc
           return (
-            <Pressable key={cc} onPress={() => { setCat(cc); bump() }} className={`rounded-full px-4 py-2 active:opacity-80 ${active ? 'bg-brand-400' : 'bg-white/[0.06]'}`}>
+            <Pressable key={cc} onPress={() => setCat(cc)} className={`rounded-full px-4 py-2 active:opacity-80 ${active ? 'bg-brand-400' : 'bg-white/[0.06]'}`}>
               <Text className={`text-[13px] font-semibold ${active ? 'text-black' : 'text-white/75'}`}>{cc}</Text>
             </Pressable>
           )
@@ -646,62 +649,73 @@ function RecipesTab({ onOpenRecipe, onAddMeal }: { onOpenRecipe: (m: BudgetMeal 
       {/* Search */}
       <View className="mt-3 flex-row items-center gap-2.5 rounded-[14px] border border-white/[0.08] bg-ink-800 px-3.5">
         <Search size={16} color={alpha(c.fg, 0.35)} />
-        <TextInput value={query} onChangeText={(t) => { setQuery(t); bump() }} placeholder="Search recipes…" placeholderTextColor={alpha(c.fg, 0.3)} className="flex-1 py-2.5 text-[14px] text-white" />
+        <TextInput value={query} onChangeText={setQuery} placeholder="Search recipes…" placeholderTextColor={alpha(c.fg, 0.3)} className="flex-1 py-2.5 text-[14px] text-white" />
       </View>
 
-      <Text className="mt-4 text-[12px] font-extrabold uppercase tracking-[1.6px] text-white/35">{countLabel}</Text>
+      <Text className="mb-2.5 mt-4 text-[12px] font-extrabold uppercase tracking-[1.6px] text-white/35">{countLabel}</Text>
+    </View>
+  )
 
-      {loading ? (
-        <View className="mt-2.5 gap-2.5">{[0, 1, 2].map((i) => <RecipeSkeleton key={i} />)}</View>
-      ) : filtered.length > 0 ? (
-        <View className="mt-2.5 gap-2.5">
-          {filtered.map((m) => (
-            <Pressable key={m.id} onPress={() => onOpenRecipe(m)} className="flex-row items-center gap-3 rounded-[18px] border border-white/[0.06] bg-ink-800 p-[11px] active:opacity-80">
-              <Image source={{ uri: m.image }} resizeMode="cover" className="h-16 w-16 rounded-[13px] bg-ink-700" />
-              <View className="min-w-0 flex-1">
-                <Text numberOfLines={1} className="text-[14.5px] font-bold leading-tight text-white">{m.name}</Text>
-                {!!m.flavour && <Text numberOfLines={2} className="mt-0.5 text-[12px] leading-[1.35] text-white/55">{m.flavour}</Text>}
-                <View className="mt-1.5 flex-row items-center gap-1.5">
-                  <Clock size={12} color={c.brand400} />
-                  <Text className="text-[12px] font-bold text-brand-400">{m.timeDisplay ?? `${m.minutes} min`}</Text>
-                </View>
-              </View>
-              <ChevronRight size={18} color={alpha(c.fg, 0.3)} />
-            </Pressable>
-          ))}
-        </View>
-      ) : (
-        <View className="mt-3 items-center rounded-[18px] border border-dashed border-white/15 px-6 py-9">
+  return (
+    <FlatList
+      className="flex-1"
+      data={filtered}
+      renderItem={renderRecipe}
+      keyExtractor={budgetMealKey}
+      contentContainerStyle={listContentStyle}
+      ListHeaderComponent={header}
+      ListEmptyComponent={(
+        <View className="items-center rounded-[18px] border border-dashed border-white/15 px-6 py-9">
           <Text className="text-[26px]">🍽️</Text>
           <Text className="mt-2 text-[14px] font-bold text-white/65">No recipes match that</Text>
           <Text className="mt-1 text-[12px] text-white/40">Try another category or clear your search.</Text>
         </View>
       )}
-    </ScrollView>
+      ItemSeparatorComponent={RecipeListGap}
+      initialNumToRender={8}
+      maxToRenderPerBatch={8}
+      windowSize={7}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      automaticallyAdjustKeyboardInsets
+    />
   )
 }
 
-function RecipeSkeleton() {
-  const shimmer = useRef(new Animated.Value(0.4)).current
-  useEffect(() => {
-    const loop = Animated.loop(Animated.sequence([
-      Animated.timing(shimmer, { toValue: 1, duration: 700, useNativeDriver: true }),
-      Animated.timing(shimmer, { toValue: 0.4, duration: 700, useNativeDriver: true }),
-    ]))
-    loop.start()
-    return () => loop.stop()
-  }, [shimmer])
+const budgetMealKey = (meal: BudgetMeal) => meal.id
+const RecipeListGap = () => <View className="h-2.5" />
+
+const BudgetRecipeRow = memo(function BudgetRecipeRow({
+  meal,
+  onOpen,
+  accentColor,
+}: {
+  meal: BudgetMeal
+  onOpen: (meal: BudgetMeal | UserMeal) => void
+  accentColor: string
+}) {
+  const handleOpen = useCallback(() => onOpen(meal), [meal, onOpen])
   return (
-    <Animated.View style={{ opacity: shimmer }} className="flex-row items-center gap-3 rounded-[18px] border border-white/[0.06] bg-ink-800 p-[11px]">
-      <View className="h-16 w-16 rounded-[13px] bg-ink-600" />
-      <View className="flex-1 gap-2">
-        <View className="h-3 w-[68%] rounded-md bg-ink-600" />
-        <View className="h-2.5 w-[88%] rounded-md bg-ink-600" />
-        <View className="h-2.5 w-[34%] rounded-md bg-ink-600" />
+    <Pressable
+      onPress={handleOpen}
+      accessibilityRole="button"
+      accessibilityLabel={`${meal.name}, ${meal.timeDisplay ?? `${meal.minutes} minutes`}`}
+      className="flex-row items-center gap-3 rounded-[18px] border border-white/[0.06] bg-ink-800 p-[11px] active:opacity-80"
+    >
+      <Image source={{ uri: meal.image }} resizeMode="cover" className="h-16 w-16 rounded-[13px] bg-ink-700" />
+      <View className="min-w-0 flex-1">
+        <Text numberOfLines={1} className="text-[14.5px] font-bold leading-tight text-white">{meal.name}</Text>
+        {!!meal.flavour && <Text numberOfLines={2} className="mt-0.5 text-[12px] leading-[1.35] text-white/55">{meal.flavour}</Text>}
+        <View className="mt-1.5 flex-row items-center gap-1.5">
+          <Clock size={12} color={accentColor} />
+          <Text className="text-[12px] font-bold text-brand-400">{meal.timeDisplay ?? `${meal.minutes} min`}</Text>
+        </View>
       </View>
-    </Animated.View>
+      <ChevronRight size={18} color="rgba(255,255,255,0.3)" />
+    </Pressable>
   )
-}
+})
 
 /* ============================ Meal Plan ============================ */
 function MealPlanTab() {
@@ -1105,7 +1119,7 @@ function isUserMeal(m: BudgetMeal | UserMeal): m is UserMeal {
   return !('image' in m)
 }
 function RecipeModal({ meal, onClose, onEdit }: { meal: BudgetMeal | UserMeal | null; onClose: () => void; onEdit: (m: UserMeal) => void }) {
-  const { dispatch } = useStore()
+  const dispatch = useDispatch()
   const toast = useToast()
   const c = useColors()
   if (!meal) return null
@@ -1194,7 +1208,7 @@ function SectionHead({ children }: { children: ReactNode }) {
 
 /* ============================ Add / edit meal sheet ============================ */
 function AddMealSheet({ open, editing, onClose }: { open: boolean; editing: UserMeal | null; onClose: () => void }) {
-  const { dispatch } = useStore()
+  const dispatch = useDispatch()
   const toast = useToast()
   const [name, setName] = useState('')
   const [ing, setIng] = useState('')

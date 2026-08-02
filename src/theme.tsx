@@ -1,5 +1,5 @@
 import { vars } from 'nativewind'
-import { useStore } from './store/store'
+import { useStoreSelector } from './store/store'
 import type { AccentKey } from './store/periods'
 
 /**
@@ -159,9 +159,10 @@ export function accentFor(key: AccentKey, c: Palette): string {
 export type Palette = (typeof palette)[ThemeName]
 
 /** Current theme name from the store. */
+const selectTheme = (state: import('./store/types').AppState) => state.settings.theme
+
 export function useThemeName(): ThemeName {
-  const { state } = useStore()
-  return state.settings.theme === 'light' ? 'light' : 'dark'
+  return useStoreSelector(selectTheme) === 'light' ? 'light' : 'dark'
 }
 
 /** Raw colour palette for the current theme. */

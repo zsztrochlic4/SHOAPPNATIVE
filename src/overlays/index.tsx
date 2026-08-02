@@ -18,7 +18,7 @@ import { Icon } from '../components/Icon'
 import { Chip } from '../components/ui'
 import { PressableScale } from '../components/PressableScale'
 import { thud } from '../lib/haptics'
-import { useStore } from '../store/store'
+import { useDispatch, useStore } from '../store/store'
 import { useAuth } from '../auth/AuthProvider'
 import { useToast } from '../components/Toast'
 import { useNav } from '../nav'
@@ -183,6 +183,7 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
   const { enabled: authEnabled, deleteAccount, user } = useAuth()
   const [exporting, setExporting] = useState(false)
   const { notificationsEnabled } = state.settings
+  const notificationConsent = state.settings.notificationConsent ?? 'unknown'
   const soundEnabled = state.settings.soundEnabled ?? true
   const lang = state.settings.language ?? 'en'
   const t = translator(lang)
@@ -247,12 +248,18 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
     if (next && NATIVE) {
       const granted = await requestPushPermission()
       if (!granted) {
-        dispatch({ type: 'SET_SETTINGS', patch: { notificationsEnabled: false } })
+        dispatch({ type: 'SET_SETTINGS', patch: { notificationsEnabled: false, notificationConsent: 'denied' } })
         toast(t('toast.notifsDenied'))
         return
       }
     }
-    dispatch({ type: 'SET_SETTINGS', patch: { notificationsEnabled: next } })
+    dispatch({
+      type: 'SET_SETTINGS',
+      patch: {
+        notificationsEnabled: next,
+        notificationConsent: next ? 'granted' : notificationConsent,
+      },
+    })
     // PushRegistration registers the token; <NotificationsSync/> reconciles the
     // scheduling/cancelling of local reminders in reaction to this settings change.
     toast(next ? t('toast.notifsOn') : t('toast.notifsOff'))
@@ -884,7 +891,7 @@ function HabitStepper({ icon, label, value, min, max, step, onChange, display, u
 
 /* ============================ Create Post ============================ */
 export function CreatePostSheet({ open, onClose }: Props) {
-  const { dispatch } = useStore()
+  const dispatch = useDispatch()
   const toast = useToast()
   const [text, setText] = useState('')
   const [image, setImage] = useState<string | undefined>()
@@ -963,7 +970,7 @@ export function LeaderboardSheet({ open, onClose }: Props) {
 }
 
 export function QuickWorkoutsSheet({ open, onClose }: Props) {
-  const { dispatch } = useStore()
+  const dispatch = useDispatch()
   const nav = useNav()
   // Seed shows instantly; a Firestore `workouts` overlay (if present) refreshes it.
   const quickWorkouts = useQuickWorkouts()

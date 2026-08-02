@@ -7,7 +7,7 @@ import { loadUserState, loadRemainingHistory, saveUserState } from './cloudRepo'
 import { saveBackoffMs, MAX_SAVE_RETRIES } from './saveRetry'
 import { mergeById, type HistoryEntry } from './historyMerge'
 import { registerEnsureFullHistory } from './historySync'
-import { SCHEMA_VERSION } from './seed'
+import { migrateAppState } from './migrate'
 import type { AppState } from './types'
 
 /**
@@ -39,6 +39,7 @@ export function CloudSync() {
   // The last state we know is persisted, used to diff the next save so we only
   // write what changed. Seeded from the cloud baseline on load.
   const savedRef = useRef<Partial<AppState> | undefined>(undefined)
+  const incompatibleCloudRef = useRef(false)
 
   // ── Lazy full-history state (Phase C) ──────────────────────────────────────
   // Whether any windowed collection still has older docs on the server.
@@ -63,19 +64,26 @@ export function CloudSync() {
     historyLoadedRef.current = false
     hydratingHistoryRef.current = false
     pendingBaselineRef.current = null
+    incompatibleCloudRef.current = false
     if (!user) { setSynced(false); savedRef.current = undefined; return }
     let cancelled = false
     setSynced(false)
     loadUserState(user.uid)
       .then((loaded) => {
         if (cancelled) return
-        if (loaded && loaded.state.v === SCHEMA_VERSION) {
+        if (loaded) {
+          const migration = migrateAppState({ ...stateRef.current, ...loaded.state })
+          if (!migration.ok) {
+            // Never let an older build overwrite a future or malformed payload.
+            incompatibleCloudRef.current = true
+            return
+          }
           // Returning user: merge cloud over current state so any local-only
           // fields survive. Diff future saves against what's actually in the
           // cloud subcollections (empty for a legacy doc → first save migrates).
           savedRef.current = loaded.baseline
           hasMoreRef.current = Object.values(loaded.partial).some(Boolean)
-          dispatch({ type: 'HYDRATE', state: { ...stateRef.current, ...loaded.state } as AppState })
+          dispatch({ type: 'HYDRATE', state: migration.state })
         } else if (loaded === null) {
           // Brand-new account (no saved doc). Two cases:
           //  - The account was created at the END of onboarding (the current
@@ -93,7 +101,7 @@ export function CloudSync() {
         }
       })
       .catch(() => { /* offline / transient — keep local state, save later */ })
-      .finally(() => { if (!cancelled) setSynced(true) })
+      .finally(() => { if (!cancelled) setSynced(!incompatibleCloudRef.current) })
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.uid])
@@ -172,7 +180,7 @@ export function CloudSync() {
   saveNowRef.current = () => {
     const u = userRef.current
     // Don't write mid-merge: state and baseline are briefly being reconciled.
-    if (!u || !syncedRef.current || hydratingHistoryRef.current) return
+    if (!u || !syncedRef.current || hydratingHistoryRef.current || incompatibleCloudRef.current) return
     if (savingRef.current) {
       savePendingRef.current = true // a change landed during a save — save again after
       return

@@ -20,7 +20,6 @@ export function setErrorReporter(next: ErrorReporter | null): void {
 /** Report an unexpected error. Never throws — reporting must not cause a second failure. */
 export function reportError(error: unknown, context?: Record<string, unknown>): void {
   try {
-    // eslint-disable-next-line no-console
     console.error('[reportError]', error, context ?? {})
     reporter?.(error, context)
   } catch {

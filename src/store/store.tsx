@@ -1,8 +1,9 @@
-import { createContext, useContext, useEffect, useReducer, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { AppState as RNAppState } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { todayKey, setLiveClock, refreshClock } from '../lib/date'
-import { buildSeed, emptyState, SCHEMA_VERSION } from './seed'
+import { buildSeed, emptyState } from './seed'
+import { migrateAppState } from './migrate'
 import { coachReply } from '../lib/coachChat'
 import { coachContext, coachOperational, coachPrecheck, guardOutgoing, sharedCoachSession } from '../lib/coachSafety'
 import type { ContactButton } from '../backend/coach/safety'
@@ -585,13 +586,45 @@ function reducer(state: AppState, action: Action): AppState {
 }
 
 /* ------------------------------ Context ------------------------------ */
-const StoreCtx = createContext<{ state: AppState; dispatch: React.Dispatch<Action>; hydrated: boolean } | null>(null)
+const StoreCtx = createContext<{
+  state: AppState
+  dispatch: React.Dispatch<Action>
+  hydrated: boolean
+  persistenceError: boolean
+} | null>(null)
+const StoreDispatchCtx = createContext<React.Dispatch<Action> | null>(null)
+const StoreMetaCtx = createContext<{ hydrated: boolean; persistenceError: boolean } | null>(null)
+type StoreSelectorApi = {
+  getState: () => AppState
+  subscribe: (listener: () => void) => () => void
+}
+const StoreSelectorCtx = createContext<StoreSelectorApi | null>(null)
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   // Seed synchronously so the first render is never empty; the persisted
   // state (if any) is loaded asynchronously from AsyncStorage right after.
-  const [state, dispatch] = useReducer(reducer, undefined, buildSeed)
+  const [state, baseDispatch] = useReducer(reducer, undefined, buildSeed)
   const [hydrated, setHydrated] = useState(false)
+  const [persistenceError, setPersistenceError] = useState(false)
+  const persistenceBlockedRef = useRef(false)
+  const stateRef = useRef(state)
+  stateRef.current = state
+  const selectorListenersRef = useRef(new Set<() => void>())
+  const selectorApi = useMemo<StoreSelectorApi>(() => ({
+    getState: () => stateRef.current,
+    subscribe: (listener) => {
+      selectorListenersRef.current.add(listener)
+      return () => selectorListenersRef.current.delete(listener)
+    },
+  }), [])
+  const meta = useMemo(() => ({ hydrated, persistenceError }), [hydrated, persistenceError])
+  const dispatch = useCallback<React.Dispatch<Action>>((action) => {
+    if (action.type === 'RESET_DEMO' || action.type === 'RESET_EMPTY') {
+      persistenceBlockedRef.current = false
+      setPersistenceError(false)
+    }
+    baseDispatch(action)
+  }, [])
   // Forces a re-render when the module-level clock moves (demo↔live, day rollover).
   const [, setClockTick] = useState(0)
 
@@ -616,11 +649,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     AsyncStorage.getItem(STORAGE_KEY)
       .then((raw) => {
         if (cancelled || !raw) return
-        const parsed = JSON.parse(raw) as AppState
-        if (parsed && parsed.v === SCHEMA_VERSION) dispatch({ type: 'HYDRATE', state: parsed })
+        const migration = migrateAppState(JSON.parse(raw))
+        if (migration.ok) {
+          dispatch({ type: 'HYDRATE', state: migration.state })
+        } else {
+          // Preserve an invalid/future payload for recovery; never overwrite it
+          // with seed data from an older build.
+          persistenceBlockedRef.current = true
+          setPersistenceError(true)
+        }
       })
       .catch(() => {
-        /* ignore — fall back to the freshly seeded demo state */
+        persistenceBlockedRef.current = true
+        setPersistenceError(true)
       })
       .finally(() => {
         if (!cancelled) setHydrated(true)
@@ -628,18 +669,77 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [dispatch])
 
-  // Persist on every change once the initial load has settled, so we never
-  // overwrite a saved state with the transient seed during hydration.
+  const savingRef = useRef(false)
+  const savePendingRef = useRef(false)
+  const writeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const persistNowRef = useRef<() => void>(() => {})
+  persistNowRef.current = () => {
+    if (!hydrated || persistenceBlockedRef.current) return
+    if (savingRef.current) {
+      savePendingRef.current = true
+      return
+    }
+    const snapshot = stateRef.current
+    savingRef.current = true
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot))
+      .then(() => setPersistenceError(false))
+      .catch(() => setPersistenceError(true))
+      .finally(() => {
+        savingRef.current = false
+        if (savePendingRef.current) {
+          savePendingRef.current = false
+          persistNowRef.current()
+        }
+      })
+  }
+
+  // Coalesce bursts (typing, timers, set logging) into one ordered local write.
   useEffect(() => {
-    if (!hydrated) return
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)).catch(() => {
-      /* ignore quota / write errors */
-    })
+    if (!hydrated || persistenceBlockedRef.current) return
+    if (writeTimerRef.current) clearTimeout(writeTimerRef.current)
+    writeTimerRef.current = setTimeout(() => {
+      writeTimerRef.current = null
+      persistNowRef.current()
+    }, 600)
+    return () => {
+      if (writeTimerRef.current) clearTimeout(writeTimerRef.current)
+    }
   }, [state, hydrated])
 
-  return <StoreCtx.Provider value={{ state, dispatch, hydrated }}>{children}</StoreCtx.Provider>
+  // Selector consumers are notified after the new reducer state commits. They
+  // compare their selected snapshot with Object.is, so unrelated domains no
+  // longer force them to render.
+  useEffect(() => {
+    selectorListenersRef.current.forEach((listener) => listener())
+  }, [state])
+
+  // Flush pending local state before native suspend / web tab backgrounding.
+  useEffect(() => {
+    const sub = RNAppState.addEventListener('change', (status) => {
+      if (status !== 'background' && status !== 'inactive') return
+      if (writeTimerRef.current) {
+        clearTimeout(writeTimerRef.current)
+        writeTimerRef.current = null
+      }
+      persistNowRef.current()
+    })
+    return () => {
+      sub.remove()
+      if (writeTimerRef.current) clearTimeout(writeTimerRef.current)
+    }
+  }, [])
+
+  return (
+    <StoreSelectorCtx.Provider value={selectorApi}>
+      <StoreMetaCtx.Provider value={meta}>
+        <StoreDispatchCtx.Provider value={dispatch}>
+          <StoreCtx.Provider value={{ state, dispatch, hydrated, persistenceError }}>{children}</StoreCtx.Provider>
+        </StoreDispatchCtx.Provider>
+      </StoreMetaCtx.Provider>
+    </StoreSelectorCtx.Provider>
+  )
 }
 
 export function useStore() {
@@ -649,7 +749,22 @@ export function useStore() {
 }
 
 export function useDispatch() {
-  return useStore().dispatch
+  const dispatch = useContext(StoreDispatchCtx)
+  if (!dispatch) throw new Error('useDispatch must be used within StoreProvider')
+  return dispatch
+}
+
+export function useStoreMeta() {
+  const meta = useContext(StoreMetaCtx)
+  if (!meta) throw new Error('useStoreMeta must be used within StoreProvider')
+  return meta
+}
+
+export function useStoreSelector<T>(selector: (state: AppState) => T): T {
+  const api = useContext(StoreSelectorCtx)
+  if (!api) throw new Error('useStoreSelector must be used within StoreProvider')
+  const getSnapshot = useCallback(() => selector(api.getState()), [api, selector])
+  return useSyncExternalStore(api.subscribe, getSnapshot, getSnapshot)
 }
 
 export type { LoggedExercise }

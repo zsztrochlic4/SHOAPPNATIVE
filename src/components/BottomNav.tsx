@@ -28,7 +28,10 @@ export function BottomNav({ active, onChange }: { active: TabKey; onChange: (t: 
             <Pressable
               key={key}
               onPress={() => onChange(key)}
-              className="flex-1 items-center gap-1 py-1"
+              accessibilityRole="tab"
+              accessibilityLabel={label}
+              accessibilityState={{ selected: isActive }}
+              className="min-h-12 flex-1 items-center justify-center gap-1 py-1 active:opacity-70"
             >
               <Icon size={24} strokeWidth={isActive ? 2.6 : 2} color={isActive ? c.brand400 : inactive} />
               <Text

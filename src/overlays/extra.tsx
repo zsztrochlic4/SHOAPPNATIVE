@@ -13,7 +13,7 @@ import { Icon } from '../components/Icon'
 import { Chip, ProgressBar } from '../components/ui'
 import { TechniqueClip } from '../components/TechniqueClip'
 import { posterOverrideUrl } from '../lib/media'
-import { useStore } from '../store/store'
+import { useDispatch, useStore } from '../store/store'
 import { useToast } from '../components/Toast'
 import { useNav } from '../nav'
 import {
@@ -387,7 +387,7 @@ export function PartnerMatchSheet({ open, onClose }: Props) {
 
 /* ====================== PR celebration =========================== */
 export function PRCelebrationSheet({ open, onClose, params }: Props) {
-  const { dispatch } = useStore()
+  const dispatch = useDispatch()
   const toast = useToast()
   const lift = (params?.lift as string) ?? 'a lift'
   const weight = (params?.weight as string) ?? ''
@@ -768,7 +768,7 @@ export function CoachChatSheet({ open, onClose }: Props) {
 
 /* ===================== Log a self-chosen activity ================= */
 export function LogActivitySheet({ open, onClose }: Props) {
-  const { dispatch } = useStore()
+  const dispatch = useDispatch()
   const toast = useToast()
   const [key, setKey] = useState('run')
   const [customName, setCustomName] = useState('')
