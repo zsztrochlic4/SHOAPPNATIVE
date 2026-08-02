@@ -12,9 +12,10 @@ import {
 import { AppModal } from '../components/WebFrame'
 import { useDispatch, useStore } from '../store/store'
 import { useToast } from '../components/Toast'
+import { useNav } from '../nav'
 import { useBudgetMeals } from '../data/recipes'
 import { NUTRITION_TAGS, type TagTone } from '../data/nutrition'
-import { nutritionTagsForDay } from '../store/selectors'
+import { nutritionForDay, nutritionTagsForDay } from '../store/selectors'
 import { useColors } from '../theme'
 import { analyzeMealPhoto } from '../lib/mealScan'
 import type { Confidence, Rec, MealFood } from '../lib/mealScan'
@@ -276,6 +277,7 @@ type ScanState = 'idle' | 'analyzing' | 'result' | 'logged'
 function OverviewTab() {
   const { state, dispatch } = useStore()
   const toast = useToast()
+  const nav = useNav()
   const c = useColors()
   const scrollPad = useScrollPad()
   const selected = nutritionTagsForDay(state)
@@ -287,8 +289,11 @@ function OverviewTab() {
   const [scanError, setScanError] = useState<string | null>(null)
   const [servings, setServings] = useState(1)
   const [nameEdit, setNameEdit] = useState<string | null>(null)
-  const [logPick, setLogPick] = useState(false)
+  // Which slot picker is open: logging to TODAY's nutrition log, or planning
+  // into the weekly meal plan. Two explicitly separate actions (audit F-008).
+  const [pickMode, setPickMode] = useState<null | 'log' | 'plan'>(null)
   const [loggedMsg, setLoggedMsg] = useState({ title: '', sub: '' })
+  const loggingRef = useRef(false)
   const idxRef = useRef(0)
   const timers = useRef<ReturnType<typeof setTimeout>[]>([])
   useEffect(() => () => timers.current.forEach(clearTimeout), [])
@@ -312,7 +317,7 @@ function OverviewTab() {
     }
     // Real analysis: show the scanning state, then Gemini vision reads the photo.
     setImg(asset.uri); setResult(null); setNotFood(false); setScanError(null)
-    setServings(1); setNameEdit(null); setLogPick(false); setScan('analyzing')
+    setServings(1); setNameEdit(null); setPickMode(null); setScan('analyzing')
     if (!asset.base64) {
       setScanError("We couldn't read that photo. You can still log this meal manually below.")
       setScan('result'); return
@@ -330,30 +335,56 @@ function OverviewTab() {
   function trySample() {
     const sample = nextSample()
     setImg(null); setResult(sample); setNotFood(false); setScanError(null)
-    setServings(1); setNameEdit(null); setLogPick(false); setScan('analyzing')
+    setServings(1); setNameEdit(null); setPickMode(null); setScan('analyzing')
     timers.current.push(setTimeout(() => setScan('result'), 1200))
   }
   function retake() {
     setScan('idle'); setImg(null); setResult(null); setNotFood(false); setScanError(null)
-    setServings(1); setLogPick(false); setNameEdit(null)
+    setServings(1); setPickMode(null); setNameEdit(null)
   }
   const scanName = () => (nameEdit != null && nameEdit.trim() ? nameEdit.trim() : result?.name ?? '')
   // A single number to log from a range: the midpoint, scaled by servings.
   const kcalToLog = () => (result ? Math.round(((result.kcalLow + result.kcalHigh) / 2) * servings) : 0)
+  /** Log the scanned meal to TODAY's nutrition log (audit F-008): a real
+   *  LoggedMeal with per-serving macros × qty, so daily calories/macros update
+   *  immediately. Guarded so a double tap can't create duplicates. */
   function logMeal(slot: MealName) {
-    if (!result) return
+    if (!result || loggingRef.current) return
+    loggingRef.current = true
+    dispatch({
+      type: 'ADD_MEAL',
+      meal: {
+        meal: slot,
+        name: scanName(),
+        qty: servings,
+        kcal: Math.round((result.kcalLow + result.kcalHigh) / 2),
+        p: result.p,
+        c: result.c,
+        f: result.f,
+      },
+    })
+    setLoggedMsg({ title: `Logged to ${slot}`, sub: `~${kcalToLog()} kcal added to today's log` })
+    setPickMode(null); setScan('logged')
+    toast(`Logged to ${slot} · ~${kcalToLog()} kcal`)
+    timers.current.push(setTimeout(() => { loggingRef.current = false; retake() }, 1250))
+  }
+  /** Separately, PLAN this meal into the weekly meal plan (the old behaviour,
+   *  now an explicit, honestly-labelled action). */
+  function planMeal(slot: MealName) {
+    if (!result || loggingRef.current) return
+    loggingRef.current = true
     const day = todayShort()
     dispatch({ type: 'ADD_PLANNED_MEAL', plan: { day, slot, name: scanName(), w: 0 } })
-    setLoggedMsg({ title: `Logged to ${slot}, ${day}`, sub: 'Saved to your meal plan' })
-    setLogPick(false); setScan('logged')
-    toast(`Added to ${slot}, ${day}`)
-    timers.current.push(setTimeout(retake, 1250))
+    setLoggedMsg({ title: `Planned for ${slot}, ${day}`, sub: 'Saved to your meal plan (not today’s log)' })
+    setPickMode(null); setScan('logged')
+    toast(`Planned for ${slot}, ${day}`)
+    timers.current.push(setTimeout(() => { loggingRef.current = false; retake() }, 1250))
   }
   function saveToMeals() {
     if (!result) return
     dispatch({ type: 'ADD_MY_MEAL', meal: { name: scanName(), kcal: kcalToLog(), p: Math.round(result.p * servings), c: Math.round(result.c * servings), f: Math.round(result.f * servings), ingredients: result.items.slice(), notes: 'Scanned meal (estimate)' } })
     setLoggedMsg({ title: scanName(), sub: 'Saved to My Meals' })
-    setLogPick(false); setScan('logged')
+    setPickMode(null); setScan('logged')
     toast('Saved to My Meals')
     timers.current.push(setTimeout(retake, 1250))
   }
@@ -400,12 +431,14 @@ function OverviewTab() {
               <Text className="text-[15px] font-extrabold text-black">Take a photo</Text>
             </Pressable>
             <View className="mt-3 flex-row items-center justify-center gap-4">
-              <Pressable onPress={() => pick('library')} className="flex-row items-center gap-1.5 active:opacity-70">
+              <Pressable onPress={() => pick('library')} accessibilityRole="button" accessibilityLabel="Upload a meal photo from your library" className="flex-row items-center gap-1.5 active:opacity-70">
                 <Upload size={14} color={alpha(c.fg, 0.6)} />
                 <Text className="text-[14px] font-semibold text-white/70">Upload from library</Text>
               </Pressable>
               <View className="h-[3px] w-[3px] rounded-full bg-white/25" />
-              <Pressable onPress={trySample} className="active:opacity-70"><Text className="text-[14px] font-semibold text-brand-400">Try a demo</Text></Pressable>
+              <Pressable onPress={() => nav.open('addFood')} accessibilityRole="button" accessibilityLabel="Log a meal manually" className="active:opacity-70"><Text className="text-[14px] font-semibold text-white/70">Log manually</Text></Pressable>
+              <View className="h-[3px] w-[3px] rounded-full bg-white/25" />
+              <Pressable onPress={trySample} accessibilityRole="button" accessibilityLabel="Try a demo scan" className="active:opacity-70"><Text className="text-[14px] font-semibold text-brand-400">Try a demo</Text></Pressable>
             </View>
           </>
         )}
@@ -425,7 +458,12 @@ function OverviewTab() {
           <View className="mt-3 items-center gap-2 rounded-[15px] border border-white/[0.06] bg-white/[0.03] px-4 py-6">
             <Text className="text-[13.5px] font-extrabold text-white">Scan unavailable</Text>
             <Text className="max-w-[250px] text-center text-[12px] leading-[1.5] text-white/50">{scanError}</Text>
-            <Pressable onPress={retake} className="mt-1 rounded-xl bg-white/[0.06] px-5 py-2.5 active:opacity-80"><Text className="text-[13px] font-bold text-white">Back</Text></Pressable>
+            {/* Recovery must be real, not just promised (audit F-009): manual
+                logging is one tap away, right from the failed-scan state. */}
+            <View className="mt-1 flex-row gap-2">
+              <Pressable onPress={() => { retake(); nav.open('addFood') }} accessibilityRole="button" accessibilityLabel="Log this meal manually" className="rounded-xl bg-brand-400 px-5 py-2.5 active:opacity-90"><Text className="text-[13px] font-extrabold text-black">Log manually</Text></Pressable>
+              <Pressable onPress={retake} accessibilityRole="button" accessibilityLabel="Back to scanner" className="rounded-xl bg-white/[0.06] px-5 py-2.5 active:opacity-80"><Text className="text-[13px] font-bold text-white">Back</Text></Pressable>
+            </View>
           </View>
         )}
 
@@ -483,26 +521,41 @@ function OverviewTab() {
               <Text className="mt-1.5 text-[12px] leading-[1.5] text-white/65">{result.note}</Text>
             </View>
 
-            {logPick ? (
+            {pickMode ? (
               <View className="mt-3 rounded-[13px] border p-3" style={{ borderColor: alpha(c.brand400, 0.28), backgroundColor: alpha(c.brand400, 0.06) }}>
-                <Text className="mb-2 text-[11px] font-extrabold uppercase tracking-wide text-white/60">Log to {todayShort()}. Which meal?</Text>
+                <Text className="mb-2 text-[11px] font-extrabold uppercase tracking-wide text-white/60">
+                  {pickMode === 'log' ? "Log to today. Which meal?" : `Plan for ${todayShort()}. Which meal?`}
+                </Text>
                 <View className="flex-row gap-1.5">
                   {SLOTS.map((sl) => (
-                    <Pressable key={sl} onPress={() => logMeal(sl)} className="flex-1 items-center rounded-[10px] border border-white/10 bg-ink-700 px-1 py-2.5 active:opacity-80"><Text className="text-[11.5px] font-bold text-white">{sl}</Text></Pressable>
+                    <Pressable
+                      key={sl}
+                      onPress={() => (pickMode === 'log' ? logMeal(sl) : planMeal(sl))}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${pickMode === 'log' ? 'Log to' : 'Plan for'} ${sl}`}
+                      className="flex-1 items-center rounded-[10px] border border-white/10 bg-ink-700 px-1 py-2.5 active:opacity-80"
+                    >
+                      <Text className="text-[11.5px] font-bold text-white">{sl}</Text>
+                    </Pressable>
                   ))}
                 </View>
-                <Pressable onPress={() => setLogPick(false)} className="mt-2 items-center active:opacity-70"><Text className="text-[11.5px] font-bold text-white/45">Cancel</Text></Pressable>
+                <Pressable onPress={() => setPickMode(null)} accessibilityRole="button" accessibilityLabel="Cancel" className="mt-2 items-center active:opacity-70"><Text className="text-[11.5px] font-bold text-white/45">Cancel</Text></Pressable>
               </View>
             ) : (
               <>
                 <View className="mt-3 flex-row gap-2.5">
-                  <Pressable onPress={() => setLogPick(true)} className="flex-[2] items-center rounded-xl bg-brand-400 py-2.5 active:opacity-90"><Text className="text-[13.5px] font-extrabold text-black">Add to today's log</Text></Pressable>
-                  <Pressable onPress={retake} className="flex-1 items-center rounded-xl bg-white/[0.06] py-2.5 active:opacity-80"><Text className="text-[13.5px] font-bold text-white">Retake</Text></Pressable>
+                  <Pressable onPress={() => setPickMode('log')} accessibilityRole="button" accessibilityLabel="Add to today's log" className="flex-[2] items-center rounded-xl bg-brand-400 py-2.5 active:opacity-90"><Text className="text-[13.5px] font-extrabold text-black">Add to today's log</Text></Pressable>
+                  <Pressable onPress={retake} accessibilityRole="button" accessibilityLabel="Retake photo" className="flex-1 items-center rounded-xl bg-white/[0.06] py-2.5 active:opacity-80"><Text className="text-[13.5px] font-bold text-white">Retake</Text></Pressable>
                 </View>
-                <Pressable onPress={saveToMeals} className="mt-2 flex-row items-center justify-center gap-1.5 rounded-xl border py-2.5 active:opacity-80" style={{ borderColor: alpha(c.brand400, 0.28), backgroundColor: alpha(c.brand400, 0.1) }}>
-                  <Plus size={15} color={c.brand400} strokeWidth={2.4} />
-                  <Text className="text-[13px] font-bold text-brand-400">Save to My Meals</Text>
-                </Pressable>
+                <View className="mt-2 flex-row gap-2.5">
+                  <Pressable onPress={saveToMeals} accessibilityRole="button" accessibilityLabel="Save to My Meals" className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl border py-2.5 active:opacity-80" style={{ borderColor: alpha(c.brand400, 0.28), backgroundColor: alpha(c.brand400, 0.1) }}>
+                    <Plus size={15} color={c.brand400} strokeWidth={2.4} />
+                    <Text className="text-[13px] font-bold text-brand-400">Save to My Meals</Text>
+                  </Pressable>
+                  <Pressable onPress={() => setPickMode('plan')} accessibilityRole="button" accessibilityLabel="Add to meal plan" className="flex-1 items-center justify-center rounded-xl bg-white/[0.06] py-2.5 active:opacity-80">
+                    <Text className="text-[13px] font-bold text-white/70">Add to meal plan</Text>
+                  </Pressable>
+                </View>
               </>
             )}
           </View>
@@ -516,6 +569,11 @@ function OverviewTab() {
           </View>
         )}
       </View>
+
+      {/* Today's food log — the quantitative daily log surface (audit F-008/J-06):
+          shows what "Add to today's log" and manual logging actually produced,
+          with live totals and per-entry removal. */}
+      <TodayLogCard onAddFood={() => nav.open('addFood')} />
 
       {/* Day tags */}
       <View className="mt-4 rounded-[22px] border border-white/5 bg-ink-800 px-[18px] py-5">
@@ -547,6 +605,86 @@ function OverviewTab() {
         </View>
       </View>
     </ScrollView>
+  )
+}
+
+/** Today's quantitative food log: totals vs target, per-meal entries, removal,
+ *  and a manual-add entry point. Before this card existed the daily log had no
+ *  display surface at all — logging updated state nobody could see. */
+function TodayLogCard({ onAddFood }: { onAddFood: () => void }) {
+  const { state, dispatch } = useStore()
+  const toast = useToast()
+  const c = useColors()
+  const day = nutritionForDay(state)
+  const target = state.profile.calorieTarget
+  const pct = target > 0 ? Math.min(100, Math.round((day.kcal / target) * 100)) : 0
+  return (
+    <View className="mt-4 rounded-[22px] border border-white/5 bg-ink-800 px-[18px] py-5">
+      <View className="flex-row items-center justify-between">
+        <View>
+          <Text className="text-[18px] font-extrabold tracking-tight text-white">Today’s food log</Text>
+          <Text className="mt-0.5 text-[12px] text-white/45">
+            {target > 0 ? `${Math.round(day.kcal)} of ~${target} kcal` : `${Math.round(day.kcal)} kcal logged`}
+          </Text>
+        </View>
+        <Pressable
+          onPress={onAddFood}
+          accessibilityRole="button"
+          accessibilityLabel="Add food to today's log"
+          className="flex-row items-center gap-1.5 rounded-full bg-brand-400 px-3.5 py-2 active:opacity-90"
+        >
+          <Plus size={14} color="#0a0a0b" strokeWidth={3} />
+          <Text className="text-[12.5px] font-extrabold text-black">Add food</Text>
+        </Pressable>
+      </View>
+      {target > 0 && (
+        <View className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/[0.08]">
+          <View style={{ width: `${pct}%`, backgroundColor: c.brand400 }} className="h-full rounded-full" />
+        </View>
+      )}
+      <View className="mt-3 flex-row gap-4">
+        {[
+          { label: 'Protein', v: Math.round(day.p), color: c.accentBlue },
+          { label: 'Carbs', v: Math.round(day.c), color: c.accentOrange },
+          { label: 'Fat', v: Math.round(day.f), color: c.accentPurple },
+        ].map((m) => (
+          <View key={m.label} className="flex-row items-center gap-1.5">
+            <View className="h-2 w-2 rounded-full" style={{ backgroundColor: m.color }} />
+            <Text className="text-[12px] font-semibold text-white/60">{m.label} <Text className="font-extrabold text-white">{m.v}g</Text></Text>
+          </View>
+        ))}
+      </View>
+      {day.meals.length === 0 ? (
+        <Text className="mt-3.5 text-[12.5px] leading-5 text-white/40">
+          Nothing logged yet today. Scan a meal above or add food manually — totals update instantly.
+        </Text>
+      ) : (
+        <View className="mt-3.5 gap-2">
+          {day.meals.map((m) => (
+            <View key={m.id} className="flex-row items-center gap-2.5 rounded-[14px] border border-white/[0.06] bg-white/[0.03] px-3 py-2.5">
+              <View className="min-w-0 flex-1">
+                <Text numberOfLines={1} className="text-[13.5px] font-bold text-white">{m.name}</Text>
+                <Text className="mt-px text-[11.5px] text-white/45">
+                  {m.meal}{m.qty !== 1 ? ` · ${m.qty} servings` : ''} · ~{Math.round(m.kcal * m.qty)} kcal
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => { dispatch({ type: 'REMOVE_MEAL', id: m.id }); toast('Removed from today’s log') }}
+                accessibilityRole="button"
+                accessibilityLabel={`Remove ${m.name} from today's log`}
+                hitSlop={8}
+                className="h-8 w-8 items-center justify-center rounded-full bg-white/[0.06] active:opacity-80"
+              >
+                <X size={14} color="rgba(255,255,255,0.55)" />
+              </Pressable>
+            </View>
+          ))}
+        </View>
+      )}
+      <Text className="mt-3 text-[10.5px] leading-4 text-white/30">
+        Scanned entries are AI estimates, not measurements. Targets are general guidance, not medical advice.
+      </Text>
+    </View>
   )
 }
 

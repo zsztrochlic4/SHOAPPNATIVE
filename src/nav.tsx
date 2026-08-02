@@ -3,6 +3,7 @@ import { createContext, useContext } from 'react'
 export type Overlay =
   | 'notifications'
   | 'settings'
+  | 'addFood'
   | 'activeWorkout'
   | 'createSession'
   | 'customize'
