@@ -46,6 +46,9 @@ export async function enforceDailyLimit(key: string, uid: string, max: number): 
       ref,
       {
         count: count + 1,
+        // The owner uid, queryable so account deletion can purge live buckets
+        // (audit F-013) — the doc id embeds it but ids can't be queried by part.
+        uid,
         updatedAt: FieldValue.serverTimestamp(),
         // TTL field — a Firestore TTL policy on `rateLimits.expiresAt` reaps old buckets.
         expiresAt: Timestamp.fromMillis(rateLimitExpiryMs(now)),

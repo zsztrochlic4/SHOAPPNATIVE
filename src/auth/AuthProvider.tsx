@@ -8,13 +8,15 @@ import {
   updateProfile,
   onAuthStateChanged,
   sendPasswordResetEmail,
-  deleteUser,
   signOut as fbSignOut,
   type User,
 } from 'firebase/auth'
 import { httpsCallable } from 'firebase/functions'
 import { auth, functions, firebaseEnabled } from '../lib/firebase'
-import { deleteUserData } from '../store/cloudRepo'
+import { ANON_IDENTITY, clearStoredStateFor, setActiveIdentity } from '../store/identity'
+import { requestCloudFlush } from '../store/cloudFlush'
+import { clearCoachWorkspaceCache } from '../lib/coachWorkspace'
+import { cancelAllReminders, unregisterPush } from '../lib/notifications'
 
 type AuthState = {
   /** True while we're still figuring out if someone is logged in. */
@@ -58,6 +60,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false)
     }
     const unsub = onAuthStateChanged(auth, (u) => {
+      // Publish the active identity BEFORE exposing the user to the tree, so
+      // the store swaps to the right per-account slot first (audit F-001).
+      setActiveIdentity(u?.uid ?? ANON_IDENTITY)
       setUser(u)
       finishLoading()
     })
@@ -100,27 +105,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function deleteAccount() {
     if (!auth || !auth.currentUser) throw new Error('You are not signed in.')
-    const current = auth.currentUser
-    // Prefer the server-side complete purge: it removes data + storage + the login
-    // with Admin privileges and needs no recent re-auth. Fall back to the
-    // client-side path if the backend is unreachable, so deletion always works.
-    if (functions) {
-      try {
-        await httpsCallable(functions, 'deleteAccount')()
-        await fbSignOut(auth).catch(() => {}) // clear the now-defunct local session
-        return
-      } catch {
-        /* backend unavailable — fall through to the client-side deletion below */
-      }
+    const uid = auth.currentUser.uid
+    // Deletion is SERVER-ONLY (audit F-002). The callable removes data, Storage
+    // and the login atomically with Admin privileges (no recent-login step), and
+    // is idempotent/resumable server-side. If it fails, NOTHING has been
+    // destroyed client-side and the user can simply retry — the old client
+    // fallback that deleted cloud data before `deleteUser` could leave the
+    // login alive with the data already gone, which is worse than failing.
+    if (!functions) {
+      throw new Error('Account deletion needs a connection to our servers. Please try again once you are back online.')
     }
-    // Fallback: delete cloud data (owner-authenticated), then the login itself.
-    // deleteUser may throw `auth/requires-recent-login`; the caller surfaces that.
-    await deleteUserData(current.uid)
-    await deleteUser(current)
+    await httpsCallable(functions, 'deleteAccount', { timeout: 300_000 })()
+    // Server purge succeeded — scrub every local trace of the account.
+    await unregisterPush(uid).catch(() => {})
+    await cancelAllReminders().catch(() => {})
+    await clearCoachWorkspaceCache(uid).catch(() => {})
+    await clearStoredStateFor(uid).catch(() => {})
+    await fbSignOut(auth).catch(() => {}) // clear the now-defunct local session
   }
 
   async function signOut() {
-    if (auth) await fbSignOut(auth)
+    if (!auth) return
+    const uid = auth.currentUser?.uid
+    if (uid) {
+      // While still authenticated: push any last pending edit to the cloud,
+      // release this device's push token (Firestore rules are owner-only) and
+      // stop local reminders, then drop the local caches so nothing of this
+      // account stays readable on a shared device (audit F-001/F-004/F-005).
+      await requestCloudFlush()
+      await unregisterPush(uid).catch(() => {})
+      await cancelAllReminders().catch(() => {})
+      await clearCoachWorkspaceCache(uid).catch(() => {})
+      await clearStoredStateFor(uid).catch(() => {})
+    }
+    await fbSignOut(auth)
   }
 
   const value: AuthState = {

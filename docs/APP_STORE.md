@@ -134,12 +134,12 @@ Play Console**:
 
 - **Bundle id** is `com.zaggy887.strengthhub` (an older handle). Not a blocker,
   but pick the final id **before first submission** — it cannot be changed after.
-- **AI Coach is LIVE** (`COACH_ENABLED = true`, enabled 2026-08-01 after
-  independent clinical validation). It runs server-side on Cloud Functions via
-  Gemini, with an automated safety layer and a remote kill switch — it is **not**
-  human-reviewed. Reflect it in the privacy answers and, if asked in review,
-  describe the safety controls and crisis routing. See
-  [COACH_RELEASE_STATE.md](COACH_RELEASE_STATE.md).
+- **AI Coach is DISABLED** (`COACH_ENABLED = false` — the 2026-08-01 enablement
+  was rolled back on 2026-08-02 because it contradicted the coach's own safety
+  record; see [COACH_RELEASE_STATE.md](COACH_RELEASE_STATE.md) for the
+  authoritative state and re-enable conditions). The coach UI shows a "coming
+  soon" surface; no user message reaches the model. Store privacy answers must
+  describe the DISABLED state until the release record changes.
 - **External images:** some screens load remote demo images. For a store build,
   prefer bundling rights-cleared assets.
 - **Apple review polish:** the app is fully functional on real + seeded data;

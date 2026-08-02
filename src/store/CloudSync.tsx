@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { AppState as RNAppState } from 'react-native'
 import { useAuth } from '../auth/AuthProvider'
-import { useStore, type WindowedHistory } from './store'
+import { useStore, useStoreMeta, type WindowedHistory } from './store'
 import { resetSharedCoachSession } from '../lib/coachSafety'
 import { loadUserState, loadRemainingHistory, saveUserState } from './cloudRepo'
 import { saveBackoffMs, MAX_SAVE_RETRIES } from './saveRetry'
 import { mergeById, type HistoryEntry } from './historyMerge'
 import { registerEnsureFullHistory } from './historySync'
+import { registerCloudFlush } from './cloudFlush'
 import { migrateAppState } from './migrate'
 import type { AppState } from './types'
 
@@ -27,6 +28,11 @@ import type { AppState } from './types'
 export function CloudSync() {
   const { user } = useAuth()
   const { state, dispatch } = useStore()
+  // The identity whose data the local store currently holds (audit F-001). The
+  // cloud load must not start until the store has swapped to THIS user's slot —
+  // otherwise a merge could mix the previous account's in-memory state into the
+  // new account's cloud copy.
+  const { identity } = useStoreMeta()
   // "synced" means we've finished loading this user's cloud state, so it's now
   // safe to save changes back (never overwrite the cloud with the local seed).
   const [synced, setSynced] = useState(false)
@@ -66,45 +72,68 @@ export function CloudSync() {
     pendingBaselineRef.current = null
     incompatibleCloudRef.current = false
     if (!user) { setSynced(false); savedRef.current = undefined; return }
+    // FAIL CLOSED on account switch (audit F-001): until the local store has
+    // swapped to this user's own slot, do nothing — and if the cloud read
+    // fails, retry with backoff rather than marking sync ready over state we
+    // never verified. The user still sees their identity-scoped local state
+    // (local-first); only cloud SAVES wait for a confirmed load.
+    if (identity !== user.uid) { setSynced(false); return }
     let cancelled = false
     setSynced(false)
-    loadUserState(user.uid)
-      .then((loaded) => {
-        if (cancelled) return
-        if (loaded) {
-          const migration = migrateAppState({ ...stateRef.current, ...loaded.state })
-          if (!migration.ok) {
-            // Never let an older build overwrite a future or malformed payload.
-            incompatibleCloudRef.current = true
-            return
+    let retryTimer: ReturnType<typeof setTimeout> | null = null
+    let attemptCount = 0
+    const attempt = () => {
+      loadUserState(user.uid)
+        .then((loaded) => {
+          if (cancelled) return
+          if (loaded) {
+            const migration = migrateAppState({ ...stateRef.current, ...loaded.state })
+            if (!migration.ok) {
+              // Never let an older build overwrite a future or malformed payload.
+              incompatibleCloudRef.current = true
+              return
+            }
+            // Returning user: merge cloud over current state so any local-only
+            // fields survive. Diff future saves against what's actually in the
+            // cloud subcollections (empty for a legacy doc → first save migrates).
+            savedRef.current = loaded.baseline
+            hasMoreRef.current = Object.values(loaded.partial).some(Boolean)
+            dispatch({ type: 'HYDRATE', state: migration.state })
+          } else if (loaded === null) {
+            // Brand-new account (no saved doc). Two cases:
+            //  - The account was created at the END of onboarding (the current
+            //    flow): the local state is already a real, onboarded user whose
+            //    freshly-gathered answers must be PUSHED to the cloud, not wiped.
+            //    Keep local and let the debounced save migrate it up.
+            //  - Otherwise (a not-yet-onboarded local state): reset to a clean,
+            //    un-onboarded state so they go through onboarding.
+            // (A network error throws instead, landing in .catch below, so we never
+            // wipe a returning user's screen just because they're offline.)
+            savedRef.current = undefined
+            const local = stateRef.current
+            const localIsRealUser = local.profile?.onboarded === true && local.demo !== true
+            if (!localIsRealUser) dispatch({ type: 'RESET_EMPTY' })
           }
-          // Returning user: merge cloud over current state so any local-only
-          // fields survive. Diff future saves against what's actually in the
-          // cloud subcollections (empty for a legacy doc → first save migrates).
-          savedRef.current = loaded.baseline
-          hasMoreRef.current = Object.values(loaded.partial).some(Boolean)
-          dispatch({ type: 'HYDRATE', state: migration.state })
-        } else if (loaded === null) {
-          // Brand-new account (no saved doc). Two cases:
-          //  - The account was created at the END of onboarding (the current
-          //    flow): the local state is already a real, onboarded user whose
-          //    freshly-gathered answers must be PUSHED to the cloud, not wiped.
-          //    Keep local and let the debounced save migrate it up.
-          //  - Otherwise (demo seed, or a not-yet-onboarded local state): reset
-          //    to a clean, un-onboarded state so they go through onboarding.
-          // (A network error throws instead, landing in .catch below, so we never
-          // wipe a returning user's screen just because they're offline.)
-          savedRef.current = undefined
-          const local = stateRef.current
-          const localIsRealUser = local.profile?.onboarded === true && local.demo !== true
-          if (!localIsRealUser) dispatch({ type: 'RESET_EMPTY' })
-        }
-      })
-      .catch(() => { /* offline / transient — keep local state, save later */ })
-      .finally(() => { if (!cancelled) setSynced(!incompatibleCloudRef.current) })
-    return () => { cancelled = true }
+          setSynced(!incompatibleCloudRef.current)
+        })
+        .catch(() => {
+          // Offline / transient: keep showing the identity-scoped local state,
+          // but NEVER mark sync ready off a failed load (that is what allowed
+          // saving unverified state under a fresh sign-in). Retry with capped
+          // backoff until a load actually resolves.
+          if (cancelled) return
+          const delay = Math.min(60_000, 5_000 * 3 ** Math.min(attemptCount, 3))
+          attemptCount += 1
+          retryTimer = setTimeout(attempt, delay)
+        })
+    }
+    attempt()
+    return () => {
+      cancelled = true
+      if (retryTimer) clearTimeout(retryTimer)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.uid])
+  }, [user?.uid, identity])
 
   // Load the older remainder of the windowed collections on demand (Phase C).
   // Idempotent; a no-op unless signed in, synced, there's more to load, and no
@@ -213,6 +242,19 @@ export function CloudSync() {
         }
       })
   }
+
+  // Let sign-out flush the pending debounced save before the session ends
+  // (registered via cloudFlush so AuthProvider needs no direct dependency).
+  useEffect(() => {
+    registerCloudFlush(async () => {
+      saveNowRef.current()
+      // Wait for the in-flight save to settle (bounded by requestCloudFlush).
+      while (savingRef.current || savePendingRef.current) {
+        await new Promise((r) => setTimeout(r, 100))
+      }
+    })
+    return () => registerCloudFlush(null)
+  }, [])
 
   // Debounced save on every change.
   useEffect(() => {

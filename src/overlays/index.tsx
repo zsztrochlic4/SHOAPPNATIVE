@@ -204,10 +204,13 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
       toast('Your account has been deleted')
       onDone?.()
     } catch (e: unknown) {
+      // Deletion is server-only and non-destructive on failure (audit F-002):
+      // nothing has been removed, so the honest message is simply "retry".
       const code = (e as { code?: string })?.code ?? ''
-      toast(code === 'auth/requires-recent-login'
-        ? 'For security, log out and back in, then delete your account'
-        : 'Could not delete your account. Please try again.')
+      const offline = code === 'functions/unavailable' || code === 'unavailable'
+      toast(offline
+        ? 'Could not reach our servers. Nothing was deleted — please try again once you are online.'
+        : 'Could not delete your account. Nothing was deleted — please try again.')
       setConfirmingDelete(false)
     } finally {
       setDeleting(false)

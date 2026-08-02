@@ -1,5 +1,5 @@
 import {
-  doc, collection, getDoc, getDocs, query, orderBy, limit, writeBatch, setDoc, serverTimestamp,
+  doc, collection, getDoc, getDocs, query, orderBy, limit, writeBatch, serverTimestamp,
 } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { sanitizeForPersist, sanitizeEntry } from '../lib/sanitize'
@@ -143,47 +143,16 @@ function chunk<T>(items: T[], size: number): T[][] {
   return out
 }
 
-/**
- * Delete a signed-in user's cloud data, for in-app account deletion.
- *
- * Removes every document in every per-user subcollection (firestore.rules allows
- * an owner to delete these), then best-effort scrubs the root singleton doc. The
- * root doc itself cannot be *deleted* from the client by design (firestore.rules:
- * `allow delete: if false` — reserved for the server account-deletion workflow),
- * so we overwrite it to strip personal data; once the user's Auth account is
- * removed the doc is owner-less and unreadable, and the backend workflow removes
- * it fully later.
- *
- * Call this BEFORE deleting the Auth user, while the owner is still authenticated
- * (the delete rules require `isOwner()`).
- */
-/** Every per-user subcollection defined in firestore.rules — the complete set that
- *  a full account wipe removes and a full data export reads. Kept in one place so
- *  deletion and export can never drift out of sync. */
+/** Every per-user subcollection defined in firestore.rules — the complete set
+ *  that a full data export reads (and that the SERVER deletion job removes; the
+ *  client-side destructive fallback was removed per audit F-002 — deletion is
+ *  server-only via the `deleteAccount` callable in functions/src/account.ts,
+ *  which also covers coach, entitlement and rate-limit records per F-013). */
 const ALL_SUBCOLLECTIONS = [
   'sessions', 'weights', 'habits', 'meals', 'activities', 'foodReviews',
   'chat', 'coachThread', 'notifications', 'workoutSummaries', 'programs',
   'workout_instances', 'set_logs', 'progression_state', 'pushTokens',
 ] as const
-
-export async function deleteUserData(uid: string): Promise<void> {
-  if (!db || !uid || uid === 'local') return
-  for (const sub of ALL_SUBCOLLECTIONS) {
-    const snap = await getDocs(collection(db, COL, uid, sub))
-    for (const group of chunk(snap.docs, BATCH_LIMIT)) {
-      const batch = writeBatch(db)
-      for (const d of group) batch.delete(d.ref)
-      await batch.commit()
-    }
-  }
-  // Strip personal data from the root doc (a client delete is blocked by rules).
-  try {
-    await setDoc(doc(db, COL, uid), { demo: false }, { merge: false })
-  } catch {
-    /* Rules may reject the scrub (e.g. a set premium flag); the root becomes
-       unreadable once the Auth account is gone, and the backend cleanup finishes it. */
-  }
-}
 
 /**
  * Gather a signed-in user's COMPLETE cloud data for "Download my data": the root

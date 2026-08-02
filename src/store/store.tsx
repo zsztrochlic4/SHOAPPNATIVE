@@ -2,6 +2,15 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useReducer,
 import { AppState as RNAppState } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { todayKey, setLiveClock, refreshClock } from '../lib/date'
+import {
+  ANON_IDENTITY,
+  LEGACY_STORAGE_KEY,
+  getActiveIdentity,
+  shouldCarryLocalState,
+  storageKeyFor,
+  subscribeIdentity,
+  type Identity,
+} from './identity'
 import { buildSeed, emptyState } from './seed'
 import { migrateAppState } from './migrate'
 import { coachReply } from '../lib/coachChat'
@@ -40,7 +49,10 @@ export type WindowedHistory = Partial<
   Pick<AppState, 'sessions' | 'meals' | 'activities' | 'chat' | 'coachThread' | 'notifications'>
 >
 
-const STORAGE_KEY = 'sho.state.v1'
+// Local persistence is scoped per account (audit F-001): each identity —
+// 'anon' (signed out / demo / mid-onboarding) or a Firebase uid — owns its own
+// AsyncStorage key. See ./identity.ts for the key scheme and the one legitimate
+// anon→account hand-off (fresh onboarding answers following the new account).
 
 /* ------------------------------ Actions ------------------------------ */
 export type Action =
@@ -598,7 +610,7 @@ const StoreCtx = createContext<{
   persistenceError: boolean
 } | null>(null)
 const StoreDispatchCtx = createContext<React.Dispatch<Action> | null>(null)
-const StoreMetaCtx = createContext<{ hydrated: boolean; persistenceError: boolean } | null>(null)
+const StoreMetaCtx = createContext<{ hydrated: boolean; persistenceError: boolean; identity: Identity } | null>(null)
 type StoreSelectorApi = {
   getState: () => AppState
   subscribe: (listener: () => void) => () => void
@@ -612,6 +624,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [hydrated, setHydrated] = useState(false)
   const [persistenceError, setPersistenceError] = useState(false)
   const persistenceBlockedRef = useRef(false)
+  // Which account's data the store currently holds (audit F-001). Starts as the
+  // module's current identity; AuthProvider publishes changes and the swap
+  // effect below re-hydrates from that identity's own storage key.
+  const [identity, setIdentity] = useState<Identity>(getActiveIdentity)
+  // The key persistence writes to — always the key the current state was
+  // hydrated FROM, so a save can never land in another account's slot.
+  const persistKeyRef = useRef<string>(storageKeyFor(getActiveIdentity()))
+  const prevIdentityRef = useRef<Identity>(getActiveIdentity())
+  const bootRef = useRef(true)
   const stateRef = useRef(state)
   stateRef.current = state
   const selectorListenersRef = useRef(new Set<() => void>())
@@ -622,7 +643,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       return () => selectorListenersRef.current.delete(listener)
     },
   }), [])
-  const meta = useMemo(() => ({ hydrated, persistenceError }), [hydrated, persistenceError])
+  const meta = useMemo(() => ({ hydrated, persistenceError, identity }), [hydrated, persistenceError, identity])
   const dispatch = useCallback<React.Dispatch<Action>>((action) => {
     if (action.type === 'RESET_DEMO' || action.type === 'RESET_EMPTY') {
       persistenceBlockedRef.current = false
@@ -649,32 +670,91 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => sub.remove()
   }, [])
 
+  // Track the active identity published by AuthProvider.
+  useEffect(() => subscribeIdentity(setIdentity), [])
+
+  // Hydrate (and re-hydrate on every identity switch) from the identity's OWN
+  // storage key. The swap is atomic from the UI's point of view: `hydrated`
+  // drops, persistence pauses, the new state lands in one dispatch, then writes
+  // resume against the new key. Prior-account state can never render or be
+  // saved under the new account (audit F-001).
   useEffect(() => {
     let cancelled = false
-    AsyncStorage.getItem(STORAGE_KEY)
-      .then((raw) => {
-        if (cancelled || !raw) return
-        const migration = migrateAppState(JSON.parse(raw))
-        if (migration.ok) {
-          dispatch({ type: 'HYDRATE', state: migration.state })
-        } else {
-          // Preserve an invalid/future payload for recovery; never overwrite it
-          // with seed data from an older build.
-          persistenceBlockedRef.current = true
+    const previousIdentity = prevIdentityRef.current
+    prevIdentityRef.current = identity
+    const isBoot = bootRef.current
+    bootRef.current = false
+    setHydrated(false)
+    persistenceBlockedRef.current = true
+    setPersistenceError(false)
+    ;(async () => {
+      const key = storageKeyFor(identity)
+      let raw: string | null = null
+      let readFailed = false
+      try {
+        raw = await AsyncStorage.getItem(key)
+        // One-time adoption of the pre-scoping global key. It cannot be safely
+        // attributed to a signed-in account, so it only ever seeds the anon slot.
+        if (!raw && identity === ANON_IDENTITY) {
+          const legacy = await AsyncStorage.getItem(LEGACY_STORAGE_KEY)
+          if (legacy) {
+            raw = legacy
+            await AsyncStorage.setItem(key, legacy).catch(() => {})
+            await AsyncStorage.removeItem(LEGACY_STORAGE_KEY).catch(() => {})
+          }
+        }
+      } catch {
+        readFailed = true
+      }
+      if (cancelled) return
+      if (readFailed) {
+        // Fail closed: leave writes blocked so an unreadable slot is never
+        // overwritten with seed data.
+        setPersistenceError(true)
+        setHydrated(true)
+        return
+      }
+      if (raw) {
+        try {
+          const migration = migrateAppState(JSON.parse(raw))
+          if (migration.ok) {
+            persistKeyRef.current = key
+            persistenceBlockedRef.current = false
+            dispatch({ type: 'HYDRATE', state: migration.state })
+          } else {
+            // Preserve an invalid/future payload for recovery; never overwrite
+            // it with seed data from an older build.
+            setPersistenceError(true)
+          }
+        } catch {
           setPersistenceError(true)
         }
-      })
-      .catch(() => {
-        persistenceBlockedRef.current = true
-        setPersistenceError(true)
-      })
-      .finally(() => {
+        setHydrated(true)
+        return
+      }
+      // No stored state for this identity.
+      const memState = stateRef.current
+      if (shouldCarryLocalState(previousIdentity, identity, memState)) {
+        // Fresh onboarding answers follow the account that was just created:
+        // move them into the new account's slot and clear the anon slot.
+        persistKeyRef.current = key
+        persistenceBlockedRef.current = false
+        await AsyncStorage.setItem(key, JSON.stringify(memState)).catch(() => {})
+        await AsyncStorage.removeItem(storageKeyFor(ANON_IDENTITY)).catch(() => {})
         if (!cancelled) setHydrated(true)
-      })
+        return
+      }
+      persistKeyRef.current = key
+      persistenceBlockedRef.current = false
+      // First boot keeps the synchronous seed (demo preview); any later switch
+      // to an empty slot starts clean so nothing leaks across accounts.
+      if (!isBoot) dispatch({ type: 'RESET_EMPTY' })
+      setHydrated(true)
+    })()
     return () => {
       cancelled = true
     }
-  }, [dispatch])
+  }, [identity, dispatch])
 
   const savingRef = useRef(false)
   const savePendingRef = useRef(false)
@@ -688,7 +768,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
     const snapshot = stateRef.current
     savingRef.current = true
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot))
+    AsyncStorage.setItem(persistKeyRef.current, JSON.stringify(snapshot))
       .then(() => setPersistenceError(false))
       .catch(() => setPersistenceError(true))
       .finally(() => {

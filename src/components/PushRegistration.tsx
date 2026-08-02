@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useAuth } from '../auth/AuthProvider'
 import { useStoreSelector } from '../store/store'
 import type { AppState } from '../store/types'
-import { getPushToken, savePushToken, syncReminders } from '../lib/notifications'
+import { getPushToken, getStoredPushRegistration, savePushToken, syncReminders, unregisterPush } from '../lib/notifications'
 
 const selectNotificationsEnabled = (state: AppState) => state.settings.notificationsEnabled
 const selectNotificationConsent = (state: AppState) => state.settings.notificationConsent ?? 'unknown'
@@ -27,11 +27,25 @@ export function PushRegistration() {
   useEffect(() => {
     // Permission is requested only from the user's Settings toggle. This
     // background bridge must never trigger an OS prompt on sign-in or launch.
-    if (!user || !enabled || consent !== 'granted') return
+    if (!user) return
+    if (!enabled || consent !== 'granted') {
+      // Notifications turned off (or consent withdrawn): revoke this device's
+      // registration so remote pushes stop, not just local reminders (audit
+      // F-005/F-021). Idempotent no-op when nothing is registered.
+      done.current = null
+      void unregisterPush().catch(() => {})
+      return
+    }
     const key = `${user.uid}:on`
     if (done.current === key) return
     done.current = key
     ;(async () => {
+      // Account switch on a shared device: best-effort release of the previous
+      // owner's claim on this device token first (sign-out already does this
+      // while the old owner is still authenticated; the server-side dedupe
+      // trigger is the authoritative backstop).
+      const previous = await getStoredPushRegistration()
+      if (previous && previous.uid !== user.uid) await unregisterPush().catch(() => {})
       const token = await getPushToken()
       if (token) await savePushToken(user.uid, token)
     })().catch(() => { done.current = null })

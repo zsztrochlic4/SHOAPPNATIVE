@@ -1,8 +1,9 @@
-// Server-side coach orchestration. COACH_ENABLED is now ON (post-validation), so the remaining
-// off-switch is the remote kill switch: runCoachTurn proceeds when the gate is open and throws
-// coach_unavailable when the kill switch is engaged. The guarded behaviour — a crisis never reaches
-// the model, an allowed turn does + is validated, the daily cap is honoured — is verified via
-// coachTurnCore with injected fakes.
+// Server-side coach orchestration. COACH_ENABLED is OFF (audit F-003: the active classifier is
+// unvalidated and the STATUS record shows the last independent validation failing critical cases),
+// so runCoachTurn must refuse every turn with coach_disabled BEFORE any other work. The guarded
+// behaviour behind the gate — a crisis never reaches the model, an allowed turn does + is
+// validated, the daily cap is honoured — remains verified via coachTurnCore with injected fakes,
+// so it stays green for the eventual authorised enablement.
 //   npm --prefix functions run build && node --test functions/test/coach.test.mjs
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -31,15 +32,10 @@ const baseDeps = (over = {}) => {
   return { deps, replyCalls: () => replyCalls }
 }
 
-test('runCoachTurn proceeds past the enable gate (COACH_ENABLED is on)', async () => {
-  const { deps } = baseDeps()
-  const out = await runCoachTurn('u1', { message: 'how do I squat?' }, deps)
-  assert.equal(out.blocked, false) // gate open + benign turn → coached (not coach_disabled)
-})
-
-test('runCoachTurn refuses with coach_unavailable when the remote kill switch is engaged', async () => {
-  const { deps } = baseDeps({ killSwitchEngaged: () => true })
-  await assert.rejects(() => runCoachTurn('u1', { message: 'how do I squat?' }, deps), /coach_unavailable/)
+test('runCoachTurn refuses every turn with coach_disabled while the gate is off (audit F-003)', async () => {
+  const { deps, replyCalls } = baseDeps()
+  await assert.rejects(() => runCoachTurn('u1', { message: 'how do I squat?' }, deps), /coach_disabled/)
+  assert.equal(replyCalls(), 0) // the model is never consulted while disabled
 })
 
 test('a crisis message is blocked by the safety floor and NEVER reaches the model', async () => {

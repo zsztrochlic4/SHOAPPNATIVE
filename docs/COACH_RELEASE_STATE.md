@@ -1,80 +1,59 @@
-# Coach release-state record (final plan Phase 0)
+# Coach release-state record — AUTHORITATIVE
 
-Phase 0's job is to make the coach's release control **unambiguous and reversible** before any
-behaviour change. This file records what is verifiable from the repository and names the operational
-checks that require live access (a person with Firebase/deploy credentials).
+_Updated 2026-08-02 (audit remediation, finding F-003). This file supersedes the
+2026-08-02 "candidate branch" note that previously lived here. Where any other
+document disagrees with this record or with `src/backend/coach/safety/STATUS.md`,
+those two lose only to each other in one direction: **STATUS.md is the safety
+record of truth; this file must always match it.**_
 
-_Recorded 2026-08-02 for the `claude/coach-human-feel` candidate branch (off `main` @ 4905c4e)._
-
-## Candidate
-
-- **Branch:** `claude/coach-human-feel` — a single dedicated branch holding the language/human-feel
-  implementation. It contains only the coach work described in the final plan (Phases 1–6) plus this
-  Phase 0 record; no unrelated changes.
-- **Shared source is regenerated, not hand-edited.** The server runs the app's guardrail code verbatim
-  via `functions/scripts/sync-shared.mjs` → `functions/src/_shared/**` (gitignored). Run
-  `node functions/scripts/sync-shared.mjs` after any `src/backend/coach/**` change.
-
-## Verifiable gate states (from the repo)
+## Current release state: DISABLED
 
 | Control | Value | Source |
 |---|---|---|
-| `COACH_ENABLED` | `true` | `src/backend/coach/coachGate.ts` |
+| `COACH_ENABLED` | **`false`** | `src/backend/coach/coachGate.ts` |
+| Safety classifier | `activeClassifier` LLM path, **`validated: false`** | `src/backend/coach/safety/classifier.ts` |
 | App Check enforcement | `false` (monitor mode) | `functions/src/lib/guards.ts` → `APP_CHECK_ENFORCED` |
 | Remote kill switch | `config/coach.killSwitch` (Firestore); OFF without redeploy | `functions/src/killSwitchRemote.ts`, `src/backend/coach/safety/killSwitch.ts` |
-| Safety classifier | `activeClassifier` LLM path, `validated: false` | `src/backend/coach/safety/classifier.ts` |
 | Daily cap | `DAILY_COACH_LIMIT` server-enforced | `src/backend/coach/safety/dailyLimit.ts` |
 
-### Enablement reconciliation
+## Why the 2026-08-01 enablement was rolled back
 
-The code, comments and review notes are now consistent: `COACH_ENABLED = true` was set on 2026-08-01
-after the R8 clinical validation (see `coachGate.ts` header and `src/backend/coach/safety/STATUS.md`).
-Stale "coach ships DISABLED" prose remains in a few file-level docblocks (`safety/types.ts`,
-`safety/index.ts`) and is historical — the authoritative flag is `coachGate.COACH_ENABLED`. The server
-turn (`functions/src/coach.ts` → `runCoachTurn`) throws `coach_disabled` when the flag is false and
-`coach_unavailable` when the kill switch is engaged, so both controls gate the callable path.
+The gate was flipped to `true` on 2026-08-01 citing an "R8 clinical validation".
+That claim did not reconcile with the coach's own safety records:
 
-### App Check decision (Phase 0 requirement)
+1. `src/backend/coach/safety/STATUS.md` records the final r8 validation **failing
+   9/123 critical cases** and states enabling was **not authorised**.
+2. The post-fix build (r9) has **not** had a fresh independent holdout validation.
+3. `activeClassifier.validated` is `false` in the shipped code — the classifier the
+   router actually runs is explicitly marked unvalidated.
 
-The coach deliberately does **not** uniquely enforce App Check ahead of the app-wide rollout, because
-the native app does not yet attest; enforcing only on the coach would reject real clients. It runs in
-**monitor mode** (`auditAppCheck` logs missing tokens without rejecting) consistently with every other
-callable, and comes along when App Check is enforced app-wide per `docs/APP_CHECK.md`.
+A release decision that contradicts its own safety evidence is a governance
+defect regardless of intent (external audit 2026-08-02, finding F-003, P0). The
+gate is therefore OFF, and the code comment in `coachGate.ts` documents the
+rollback.
 
-- **Temporary risk owner:** the coach release owner (see `docs/APP_CHECK.md`).
-- **Exit condition:** flip `APP_CHECK_ENFORCED = true` once real clients are confirmed to attest; until
-  then endpoint-abuse risk is bounded by auth (`requireVerifiedUser`) + the server-authoritative daily
-  cap + the remote kill switch.
+## Conditions for re-enabling (all required, in order)
 
-## Automated suites on this branch (all green)
+1. **Fresh independent clinical holdout** on the exact shipping build (r9 or
+   later) against a set the builder has never seen, meeting the documented
+   thresholds: zero critical misses, zero emergency under-routes.
+2. **`activeClassifier.validated` flipped by the reviewing clinician's record**,
+   never by the builder. The reviewer's name, credentials, date, dataset id and
+   result summary must be appended to `STATUS.md`.
+3. **Named sign-offs** recorded here: clinical, privacy, security, implementation.
+4. **Live rollback drill**: set `config/coach.killSwitch = true` in production,
+   confirm the callable refuses without a redeploy, record the drill owner/date.
+5. Only then: one commit that flips `COACH_ENABLED = true`, updates this file and
+   `STATUS.md` in the same change, and names the deployed Functions revision.
 
-- Coach safety regression suite — `node .sweep-out/backend/coach/safety/runCoachSafetyTests.js` →
-  **218 assertions PASS**.
-- Detection report baseline — `runDetectionReport.js` → **unchanged** vs `main` (84 stub-baseline
-  failures; the `tren` substring false-positive fix removed benign "strength"/"trend" mis-referrals
-  without changing the clinical detection set or reducing real PED recall).
-- `npm run test:safety` → **61 pass** (incl. new `conversational-routing.test.mjs`).
-- `npm run test:unit` → **170 pass** (incl. `context-selection`, `coach-fallback-policy`,
-  `coach-telemetry`).
-- `functions` → `coach.test.mjs` 9 pass, `killSwitch.test.mjs` 4 pass.
-- `npm run benchmark:coach` → **ROUTING GATES: PASS**.
+## What remains true while disabled
 
-## Operational checks that require live access (NOT verifiable from the repo)
-
-These are the Phase 0 items a person with credentials must record/verify before release; they cannot
-be established from source alone:
-
-1. **Deployed commit + Cloud Functions revision** actually serving `coachMessage` in production.
-2. **Live `config/coach.killSwitch` value**, and a real test that setting it `true` disables the
-   callable **without a redeploy** (the code path and `killSwitch.test.mjs` prove the logic; a live
-   toggle proves the wiring).
-3. **Live App Check monitoring** thresholds and the named risk owner acknowledging the exit condition.
-4. **Rollback** verified (revert the flag / engage the kill switch) before any rollout expansion.
-
-## Do-not-regress
-
-The clinically sensitive safety layer is preserved. Any change to fixed emergency, crisis, medical,
-pregnancy, eating-disorder, poisoning, or other professional-referral wording requires the appropriate
-clinical review. The conversational changes in this branch are **additive on the `allow` branch only**
-and never downgrade a safety route (verified by `conversational-routing.test.mjs` and the 218-assertion
-suite).
+- The server turn (`functions/src/coach.ts` → `runCoachTurn`) throws
+  `coach_disabled` before any other work; the client shows the "coming soon"
+  surface. Neither the live model nor the rules fallback answers.
+- The deterministic safety suite (218 assertions), routing benchmarks, function
+  orchestration tests and context-selection tests keep running in CI so the
+  gated build stays releasable.
+- App Check remains in monitor mode app-wide; the coach follows the app-wide
+  enforcement rollout (`docs/APP_CHECK.md`) and never enforces uniquely ahead of
+  native attestation.

@@ -11,14 +11,22 @@
  * signOff.ts). Enabling the workout generator must never enable the coach; the coach
  * is not part of that launch and gets reviewed and switched on separately.
  *
- * ENABLED 2026-08-01 after the independent clinical validation (Jack Dov, R8: 0 critical
- * misses, 0 emergency under-routes, 0 crisis-tier false alarms) and the activation controls
- * (named owners, kill switch verified, App Check aligned across the backend). Remote OFF stays
- * available WITHOUT a redeploy via `config/coach.killSwitch` (see safety/killSwitch.ts +
- * functions/src/killSwitchRemote.ts) — the kill switch is now the active off-switch.
+ * DISABLED 2026-08-02 (audit F-003). The 2026-08-01 enablement was NOT authorised by the
+ * coach's own safety record and has been rolled back: the active classifier ships with
+ * `validated: false` (src/backend/coach/safety/classifier.ts), and the authoritative status
+ * record (src/backend/coach/safety/STATUS.md) documents the final r8 validation failing
+ * 9/123 critical cases with r9 not yet independently re-validated. A release note claiming
+ * the opposite existed alongside those records; the STATUS record wins, so the gate is OFF.
+ *
+ * Re-enabling requires ALL of (recorded in docs/COACH_RELEASE_STATE.md):
+ *  1. a FRESH independent clinical holdout on the current build (r9) passing the documented
+ *     zero-critical-miss / zero-emergency-under-route thresholds,
+ *  2. `activeClassifier.validated` flipped by that review — never by the builder,
+ *  3. named clinical/privacy/security/implementation sign-offs,
+ *  4. a live kill-switch rollback drill (config/coach.killSwitch) with a named owner.
  */
 
-export const COACH_ENABLED = true
+export const COACH_ENABLED = false
 
 /** True only when the coach has been deliberately enabled post-review. */
 export function coachAvailable(): boolean {

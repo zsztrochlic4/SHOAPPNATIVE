@@ -1,4 +1,5 @@
 import { Platform } from 'react-native'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import Constants from 'expo-constants'
 import * as Device from 'expo-device'
 import * as Notifications from 'expo-notifications'
@@ -74,6 +75,25 @@ export async function getPushToken(): Promise<string | null> {
   }
 }
 
+/**
+ * The device's active push registration — which account currently owns this
+ * device's token (audit F-005). Persisted locally so sign-out, account switch
+ * and the notifications toggle can revoke the OLD owner's registration before
+ * (or without) creating a new one; without this, one device token accumulates
+ * under every account that ever signed in here.
+ */
+const PUSH_REG_KEY = 'sho.push.registration.v1'
+type PushRegistrationRecord = { uid: string; token: string }
+
+export async function getStoredPushRegistration(): Promise<PushRegistrationRecord | null> {
+  try {
+    const raw = await AsyncStorage.getItem(PUSH_REG_KEY)
+    return raw ? (JSON.parse(raw) as PushRegistrationRecord) : null
+  } catch {
+    return null
+  }
+}
+
 /** Store this device's push token under the user (owner-only per Firestore rules). No-op locally. */
 export async function savePushToken(uid: string, token: string): Promise<void> {
   if (!db || !uid || uid === 'local' || !token) return
@@ -90,6 +110,7 @@ export async function savePushToken(uid: string, token: string): Promise<void> {
       },
       { merge: true },
     )
+    await AsyncStorage.setItem(PUSH_REG_KEY, JSON.stringify({ uid, token })).catch(() => {})
   } catch {
     /* transient — retried on next launch */
   }
@@ -100,6 +121,24 @@ export async function removePushToken(uid: string, token: string): Promise<void>
   if (!db || !uid || uid === 'local' || !token) return
   try {
     await deleteDoc(doc(db, 'users', uid, 'pushTokens', token))
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Revoke this device's stored push registration (audit F-005): delete the token
+ * doc from its recorded owner and clear the local record. Called on sign-out,
+ * account switch, notification disable and account deletion. Must run while the
+ * owner is still authenticated (Firestore rules are owner-only). Never throws.
+ */
+export async function unregisterPush(expectedUid?: string): Promise<void> {
+  const reg = await getStoredPushRegistration()
+  if (!reg) return
+  if (expectedUid && reg.uid !== expectedUid) return
+  await removePushToken(reg.uid, reg.token)
+  try {
+    await AsyncStorage.removeItem(PUSH_REG_KEY)
   } catch {
     /* ignore */
   }
