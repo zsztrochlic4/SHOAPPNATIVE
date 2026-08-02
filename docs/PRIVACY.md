@@ -1,174 +1,358 @@
 # Privacy Policy — StrengthHub Online
 
-**Last updated: 2 August 2026**
+**Effective 2 August 2026 · Version 1.0**
+Melbourne, Victoria, Australia · info@strengthhubonline.com
 
-StrengthHub Online ("StrengthHub", "we", "us", "our") is a fitness, training and
-nutrition app for university students. This policy explains what information we
-collect, how we use it, who we share it with, and the choices and rights you
-have. It is written to reflect what the app actually does.
+StrengthHub Online ("StrengthHub", "we", "us" or "our") is a fitness, training,
+nutrition and wellbeing service operated from Melbourne, Victoria, Australia.
+This Privacy Policy explains how we handle personal information through our
+mobile and web application, website, AI-powered Coach and related services
+(together, the "Service").
 
-If you have any questions, contact us at **info@strengthhubonline.com**.
+We aim to handle personal information in accordance with the Privacy Act 1988
+(Cth) and the Australian Privacy Principles (APPs) where they apply, and use
+those principles as our privacy baseline.
+
+**Contact: info@strengthhubonline.com**
 
 ---
 
-## 1. Who we are
+## Contents
 
-StrengthHub Online is operated by **Strengthhubonline**. For any privacy
-question or request, email **info@strengthhubonline.com**.
+1. Scope and age requirement
+2. Personal information we collect
+3. How we collect information
+4. Why we collect, use and disclose information
+5. AI and automated processing
+6. Who we disclose information to
+7. Overseas processing and disclosure
+8. How we store and protect information
+9. How long we retain information
+10. Your choices and rights
+11. Privacy questions and complaints
+12. Direct communications
+13. Changes to this Policy
+14. Contact
 
-The app is intended for users **aged 18 and over** who are studying at
-university. It is not directed at children (see section 9).
+---
 
-## 2. What information we collect
+## 1. Scope and age requirement
 
-We only collect what the app needs to work for you:
+This Policy applies to personal information we collect or hold in connection with
+the Service. It does not replace the privacy policy of a third-party app, store
+or connected service.
 
-**Account information**
-- Your email address and a password (used to create and secure your account).
-- Optionally, a display name you choose.
+The Service is intended for people aged 18 and over. We do not knowingly permit
+children to create accounts. If you believe a person under 18 has provided
+personal information, contact us so we can investigate and take appropriate
+action.
 
-**Your fitness and profile data** (the content you create in the app)
-- Your goals, training experience and preferences.
-- Workouts, sessions and exercises you log.
-- Nutrition entries, meal logs and food "check-in" tags.
-- Body metrics you choose to enter, such as weight, and streaks/progress.
-- Any injuries, limitations or dietary preferences you tell the app so it can
-  tailor guidance to you.
-- If you consent to the AI coach: coach conversations, useful details the coach
-  remembers, coach preferences, proposed actions and your responses. Minimal
-  operational safety state is stored separately and is not directly readable or
-  editable by the app.
+## 2. Personal information we collect
 
-**Meal photos (only when you use the photo scan)**
-- When you take or upload a photo of a meal, the image is sent to Google's
-  Gemini AI to estimate its nutrition (see section 4). **We do not store your
-  meal photos on our servers** — only the resulting estimate (for example the
-  meal name and calorie/macro figures) is saved to your account if you choose
-  to log it.
+The information we collect depends on the features you use and the choices you
+make.
 
-**Device and notification data**
-- If you turn on notifications, we store a "push token" for your device so we
-  can send the reminders you asked for. You can turn this off at any time in
-  the app's settings or your device settings.
+**Account and identity information**
 
-**Technical data**
-- Basic information needed to run a mobile app and keep it secure (for example
-  app version and general error information). We do **not** use third-party
-  analytics or advertising SDKs.
+- email address, account identifier and optional display name;
+- date of birth and age-verification status;
+- university, campus, residence, society or similar community affiliation, if a
+  profile or community feature asks for it and you choose to provide it; and
+- authentication and security information. Password credentials are processed by
+  Firebase Authentication; we do not receive your readable password.
 
-## 3. How we use your information
+**Fitness, health and profile information**
 
-We use your information to:
-- Create and secure your account and let you sign in.
-- Provide the app's core features: training plans, logging, progress tracking,
-  nutrition guidance and reminders.
-- Personalise your experience (for example, respecting your goals, injuries and
-  dietary preferences).
-- Provide the AI coach with selected profile, goal, training-history,
-  recovery/habit, nutrition-summary, coach-memory and recent-conversation
-  context after you give in-app consent.
-- Estimate the nutrition of meals you photograph, when you use that feature.
-- Send you the notifications you have enabled.
-- Keep the service safe, prevent abuse, and fix problems.
+- sex, height, weight, goal weight, goals, experience and motivation;
+- training availability, preferred environment and equipment, exercises and
+  training history;
+- injuries, affected body regions, limitations, symptoms, pregnancy or
+  postpartum answers, professional-clearance status and other pre-exercise
+  screening responses;
+- nutrition entries, dietary preferences, meal plans, food check-ins, calorie
+  and macro estimates;
+- habits, sleep, recovery, activity, streaks, progress and body metrics you
+  choose to log; and
+- information about medication, physical or mental health, eating concerns or
+  other sensitive matters that you choose to provide in screening, notes or AI
+  conversations.
 
-We do **not** sell your personal information, and we do **not** track you across
-other apps or websites for advertising.
+Some of this is health information or other sensitive information. Where
+required, we ask for consent before collecting it. You do not have to provide
+optional information, but the Service may be unable to personalise guidance or
+safely provide a feature without it.
 
-## 4. Artificial intelligence (AI) features
+**Workout, nutrition and activity records**
 
-Some features use Google's Gemini AI:
-- **Meal photo scan:** the photo you submit is sent to Google's Gemini AI to
-  estimate its nutrition. The result is an **estimate only** and is not a
-  substitute for a nutrition label or professional dietary advice.
-- Any other AI-assisted guidance sends the relevant text you provide to Google's
-  Gemini AI to generate a response.
-- **AI coach:** after in-app consent, your current message and selected
-  coach-relevant app context may be sent to Google Gemini. This can include your
-  profile and goals, training history, recovery/habit and nutrition summaries,
-  saved coach memories, and recent coach messages. Long-term coach memory is a
-  separate setting that you can pause, inspect and delete.
+We collect workouts, sessions, sets, repetitions, loads, exercise
+substitutions, activities, meals, recipes, habits, goals and progress entries
+you log or import.
 
-When you use these features, the data you submit is processed by Google in
-accordance with Google's privacy terms. We ask you not to submit sensitive
-personal information you would not want processed this way.
+Progress photos are intended to remain on your device unless you deliberately
+use a sharing or upload feature. Meal photos submitted for AI analysis are
+processed transiently and are not stored by us as account photos; the resulting
+nutrition estimate is stored only if you choose to log it.
 
-## 5. Who we share your information with
+**AI-feature information**
 
-We share data only with the service providers that run the app for us, and only
-as needed to provide the service:
-- **Google Firebase** — authentication, cloud database and storage, and hosting
-  (Google LLC / Google Cloud).
-- **Google's Gemini AI** — to power the AI features described
-  in section 4.
+If you use an AI feature, we may process:
 
-These providers process data on our behalf under their own terms and security
-commitments. We may also disclose information if required by law, or to protect
-the rights, safety and security of our users and the service.
+- prompts, messages, meal photos and AI responses;
+- selected profile, goal, screening, training-history, recovery, habit and
+  nutrition context relevant to the request;
+- recent conversation context and any coach memories you choose to save;
+- your feature consent, preferences and proposed-action responses; and
+- limited safety classifications, usage counters and operational safety state
+  used to apply safeguards and prevent abuse.
 
-We do **not** sell your personal information to anyone.
+Coach conversations are not reviewed live by a person by default. Do not use the
+Coach as an emergency or confidential clinical service.
 
-## 6. Where your data is stored and how we protect it
+**Community and user content**
 
-Your account and app data are stored using Google Firebase, in a data centre
-region located in **Australia**. We rely on Firebase's security controls,
-enforce access rules so that you can generally only read and write your own
-data, and take reasonable steps to protect your information. No online service
-can be guaranteed to be 100% secure, but we work to keep your data safe.
+Community and social features (such as feeds, groups, challenges, leaderboards
+and training-partner matching) are being developed and may be shown as a preview
+with example content before they are active. When these features are live and
+you use them, we collect the posts, comments, reactions, challenge
+participation, leaderboard activity, training-partner preferences and other
+content you submit, and content you choose to publish will be visible to the
+audience identified in the feature, such as a campus, residence, society or
+wider community. Until a social feature is active, content of this kind that you
+create is stored only in your own account.
 
-## 7. How long we keep your data
+**Connected-service information**
 
-We keep your account and app data for as long as your account is active. If you
-delete your account (see section 8), we delete or de-identify your personal data
-that we hold, except where we are required to keep certain records by law.
+If you connect a compatible on-device health service such as Apple Health (iOS)
+or Health Connect (Android), you grant permission on your device and we receive
+only the data categories you approve, which may include steps, sleep, activity
+or workout information. These on-device connections are being introduced with
+our native app builds and may not be available in every version of the Service.
 
-## 8. Your rights and choices
+You can disconnect a service at any time. This stops new collection through that
+connection but does not by itself delete information already imported.
 
-You can:
-- **Access and correct** your information — most of it is editable directly in
-  the app.
-- **Download your data** — from **Settings → Download my data**, export your
-  profile and logs as a JSON file to keep or move elsewhere.
-- **Delete your account and data** — you can request deletion from within the
-  app or by emailing **info@strengthhubonline.com**. When you delete your
-  account, we remove your login and associated personal data.
-- **Control notifications** — turn reminders on or off in the app's settings or
-  in your device settings.
-- **Control coach memory:** from the coach profile, pause long-term memory,
-  inspect individual memories, delete one memory, or clear all memories. Coach
-  records are included in the downloadable account export. Internal safety state
-  is excluded from that export to protect safety-control logic, but is deleted
-  with the account. You can also withdraw coach consent and delete the complete
-  coach workspace and its safety state without deleting the rest of your account.
-- **Contact us** about any privacy request at **info@strengthhubonline.com**.
+**Subscription and transaction information**
 
-Depending on where you live, you may have additional rights under local privacy
-law (for example, the Australian Privacy Principles). Contact us and we will
-help.
+If you subscribe, we collect or receive information needed to administer access,
+such as your email, payment-provider customer identifier, plan, subscription
+status, trial and renewal dates, transaction references and limited billing
+metadata. Stripe or the applicable app store processes payment-card details; we
+do not receive or store your full card number.
 
-## 9. Children's privacy
+**Device, notification and technical information**
 
-StrengthHub Online is intended for users **aged 18 and over**. We do not
-knowingly collect personal information from children under 18. If you believe a
-child has provided us with personal information, contact us and we will delete
-it.
+- a device push token, notification preferences and delivery status when
+  notifications are enabled;
+- app version, device/platform type, connectivity and general diagnostic or
+  error information;
+- security and service records such as authentication events, request
+  timestamps, rate limits and logs; and
+- internet protocol address and similar network information that hosting,
+  security and service providers may process when you use an online service.
 
-## 10. Health and wellbeing disclaimer
+We do not use third-party advertising SDKs and do not track you across unrelated
+apps or websites for advertising.
 
-StrengthHub Online provides **general fitness, training and nutrition
-information for health and wellbeing**. It is **not a medical device** and does
-not provide medical advice, diagnosis or treatment. Calorie and nutrition
-figures (including AI photo estimates) are approximate. Always seek advice from a
-qualified professional before making significant changes to your exercise or
-diet, and for any medical or mental-health concern.
+## 3. How we collect information
 
-## 11. Changes to this policy
+We collect information:
 
-We may update this policy from time to time. When we do, we will change the
-"Last updated" date above and, where appropriate, notify you in the app. Your
-continued use of StrengthHub Online after an update means you accept the revised
-policy.
+- directly from you when you create an account, complete onboarding or
+  screening, log activity, use AI, post content, contact us or change settings;
+- automatically from your device and use of the Service where needed for
+  operation, security and notifications;
+- from payment providers and app stores when you subscribe;
+- from a fitness or health service you choose to connect; and
+- from another person only where they are authorised to provide it or where law
+  permits.
 
-## 12. Contact us
+If you provide information about another person, you must have authority to do so
+and must not submit more than is necessary.
 
-Strengthhubonline
-Email: **info@strengthhubonline.com**
+## 4. Why we collect, use and disclose information
+
+We use personal information to:
+
+- create, authenticate, secure and support accounts;
+- provide onboarding, screening, training, logging, nutrition, progress,
+  community, reminder and connected-service features;
+- personalise programs and guidance using the information you provide;
+- provide AI responses, meal estimates, coach memory and safety controls where
+  enabled;
+- process subscriptions, confirm entitlements and support billing enquiries;
+- communicate service, security, support and policy information;
+- prevent abuse, enforce our Terms, investigate incidents and protect users and
+  the Service;
+- troubleshoot, maintain and improve reliability, accessibility and safety;
+- comply with law and respond to lawful requests; and
+- establish, exercise or defend legal claims.
+
+We do not sell personal information. We do not use personal information for
+third-party targeted advertising.
+
+We may use aggregated or de-identified information for analysis, planning, safety
+evaluation and improvement where it is no longer reasonably identifiable.
+
+## 5. AI and automated processing
+
+The Coach and meal-photo scan use Google's Gemini AI. Relevant content is sent to
+Google to classify safety risk, generate a response or estimate meal nutrition.
+AI systems may infer information from the content you submit and can produce
+inaccurate results.
+
+Automated safety systems may block or redirect a request, limit feature use or
+display support information. These controls are designed to reduce risk; they do
+not make clinical diagnoses or decisions that have legal or similarly
+significant effects. A person is not monitoring each interaction in real time.
+
+Long-term Coach memory is optional. Where available, you can pause it, inspect
+and delete individual memories, or clear them. You can withdraw Coach consent and
+delete the Coach workspace without deleting the rest of your account, subject to
+minimal records we must retain for security or law.
+
+Google processes AI inputs and outputs under the terms and privacy commitments
+applicable to the service configuration we use. Do not submit information that is
+unnecessary for the feature.
+
+## 6. Who we disclose information to
+
+We disclose personal information only as reasonably necessary to:
+
+- Google Firebase and Google Cloud, for authentication, database, hosting,
+  storage, server functions and security;
+- Google's Gemini services, for the AI features described above;
+- Stripe or an applicable app store, for checkout, subscriptions, fraud
+  prevention and payment support;
+- Expo or another notification-delivery provider, if you enable remote
+  notifications;
+- the operating-system health platform you choose to connect on your device,
+  such as Apple Health or Health Connect, to the extent needed to operate that
+  connection;
+- professional advisers, insurers, auditors or contractors bound by appropriate
+  confidentiality obligations;
+- a buyer, investor or successor in a genuine business transaction, subject to
+  appropriate safeguards and notice where required;
+- regulators, courts, law-enforcement bodies or other persons where required or
+  authorised by law; and
+- another person where you direct us or consent.
+
+Community content is disclosed to the audience you select or that the feature
+clearly identifies. We do not sell personal information.
+
+## 7. Overseas processing and disclosure
+
+Our primary Firestore database and Cloud Functions are configured in an
+Australian region. Some providers are global companies and may process, support
+or store information outside Australia.
+
+Overseas recipients are likely to include providers in the United States.
+Depending on the provider, your location and its current infrastructure,
+information may also be processed in other countries described in that provider's
+published privacy or data-location materials.
+
+Likely overseas processing includes Google AI and support systems, Stripe, Expo
+and app stores. On-device health connections such as Apple Health and Health
+Connect are read locally on your device and are not, by themselves, disclosed by
+us overseas. Before a cross-border disclosure, we take reasonable steps required
+by applicable Australian privacy law, and we assess providers and contractual or
+technical safeguards appropriate to the information and service.
+
+## 8. How we store and protect information
+
+Cloud account and app data is primarily held using Firebase services. Some
+information is cached locally on your device to support performance and offline
+use.
+
+We use safeguards appropriate to the nature of the information, including
+encrypted network connections, authentication, user-scoped access controls,
+restricted administrative access, service-provider controls, logging, rate
+limits and deletion processes.
+
+No system is completely secure. You should use a unique password, protect your
+device and notify us if you suspect unauthorised access.
+
+If a data breach is likely to cause serious harm and notification is required, we
+will notify affected individuals and the Office of the Australian Information
+Commissioner (OAIC) in accordance with the Notifiable Data Breaches scheme.
+
+## 9. How long we retain information
+
+We retain account and app data while your account is active and for only as long
+afterwards as reasonably needed for the purposes described in this Policy, backup
+and security cycles, dispute resolution and legal obligations.
+
+When you delete your account, we delete the active Firebase authentication
+account and user data we control, subject to:
+
+- a limited period for deletion to propagate through backups and caches;
+- financial, transaction, fraud-prevention or legal records that must or may
+  reasonably be retained;
+- information held independently by a payment, app-store or connected-service
+  provider; and
+- a minimal deletion audit record containing an account identifier and
+  timestamp, retained only for security, compliance and evidence that the
+  request was completed.
+
+Where deletion is not required or reasonably possible, we may de-identify
+information. We periodically review retained information and delete or
+de-identify it when no longer reasonably required.
+
+## 10. Your choices and rights
+
+Subject to applicable law and reasonable verification, you may:
+
+- access and correct personal information through the app or by contacting us;
+- download available profile and log data from Settings > Download my data;
+- delete your account from Settings or request deletion by email;
+- control notifications through the app and device settings;
+- connect or disconnect optional third-party services;
+- control available Coach consent and memory settings; and
+- withdraw consent to future collection or use where we rely on consent.
+
+Withdrawing consent does not affect earlier lawful processing and may mean a
+feature cannot operate. Internal security logic, confidential information about
+others and information we are legally entitled or required to withhold may not
+appear in an export.
+
+We will respond to access and correction requests within a reasonable period. If
+we refuse a request, we will explain why and available complaint options where
+required.
+
+## 11. Privacy questions and complaints
+
+To ask a question, make a request or complain about privacy, email
+info@strengthhubonline.com with enough detail for us to understand the issue. Do
+not send unnecessary health information or account passwords.
+
+We will acknowledge and investigate a complaint and aim to respond within 30
+days. We may ask you to verify your identity or provide further information. If
+more time is reasonably needed, we will tell you why and provide an updated
+timeframe.
+
+If you are not satisfied after giving us a reasonable opportunity to respond, you
+may complain to the Office of the Australian Information Commissioner at
+www.oaic.gov.au or by calling 1300 363 992. Other complaint rights may also
+apply.
+
+## 12. Direct communications
+
+We may send service, billing, safety and security messages needed to operate your
+account. If we send optional marketing communications, we will provide a way to
+unsubscribe. You may still receive essential non-marketing messages while your
+account is active.
+
+## 13. Changes to this Policy
+
+We may update this Policy when our practices, providers, features or legal
+obligations change. We will publish the new effective date and take reasonable
+steps to notify you of a material change before it takes effect where
+practicable.
+
+This Policy is a notice about how information is handled; it does not reduce
+rights you have under applicable law.
+
+## 14. Contact
+
+StrengthHub Online
+Melbourne, Victoria, Australia
+Email: info@strengthhubonline.com
