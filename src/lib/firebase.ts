@@ -14,7 +14,6 @@ import { getFunctions, type Functions } from 'firebase/functions'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { initAppCheck } from './appCheck'
 import { startCoachKillSwitch } from './coachKillSwitch'
-import { initCoachClassifier } from './coachClassifier'
 
 /**
  * Firebase web config. These values are NOT secrets — access is governed by
@@ -88,7 +87,10 @@ if (firebaseEnabled) {
   startCoachKillSwitch(db)
   // LLM safety-classifier transport (Gemini via AI Logic). Registered only; it fires solely when a
   // live coach surface runs the async precheck, which stays gated off while COACH_ENABLED is false.
-  initCoachClassifier()
+  // Imported LAZILY: coachClassifier itself imports `app` from this module, and a static import
+  // created a firebase ↔ coachClassifier require cycle (audit F-036) that surfaced as a Metro
+  // console warning and risks undefined bindings at init order changes.
+  void import('./coachClassifier').then((m) => m.initCoachClassifier()).catch(() => {})
   storage = getStorage(app)
   // Trusted backend (Cloud Functions v2) — co-located with Firestore. Hosts the
   // server-side meal analysis (and, later, coach / notifications / deletion).

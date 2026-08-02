@@ -375,7 +375,7 @@ export function PartnerMatchSheet({ open, onClose }: Props) {
               <Text className="mt-2 text-[13px] leading-snug text-white/65">{c.blurb}</Text>
               <Text className="mt-1 text-[12px] text-white/40">Free: {c.availability}</Text>
               <Pressable
-                onPress={() => { dispatch({ type: 'CONNECT_PARTNER', id: c.id }); toast(c.connected ? 'Request cancelled' : `Request sent to ${c.name.split(' ')[0]}`) }}
+                onPress={() => { dispatch({ type: 'CONNECT_PARTNER', id: c.id }); toast(c.connected ? 'Preview request cancelled' : 'Preview only — partner matching isn’t live yet, no request was sent') }}
                 className={`mt-3 w-full items-center rounded-full py-2.5 active:opacity-90 ${c.connected ? 'bg-ink-700' : 'bg-brand-400'}`}
               >
                 <Text className={`text-sm font-bold ${c.connected ? 'text-white/70' : 'text-black'}`}>{c.connected ? 'Request sent' : 'Connect'}</Text>

@@ -132,6 +132,20 @@ service cloud.firestore {
       // --- per-entry shape/size helpers for subcollection docs -------- //
       function entryKeysBounded() { return request.resource.data.size() < 100; }
       function textCap(field, max) { return request.resource.data.get(field, '').size() <= max; }
+      // Numeric bound: when the field is present it must be a number in
+      // [min, max]; absent fields pass (the default sits inside the range).
+      // Closes the malformed-type / absurd-magnitude writes the audit flagged
+      // (F-025) without breaking legitimate sparse entries.
+      function numIn(field, min, max) {
+        return request.resource.data.get(field, min) is number
+          && request.resource.data.get(field, min) >= min
+          && request.resource.data.get(field, min) <= max;
+      }
+      // Bounded list: when present the field must be a list of at most `max`.
+      function listCap(field, max) {
+        return request.resource.data.get(field, []) is list
+          && request.resource.data.get(field, []).size() <= max;
+      }
       // An `id`-keyed entry must embed the document id it is stored under.
       function idMatches(docId) { return request.resource.data.get('id', docId) == docId; }
       // A `dateKey`-keyed entry: the path segment IS the dateKey, in YYYY-MM-DD.
@@ -151,20 +165,27 @@ service cloud.firestore {
       match /sessions/{id} {
         allow get, list, delete: if isOwner();
         allow create, update: if isOwner() && entryKeysBounded() && idMatches(id)
-          && textCap('name', 200) && textCap('focus', 200);
+          && textCap('name', 200) && textCap('focus', 200)
+          && listCap('exercises', 40)
+          && numIn('volumeKg', 0, 1000000) && numIn('durationMin', 0, 1440);
       }
       match /weights/{dateKey} {
         allow get, list, delete: if isOwner();
-        allow create, update: if isOwner() && entryKeysBounded() && dateKeyMatches(dateKey);
+        allow create, update: if isOwner() && entryKeysBounded() && dateKeyMatches(dateKey)
+          && numIn('kg', 1, 500);
       }
       match /habits/{dateKey} {
         allow get, list, delete: if isOwner();
-        allow create, update: if isOwner() && entryKeysBounded() && dateKeyMatches(dateKey);
+        allow create, update: if isOwner() && entryKeysBounded() && dateKeyMatches(dateKey)
+          && numIn('steps', 0, 500000) && numIn('sleepH', 0, 24)
+          && numIn('waterL', 0, 50) && numIn('mindsetMin', 0, 1440);
       }
       match /meals/{id} {
         allow get, list, delete: if isOwner();
         allow create, update: if isOwner() && entryKeysBounded() && idMatches(id)
-          && textCap('name', 200);
+          && textCap('name', 200)
+          && numIn('qty', 0, 100) && numIn('kcal', 0, 30000)
+          && numIn('p', 0, 3000) && numIn('c', 0, 3000) && numIn('f', 0, 3000);
       }
       match /activities/{id} {
         allow get, list, delete: if isOwner();

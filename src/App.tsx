@@ -27,6 +27,7 @@ import { initBudgetMeals } from './data/recipes'
 import { initExerciseInfo } from './data/exerciseInfo'
 import { initQuickWorkouts } from './data/quickWorkouts'
 import { Skeleton, SkeletonLines } from './components/Skeleton'
+import { installGlobalErrorHooks } from './lib/reportError'
 import { OfflineBanner } from './components/OfflineBanner'
 import Dashboard from './screens/Dashboard'
 import Workout from './screens/Workout'
@@ -433,6 +434,11 @@ function DevSafetyHarnessGate(): React.ReactElement | null {
   const { SafetyHarnessScreen } = require('./dev/SafetyHarnessScreen')
   return <SafetyHarnessScreen />
 }
+
+// Catch uncaught JS errors + unhandled rejections app-wide (audit F-034) —
+// they flow through the reportError seam into the redacted local diagnostics
+// buffer (and any crash service registered later via setErrorReporter).
+installGlobalErrorHooks()
 
 export default function App() {
   const devHarness = DevSafetyHarnessGate()

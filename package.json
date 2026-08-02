@@ -83,5 +83,8 @@
     "workouts:build": "node scripts/build-quick-workouts.mjs",
     "workouts:upload": "node scripts/upload-workouts.mjs"
   },
-  "private": true
+  "private": true,
+  "engines": {
+    "node": "22.x"
+  }
 }

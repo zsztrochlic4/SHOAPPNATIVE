@@ -291,3 +291,37 @@ test('exercises info: signed-in get + list allowed; client write + anon read den
   await assertFails(getDoc(doc(anonDb(), 'exercises', 'CH01')))
   await assertFails(setDoc(doc(aliceDb(), 'exercises', 'CH99'), { id: 'CH99', name: 'x' }))
 })
+
+/* ----------------- adversarial per-entry bounds (audit F-025) ----------------- */
+
+test('weights: malformed type and absurd magnitude are denied; sane value passes', async () => {
+  const db = aliceDb()
+  await assertSucceeds(setDoc(doc(db, 'users', ALICE, 'weights', DK), { dateKey: DK, kg: 82.5 }))
+  await assertFails(setDoc(doc(db, 'users', ALICE, 'weights', DK), { dateKey: DK, kg: 'NaN-string' }))
+  await assertFails(setDoc(doc(db, 'users', ALICE, 'weights', DK), { dateKey: DK, kg: 12000 }))
+  await assertFails(setDoc(doc(db, 'users', ALICE, 'weights', DK), { dateKey: DK, kg: 0 }))
+})
+
+test('habits: numeric bounds enforced when fields are present; sparse entry passes', async () => {
+  const db = aliceDb()
+  await assertSucceeds(setDoc(doc(db, 'users', ALICE, 'habits', DK), { dateKey: DK, steps: 12000, sleepH: 7.5, waterL: 2.5, mindsetMin: 10, workout: true }))
+  await assertSucceeds(setDoc(doc(db, 'users', ALICE, 'habits', DK), { dateKey: DK, workout: false })) // sparse is fine
+  await assertFails(setDoc(doc(db, 'users', ALICE, 'habits', DK), { dateKey: DK, sleepH: 240 }))
+  await assertFails(setDoc(doc(db, 'users', ALICE, 'habits', DK), { dateKey: DK, steps: { nested: 'map' } }))
+})
+
+test('meals: macro bounds enforced; a plausible logged meal passes', async () => {
+  const db = aliceDb()
+  await assertSucceeds(setDoc(doc(db, 'users', ALICE, 'meals', 'm-1'), { id: 'm-1', dateKey: DK, meal: 'Lunch', name: 'Chicken and rice', qty: 1, kcal: 650, p: 45, c: 70, f: 15 }))
+  await assertFails(setDoc(doc(db, 'users', ALICE, 'meals', 'm-2'), { id: 'm-2', dateKey: DK, meal: 'Lunch', name: 'x', qty: 1, kcal: 900000, p: 1, c: 1, f: 1 }))
+  await assertFails(setDoc(doc(db, 'users', ALICE, 'meals', 'm-3'), { id: 'm-3', dateKey: DK, meal: 'Lunch', name: 'x', qty: 5000, kcal: 100, p: 1, c: 1, f: 1 }))
+})
+
+test('sessions: oversized exercises list and non-list exercises are denied', async () => {
+  const db = aliceDb()
+  const ex = (n) => Array.from({ length: n }, (_, i) => ({ defId: `d${i}`, sets: [] }))
+  await assertSucceeds(setDoc(doc(db, 'users', ALICE, 'sessions', 's-1'), { id: 's-1', dateKey: DK, name: 'Push', exercises: ex(6), volumeKg: 4200, durationMin: 55 }))
+  await assertFails(setDoc(doc(db, 'users', ALICE, 'sessions', 's-2'), { id: 's-2', dateKey: DK, name: 'Push', exercises: ex(60), volumeKg: 1, durationMin: 1 }))
+  await assertFails(setDoc(doc(db, 'users', ALICE, 'sessions', 's-3'), { id: 's-3', dateKey: DK, name: 'Push', exercises: 'not-a-list', volumeKg: 1, durationMin: 1 }))
+  await assertFails(setDoc(doc(db, 'users', ALICE, 'sessions', 's-4'), { id: 's-4', dateKey: DK, name: 'Push', exercises: ex(3), volumeKg: 99999999, durationMin: 20 }))
+})

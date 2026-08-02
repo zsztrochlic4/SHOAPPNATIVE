@@ -1103,13 +1103,20 @@ export function CreatePostSheet({ open, onClose }: Props) {
   function post() {
     if (!text.trim()) return
     dispatch({ type: 'ADD_POST', text: text.trim(), image })
-    toast('Posted to your campus feed')
+    // Community is a PREVIEW (audit F-024): nothing is shared with anyone, so
+    // never imply a real publish happened.
+    toast('Saved to your preview feed — community isn’t live yet, only you can see this')
     setText(''); setImage(undefined)
     onClose()
   }
 
   return (
     <Sheet open={open} onClose={onClose} title="Create a post">
+      <View className="mb-3 rounded-xl border border-amber-400/20 bg-amber-400/[0.06] px-3 py-2.5">
+        <Text className="text-[12px] leading-4 text-amber-200/90">
+          Preview: community isn’t live yet. Posts stay on your device and aren’t visible to anyone else.
+        </Text>
+      </View>
       <TextInput
         autoFocus
         multiline

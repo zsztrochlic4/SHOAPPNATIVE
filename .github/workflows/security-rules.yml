@@ -105,3 +105,16 @@ jobs:
             --project "${{ inputs.project_id }}" \
             --non-interactive
           rm -f sa.json
+      # Release manifest (audit F-026): pin exactly WHICH rules went live, so a
+      # deployed revision is attributable to a commit + content hash.
+      - name: Record deployed revision manifest
+        run: |
+          {
+            echo "## Rules deployment manifest"
+            echo "- project: ${{ inputs.project_id }}"
+            echo "- commit: $GITHUB_SHA"
+            echo '- hashes:'
+            echo '```'
+            sha256sum firestore.rules storage.rules
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

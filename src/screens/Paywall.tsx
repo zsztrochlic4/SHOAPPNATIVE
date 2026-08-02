@@ -9,6 +9,7 @@ import { tick, thud } from '../lib/haptics'
 import { startCheckout, openBillingPortal } from '../lib/billing'
 import { LegalDocModal } from '../components/LegalDocModal'
 import { type LegalDocKey } from '../content/legal'
+import { useReducedMotion } from '../lib/a11y'
 
 /**
  * Paywall — the post-account trial gate. Pixel-port of the "StrengthHub Paywall
@@ -115,18 +116,30 @@ function WaveGraph({ tok }: { tok: Tok }) {
   const stroke = tok.rgb('--brand-400')
   const gradId = useRef('shoWave' + Math.random().toString(36).slice(2, 7)).current
   const [paths, setPaths] = useState(() => wavePaths(0))
+  // Decorative motion policy (audit F-038): honour Reduce Motion (live, native
+  // included) with a static frame, and halve the redraw rate — ~30fps is
+  // indistinguishable for a 120px ambient wave but costs half the battery/CPU
+  // on this conversion-critical screen. rAF stops while backgrounded.
+  const reduced = useReducedMotion()
 
   useEffect(() => {
+    if (reduced) {
+      setPaths(wavePaths(0))
+      return
+    }
     let raf = 0
     let phase = 0
-    const loop = () => {
-      phase += 0.045
-      setPaths(wavePaths(phase))
+    let last = 0
+    const loop = (t: number) => {
       raf = requestAnimationFrame(loop)
+      if (t - last < 33) return
+      last = t
+      phase += 0.09
+      setPaths(wavePaths(phase))
     }
     raf = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(raf)
-  }, [])
+  }, [reduced])
 
   return (
     <View style={{ width: 120, height: 56 }}>
