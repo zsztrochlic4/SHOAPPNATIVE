@@ -17,13 +17,15 @@ import { examState, examTrim, nextSetRecommendation } from '../store/training'
 import { prForSession, type PR } from '../store/coach'
 import { exerciseDetail, workoutGoalLine } from '../data/catalog'
 import { exerciseView } from '../store/programSession'
-import { logCompletedProgramSession } from '../backend/repo/setLogRepo'
+import { enqueueCompletion } from '../backend/repo/completionQueue'
 import type { LoggedSetInput } from '../backend/runtime/logging'
 import { fmtWeightNum, weightUnit, fmtVolume, fmtWeight, toKg } from '../lib/format'
 import { palette } from '../theme'
 import type { Units, WorkoutSession } from '../store/types'
 import { isTimeSession, nextCircuitCursor, circuitRestSec, switchSidesAtSec } from './quickCircuit'
+import { clearWorkoutRuntime, loadWorkoutRuntime, resumableRuntime, saveWorkoutRuntime } from './activeWorkoutRuntime'
 import { prefersReducedMotion } from '../lib/a11y'
+import { AppState as RNAppState } from 'react-native'
 
 /* This follow-along flow is a dark, full-immersion surface (like the design's
  * dark default and the previous implementation), so it pins the dark palette
@@ -190,29 +192,88 @@ export default function ActiveWorkout({ open, onClose, onComplete, params }: { o
   const finishPRRef = useRef<PR | null>(null)
   const listScrollRef = useRef<ScrollView>(null)
 
-  // Fresh guided state every time the surface opens.
+  // Wall-clock anchors (audit F-010): every timer derives from these epochs, so
+  // backgrounding, closing and reopening never lose or duplicate time.
+  const startAtRef = useRef(0) // epoch when the workout started (now − elapsed)
+  const workStartRef = useRef(0) // epoch the current work phase began
+  const restEndsRef = useRef(0) // epoch the current rest ends
+  const prevRestRef = useRef(-1) // last announced rest second (cue dedupe)
+
+  // Restore (or reset) the guided state when the surface opens: an interrupted
+  // workout resumes its exercise/set cursor, accurate elapsed time and any
+  // in-flight rest deadline; anything else starts fresh (audit F-010 / J-08).
   useEffect(() => {
     if (!open) return
+    let cancelled = false
     setMode('list'); setCursor({ exIdx: 0, setIdx: 0 }); setStarted(false)
     setTotalElapsed(0); setWorkElapsed(0); setWorkRemaining(0); setRestRemaining(0)
     setGoalOpen(false); setExpanded(null); setShowHow(false); setConfirmEnd(false)
     finishPRRef.current = null; finishStatsRef.current = null
     // Opening the workout counts as starting it for today's dashboard tick.
     if (session) dispatch({ type: 'MARK_WORKOUT_STARTED' })
+    if (session && !session.completed) {
+      void loadWorkoutRuntime().then((rt) => {
+        if (cancelled) return
+        const plan = resumableRuntime(rt, session.id, Date.now())
+        if (!plan) return
+        startAtRef.current = Date.now() - plan.totalElapsedSec * 1000
+        setStarted(plan.started)
+        setCursor(plan.cursor)
+        setTotalElapsed(plan.totalElapsedSec)
+        if (plan.mode === 'rest') {
+          restEndsRef.current = Date.now() + plan.restRemainingSec * 1000
+          prevRestRef.current = plan.restRemainingSec
+          setRestTotal(plan.restTotal)
+          setRestRemaining(plan.restRemainingSec)
+          setMode('rest')
+        } else if (plan.mode === 'work') {
+          workStartRef.current = Date.now()
+          setWorkElapsed(0)
+          setMode('work')
+        }
+      })
+    }
+    return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
-  // Session clock — runs once the workout has actually started.
+  // Persist the runtime whenever its shape changes (and on background), so a
+  // kill/close mid-workout can resume. Cleared on finish.
+  useEffect(() => {
+    if (!open || !session || !started || mode === 'finish') return
+    const snapshot = () => ({
+      sessionId: session.id,
+      startedAtMs: startAtRef.current || Date.now(),
+      started: true,
+      mode: (mode === 'rest' ? 'rest' : mode === 'work' || mode === 'go' ? 'work' : 'list') as 'list' | 'work' | 'rest',
+      cursor,
+      restEndsAtMs: mode === 'rest' ? restEndsRef.current : null,
+      restTotal,
+      savedAtMs: Date.now(),
+    })
+    void saveWorkoutRuntime(snapshot())
+    const sub = RNAppState.addEventListener('change', (s) => {
+      if (s === 'background' || s === 'inactive') void saveWorkoutRuntime(snapshot())
+    })
+    return () => sub.remove()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, started, mode, cursor, restTotal, session?.id])
+
+  // Session clock — derives from the wall-clock start anchor, so time spent
+  // backgrounded/closed still counts and nothing double-ticks.
   useEffect(() => {
     if (!open || !started) return
-    const t = setInterval(() => setTotalElapsed((e) => e + 1), 1000)
+    if (!startAtRef.current) startAtRef.current = Date.now() - totalElapsed * 1000
+    const t = setInterval(() => setTotalElapsed(Math.max(0, Math.floor((Date.now() - startAtRef.current) / 1000))), 1000)
     return () => clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, started])
 
-  // Work clock — counts up while performing a set.
+  // Work clock — counts up from the wall-clock phase start.
   useEffect(() => {
     if (!open || mode !== 'work') return
-    const t = setInterval(() => setWorkElapsed((e) => e + 1), 1000)
+    if (!workStartRef.current) workStartRef.current = Date.now()
+    const t = setInterval(() => setWorkElapsed(Math.max(0, Math.floor((Date.now() - workStartRef.current) / 1000))), 500)
     return () => clearInterval(t)
   }, [open, mode, cursor])
 
@@ -239,20 +300,26 @@ export default function ActiveWorkout({ open, onClose, onComplete, params }: { o
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, mode, workRemaining, cursor.exIdx])
 
-  // Rest clock — counts down; a rising tick in the final 3s, a beep + GO at zero.
+  // Rest clock — counts down against the wall-clock deadline (restEndsRef), so
+  // a backgrounded rest finishes exactly on time instead of pausing. A rising
+  // tick cues the final 3s (deduped per second), a beep + GO at zero.
   useEffect(() => {
     if (mode !== 'rest') return
-    if (restRemaining <= 0) {
-      thud()
-      if (!prefersReducedMotion()) (typeof navigator !== 'undefined' ? (navigator as any) : undefined)?.vibrate?.([200, 100, 200])
-      beep()
-      setMode('go')
-      return
-    }
-    if (restRemaining <= 3) restTick()
-    const t = setTimeout(() => setRestRemaining((r) => r - 1), 1000)
-    return () => clearTimeout(t)
-  }, [mode, restRemaining])
+    const t = setInterval(() => {
+      const rem = Math.max(0, Math.ceil((restEndsRef.current - Date.now()) / 1000))
+      if (rem === prevRestRef.current) return
+      prevRestRef.current = rem
+      setRestRemaining(rem)
+      if (rem > 0 && rem <= 3) restTick()
+      if (rem <= 0) {
+        thud()
+        if (!prefersReducedMotion()) (typeof navigator !== 'undefined' ? (navigator as any) : undefined)?.vibrate?.([200, 100, 200])
+        beep()
+        setMode('go')
+      }
+    }, 250)
+    return () => clearInterval(t)
+  }, [mode])
 
   const exam = examState(state)
   const trim = useMemo(() => (session ? examTrim(session, state) : null), [session, state])
@@ -295,15 +362,22 @@ export default function ActiveWorkout({ open, onClose, onComplete, params }: { o
   }
 
   /* ------------------------------------------------------------- flow ctl */
+  /** Reset the wall-clock anchor for a fresh work phase. */
+  function resetWorkClock() {
+    workStartRef.current = Date.now()
+    setWorkElapsed(0)
+  }
   function start() {
     const cur = nextUndoneCursor(session!, 0)
     if (!cur) { finish(); return }
-    setStarted(true); setCursor(cur); setWorkElapsed(0); setMode('work')
+    startAtRef.current = Date.now()
+    setStarted(true); setCursor(cur); resetWorkClock(); setMode('work')
   }
   function startAt(exIdx: number) {
     const found = session!.exercises[exIdx].sets.findIndex((s) => !s.done)
+    if (!started) startAtRef.current = Date.now()
     setStarted(true); setExpanded(null)
-    setCursor({ exIdx, setIdx: found >= 0 ? found : 0 }); setWorkElapsed(0); setMode('work')
+    setCursor({ exIdx, setIdx: found >= 0 ? found : 0 }); resetWorkClock(); setMode('work')
   }
   // Finish the current set → log it, then rest before the next (or back to list).
   function logSet() {
@@ -320,11 +394,19 @@ export default function ActiveWorkout({ open, onClose, onComplete, params }: { o
     // Time circuits rest per-station within a round, and the longer round rest when
     // the next station starts a fresh round; lifting sessions derive from the id.
     const secs = timed ? circuitRestSec(next, exIdx, setIdx, upcoming) : restSecondsFor(session!.exercises[exIdx].defId)
-    setCursor(upcoming); setRestTotal(secs); setRestRemaining(secs); setWorkElapsed(0); setMode('rest')
+    restEndsRef.current = Date.now() + secs * 1000
+    prevRestRef.current = secs
+    setCursor(upcoming); setRestTotal(secs); setRestRemaining(secs); resetWorkClock(); setMode('rest')
   }
-  function skipRest() { setWorkElapsed(0); setMode('work') }
-  function addRest() { setRestTotal((t) => t + 15); setRestRemaining((r) => r + 15) }
-  function subRest() { setRestRemaining((r) => Math.max(0, r - 15)) }
+  function skipRest() { resetWorkClock(); setMode('work') }
+  function addRest() {
+    restEndsRef.current += 15_000
+    setRestTotal((t) => t + 15); setRestRemaining((r) => r + 15)
+  }
+  function subRest() {
+    restEndsRef.current = Math.max(Date.now(), restEndsRef.current - 15_000)
+    setRestRemaining((r) => Math.max(0, r - 15))
+  }
 
   function finish() {
     if (mode === 'finish') return
@@ -332,18 +414,21 @@ export default function ActiveWorkout({ open, onClose, onComplete, params }: { o
     finishStatsRef.current = { time: totalElapsed, volume: s.vol || session!.volumeKg, sets: s.done }
     finishPRRef.current = prForSession(state, session!)
     dispatch({ type: 'COMPLETE_WORKOUT', id: session!.id })
-    // Materialised from a generated program day? Persist the completed set logs
-    // (keyed by backend exercise_id) and feed the Progression Engine, which
-    // re-clamps the next prescription through the Safety Rules. No-op in demo /
-    // without Firebase — the pure logging maths is covered by the profile sweep.
+    // Materialised from a generated program day? Queue the canonical completion
+    // write (set logs + Progression Engine + instance status) through the
+    // durable, idempotent completion queue (audit F-011): it tries immediately,
+    // survives restarts, retries on foreground, and surfaces a visible pending
+    // status on the Workout screen instead of silently discarding failures.
     if (session!.instanceId && state.backendUser) {
       const instance = (state.workoutInstances ?? []).find((i) => i.instance_id === session!.instanceId)
       if (instance) {
         const logged: Record<string, LoggedSetInput[]> = {}
         for (const ex of session!.exercises) logged[ex.defId] = ex.sets.map((st) => ({ weightKg: st.weightKg, reps: st.reps, done: st.done }))
-        void logCompletedProgramSession(state.backendUser.uid, state.backendUser, instance, logged).catch(() => { /* retried opportunistically */ })
+        void enqueueCompletion(state.backendUser.uid, state.backendUser.goal, instance, logged).catch(() => {})
       }
     }
+    // The workout is over — a stored runtime must never resurrect it (F-010).
+    void clearWorkoutRuntime()
     thud()
     if (!prefersReducedMotion()) (typeof navigator !== 'undefined' ? (navigator as any) : undefined)?.vibrate?.([0, 55, 45, 120])
     successChime()

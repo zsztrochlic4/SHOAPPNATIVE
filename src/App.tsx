@@ -17,6 +17,7 @@ import { BillingSync } from './store/BillingSync'
 import { Paywall } from './screens/Paywall'
 import { IntegrationsAutoSync } from './components/Integrations'
 import { PushRegistration, NotificationsSync } from './components/PushRegistration'
+import { CompletionQueueSync } from './components/CompletionQueueSync'
 import { ToastProvider } from './components/Toast'
 import { NavProvider, type Overlay } from './nav'
 import { themeVars, useThemeName, brand, cssVars } from './theme'
@@ -363,6 +364,7 @@ function AuthGate() {
       <PushRegistration />
       <NotificationsSync />
       <BillingSync />
+      <CompletionQueueSync />
     </>
   ) : null
 

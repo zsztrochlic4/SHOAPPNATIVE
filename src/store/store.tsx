@@ -99,6 +99,8 @@ export type Action =
     }
   | { type: 'MARK_CHAT_READ' }
   | { type: 'SAVE_SESSION'; session: WorkoutSession }
+  | { type: 'UPDATE_SESSION'; session: WorkoutSession }
+  | { type: 'REMOVE_SESSION'; id: string }
   | { type: 'TOGGLE_EXERCISE_DONE'; defId: string }
   | { type: 'COMPLETE_WORKOUT'; id: string }
   | { type: 'TOGGLE_LIKE'; postId: string }
@@ -124,15 +126,16 @@ function nowTime() {
 
 /**
  * Keep the workout-summary projection (Phase C Option B) in step with a
- * completed session: upsert its compact summary so the all-time Progress charts
- * stay current without ever re-reading full session history. No-op for a session
- * that isn't completed (only completed sessions feed the charts).
+ * session: upsert its compact summary when completed, and REMOVE any stale
+ * summary when it is not (audit F-022 — retroactive un-completion or edits must
+ * never leave the all-time Progress charts contradicting the session history).
  */
 function withSummary(state: AppState, session: WorkoutSession): AppState {
-  if (!session.completed) return state
-  const sum = summarizeSession(session)
-  const rest = (state.workoutSummaries ?? []).filter((w) => w.id !== sum.id)
-  return { ...state, workoutSummaries: [...rest, sum] }
+  const rest = (state.workoutSummaries ?? []).filter((w) => w.id !== session.id)
+  if (!session.completed) {
+    return rest.length === (state.workoutSummaries ?? []).length ? state : { ...state, workoutSummaries: rest }
+  }
+  return { ...state, workoutSummaries: [...rest, summarizeSession(session)] }
 }
 
 function recalc(s: WorkoutSession): WorkoutSession {
@@ -277,7 +280,13 @@ function reducer(state: AppState, action: Action): AppState {
           ? [...state.habits, { dateKey: action.dateKey, steps: 0, sleepH: 0, waterL: 0, mindsetMin: 0, nutritionScore: 0, workout: true }]
           : state.habits
       const sessions = state.sessions.map((s) => (s.dateKey === action.dateKey ? { ...s, completed: action.done } : s))
-      return { ...state, workoutStartedKeys: [...keys], habits, sessions }
+      // Reconcile the chart projection for every session whose completion flag
+      // changed (audit F-022): charts must never contradict workout history.
+      let next: AppState = { ...state, workoutStartedKeys: [...keys], habits, sessions }
+      for (const s of sessions) {
+        if (s.dateKey === action.dateKey) next = withSummary(next, s)
+      }
+      return next
     }
 
     case 'ADD_MEAL': {
@@ -482,12 +491,16 @@ function reducer(state: AppState, action: Action): AppState {
     }
 
     case 'COMPLETE_WORKOUT': {
+      // Idempotent by session id (audit F-023): completing an already-completed
+      // session must not append a duplicate notification or touch anything.
+      const target = state.sessions.find((s) => s.id === action.id)
+      if (!target || target.completed) return state
       const sessions = state.sessions.map((s) =>
         s.id === action.id ? recalc({ ...s, completed: true }) : s,
       )
       const habits = state.habits.map((h) => (h.dateKey === todayKey ? { ...h, workout: true } : h))
       const notif: AppNotification = {
-        id: `n-${Date.now()}`,
+        id: `n-${action.id}`,
         type: 'workout',
         title: 'Workout logged',
         body: 'Nice work. Your stats, streak and next session weights are updated.',
@@ -495,9 +508,42 @@ function reducer(state: AppState, action: Action): AppState {
         time: nowTime(),
         read: false,
       }
-      const next = { ...state, sessions, habits, notifications: [notif, ...state.notifications] }
+      const notifications = state.notifications.some((n) => n.id === notif.id)
+        ? state.notifications
+        : [notif, ...state.notifications]
+      const next = { ...state, sessions, habits, notifications }
       const completed = sessions.find((s) => s.id === action.id)
       return completed ? withSummary(next, completed) : next
+    }
+
+    // Edit a logged session in place (audit F-012): volume is recomputed, the
+    // summary projection reconciles (upsert/remove via withSummary), and the
+    // day's workout habit flag follows whether any completed session remains.
+    case 'UPDATE_SESSION': {
+      const exists = state.sessions.some((s) => s.id === action.session.id)
+      if (!exists) return state
+      const updated = recalc(action.session)
+      const sessions = state.sessions.map((s) => (s.id === updated.id ? updated : s))
+      const dayCompleted = sessions.some((s) => s.dateKey === updated.dateKey && s.completed)
+      const habits = state.habits.map((h) => (h.dateKey === updated.dateKey ? { ...h, workout: dayCompleted } : h))
+      return withSummary({ ...state, sessions, habits }, updated)
+    }
+
+    // Delete a logged session (audit F-012): the session, its chart summary,
+    // its completion notification, and — when it was the day's only completed
+    // session — the day's workout habit flag all go together, so history,
+    // charts and streaks can never contradict each other.
+    case 'REMOVE_SESSION': {
+      const target = state.sessions.find((s) => s.id === action.id)
+      if (!target) return state
+      const sessions = state.sessions.filter((s) => s.id !== action.id)
+      const workoutSummaries = (state.workoutSummaries ?? []).filter((w) => w.id !== action.id)
+      const dayCompleted = sessions.some((s) => s.dateKey === target.dateKey && s.completed)
+      const habits = state.habits.map((h) => (h.dateKey === target.dateKey ? { ...h, workout: dayCompleted } : h))
+      const keys = new Set(state.workoutStartedKeys ?? [])
+      if (!dayCompleted && !sessions.some((s) => s.dateKey === target.dateKey)) keys.delete(target.dateKey)
+      const notifications = state.notifications.filter((n) => n.id !== `n-${action.id}`)
+      return { ...state, sessions, workoutSummaries, habits, notifications, workoutStartedKeys: [...keys] }
     }
 
     case 'TOGGLE_LIKE': {

@@ -22,6 +22,8 @@ import { posterOverrideUrl } from '../lib/media'
 import { brand, useColors } from '../theme'
 import { useToast } from '../components/Toast'
 import { syncAll } from '../lib/integrations'
+import { useAuth } from '../auth/AuthProvider'
+import { flushCompletionQueue, subscribePending } from '../backend/repo/completionQueue'
 import { ProgramHolding, GeneratedProgramView } from './GeneratedProgramView'
 
 const TABS = ['Today', 'Program', 'Exercises', 'History']
@@ -73,6 +75,36 @@ function RowThumb({ uri }: { uri: string }) {
   )
 }
 
+/**
+ * Honest sync status for canonical workout-completion writes (audit F-011):
+ * shows how many finished workouts are still waiting to reach the cloud, with
+ * a one-tap retry. Hidden when everything is synced.
+ */
+function PendingSyncChip() {
+  const { user } = useAuth()
+  const [pending, setPending] = useState(0)
+  const [retrying, setRetrying] = useState(false)
+  useEffect(() => subscribePending(setPending), [])
+  if (!user || pending === 0) return null
+  return (
+    <Pressable
+      onPress={async () => {
+        if (retrying) return
+        setRetrying(true)
+        try { await flushCompletionQueue(user.uid) } finally { setRetrying(false) }
+      }}
+      accessibilityRole="button"
+      accessibilityLabel={`${pending} ${pending === 1 ? 'workout' : 'workouts'} waiting to sync. Retry now.`}
+      className="mb-4 flex-row items-center justify-between rounded-[16px] border border-amber-400/25 bg-amber-400/10 px-4 py-3 active:opacity-80"
+    >
+      <Text className="text-[12.5px] font-semibold text-amber-200">
+        {pending} {pending === 1 ? 'workout' : 'workouts'} waiting to sync — progress is safe on this device
+      </Text>
+      <Text className="text-[12.5px] font-extrabold text-amber-300">{retrying ? 'Retrying…' : 'Retry'}</Text>
+    </Pressable>
+  )
+}
+
 function TodayTab() {
   const { state, dispatch } = useStore()
   const nav = useNav()
@@ -94,6 +126,7 @@ function TodayTab() {
   if (state.programStatus && !state.programStatus.ok && !session) {
     return (
       <>
+        <PendingSyncChip />
         <ProgramHolding status={state.programStatus} />
         <OtherActivities />
       </>
@@ -105,6 +138,7 @@ function TodayTab() {
 
   return (
     <>
+      <PendingSyncChip />
       {session ? (
         <>
           {/* Today's plan — anatomical muscle map (design handoff) */}
@@ -600,6 +634,8 @@ function HistoryTab({ bottomInset }: { bottomInset: number }) {
   const units = state.settings.units
   const [syncing, setSyncing] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
+  // Two-tap inline delete confirmation (RN Alert is a no-op on web).
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const anyConnected = useMemo(
     () => Object.values(state.integrations ?? {}).some((i) => i.connected),
     [state.integrations],
@@ -668,7 +704,7 @@ function HistoryTab({ bottomInset }: { bottomInset: number }) {
         const open = openId === h.id
         return (
           <View key={h.id} className="overflow-hidden rounded-[20px] border border-white/5 bg-ink-800">
-            <Pressable onPress={() => setOpenId(open ? null : h.id)} className="flex-row items-center gap-3 p-3.5 active:opacity-90">
+            <Pressable onPress={() => { setOpenId(open ? null : h.id); setConfirmDeleteId(null) }} className="flex-row items-center gap-3 p-3.5 active:opacity-90">
               <View className="h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[14px] bg-brand-400/15">
                 {h.kind === 'session' ? <Icon name="dumbbell" size={20} color={brand[400]} /> : <ActivityIcon name={h.icon} size={20} color={brand[400]} />}
               </View>
@@ -739,6 +775,41 @@ function HistoryTab({ bottomInset }: { bottomInset: number }) {
                       <Text className="text-[13px] font-bold text-brand-300">{h.calories} kcal</Text>
                     </View>
                   )}
+                </View>
+
+                {/* Correct or remove this record (audit F-012): edits reuse the
+                    set-logging surface; deletion is two-tap confirmed and
+                    reconciles charts, streaks and habit flags in the reducer. */}
+                <View className="mt-3 flex-row gap-2">
+                  {h.kind === 'session' && (
+                    <Pressable
+                      onPress={() => nav.open('activeWorkout', { sessionId: h.id })}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Edit ${h.name}`}
+                      className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl bg-white/[0.06] py-2.5 active:opacity-80"
+                    >
+                      <Pencil size={13} color="rgba(255,255,255,0.7)" />
+                      <Text className="text-[12.5px] font-bold text-white/80">Edit sets</Text>
+                    </Pressable>
+                  )}
+                  <Pressable
+                    onPress={() => {
+                      if (confirmDeleteId !== h.id) { setConfirmDeleteId(h.id); return }
+                      setConfirmDeleteId(null)
+                      setOpenId(null)
+                      if (h.kind === 'session') dispatch({ type: 'REMOVE_SESSION', id: h.id })
+                      else dispatch({ type: 'REMOVE_ACTIVITY', id: h.id })
+                      toast(h.kind === 'session' ? 'Workout deleted — charts and streaks updated' : 'Activity deleted')
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={confirmDeleteId === h.id ? `Confirm delete ${h.name}` : `Delete ${h.name}`}
+                    className={`flex-1 flex-row items-center justify-center gap-1.5 rounded-xl py-2.5 active:opacity-80 ${confirmDeleteId === h.id ? 'bg-red-500/20' : 'bg-white/[0.06]'}`}
+                  >
+                    <Trash2 size={13} color={confirmDeleteId === h.id ? '#f87171' : 'rgba(255,255,255,0.7)'} />
+                    <Text className={`text-[12.5px] font-bold ${confirmDeleteId === h.id ? 'text-red-400' : 'text-white/80'}`}>
+                      {confirmDeleteId === h.id ? 'Tap again to delete' : 'Delete'}
+                    </Text>
+                  </Pressable>
                 </View>
               </View>
             )}

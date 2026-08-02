@@ -4,18 +4,21 @@ Fill-in guide for the **Apple App Privacy** and **Google Play Data Safety**
 forms. Based on what StrengthHub Online actually does (verified against the code).
 Keep it in sync with [PRIVACY.md](PRIVACY.md) — the two must say the same thing.
 
-> Reviewed 2 August 2026 against the finalised Privacy Policy v1.0. This version
-> reflects the **subscription (Stripe), AI Coach, and on-device health** surfaces,
-> which the earlier answer sheet predated.
+> Reviewed 2 August 2026 against the finalised Privacy Policy v1.0. Reflects the
+> **subscription (Stripe)** and **on-device health** surfaces the earlier sheet
+> predated. **The AI Coach is currently gated OFF** (`COACH_ENABLED = false`; see
+> [COACH_RELEASE_STATE.md](COACH_RELEASE_STATE.md)) — its data types are noted
+> below but must **not** be declared on the store forms until it is enabled.
 
 ---
 
 ## The short version (true for both stores)
 
 - **We collect:** email, optional name, date of birth (for 18+ age-gating), the
-  fitness/health data you enter, AI Coach messages and meal photos (photos only
-  to analyse them — **not stored**), subscription status (via Stripe), and a
-  device push token for notifications.
+  fitness/health data you enter, meal photos (photos only to analyse them —
+  **not stored**), subscription status (via Stripe), and a device push token for
+  notifications. (AI Coach messages too, but **only once the Coach is enabled** —
+  it is currently gated off, so nothing is collected there today.)
 - **We do NOT:** track you, show ads, use third-party analytics, or sell/"share"
   data for others' independent use.
 - **Encryption in transit:** Yes (HTTPS/TLS via Firebase and our providers).
