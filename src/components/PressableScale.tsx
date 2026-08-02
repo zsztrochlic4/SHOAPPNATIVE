@@ -29,6 +29,11 @@ export function PressableScale({
   return (
     <Animated.View style={[containerStyle, { transform: [{ scale }] }]}>
       <Pressable
+        // Every scaled pressable is semantically a button unless the caller
+        // says otherwise (audit F-016) — screen readers get role + disabled
+        // state everywhere this primitive is used, in one change.
+        accessibilityRole={rest.accessibilityRole ?? 'button'}
+        accessibilityState={{ disabled: !!disabled, ...(rest.accessibilityState ?? {}) }}
         {...rest}
         disabled={disabled}
         onPressIn={(e) => {

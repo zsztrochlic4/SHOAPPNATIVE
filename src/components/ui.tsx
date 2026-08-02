@@ -161,7 +161,7 @@ export function SegmentedTabs({
         {tabs.map((t) => {
           const isActive = t === active
           return (
-            <Pressable key={t} onPress={() => onChange(t)} className="pb-3">
+            <Pressable key={t} onPress={() => onChange(t)} accessibilityRole="tab" accessibilityLabel={t} accessibilityState={{ selected: isActive }} className="pb-3">
               {t === 'Coach' ? (
                 <Sun size={18} color={isActive ? brand[400] : 'rgba(148,148,148,0.75)'} />
               ) : (

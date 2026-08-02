@@ -371,7 +371,7 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
 
       <Group label={t('settings.preferences')}>
         <Row icon={<BellRing size={18} color={brand[400]} />} title={t('settings.pushNotifs')} sub={t('settings.pushNotifsSub')}>
-          <Toggle on={notificationsEnabled} onPress={toggleNotifs} />
+          <Toggle on={notificationsEnabled} onPress={toggleNotifs} label={t('settings.pushNotifs')} />
         </Row>
         {notificationConsent === 'denied' && !notificationsEnabled && NATIVE && (
           // Recovery after an OS-level denial (audit F-021): the in-app toggle
@@ -391,7 +391,7 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
         )}
         {notificationsEnabled && <NotificationPrefsPanel t={t} />}
         <Row icon={<Volume2 size={18} color={brand[400]} />} title={t('settings.sound')} sub={t('settings.soundSub')}>
-          <Toggle on={soundEnabled} onPress={toggleSound} />
+          <Toggle on={soundEnabled} onPress={toggleSound} label={t('settings.sound')} />
         </Row>
       </Group>
 
@@ -1252,7 +1252,7 @@ function Row({ icon, title, sub, children }: { icon: ReactNode; title: string; s
 
 function LinkRow({ icon, title, sub, onPress }: { icon: ReactNode; title: string; sub: string; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} className="w-full flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-4 active:opacity-90">
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`${title}. ${sub}`} className="w-full flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-4 active:opacity-90">
       <View className="h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/5">{icon}</View>
       <View className="flex-1">
         <Text className="font-bold leading-tight text-white">{title}</Text>
@@ -1263,9 +1263,18 @@ function LinkRow({ icon, title, sub, onPress }: { icon: ReactNode; title: string
   )
 }
 
-function Toggle({ on, onPress }: { on: boolean; onPress: () => void }) {
+function Toggle({ on, onPress, label }: { on: boolean; onPress: () => void; label?: string }) {
   return (
-    <Pressable onPress={onPress} className={`relative h-7 w-12 rounded-full active:opacity-90 ${on ? 'bg-brand-400' : 'bg-white/15'}`}>
+    <Pressable
+      onPress={onPress}
+      // Real switch semantics (audit F-016): role, checked state and a hit
+      // target padded to ≥44pt without changing the visual size.
+      accessibilityRole="switch"
+      accessibilityState={{ checked: on }}
+      accessibilityLabel={label}
+      hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+      className={`relative h-7 w-12 rounded-full active:opacity-90 ${on ? 'bg-brand-400' : 'bg-white/15'}`}
+    >
       <View className="absolute top-0.5 h-6 w-6 rounded-full bg-white" style={{ left: on ? 22 : 2 }} />
     </Pressable>
   )
@@ -1289,10 +1298,10 @@ function NotificationPrefsPanel({ t }: { t: (k: string) => string }) {
     <View className="gap-2.5 rounded-2xl border border-white/5 bg-ink-800/60 p-3.5">
       <Text className="text-[11px] font-bold uppercase tracking-wide text-white/40">{t('notif.deliver')}</Text>
       <Row icon={<Dumbbell size={18} color={brand[400]} />} title={t('notif.workout')} sub={t('notif.workoutSub')}>
-        <Toggle on={prefs.workoutReminder} onPress={() => set({ workoutReminder: !prefs.workoutReminder })} />
+        <Toggle on={prefs.workoutReminder} onPress={() => set({ workoutReminder: !prefs.workoutReminder })} label="Workout reminder" />
       </Row>
       <Row icon={<Flame size={18} color={brand[400]} />} title={t('notif.streak')} sub={t('notif.streakSub')}>
-        <Toggle on={prefs.streakReminder} onPress={() => set({ streakReminder: !prefs.streakReminder })} />
+        <Toggle on={prefs.streakReminder} onPress={() => set({ streakReminder: !prefs.streakReminder })} label="Streak reminder" />
       </Row>
 
       <Text className="mt-1 text-[11px] font-bold uppercase tracking-wide text-white/40">{t('notif.time')}</Text>
@@ -1309,7 +1318,7 @@ function NotificationPrefsPanel({ t }: { t: (k: string) => string }) {
 
       <View className="mt-1">
         <Row icon={<Moon size={18} color={accent.purple} />} title={t('notif.quiet')} sub={t('notif.quietSub')}>
-          <Toggle on={prefs.quiet} onPress={() => set({ quiet: !prefs.quiet })} />
+          <Toggle on={prefs.quiet} onPress={() => set({ quiet: !prefs.quiet })} label="Quiet hours" />
         </Row>
       </View>
       {prefs.quiet && (
@@ -1362,7 +1371,14 @@ function Segmented<T extends string>({ value, options, onChange }: { value: T; o
         />
       )}
       {options.map((o) => (
-        <Pressable key={o.v} onPress={() => onChange(o.v)} className="flex-1 flex-row items-center justify-center gap-1.5 rounded-lg py-2.5 active:opacity-90">
+        <Pressable
+          key={o.v}
+          onPress={() => onChange(o.v)}
+          accessibilityRole="button"
+          accessibilityLabel={o.l}
+          accessibilityState={{ selected: value === o.v }}
+          className="flex-1 flex-row items-center justify-center gap-1.5 rounded-lg py-2.5 active:opacity-90"
+        >
           {o.icon}
           <Text className={`text-sm font-semibold ${value === o.v ? 'text-black' : 'text-white/60'}`}>{o.l}</Text>
         </Pressable>

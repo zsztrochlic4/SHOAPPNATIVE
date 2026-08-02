@@ -77,11 +77,16 @@ export function Sheet({
     <AppModal visible={open} transparent animationType="slide" onRequestClose={onClose}>
       <View style={{ flex: 1, justifyContent: 'flex-end' }}>
         <Pressable
-          accessibilityLabel="Close"
+          accessibilityRole="button"
+          accessibilityLabel={`Close ${title ?? 'sheet'}`}
           onPress={onClose}
           style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)' }}
         />
         <View
+          // Isolate the sheet for assistive tech (audit F-016): screen readers
+          // stay inside the modal instead of reading the obscured page behind.
+          accessibilityViewIsModal
+          onAccessibilityEscape={onClose}
           className={full ? 'bg-ink-900' : 'rounded-t-3xl border-t border-white/10 bg-ink-900'}
           // `full` = a genuine full-screen surface (chat, builders): fill the device
           // screen edge-to-edge. Otherwise a bottom sheet capped at 88%.
@@ -98,7 +103,9 @@ export function Sheet({
               <Text className="text-lg font-bold text-white">{title}</Text>
               <Pressable
                 onPress={onClose}
-                hitSlop={8}
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel={`Close ${title ?? 'sheet'}`}
                 className="h-8 w-8 items-center justify-center rounded-full bg-white/10"
               >
                 <X size={18} color={colors.fg} />
@@ -184,11 +191,11 @@ function MenuDetailPanel({
         style={[{ paddingTop: insets.top }, animStyle, IS_WEB ? { flex: 1, minHeight: 0 } : null]}
       >
         <View className="flex-row items-center gap-1 px-3 py-2.5">
-          <Pressable onPress={onBack} hitSlop={8} accessibilityLabel="Back to menu" className="h-9 w-9 items-center justify-center rounded-full active:opacity-70">
+          <Pressable onPress={onBack} hitSlop={10} accessibilityRole="button" accessibilityLabel="Back to menu" className="h-9 w-9 items-center justify-center rounded-full active:opacity-70">
             <ChevronLeft size={24} color={colors.fg} />
           </Pressable>
-          <Text numberOfLines={1} className="flex-1 text-[17px] font-bold text-white">{title}</Text>
-          <Pressable onPress={onDashboard} hitSlop={8} accessibilityLabel="Close to dashboard" className="h-9 w-9 items-center justify-center rounded-full bg-white/10 active:opacity-70">
+          <Text numberOfLines={1} accessibilityRole="header" className="flex-1 text-[17px] font-bold text-white">{title}</Text>
+          <Pressable onPress={onDashboard} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close to dashboard" className="h-9 w-9 items-center justify-center rounded-full bg-white/10 active:opacity-70">
             <X size={18} color={colors.fg} />
           </Pressable>
         </View>

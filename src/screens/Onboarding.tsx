@@ -595,6 +595,9 @@ function ActionBar({ onPress, disabled, label = 'Continue', onSkip, skipLabel = 
       <Animated.View style={{ transform: [{ scale }] }}>
         <Pressable
           disabled={disabled}
+          accessibilityRole="button"
+          accessibilityLabel={label}
+          accessibilityState={{ disabled: !!disabled }}
           onPressIn={() => { if (!disabled) Animated.spring(scale, { toValue: 0.985, useNativeDriver: NATIVE, speed: 50, bounciness: 0 }).start() }}
           onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: NATIVE, speed: 30, bounciness: 6 }).start()}
           onPress={() => { if (!disabled) { thud(); onPress() } }}
@@ -604,7 +607,7 @@ function ActionBar({ onPress, disabled, label = 'Continue', onSkip, skipLabel = 
         </Pressable>
       </Animated.View>
       {onSkip ? (
-        <Pressable onPress={() => { tick(); onSkip() }} style={{ height: 40, marginTop: 6, alignItems: 'center', justifyContent: 'center' }}>
+        <Pressable onPress={() => { tick(); onSkip() }} accessibilityRole="button" accessibilityLabel={skipLabel} style={{ height: 44, marginTop: 6, alignItems: 'center', justifyContent: 'center' }}>
           <Text style={{ fontSize: 15, fontWeight: '600', color: tok.rgb('--fg', 0.5) }}>{skipLabel}</Text>
         </Pressable>
       ) : null}
@@ -625,7 +628,7 @@ function Radio({ selected }: { selected: boolean }) {
 function OptionRow({ label, glyph, flag, selected, onPress }: { label: string; glyph?: string; flag?: string; selected: boolean; onPress: () => void }) {
   const tok = useTok()
   return (
-    <Pressable onPress={onPress} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 17, paddingHorizontal: 18, borderRadius: 18, backgroundColor: selected ? tok.rgb('--brand-400', 0.12) : tok.rgb('--ink-800'), borderWidth: 1.5, borderColor: selected ? tok.rgb('--brand-400', 0.9) : tok.rgb('--fg', 0.06), transform: [{ scale: selected ? 1.005 : 1 }] }}>
+    <Pressable onPress={onPress} accessibilityRole="radio" accessibilityLabel={label} accessibilityState={{ selected, checked: selected }} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 17, paddingHorizontal: 18, borderRadius: 18, backgroundColor: selected ? tok.rgb('--brand-400', 0.12) : tok.rgb('--ink-800'), borderWidth: 1.5, borderColor: selected ? tok.rgb('--brand-400', 0.9) : tok.rgb('--fg', 0.06), transform: [{ scale: selected ? 1.005 : 1 }] }}>
       {glyph ? <View style={{ width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: selected ? tok.rgb('--brand-400', 0.18) : tok.rgb('--fg', 0.06) }}><Text style={{ fontSize: 22, color: selected ? tok.rgb('--brand-300') : tok.rgb('--fg', 0.6) }}>{glyph}</Text></View> : null}
       <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 9 }}>
         <Text style={{ fontSize: 16.5, fontWeight: '700', color: tok.rgb('--fg') }}>{label}</Text>
@@ -1147,8 +1150,8 @@ function StepView({ step, answers, set, header, onContinue, onAdvance, onRestart
 }
 
 /** Text input with a brand focus ring (matches the prototype's focus style). */
-function FocusInput({ value, onChangeText, placeholder, multiline, autoFocus, keyboardType, autoCapitalize, big }: {
-  value: string; onChangeText: (t: string) => void; placeholder?: string; multiline?: boolean; autoFocus?: boolean; keyboardType?: 'default' | 'email-address'; autoCapitalize?: 'none' | 'words' | 'sentences'; big?: boolean
+function FocusInput({ value, onChangeText, placeholder, multiline, autoFocus, keyboardType, autoCapitalize, big, label }: {
+  value: string; onChangeText: (t: string) => void; placeholder?: string; multiline?: boolean; autoFocus?: boolean; keyboardType?: 'default' | 'email-address'; autoCapitalize?: 'none' | 'words' | 'sentences'; big?: boolean; label?: string
 }) {
   const tok = useTok()
   const [focused, setFocused] = useState(false)
@@ -1163,6 +1166,9 @@ function FocusInput({ value, onChangeText, placeholder, multiline, autoFocus, ke
   return (
     <TextInput
       ref={ref}
+      // Screen readers need a programmatic name, not just the placeholder
+      // (audit F-016 — the name field exposed no label at runtime).
+      accessibilityLabel={label ?? placeholder}
       value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={tok.rgb('--fg', 0.32)}
       multiline={multiline} keyboardType={keyboardType} autoCapitalize={autoCapitalize}
       onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} selectionColor={tok.rgb('--brand-400')}
@@ -1192,7 +1198,7 @@ function TextStep({ step, answers, set, header, onContinue, onSkip }: { step: St
     <Shell header={header} footer={<ActionBar disabled={!valid} onPress={onContinue} onSkip={step.optional ? onSkip : undefined} skipLabel="Skip" />}>
       <QHeader title={step.title} sub={step.sub} />
       <Reveal delay={180}>
-        <FocusInput value={val} onChangeText={(t) => set(key, t as any)} placeholder={step.placeholder} multiline={!!step.multiline} autoFocus big />
+        <FocusInput value={val} onChangeText={(t) => set(key, t as any)} placeholder={step.placeholder} multiline={!!step.multiline} autoFocus big label={step.title} />
       </Reveal>
       {showName ? <Reveal delay={40} style={{ marginTop: 16 }}><Text style={{ fontSize: 15, fontWeight: '600', color: tok.rgb('--brand-300') }}>Great to meet you, {normalizeName(val).split(' ')[0]}.</Text></Reveal> : null}
       {step.prompts ? (
@@ -1223,7 +1229,7 @@ const DOB_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'Jul
 const WHEEL_ITEM = 42
 const pad2 = (n: number) => String(n).padStart(2, '0')
 
-function Wheel({ items, index, onIndex, flexBasis, render }: { items: (string | number)[]; index: number; onIndex: (i: number) => void; flexBasis: number; render?: (v: string | number) => string }) {
+function Wheel({ items, index, onIndex, flexBasis, render, label }: { items: (string | number)[]; index: number; onIndex: (i: number) => void; flexBasis: number; render?: (v: string | number) => string; label: string }) {
   const tok = useTok()
   const ref = useRef<ScrollView>(null)
   const last = useRef(index)
@@ -1232,8 +1238,39 @@ function Wheel({ items, index, onIndex, flexBasis, render }: { items: (string | 
     const i = Math.max(0, Math.min(items.length - 1, Math.round(e.nativeEvent.contentOffset.y / WHEEL_ITEM)))
     if (i !== last.current) { last.current = i; tick(); onIndex(i) }
   }
+  const valueText = render ? render(items[index]) : String(items[index])
+  const step = (dir: 1 | -1) => {
+    const next = Math.max(0, Math.min(items.length - 1, index + dir))
+    if (next === index) return
+    last.current = next
+    ref.current?.scrollTo({ y: next * WHEEL_ITEM, animated: true })
+    onIndex(next)
+  }
   return (
-    <ScrollView ref={ref} style={{ flex: flexBasis, height: WHEEL_ITEM * 5 }} showsVerticalScrollIndicator={false} snapToInterval={WHEEL_ITEM} decelerationRate="fast" scrollEventThrottle={16} onScroll={onScroll} contentContainerStyle={{ paddingVertical: WHEEL_ITEM * 2 }}>
+    <ScrollView
+      ref={ref}
+      // One ADJUSTABLE element per column (audit F-017): screen readers hear
+      // "Month, March, adjustable" and swipe up/down to change it, instead of
+      // ~100 generic text items with no selected state.
+      accessible
+      accessibilityRole="adjustable"
+      accessibilityLabel={label}
+      accessibilityValue={{ text: valueText }}
+      accessibilityHint={`Swipe up or down to change the ${label.toLowerCase()}`}
+      accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+      onAccessibilityAction={(e) => {
+        // increment = next value (a later month/day/year is further down the list).
+        if (e.nativeEvent.actionName === 'increment') step(1)
+        else if (e.nativeEvent.actionName === 'decrement') step(-1)
+      }}
+      style={{ flex: flexBasis, height: WHEEL_ITEM * 5 }}
+      showsVerticalScrollIndicator={false}
+      snapToInterval={WHEEL_ITEM}
+      decelerationRate="fast"
+      scrollEventThrottle={16}
+      onScroll={onScroll}
+      contentContainerStyle={{ paddingVertical: WHEEL_ITEM * 2 }}
+    >
       {items.map((it, i) => {
         const sel = i === index
         return (
@@ -1273,9 +1310,9 @@ function DateStep({ step, answers, set, header, onContinue }: { step: Step; answ
             <View>
               <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: '50%', height: 42, marginTop: -21, borderRadius: 14, backgroundColor: tok.rgb('--ink-700'), borderWidth: 1, borderColor: tok.rgb('--brand-400', 0.28) }} />
               <View style={{ flexDirection: 'row' }}>
-                <Wheel items={DOB_MONTHS} index={mIdx} onIndex={(i) => { setM(i); commit(i, dIdx, yIdx) }} flexBasis={1.5} />
-                <Wheel items={days} index={dIdx} onIndex={(i) => { setD(i); commit(mIdx, i, yIdx) }} flexBasis={0.8} />
-                <Wheel items={years} index={yIdx} onIndex={(i) => { setY(i); commit(mIdx, dIdx, i) }} flexBasis={1} />
+                <Wheel label="Month" items={DOB_MONTHS} index={mIdx} onIndex={(i) => { setM(i); commit(i, dIdx, yIdx) }} flexBasis={1.5} />
+                <Wheel label="Day" items={days} index={dIdx} onIndex={(i) => { setD(i); commit(mIdx, i, yIdx) }} flexBasis={0.8} />
+                <Wheel label="Year" items={years} index={yIdx} onIndex={(i) => { setY(i); commit(mIdx, dIdx, i) }} flexBasis={1} />
               </View>
               <FadeMask horizontal={false} />
             </View>
@@ -1792,7 +1829,7 @@ function AccountCreate({ name, onComplete, onBack, onLogin }: { name: string; on
         <Reveal delay={220}><Text style={{ marginTop: 12, marginBottom: 22, fontSize: 15, lineHeight: 22.5, color: tok.rgb('--fg', 0.55) }}>Create your account to save your answers, access your personalised training and track your progress.</Text></Reveal>
         <Reveal delay={300}>
           <Text style={{ fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', color: tok.rgb('--fg', 0.4), marginBottom: 8 }}>Email</Text>
-          <View style={{ marginBottom: 12 }}><FocusInput value={email} onChangeText={setEmail} placeholder="you@university.ac.uk" keyboardType="email-address" autoCapitalize="none" /></View>
+          <View style={{ marginBottom: 12 }}><FocusInput value={email} onChangeText={setEmail} placeholder="you@university.ac.uk" keyboardType="email-address" autoCapitalize="none" label="Email address" /></View>
           {enabled ? (
             <>
               <Text style={{ fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', color: tok.rgb('--fg', 0.4), marginBottom: 8 }}>Password</Text>
@@ -2199,7 +2236,7 @@ function Login({ onBack }: { onBack: () => void }) {
         </Reveal>
         <Reveal delay={260}>
           <Text style={{ fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', color: tok.rgb('--fg', 0.4), marginBottom: 8 }}>Email</Text>
-          <View style={{ marginBottom: 14 }}><FocusInput value={email} onChangeText={setEmail} placeholder="you@university.ac.uk" keyboardType="email-address" autoCapitalize="none" /></View>
+          <View style={{ marginBottom: 14 }}><FocusInput value={email} onChangeText={setEmail} placeholder="you@university.ac.uk" keyboardType="email-address" autoCapitalize="none" label="Email address" /></View>
         </Reveal>
         <Reveal delay={300}>
           <Text style={{ fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', color: tok.rgb('--fg', 0.4), marginBottom: 8 }}>Password</Text>
