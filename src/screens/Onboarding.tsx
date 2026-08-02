@@ -245,13 +245,11 @@ function evaluateSafety(a: Answers): Verdict {
   }
 }
 
-const targetsFor = (goal: Goal) => {
-  switch (goal) {
-    case 'build-muscle': return { calorieTarget: 2600, proteinTarget: 170, carbTarget: 300, fatTarget: 75 }
-    case 'lose-fat': return { calorieTarget: 1900, proteinTarget: 165, carbTarget: 180, fatTarget: 60 }
-    case 'gain-strength': return { calorieTarget: 2500, proteinTarget: 160, carbTarget: 280, fatTarget: 80 }
-    default: return { calorieTarget: 2200, proteinTarget: 140, carbTarget: 240, fatTarget: 70 }
-  }
+// APP-WIDE RULE — no calorie or nutritional goals. Onboarding never assigns a
+// calorie/macro target; we don't prescribe intake numbers to hit. Kept as zeros
+// for shape only (see nutritionTargets in backend/mapping/projection.ts).
+const targetsFor = (_goal: Goal) => {
+  return { calorieTarget: 0, proteinTarget: 0, carbTarget: 0, fatTarget: 0 }
 }
 const GOAL_MAP: Record<GoalKey, Goal> = { build: 'build-muscle', lose: 'lose-fat', strong: 'gain-strength', healthy: 'stay-healthy' }
 const EQUIP_MAP: Record<EnvKey, Equipment> = { gym: 'full-gym', home: 'home-basic', bodyweight: 'dorm-bodyweight' }

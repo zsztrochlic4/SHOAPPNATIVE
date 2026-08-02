@@ -41,14 +41,22 @@ const REGION_LABEL: Record<InjuryRegion, string> = {
   ankle: 'ankles',
 }
 
-/** Deterministic nutrition macro defaults by goal (mirrors the old onboarding). */
-export function nutritionTargets(goal: Goal): Pick<Profile, 'calorieTarget' | 'proteinTarget' | 'carbTarget' | 'fatTarget'> {
-  switch (goal) {
-    case 'build-muscle': return { calorieTarget: 2600, proteinTarget: 170, carbTarget: 300, fatTarget: 75 }
-    case 'lose-fat': return { calorieTarget: 1900, proteinTarget: 165, carbTarget: 180, fatTarget: 60 }
-    case 'gain-strength': return { calorieTarget: 2500, proteinTarget: 160, carbTarget: 280, fatTarget: 80 }
-    default: return { calorieTarget: 2200, proteinTarget: 140, carbTarget: 240, fatTarget: 70 }
-  }
+/**
+ * APP-WIDE RULE — no calorie or nutritional goals.
+ *
+ * StrengthHub deliberately does NOT set calorie or macro targets for users (no
+ * "hit 2600 kcal", no protein/carb/fat goals). Numeric intake targets can be
+ * harmful for our audience, so we never prescribe them. Nutrition is handled
+ * qualitatively (the balanced-plate guide + "how did your eating go?" check-in),
+ * and the food log shows what was eaten as a descriptive estimate only — never
+ * measured against a goal.
+ *
+ * This function is kept for shape/compatibility but returns zeros for every
+ * target. Do not reintroduce non-zero numbers here (or anywhere) without an
+ * explicit product decision to reverse this rule.
+ */
+export function nutritionTargets(_goal: Goal): Pick<Profile, 'calorieTarget' | 'proteinTarget' | 'carbTarget' | 'fatTarget'> {
+  return { calorieTarget: 0, proteinTarget: 0, carbTarget: 0, fatTarget: 0 }
 }
 
 function injuriesString(user: UserDoc): string {

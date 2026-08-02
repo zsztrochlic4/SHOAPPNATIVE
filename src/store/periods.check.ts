@@ -63,7 +63,7 @@ function makeState(over: Partial<AppState> = {}): AppState {
       name: 'Test', age: 20, sex: 'other', university: 'U', cohort: '', dorm: '', society: '',
       goal: 'build-muscle', experience: 'beginner', daysPerWeek: 3, equipment: 'full-gym',
       heightCm: 175, startWeightKg: 75, goalWeightKg: 72,
-      calorieTarget: 2400, proteinTarget: 150, carbTarget: 260, fatTarget: 70,
+      calorieTarget: 0, proteinTarget: 0, carbTarget: 0, fatTarget: 0, // no calorie/nutrition goals (app-wide rule)
       waterTargetL: 3, stepTarget: 9000, sleepTargetH: 8,
       onboarded: true, examMode: false, budgetMode: false, newToGym: false, premium: false,
       createdAtKey: todayKey,
