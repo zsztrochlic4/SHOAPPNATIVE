@@ -640,6 +640,10 @@ export function CoachChatSheet({ open, onClose }: Props) {
   const [replyingTo, setReplyingTo] = useState<{ role: 'user' | 'coach'; text: string } | null>(null)
   const [coachConsented, setCoachConsented] = useState<boolean | null>(null)
   const [showMemory, setShowMemory] = useState(false)
+  // Failed-turn recovery (audit F-028): the message that failed, for one-tap
+  // retry, and a send sequence so Cancel/supersede drops a stale response.
+  const [retryMsg, setRetryMsg] = useState<string | null>(null)
+  const sendSeqRef = useRef(0)
   // Shared offset: dragging any row left reveals every row's timestamp together.
   const revealX = useRef(new Animated.Value(0)).current
   // Per-conversation safety state (persistence + retraction across messages, spec §2).
@@ -670,15 +674,17 @@ export function CoachChatSheet({ open, onClose }: Props) {
     return () => { active = false }
   }, [open])
 
-  async function send(t?: string) {
+  async function send(t?: string, opts?: { resend?: boolean }) {
     if (!coachOperational() && !COACH_PREVIEW) return // HARD gate + server-side kill switch (spec §20).
     const msg = (t ?? text).trim()
     if (!msg || typing) return
     const replyTo = replyingTo ?? undefined
     setText('')
     setReplyingTo(null)
-    // Show the user's message immediately (with any reply quote), then a typing indicator.
-    dispatch({ type: 'PUSH_CHAT', role: 'user', text: msg, replyTo })
+    // Show the user's message immediately (with any reply quote), then a typing
+    // indicator. A RETRY re-sends the already-visible message (F-028) — no
+    // duplicate bubble.
+    if (!opts?.resend) dispatch({ type: 'PUSH_CHAT', role: 'user', text: msg, replyTo })
     // DEV DESIGN PREVIEW only: reply with the on-device scripted coach ONLY — never the live AI or the
     // safety classifier (both stay gated) — so the coach can be redesigned without the crisis detector.
     if (COACH_PREVIEW && !coachOperational()) {
@@ -698,12 +704,15 @@ export function CoachChatSheet({ open, onClose }: Props) {
       return
     }
     dispatch({ type: 'BUMP_COACH_USAGE' })
+    const seq = ++sendSeqRef.current
+    setRetryMsg(null)
     setTyping(true)
     try {
       // TRUSTED BACKEND coach: the server re-runs the precheck (authoritative), the
       // model call, and the validator, so a modified client can't bypass safety
       // (§4.4). It may BLOCK even though the client's fast precheck allowed the turn.
       const res = await askCoachServer({ message: msg })
+      if (seq !== sendSeqRef.current) return // cancelled / superseded — drop stale reply
       // Server already ran guardOutgoing; blocked replies carry crisis buttons.
       dispatch({
         type: 'PUSH_CHAT', role: 'coach', text: res.text,
@@ -713,14 +722,41 @@ export function CoachChatSheet({ open, onClose }: Props) {
         learnedMemory: res.memory ?? undefined,
         proposal: res.proposal ?? undefined,
       })
-    } catch {
-      // Backend unavailable / gated off. We never answer training questions without the
-      // server-authoritative safety layer, so keep the message in the thread, show a calm status (no
-      // raw error), and offer a plain retry (final plan Phase 4).
-      dispatch({ type: 'PUSH_CHAT', role: 'coach', text: "I couldn't reach the coach service just now, so I haven't answered yet — your message is still here. Give it another go in a moment and I'll pick it up.", mode: 'safety' })
+    } catch (e: unknown) {
+      if (seq !== sendSeqRef.current) return
+      // Distinguish WHY it failed (audit F-028) — calm copy per category, the
+      // user's message stays in the thread, and a one-tap Retry appears. We
+      // never answer training questions without the server-authoritative
+      // safety layer, so there is no local fallback answer.
+      const code = String((e as { code?: string })?.code ?? '')
+      const detail = String((e as { message?: string })?.message ?? '')
+      const isLimit = code.includes('resource-exhausted')
+      const isGate = code.includes('failed-precondition') || detail.includes('coach_disabled') || detail.includes('coach_unavailable')
+      const isAuth = code.includes('unauthenticated')
+      const isTimeout = code.includes('deadline-exceeded') || detail.toLowerCase().includes('timeout')
+      const text = isLimit
+        ? "You've reached today's coach limit — it resets tomorrow. Your message is still here if you want to send it then."
+        : isGate
+          ? 'The coach is paused right now. Your message is saved here and nothing was lost.'
+          : isAuth
+            ? 'Please sign in again to keep chatting — your message is still here.'
+            : isTimeout
+              ? 'That took too long to answer, so I stopped rather than guess. Tap retry and I’ll try again.'
+              : "I couldn't reach the coach service just now, so I haven't answered yet — your message is still here. Tap retry when you're back online."
+      if (!isLimit && !isGate) setRetryMsg(msg)
+      dispatch({ type: 'PUSH_CHAT', role: 'coach', text, mode: 'safety' })
     } finally {
-      setTyping(false)
+      if (seq === sendSeqRef.current) setTyping(false)
     }
+  }
+
+  /** Cancel the in-flight turn (audit F-028): the response, if it ever lands,
+   *  is dropped; the user's message stays and can be retried. */
+  function cancelPending() {
+    const msg = [...state.chat].reverse().find((m) => m.role === 'user')?.text ?? null
+    sendSeqRef.current += 1
+    setTyping(false)
+    if (msg) setRetryMsg(msg)
   }
 
   const handleProposalConfirmed = useCallback((proposal: CoachActionProposal) => {
@@ -841,6 +877,28 @@ export function CoachChatSheet({ open, onClose }: Props) {
               </View>
             )}
 
+            {typing && (
+              <Pressable
+                onPress={cancelPending}
+                accessibilityRole="button"
+                accessibilityLabel="Cancel waiting for the coach"
+                style={{ alignSelf: 'center', marginBottom: 10, paddingVertical: 7, paddingHorizontal: 16, borderRadius: 999, backgroundColor: withAlpha(colors.fg, 0.08) }}
+                className="active:opacity-70"
+              >
+                <Text style={{ fontSize: 12.5, fontWeight: '700', color: withAlpha(colors.fg, 0.65) }}>Cancel</Text>
+              </Pressable>
+            )}
+            {!typing && retryMsg && (
+              <Pressable
+                onPress={() => void send(retryMsg, { resend: true })}
+                accessibilityRole="button"
+                accessibilityLabel="Retry your last message"
+                style={{ alignSelf: 'center', marginBottom: 10, paddingVertical: 7, paddingHorizontal: 16, borderRadius: 999, backgroundColor: withAlpha(colors.brand400, 0.14), borderWidth: 1, borderColor: withAlpha(colors.brand400, 0.4) }}
+                className="active:opacity-80"
+              >
+                <Text style={{ fontSize: 12.5, fontWeight: '700', color: colors.brand400 }}>Retry last message</Text>
+              </Pressable>
+            )}
             {replyingTo && (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10, paddingVertical: 8, paddingLeft: 10, paddingRight: 8, backgroundColor: colors.ink800, borderRadius: 12, borderLeftWidth: 3, borderLeftColor: colors.brand400 }}>
                 <View style={{ flex: 1, minWidth: 0 }}>

@@ -25,6 +25,7 @@ import Svg, { Path, Line, Rect, Circle, Polygon, G, Text as SvgText } from 'reac
 import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useDispatch, useStore } from '../store/store'
+import { clearOnboardingDraft, loadOnboardingDraft, saveOnboardingDraft } from './onboardingDraft'
 import { useAuth } from '../auth/AuthProvider'
 import { friendlyError } from '../auth/authErrors'
 import { auth } from '../lib/firebase'
@@ -847,6 +848,30 @@ export default function Onboarding() {
   const [returnToSummary, setReturnToSummary] = useState(false)
   const set = <K extends keyof Answers>(k: K, v: Answers[K]) => setAnswers((a) => ({ ...a, [k]: v }))
 
+  // ── Draft persistence (audit F-019 / J-04) ────────────────────────────────
+  // The long questionnaire survives reload/backgrounding: answers + position save
+  // after every change and restore on mount, so an interruption resumes at the
+  // same step instead of wiping 5+ minutes of personalisation. Cleared on
+  // completion and explicit restart. Anonymous-scoped (onboarding is pre-auth).
+  const draftReadyRef = useRef(false)
+  useEffect(() => {
+    let cancelled = false
+    void loadOnboardingDraft().then((draft) => {
+      if (cancelled) return
+      if (draft) {
+        setAnswers((cur) => ({ ...cur, ...(draft.answers as Partial<Answers>) }))
+        setIndex(Math.max(0, draft.index))
+      }
+      draftReadyRef.current = true
+    })
+    return () => { cancelled = true }
+  }, [])
+  useEffect(() => {
+    if (!draftReadyRef.current) return
+    if (phase !== 'flow' && phase !== 'summary' && phase !== 'terms' && phase !== 'account') return
+    void saveOnboardingDraft({ version: 1, answers: answers as unknown as Record<string, unknown>, index, savedAt: Date.now() })
+  }, [answers, index, phase])
+
   const flow = useMemo(() => buildFlow(answers), [answers])
   const step = flow[Math.min(index, flow.length - 1)]
 
@@ -885,7 +910,10 @@ export default function Onboarding() {
     const i = flow.findIndex((s) => s.id === stepId)
     if (i >= 0) { setReturnToSummary(true); setDir('back'); setPhase('flow'); setIndex(i) }
   }
-  const restart = () => { setAnswers(DEFAULT_ANSWERS); setIndex(0); setReturnToSummary(false); setDir('fwd'); setPhase('welcome') }
+  const restart = () => {
+    void clearOnboardingDraft()
+    setAnswers(DEFAULT_ANSWERS); setIndex(0); setReturnToSummary(false); setDir('fwd'); setPhase('welcome')
+  }
 
   function finish() {
     // Build the canonical backend `users` document via the single deterministic mapping
@@ -910,6 +938,8 @@ export default function Onboarding() {
     // status.ok === false and NO program — the app then shows the "being finalised"
     // holding screen. No safety rule is relaxed here; the generator self-clamps.
     const activation = activateProgram(userDoc)
+    // Onboarding is complete — the draft has served its purpose (F-019).
+    void clearOnboardingDraft()
     thud()
     dispatch({
       type: 'COMPLETE_ONBOARDING',

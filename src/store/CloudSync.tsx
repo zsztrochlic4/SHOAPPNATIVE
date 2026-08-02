@@ -8,6 +8,7 @@ import { saveBackoffMs, MAX_SAVE_RETRIES } from './saveRetry'
 import { mergeById, type HistoryEntry } from './historyMerge'
 import { registerEnsureFullHistory } from './historySync'
 import { registerCloudFlush } from './cloudFlush'
+import { publishSyncStatus } from './syncStatus'
 import { migrateAppState } from './migrate'
 import type { AppState } from './types'
 
@@ -38,6 +39,8 @@ export function CloudSync() {
   const [synced, setSynced] = useState(false)
   const syncedRef = useRef(false)
   syncedRef.current = synced
+  // Publish the load state for the Settings sync row (audit F-039).
+  useEffect(() => { publishSyncStatus({ synced }) }, [synced])
   const stateRef = useRef(state)
   stateRef.current = state
   const userRef = useRef(user)
@@ -216,15 +219,19 @@ export function CloudSync() {
     }
     const snapshot = stateRef.current
     savingRef.current = true
+    publishSyncStatus({ pending: true })
     saveUserState(u.uid, snapshot, savedRef.current)
       .then(() => {
         savedRef.current = snapshot
         retryAttemptRef.current = 0
         clearRetry()
+        publishSyncStatus({ pending: false, error: false, lastSavedAt: Date.now() })
       })
       .catch(() => {
         // The last edit may be the final one — without a retry a transient failure
-        // would silently lose it. Retry with capped backoff (reset by the next edit).
+        // would silently lose it. Retry with capped backoff (reset by the next edit),
+        // and surface the failure so Settings can show it with a manual retry (F-039).
+        publishSyncStatus({ pending: false, error: true })
         if (!retryTimerRef.current && retryAttemptRef.current < MAX_SAVE_RETRIES) {
           const delay = saveBackoffMs(retryAttemptRef.current)
           retryAttemptRef.current += 1

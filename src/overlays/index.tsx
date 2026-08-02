@@ -32,6 +32,8 @@ import { deliverExport } from '../lib/exportDeliver'
 import { pick, makeRng } from '../lib/rng'
 import { requestPushPermission, resolveNotifPrefs } from '../lib/notifications'
 import { openBillingPortal } from '../lib/billing'
+import { subscribeSyncStatus, type SyncStatus } from '../store/syncStatus'
+import { requestCloudFlush } from '../store/cloudFlush'
 import { LegalDocModal } from '../components/LegalDocModal'
 import type { LegalDocKey } from '../content/legal'
 import Constants from 'expo-constants'
@@ -439,6 +441,7 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
       )}
 
       <Group label={t('settings.data')}>
+        {authEnabled && user && <SyncStatusRow />}
         <Pressable onPress={() => { dispatch({ type: 'RESET_DEMO' }); toast('Demo data restored'); onDone?.() }} className="w-full flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-4 active:opacity-90">
           <RotateCcw size={18} color={brand[400]} />
           <View className="flex-1">
@@ -540,6 +543,48 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
 
       <LegalDocModal docKey={legalDoc} onClose={() => setLegalDoc(null)} />
     </>
+  )
+}
+
+/**
+ * Honest cloud-backup status with a manual retry (audit F-039): last successful
+ * save time, pending/failed states, and a Sync-now action. Silent bounded
+ * retries alone let users believe sensitive changes were backed up when they
+ * weren't.
+ */
+function SyncStatusRow() {
+  const [status, setStatus] = useState<SyncStatus>({ synced: false, pending: false, error: false, lastSavedAt: null })
+  const [retrying, setRetrying] = useState(false)
+  useEffect(() => subscribeSyncStatus(setStatus), [])
+  const label = status.error
+    ? 'Some changes are NOT backed up yet'
+    : status.pending
+      ? 'Backing up…'
+      : !status.synced
+        ? 'Connecting to your cloud backup…'
+        : status.lastSavedAt
+          ? `Backed up ${new Date(status.lastSavedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+          : 'Up to date'
+  const tone = status.error ? 'text-amber-200' : 'text-white/85'
+  return (
+    <View className={`w-full flex-row items-center gap-3 rounded-2xl border p-4 ${status.error ? 'border-amber-400/25 bg-amber-400/[0.06]' : 'border-white/5 bg-ink-800'}`}>
+      <View className="flex-1">
+        <Text className={`font-bold ${tone}`}>Cloud backup</Text>
+        <Text className="mt-0.5 text-[12px] text-white/50">{label}</Text>
+      </View>
+      <Pressable
+        onPress={async () => {
+          if (retrying) return
+          setRetrying(true)
+          try { await requestCloudFlush(8000) } finally { setRetrying(false) }
+        }}
+        accessibilityRole="button"
+        accessibilityLabel="Sync now"
+        className="rounded-full bg-white/[0.08] px-3.5 py-2 active:opacity-80"
+      >
+        <Text className="text-[12.5px] font-bold text-white/80">{retrying ? 'Syncing…' : 'Sync now'}</Text>
+      </Pressable>
+    </View>
   )
 }
 

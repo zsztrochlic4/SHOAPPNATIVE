@@ -18,6 +18,7 @@ import { Paywall } from './screens/Paywall'
 import { IntegrationsAutoSync } from './components/Integrations'
 import { PushRegistration, NotificationsSync } from './components/PushRegistration'
 import { CompletionQueueSync } from './components/CompletionQueueSync'
+import { DeepLinkHandler } from './components/DeepLinkHandler'
 import { ToastProvider } from './components/Toast'
 import { NavProvider, type Overlay } from './nav'
 import { themeVars, useThemeName, cssVars } from './theme'
@@ -256,6 +257,8 @@ function Shell() {
 
   return (
     <NavProvider value={nav}>
+      {/* Push taps / strengthhub:// links route to allowlisted destinations (F-020). */}
+      <DeepLinkHandler />
       <View className="flex-1 bg-ink-900" style={{ paddingTop: insets.top }}>
         {persistenceError && onboarded && (
           <View
