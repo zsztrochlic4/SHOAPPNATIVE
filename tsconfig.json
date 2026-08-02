@@ -8,5 +8,5 @@
     }
   },
   "include": ["**/*.ts", "**/*.tsx", "nativewind-env.d.ts"],
-  "exclude": ["node_modules", "api", "functions", "dist"]
+  "exclude": ["node_modules", "api", "functions", "dist", "e2e", "playwright.config.ts", "playwright-report", "test-results"]
 }

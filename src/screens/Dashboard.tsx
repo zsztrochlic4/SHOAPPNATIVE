@@ -160,7 +160,7 @@ export default function Dashboard() {
   return (
     <View className="px-5 pt-2">
       <View className="mb-4 flex-row items-center justify-between">
-        <Pressable accessibilityLabel="Open menu" onPress={() => nav.openMenu()} className="h-10 w-10 items-center justify-center rounded-xl active:opacity-70">
+        <Pressable accessibilityRole="button" accessibilityLabel="Open menu" onPress={() => nav.openMenu()} className="h-10 w-10 items-center justify-center rounded-xl active:opacity-70">
           <Menu size={24} color={colors.fg} />
         </Pressable>
         <Wordmark size="sm" />

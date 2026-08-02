@@ -35,6 +35,7 @@
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.1",
+    "@playwright/test": "^1.62.1",
     "@types/react": "~19.2.2",
     "@typescript-eslint/parser": "^8.65.0",
     "babel-preset-expo": "~57.0.0",
@@ -81,7 +82,9 @@
     "media:folders": "node scripts/create-exercise-folders.mjs",
     "exercises:upload": "node scripts/upload-exercises.mjs",
     "workouts:build": "node scripts/build-quick-workouts.mjs",
-    "workouts:upload": "node scripts/upload-workouts.mjs"
+    "workouts:upload": "node scripts/upload-workouts.mjs",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "private": true,
   "engines": {
