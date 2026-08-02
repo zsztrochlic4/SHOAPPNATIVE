@@ -547,7 +547,7 @@ function CustomiseSheet({ open, onClose, colors }: { open: boolean; onClose: () 
         <View style={{ width: 38, height: 5, borderRadius: 3, backgroundColor: `${colors.fg}33`, alignSelf: 'center', marginBottom: 14 }} />
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <Text style={{ fontSize: 22, fontWeight: '800', letterSpacing: -0.2, color: colors.fg }}>Customise</Text>
-          <Pressable onPress={onClose} hitSlop={8}><Text style={{ fontSize: 16, fontWeight: '700', color: colors.brand400 }}>Done</Text></Pressable>
+          <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="Done"><Text style={{ fontSize: 16, fontWeight: '700', color: colors.brand400 }}>Done</Text></Pressable>
         </View>
       </View>
 
@@ -607,7 +607,7 @@ function CustomiseSheet({ open, onClose, colors }: { open: boolean; onClose: () 
                       <Icon name={q.icon} size={17} color={colors.brand400} />
                     </View>
                     <Text style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: '700', color: colors.fg }}>{q.label}</Text>
-                    <Pressable onPress={() => toggleQuick(q.id)} hitSlop={6}>
+                    <Pressable onPress={() => toggleQuick(q.id)} hitSlop={10} accessibilityRole="button" accessibilityLabel={`Toggle ${q.label}`}>
                       {on ? (
                         <View style={{ width: 27, height: 27, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brand400 }}><Check size={15} strokeWidth={3} color="#0a0a0b" /></View>
                       ) : (
@@ -637,7 +637,7 @@ function CustomiseSheet({ open, onClose, colors }: { open: boolean; onClose: () 
                     <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '700', color: colors.fg }}>{t.name}</Text>
                     <Text style={{ fontSize: 11.5, color: `${colors.fg}73` }}>{t.muscle}</Text>
                   </View>
-                  <Pressable onPress={() => toggleTracked(t.id)} hitSlop={6} disabled={trackedIds.length <= 1} style={{ width: 27, height: 27, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: `${colors.fg}14`, opacity: trackedIds.length <= 1 ? 0.4 : 1 }}>
+                  <Pressable onPress={() => toggleTracked(t.id)} hitSlop={10} accessibilityRole="button" accessibilityLabel="Remove tracked lift" disabled={trackedIds.length <= 1} style={{ width: 27, height: 27, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: `${colors.fg}14`, opacity: trackedIds.length <= 1 ? 0.4 : 1 }}>
                     <Minus size={15} color={`${colors.fg}99`} />
                   </Pressable>
                 </View>
@@ -658,7 +658,7 @@ function CustomiseSheet({ open, onClose, colors }: { open: boolean; onClose: () 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 9, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 14, backgroundColor: colors.ink700, borderWidth: 1, borderColor: `${colors.fg}14` }}>
             <Search size={18} color={`${colors.fg}66`} />
             <TextInput value={exQuery} onChangeText={setExQuery} placeholder="Search exercises" placeholderTextColor={`${colors.fg}59`} style={{ flex: 1, minWidth: 0, fontSize: 15, color: colors.fg, paddingVertical: 0 }} />
-            {exQuery.length > 0 && <Pressable onPress={() => setExQuery('')} hitSlop={8}><X size={15} color={`${colors.fg}73`} /></Pressable>}
+            {exQuery.length > 0 && <Pressable onPress={() => setExQuery('')} hitSlop={8} accessibilityRole="button" accessibilityLabel="Clear search"><X size={15} color={`${colors.fg}73`} /></Pressable>}
           </View>
           {exq.length > 0 && (
             <View style={{ marginTop: 10, borderRadius: 16, overflow: 'hidden', backgroundColor: colors.ink700, borderWidth: 1, borderColor: `${colors.fg}10` }}>
@@ -734,15 +734,15 @@ function AddWeightSheet({ open, onClose, colors }: { open: boolean; onClose: () 
         <View style={{ width: 40, height: 4, borderRadius: 999, backgroundColor: `${colors.fg}33`, alignSelf: 'center', marginBottom: 14 }} />
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <Text style={{ fontSize: 19, fontWeight: '800', letterSpacing: -0.2, color: colors.fg }}>Add today's weight</Text>
-          <Pressable onPress={onClose} style={{ height: 32, width: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 999, backgroundColor: `${colors.fg}1a` }}><X size={16} color={colors.fg} /></Pressable>
+          <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" style={{ height: 32, width: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 999, backgroundColor: `${colors.fg}1a` }}><X size={16} color={colors.fg} /></Pressable>
         </View>
         <View style={{ marginTop: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 22 }}>
-          <Pressable onPress={() => step(-0.1)} style={{ height: 48, width: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 999, backgroundColor: `${colors.fg}0f` }}><Minus size={20} color={colors.fg} strokeWidth={2.4} /></Pressable>
+          <Pressable onPress={() => step(-0.1)} accessibilityRole="button" accessibilityLabel="Decrease" style={{ height: 48, width: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 999, backgroundColor: `${colors.fg}0f` }}><Minus size={20} color={colors.fg} strokeWidth={2.4} /></Pressable>
           <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, minWidth: 150, justifyContent: 'center' }}>
             <Text style={{ fontSize: 44, fontWeight: '800', lineHeight: 46, color: colors.fg, letterSpacing: -1 }}>{draft.toFixed(1)}</Text>
             <Text style={{ fontSize: 16, fontWeight: '600', color: `${colors.fg}73` }}>{weightUnit(units)}</Text>
           </View>
-          <Pressable onPress={() => step(0.1)} style={{ height: 48, width: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 999, backgroundColor: `${colors.brand400}26` }}><Plus size={20} color={colors.brand400} strokeWidth={2.4} /></Pressable>
+          <Pressable onPress={() => step(0.1)} accessibilityRole="button" accessibilityLabel="Increase" style={{ height: 48, width: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 999, backgroundColor: `${colors.brand400}26` }}><Plus size={20} color={colors.brand400} strokeWidth={2.4} /></Pressable>
         </View>
         <Text style={{ marginTop: 8, textAlign: 'center', fontSize: 12, color: `${colors.fg}73` }}>{dLabel}</Text>
         <Pressable onPress={save} style={{ marginTop: 22, alignItems: 'center', justifyContent: 'center', borderRadius: 999, backgroundColor: colors.brand400, paddingVertical: 14 }}>
@@ -769,7 +769,7 @@ function BmiInfoSheet({ open, onClose, colors }: { open: boolean; onClose: () =>
         <View style={{ width: 40, height: 4, borderRadius: 999, backgroundColor: `${colors.fg}33`, alignSelf: 'center', marginBottom: 16 }} />
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <Text style={{ fontSize: 19, fontWeight: '800', letterSpacing: -0.2, color: colors.fg }}>What is BMI?</Text>
-          <Pressable onPress={onClose} style={{ height: 32, width: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 999, backgroundColor: `${colors.fg}1a` }}><X size={16} color={colors.fg} /></Pressable>
+          <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" style={{ height: 32, width: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 999, backgroundColor: `${colors.fg}1a` }}><X size={16} color={colors.fg} /></Pressable>
         </View>
         <Text style={{ marginTop: 14, fontSize: 14, lineHeight: 22, color: `${colors.fg}b3` }}>
           Body Mass Index estimates whether your weight sits in a healthy range for your height. It's your weight in kilograms divided by your height in metres squared.

@@ -26,7 +26,7 @@ export default function Community() {
       <ScreenHeader
         title="Community"
         trailing={
-          <Pressable onPress={() => nav.open('leaderboard')} className="relative h-10 w-10 items-center justify-center rounded-xl active:opacity-70">
+          <Pressable onPress={() => nav.open('leaderboard')} accessibilityRole="button" accessibilityLabel="Campus leaderboard" className="relative h-10 w-10 items-center justify-center rounded-xl active:opacity-70">
             <Users size={22} color={colors.fg} />
             <View className="absolute right-2 top-2 h-2 w-2 rounded-full bg-brand-400" style={{ borderWidth: 2, borderColor: colors.ink900 }} />
           </Pressable>
@@ -77,10 +77,10 @@ function FeedTab() {
         <Text className="mt-2 text-xl font-extrabold leading-tight tracking-tight text-white">Your campus,{'\n'}<Text className="text-brand-400">your people.</Text></Text>
         <Text className="mt-2 max-w-[230px] text-[13px] leading-snug text-white/65">Train alongside students in your halls and societies, not strangers across the world.</Text>
         <View className="mt-4 flex-row gap-2">
-          <Pressable onPress={() => nav.open('createPost')} className="btn-primary px-4 py-2.5 active:opacity-90">
+          <Pressable onPress={() => nav.open('createPost')} accessibilityRole="button" accessibilityLabel="Create a post" className="btn-primary px-4 py-2.5 active:opacity-90">
             <Text className="text-sm font-semibold text-black">Share something</Text>
           </Pressable>
-          <Pressable onPress={() => nav.open('partnerMatch')} className="flex-row items-center gap-1.5 rounded-full bg-white/10 px-4 py-2.5 active:opacity-90">
+          <Pressable onPress={() => nav.open('partnerMatch')} accessibilityRole="button" accessibilityLabel="Find a training partner" className="flex-row items-center gap-1.5 rounded-full bg-white/10 px-4 py-2.5 active:opacity-90">
             <UserPlus size={15} color="#fff" />
             <Text className="text-sm font-semibold text-white">Find a partner</Text>
           </Pressable>
@@ -92,7 +92,7 @@ function FeedTab() {
         {SCOPES.map((s) => {
           const active = scope === s.id
           return (
-            <Pressable key={s.id} onPress={() => setScope(s.id)} className={`flex-1 items-center rounded-full py-2 active:opacity-80 ${active ? 'bg-brand-400' : 'bg-ink-700'}`}>
+            <Pressable key={s.id} onPress={() => setScope(s.id)} accessibilityRole="button" accessibilityLabel={s.label(state.profile)} accessibilityState={{ selected: active }} className={`flex-1 items-center rounded-full py-2 active:opacity-80 ${active ? 'bg-brand-400' : 'bg-ink-700'}`}>
               <Text numberOfLines={1} className={`text-[13px] font-semibold ${active ? 'text-black' : 'text-white/60'}`}>{s.label(state.profile)}</Text>
             </Pressable>
           )
@@ -120,7 +120,7 @@ function FeedTab() {
         </>
       )}
 
-      <Pressable onPress={() => nav.open('leaderboard')} className="mt-4 w-full flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-4 active:opacity-90">
+      <Pressable onPress={() => nav.open('leaderboard')} accessibilityRole="button" accessibilityLabel="Open campus leaderboard" className="mt-4 w-full flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-4 active:opacity-90">
         <Award size={24} color={brand[400]} />
         <View className="flex-1">
           <Text className="font-bold text-white">Campus leaderboard</Text>
@@ -180,11 +180,11 @@ const FeedCard = memo(function FeedCard({ post: p }: { post: Post }) {
           onPress={onKudos}
           renderIcon={(active) => <HeartHandshake size={17} color={active ? brand[400] : 'rgba(255,255,255,0.55)'} fill={active ? brand[400] : 'none'} />}
         />
-        <Pressable onPress={onComment} className="flex-row items-center gap-1.5 active:opacity-70">
+        <Pressable onPress={onComment} accessibilityRole="button" accessibilityLabel={`Comments (${p.comments})`} className="flex-row items-center gap-1.5 active:opacity-70">
           <MessageCircle size={17} color="rgba(255,255,255,0.55)" />
           <Text className="text-sm text-white/55">{p.comments}</Text>
         </Pressable>
-        <Pressable onPress={onBookmark} className="ml-auto active:opacity-70">
+        <Pressable onPress={onBookmark} accessibilityRole="button" accessibilityLabel={p.bookmarked ? "Remove bookmark" : "Bookmark post"} accessibilityState={{ selected: !!p.bookmarked }} className="ml-auto active:opacity-70">
           <Bookmark size={17} color={p.bookmarked ? brand[400] : 'rgba(255,255,255,0.45)'} fill={p.bookmarked ? brand[400] : 'none'} />
         </Pressable>
       </View>
@@ -218,7 +218,7 @@ function ReactionButton({ active, count, onPress, renderIcon }: {
   }
 
   return (
-    <Pressable onPress={press} hitSlop={6} className="flex-row items-center gap-1.5 active:opacity-70">
+    <Pressable onPress={press} hitSlop={10} accessibilityRole="button" accessibilityLabel={`Kudos (${count})`} accessibilityState={{ selected: active }} className="flex-row items-center gap-1.5 active:opacity-70">
       <View style={{ width: 17, height: 17, alignItems: 'center', justifyContent: 'center' }}>
         {Array.from({ length: PARTICLES }).map((_, i) => {
           const angle = (i / PARTICLES) * Math.PI * 2
@@ -305,11 +305,11 @@ function ChallengeCard({ c, onJoin }: { c: Challenge; onJoin: () => void }) {
       )}
 
       <View className="mt-4 flex-row gap-2">
-        <Pressable onPress={() => nav.open('challengeDetail', { id: c.id })} className="flex-1 items-center rounded-full border border-white/10 bg-white/5 py-2.5 active:opacity-80">
+        <Pressable onPress={() => nav.open('challengeDetail', { id: c.id })} accessibilityRole="button" accessibilityLabel="View challenge details" className="flex-1 items-center rounded-full border border-white/10 bg-white/5 py-2.5 active:opacity-80">
           <Text className="text-sm font-semibold text-white/80">View standings</Text>
         </Pressable>
         {!c.joined && (
-          <Pressable onPress={onJoin} className="btn-primary flex-1 py-2.5 active:opacity-90">
+          <Pressable onPress={onJoin} accessibilityRole="button" accessibilityLabel="Join challenge" className="btn-primary flex-1 py-2.5 active:opacity-90">
             <Text className="text-sm font-semibold text-black">Join</Text>
           </Pressable>
         )}
@@ -330,7 +330,7 @@ function GroupList() {
             <Text className="text-[12px] text-white/45">{g.members} members · {g.desc}</Text>
           </View>
           {g.unread > 0 && g.joined && <Chip color="green">{g.unread} new</Chip>}
-          <Pressable onPress={() => dispatch({ type: 'JOIN_GROUP', id: g.id })} className={`rounded-full px-3.5 py-1.5 active:opacity-80 ${g.joined ? 'bg-ink-700' : 'bg-brand-400'}`}>
+          <Pressable onPress={() => dispatch({ type: 'JOIN_GROUP', id: g.id })} accessibilityRole="button" accessibilityLabel={g.joined ? 'Leave group' : 'Join group'} accessibilityState={{ selected: g.joined }} className={`rounded-full px-3.5 py-1.5 active:opacity-80 ${g.joined ? 'bg-ink-700' : 'bg-brand-400'}`}>
             <Text className={`text-sm font-bold ${g.joined ? 'text-white/70' : 'text-black'}`}>{g.joined ? 'Joined' : 'Join'}</Text>
           </Pressable>
         </View>
@@ -366,7 +366,7 @@ function EventsTab() {
             <Text className="text-[12px] text-white/50">{e.when}</Text>
             <Text className="text-[12px] text-white/40">Hosted by {e.host}</Text>
           </View>
-          <Pressable onPress={() => dispatch({ type: 'RSVP_EVENT', id: e.id })} className={`rounded-full px-3.5 py-1.5 active:opacity-80 ${e.rsvp ? 'bg-brand-400' : 'bg-ink-700'}`}>
+          <Pressable onPress={() => dispatch({ type: 'RSVP_EVENT', id: e.id })} accessibilityRole="button" accessibilityLabel={e.rsvp ? 'Cancel RSVP' : 'RSVP to event'} accessibilityState={{ selected: e.rsvp }} className={`rounded-full px-3.5 py-1.5 active:opacity-80 ${e.rsvp ? 'bg-brand-400' : 'bg-ink-700'}`}>
             <Text className={`text-sm font-bold ${e.rsvp ? 'text-black' : 'text-white/70'}`}>{e.rsvp ? 'Going' : 'RSVP'}</Text>
           </Pressable>
         </View>

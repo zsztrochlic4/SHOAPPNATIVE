@@ -893,13 +893,13 @@ function GoalStepper({ goal, open, colors }: { goal: Extract<Goal, { kind: 'meas
   return (
     <Animated.View style={{ height: grow.interpolate({ inputRange: [0, 1], outputRange: [0, STEPPER_H] }), opacity: grow, overflow: 'hidden' }}>
       <View style={S.stepRow}>
-        <PressableScale onPress={() => bump(-1)} scaleTo={0.9}>
+        <PressableScale onPress={() => bump(-1)} scaleTo={0.9} accessibilityLabel={`Decrease ${goal.label}`}>
           <View style={[S.stepBtn, { backgroundColor: 'rgba(255,255,255,0.06)' }]}>
             <Text style={[S.stepGlyph, { color: colors.fg }]}>−</Text>
           </View>
         </PressableScale>
         <Text style={S.stepValue}>{goal.fmt(goal.value)} / {goal.fmt(goal.target)}</Text>
-        <PressableScale onPress={() => bump(1)} scaleTo={0.9}>
+        <PressableScale onPress={() => bump(1)} scaleTo={0.9} accessibilityLabel={`Increase ${goal.label}`}>
           <View style={[S.stepBtn, { backgroundColor: `${colors.brand400}2e` }]}>
             <Text style={[S.stepGlyph, { color: colors.brand400 }]}>+</Text>
           </View>
