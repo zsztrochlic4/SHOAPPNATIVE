@@ -24,5 +24,5 @@ export {
   respondToCoachProposal,
 } from './coachProfile'
 export { deleteAccount } from './account'
-export { sendNotification } from './notifications'
+export { sendNotification, dedupePushToken } from './notifications'
 export { createCheckoutSession, createBillingPortalSession, stripeWebhook } from './billing'

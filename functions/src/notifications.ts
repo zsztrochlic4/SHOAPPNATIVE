@@ -1,4 +1,5 @@
 import { onCall, HttpsError, type CallableRequest } from 'firebase-functions/v2/https'
+import { onDocumentWritten } from 'firebase-functions/v2/firestore'
 import { getFirestore } from 'firebase-admin/firestore'
 import { randomUUID } from 'node:crypto'
 import { requireOwner, auditAppCheck, APP_CHECK_ENFORCED } from './lib/guards'
@@ -72,6 +73,29 @@ export const sendNotification = onCall<SendNotificationInput>(
         dryRun: d.dryRun === true,
         sendId: typeof d.sendId === 'string' && d.sendId ? d.sendId : randomUUID(),
       },
+    )
+  },
+)
+
+/**
+ * One active owner per device token (audit F-005): when a token doc is written
+ * under users/{uid}/pushTokens/{token}, remove the SAME token from every other
+ * user. The client releases its old registration on sign-out/switch, but that
+ * is best-effort (it cannot delete another account's doc once the session has
+ * changed) — this trigger is the authoritative backstop, so a shared device
+ * can never deliver user A's content while user B is signed in.
+ */
+export const dedupePushToken = onDocumentWritten(
+  'users/{uid}/pushTokens/{token}',
+  async (event) => {
+    if (!event.data?.after.exists) return // deletion — nothing to dedupe
+    const { uid, token } = event.params
+    const db = getFirestore()
+    const dupes = await db.collectionGroup('pushTokens').where('token', '==', token).get()
+    await Promise.all(
+      dupes.docs
+        .filter((d) => d.ref.parent.parent?.id !== uid)
+        .map((d) => d.ref.delete()),
     )
   },
 )
