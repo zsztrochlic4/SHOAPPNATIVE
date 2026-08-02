@@ -13,7 +13,10 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.zaggy887.strengthhub",
-      "buildNumber": "1"
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.zaggy887.strengthhub",
@@ -31,7 +34,13 @@
       "bundler": "metro"
     },
     "plugins": [
-      "expo-image-picker",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "StrengthHub uses the camera so you can photograph a meal and get an instant nutrition estimate.",
+          "photosPermission": "StrengthHub accesses your photos so you can choose a meal picture to get a nutrition estimate."
+        }
+      ],
       "expo-status-bar",
       "expo-video",
       "expo-web-browser",

@@ -1,81 +1,146 @@
-# Publishing StrengthHub to the App Store
+# Publishing StrengthHub to the App Store & Google Play
 
 **Important:** Firebase App Hosting / Firebase Hosting only serve *websites*. They
-**cannot** publish this app to the Apple App Store. You can disconnect the App
-Hosting backend in the Firebase console (or ignore the failed rollouts) — it is
-not part of shipping the mobile app. (Firebase is still useful *later* if you
-want a cloud backend, e.g. to host the AI-coach API or sync user data.)
+**cannot** publish this app to the Apple App Store or Google Play. Shipping the
+mobile app is done via **EAS** (Expo Application Services): EAS Build compiles the
+native binary **in the cloud (no Mac required)**, and EAS Submit uploads it to
+App Store Connect / Google Play.
 
-A React Native / Expo app ships to the App Store via **EAS** (Expo Application
-Services): EAS Build compiles a native iOS binary **in the cloud (no Mac
-required)**, and EAS Submit uploads it to App Store Connect.
+> **What the app actually does (as of 2 Aug 2026):** it is a networked app. It
+> uses **Firebase** (Auth, Firestore, Cloud Functions — Australian region
+> `australia-southeast2`), **Google Gemini** for the AI Coach and meal-photo
+> scan, **Stripe** for the subscription, and the **Expo push service** for
+> notifications. It also caches data locally (AsyncStorage). Any store privacy
+> answers must reflect this — see [DATA_SAFETY.md](DATA_SAFETY.md).
+
+---
+
+## 🚦 Readiness checklist
+
+### Blockers — must resolve before submission
+- [ ] **Payments must use the stores' billing (see "Payments" below).** The
+      current auto-renewing subscription goes through **Stripe Checkout**, which
+      **violates Apple Guideline 3.1.1 and Google Play's Payments policy** for
+      digital content unlocked in-app. This is a product decision and likely a
+      code change (Apple IAP + Google Play Billing, e.g. via RevenueCat), or a
+      qualifying external-purchase entitlement. **Do not submit until resolved.**
+- [ ] **Real app icon** — replace `assets/icon.png` with a **1024×1024 PNG, no
+      transparency** (Apple rejects transparent/placeholder icons). Current icon
+      is the Expo placeholder.
+- [ ] **Public Privacy Policy + Terms URLs** live on strengthhubonline.com
+      (`/privacy`, `/terms`). Apple requires a Privacy Policy URL; for
+      auto-renewing subscriptions it also requires a functional Terms/EULA link.
+      Google Play requires the Privacy Policy URL in the listing + Data Safety.
+      (Website build handed off separately.)
+
+### Should do before submission
+- [ ] **App Privacy / Data Safety** questionnaires filled per
+      [DATA_SAFETY.md](DATA_SAFETY.md) (email, name, DOB, health/fitness, AI Coach
+      messages, meal photos [ephemeral], subscription/purchase, push token; no
+      tracking/ads; Share = No).
+- [ ] **Age rating** — 18+ (health & fitness; general wellbeing guidance).
+- [ ] **Screenshots** for each required device size.
+- [ ] **App Check** — `APP_CHECK_ENFORCED = false` in
+      `functions/src/lib/guards.ts`. Register the native app in Firebase and flip
+      it to `true` once real clients attest, to protect the callable/AI endpoints
+      (see [APP_CHECK.md](APP_CHECK.md)).
+
+### Already handled in the repo
+- [x] iOS camera + photo-library **purpose strings** (`app.json` →
+      `expo-image-picker` plugin config) for the meal scanner.
+- [x] `ITSAppUsesNonExemptEncryption = false` set (standard HTTPS/TLS is exempt) —
+      avoids the per-build export-compliance prompt.
+- [x] `eas.json` build profiles (`development`, `preview`, `production`) + submit.
+- [x] Notification config (`expo-notifications`) and deep-link scheme
+      (`strengthhub://`) for Stripe checkout return.
+
+---
+
+## Payments — App Store & Play Store billing (read first)
+
+The paywall (4-week free trial → **$2.99/week AUD**) currently opens **Stripe
+Checkout** and unlocks in-app features via the `entitlements/{uid}` record. That
+is fine on the **web** build, but for the **iOS and Android apps**:
+
+- **Apple (Guideline 3.1.1):** digital content/subscriptions consumed inside the
+  app **must** use Apple In-App Purchase. Stripe/other external payment for this
+  is rejected (narrow exceptions: "reader" apps, or the External Purchase Link
+  entitlement in some regions).
+- **Google Play:** in-app digital purchases generally **must** use Google Play
+  Billing (with limited regional/user-choice-billing exceptions).
+
+**Options to decide (owner call):**
+1. Add native IAP — Apple IAP + Google Play Billing — typically via **RevenueCat**
+   or `expo-in-app-purchases`, and drive the same entitlement gate. Keep Stripe
+   for the web app only.
+2. Pursue a qualifying external-purchase entitlement (complex, region-limited).
+3. Ship the store app without the paywall (free) and monetise on web only.
+
+Until one of these is in place, the iOS/Android build should **not** go to review
+with the Stripe paywall active, or it will be rejected.
+
+---
 
 ## One-time prerequisites
 
-1. **Expo account** — free, sign up at https://expo.dev.
-2. **Apple Developer Program** — **$99/year**, required to publish to the App
-   Store. Enroll at https://developer.apple.com/programs/.
-3. **EAS CLI** on your computer:
+1. **Expo account** — free, https://expo.dev. (Project is already linked:
+   `extra.eas.projectId` is set in `app.json`, owner `strengthhubonline`.)
+2. **Apple Developer Program** — **$99/year**, https://developer.apple.com/programs/.
+3. **Google Play Developer** — **$25 one-time**, for the Android release.
+4. **EAS CLI**:
    ```bash
    npm install -g eas-cli
    eas login
    ```
-4. A real **app icon**: replace `assets/icon.png` with a **1024×1024 PNG with no
-   transparency** before submitting (Apple rejects transparent/placeholder
-   icons). The current icon is the Expo placeholder.
 
 ## Build & submit
 
 From the project root after `git pull`:
 
 ```bash
-# 1. Link this repo to an Expo project (writes extra.eas.projectId into app.json)
-eas init
-
-# 2. Build the production iOS app in the cloud.
-#    EAS will offer to create & manage your iOS signing credentials for you
-#    using your Apple account — say yes.
+# iOS: build the production binary in the cloud (EAS manages signing credentials)
 eas build --platform ios --profile production
-
-# 3. Upload the finished build to App Store Connect / TestFlight.
 eas submit --platform ios --profile production
+
+# Android:
+eas build --platform android --profile production
+eas submit --platform android --profile production
 ```
 
-Then in **App Store Connect** (https://appstoreconnect.apple.com):
-- The app record is created automatically by `eas submit` (or create it manually
-  with bundle id `com.zaggy887.strengthhub`).
-- Add: app name, description, keywords, support URL, **screenshots** (you can use
-  the ones from the iOS Simulator or a device), age rating, and the **privacy**
-  questionnaire (this app stores data only on-device via AsyncStorage; it makes
-  no network calls unless you enable the AI coach).
-- Submit for review. First review typically takes 24–48h.
+Then in **App Store Connect** (https://appstoreconnect.apple.com) and **Google
+Play Console**:
+- The app record is created by `eas submit` (or create manually — iOS bundle id
+  `com.zaggy887.strengthhub`, Android package `com.zaggy887.strengthhub`).
+- Add: name, description, keywords, support URL, **Privacy Policy URL**,
+  **screenshots**, **age rating**, the **App Privacy / Data Safety** answers
+  (per [DATA_SAFETY.md](DATA_SAFETY.md)), and — once payments use store billing —
+  the subscription products.
+- Submit for review. First review typically 24–48h.
 
 ## Test before you ship (recommended)
 
-- **Simulator build** to click through locally on a Mac:
-  `eas build --platform ios --profile preview` (the `preview` profile builds a
-  simulator binary).
-- **TestFlight**: after `eas submit`, invite testers from App Store Connect to
-  try the real build on their devices before public release.
+- **Simulator build:** `eas build --platform ios --profile preview`.
+- **TestFlight / Play internal testing:** after `eas submit`, invite testers to
+  try the real build before public release.
 
 ## Config already in this repo
 
-- `eas.json` — build profiles (`development`, `preview`, `production`) + submit.
-- `app.json` — `ios.bundleIdentifier` = `com.zaggy887.strengthhub`,
-  `ios.buildNumber`, `android.package`, `version` 1.0.0.
+- `eas.json` — build profiles + submit; `appVersionSource: remote`.
+- `app.json` — `version` 1.0.0, iOS `bundleIdentifier` / `buildNumber`, Android
+  `package` / `versionCode`, camera/photo purpose strings, notification &
+  splash config, EAS `projectId`.
 
 ## Notes / gotchas
 
-- **App icon & splash**: swap the placeholder art for real 1024×1024 assets.
-- **External images**: some demo screens load images from remote URLs. They work,
-  but for a store app prefer bundling your own assets or using rights-cleared
-  images.
-- **Apple review**: make sure the app feels complete (it does — it's fully
-  functional on seeded data). Apps that look like thin demos can be rejected.
-- **Android / Google Play** is the same flow with `--platform android` and a
-  Google Play Developer account ($25 one-time).
-- The **AI coach** is gated off for v1 (`COACH_ENABLED=false`) and, per the
-  Production Readiness plan, must move server-side behind a trusted backend and
-  pass an independent safety holdout before it can be enabled. Until then the app
-  uses its on-device rules engine. (The legacy Claude `/api/coach` endpoint has
-  been retired.)
+- **Bundle id** is `com.zaggy887.strengthhub` (an older handle). Not a blocker,
+  but pick the final id **before first submission** — it cannot be changed after.
+- **AI Coach is LIVE** (`COACH_ENABLED = true`, enabled 2026-08-01 after
+  independent clinical validation). It runs server-side on Cloud Functions via
+  Gemini, with an automated safety layer and a remote kill switch — it is **not**
+  human-reviewed. Reflect it in the privacy answers and, if asked in review,
+  describe the safety controls and crisis routing. See
+  [COACH_RELEASE_STATE.md](COACH_RELEASE_STATE.md).
+- **External images:** some screens load remote demo images. For a store build,
+  prefer bundling rights-cleared assets.
+- **Apple review polish:** the app is fully functional on real + seeded data;
+  make sure nothing reads as a thin demo.
