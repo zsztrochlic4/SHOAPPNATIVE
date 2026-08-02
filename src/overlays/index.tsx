@@ -31,6 +31,11 @@ import { serializeUserExport, splitLocalState, buildExportFilename } from '../li
 import { deliverExport } from '../lib/exportDeliver'
 import { pick, makeRng } from '../lib/rng'
 import { requestPushPermission, resolveNotifPrefs } from '../lib/notifications'
+import { openBillingPortal } from '../lib/billing'
+import { LegalDocModal } from '../components/LegalDocModal'
+import type { LegalDocKey } from '../content/legal'
+import Constants from 'expo-constants'
+import { Linking } from 'react-native'
 import { todayKey, relativeLabel, shortDate, fromKey } from '../lib/date'
 import {
   fmtWeight, fmtWeightNum, toKg, weightUnit, fmtFluid,
@@ -106,18 +111,26 @@ export function GoalsSettings() {
   const units = state.settings.units
   const p = state.profile
 
+  // Water is stored in litres but displayed in the user's units (fl oz on
+  // imperial) — the audit flagged the always-litres label (F-032).
+  const L_TO_OZ = 33.814
+  const waterDisplay = (litres: number) =>
+    units === 'imperial' ? String(Math.round(litres * L_TO_OZ)) : String(Math.round(litres * 10) / 10)
+
   const [goalW, setGoalW] = useState(() => String(Math.round(weightVal(p.goalWeightKg, units) * 10) / 10))
   const [steps, setSteps] = useState(() => String(p.stepTarget))
   const [sleep, setSleep] = useState(() => String(p.sleepTargetH))
-  const [water, setWater] = useState(() => String(p.waterTargetL))
+  const [water, setWater] = useState(() => waterDisplay(p.waterTargetL))
   const [days, setDays] = useState(() => String(p.daysPerWeek))
 
-  // The units toggle sits directly above this, so re-read the weight whenever it
-  // (or the saved goal) changes — otherwise the field would keep showing kg
-  // after a switch to lb and "save" would write the wrong number back.
+  // The units toggle sits directly above this, so re-read unit-bearing values
+  // whenever it (or the saved goal) changes — otherwise the fields would keep
+  // showing the old unit and "save" would write the wrong number back.
   useEffect(() => {
     setGoalW(String(Math.round(weightVal(p.goalWeightKg, units) * 10) / 10))
-  }, [units, p.goalWeightKg])
+    setWater(waterDisplay(p.waterTargetL))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [units, p.goalWeightKg, p.waterTargetL])
 
   function saveGoals() {
     dispatch({
@@ -126,7 +139,7 @@ export function GoalsSettings() {
         goalWeightKg: Math.round(toKg(parseFloat(goalW) || weightVal(p.goalWeightKg, units), units) * 10) / 10,
         stepTarget: Math.max(0, Math.round(Number(steps) || 0)),
         sleepTargetH: Math.max(0, Math.min(14, Number(sleep) || 0)),
-        waterTargetL: Math.max(0, Number(water) || 0),
+        waterTargetL: Math.max(0, units === 'imperial' ? (Number(water) || 0) / L_TO_OZ : Number(water) || 0),
         daysPerWeek: Math.max(1, Math.min(7, Math.round(Number(days) || 1))),
       },
     })
@@ -145,7 +158,7 @@ export function GoalsSettings() {
       <GoalRow label="Sleep" unit="hours">
         <TextInput value={sleep} onChangeText={(v) => setSleep(v.replace(/[^\d.]/g, ''))} keyboardType="decimal-pad" placeholderTextColor="rgba(148,148,148,0.6)" className={inputCls} />
       </GoalRow>
-      <GoalRow label="Water" unit="litres">
+      <GoalRow label="Water" unit={units === 'imperial' ? 'fl oz' : 'litres'}>
         <TextInput value={water} onChangeText={(v) => setWater(v.replace(/[^\d.]/g, ''))} keyboardType="decimal-pad" placeholderTextColor="rgba(148,148,148,0.6)" className={inputCls} />
       </GoalRow>
       <GoalRow label="Workouts / week" unit="days">
@@ -193,7 +206,37 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [langOpen, setLangOpen] = useState(false)
-  useEffect(() => { if (!visible) { setConfirmingClear(false); setConfirmingDelete(false); setLangOpen(false) } }, [visible])
+  const [portalBusy, setPortalBusy] = useState(false)
+  const [legalDoc, setLegalDoc] = useState<LegalDocKey | null>(null)
+  useEffect(() => { if (!visible) { setConfirmingClear(false); setConfirmingDelete(false); setLangOpen(false); setLegalDoc(null) } }, [visible])
+
+  // Subscription state written by the Stripe webhook (server-authoritative,
+  // mirrored by BillingSync). Drives the Settings billing section (audit F-014).
+  const sub = state.subscription
+  const hasSubscription = authEnabled && !!user && !!sub && sub.status !== 'none'
+  const periodEndLabel = sub?.currentPeriodEnd
+    ? new Date(sub.currentPeriodEnd * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+    : null
+  const subStatusLabel =
+    sub?.status === 'trialing' ? 'Free trial'
+    : sub?.status === 'active' ? 'Active'
+    : sub?.status === 'past_due' ? 'Payment issue'
+    : sub?.status === 'canceled' ? 'Cancelled'
+    : sub?.status === 'incomplete' ? 'Incomplete'
+    : 'None'
+
+  async function onManageSubscription() {
+    if (portalBusy) return
+    setPortalBusy(true)
+    try {
+      // Stripe's hosted Billing Portal: plan, payment method, invoices, cancel.
+      await openBillingPortal()
+    } catch {
+      toast('Could not open subscription management. Please try again, or email info@strengthhubonline.com.')
+    } finally {
+      setPortalBusy(false)
+    }
+  }
 
   async function onDeleteAccount() {
     if (!confirmingDelete) { setConfirmingDelete(true); return }
@@ -330,11 +373,60 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
         <Row icon={<BellRing size={18} color={brand[400]} />} title={t('settings.pushNotifs')} sub={t('settings.pushNotifsSub')}>
           <Toggle on={notificationsEnabled} onPress={toggleNotifs} />
         </Row>
+        {notificationConsent === 'denied' && !notificationsEnabled && NATIVE && (
+          // Recovery after an OS-level denial (audit F-021): the in-app toggle
+          // alone can't help — the permission lives in device Settings.
+          <Pressable
+            onPress={() => void Linking.openSettings()}
+            accessibilityRole="button"
+            accessibilityLabel="Open device settings to allow notifications"
+            className="w-full flex-row items-center gap-3 rounded-2xl border border-amber-400/20 bg-amber-400/[0.06] p-4 active:opacity-90"
+          >
+            <View className="flex-1">
+              <Text className="font-bold text-amber-200">Notifications are blocked by your device</Text>
+              <Text className="mt-0.5 text-[12px] leading-4 text-white/50">Allow them in device Settings, then turn the switch on here.</Text>
+            </View>
+            <Text className="text-[12.5px] font-extrabold text-amber-300">Open Settings</Text>
+          </Pressable>
+        )}
         {notificationsEnabled && <NotificationPrefsPanel t={t} />}
         <Row icon={<Volume2 size={18} color={brand[400]} />} title={t('settings.sound')} sub={t('settings.soundSub')}>
           <Toggle on={soundEnabled} onPress={toggleSound} />
         </Row>
       </Group>
+
+      {hasSubscription && (
+        <Group label="Subscription">
+          <View className="rounded-2xl border border-white/5 bg-ink-800 p-4">
+            <View className="flex-row items-center justify-between">
+              <View className="min-w-0 flex-1">
+                <Text className="font-bold text-white">StrengthHub membership</Text>
+                <Text className="mt-0.5 text-[12px] text-white/50">
+                  {subStatusLabel}
+                  {sub?.status === 'trialing' && sub.trialEnd ? ` · trial ends ${new Date(sub.trialEnd * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : ''}
+                  {sub?.status === 'active' && periodEndLabel ? ` · renews ${periodEndLabel}` : ''}
+                  {sub?.status === 'canceled' && periodEndLabel ? ` · access until ${periodEndLabel}` : ''}
+                </Text>
+              </View>
+              <View className={`rounded-full px-2.5 py-1 ${sub?.status === 'past_due' ? 'bg-amber-400/15' : 'bg-brand-400/15'}`}>
+                <Text className={`text-[11px] font-bold ${sub?.status === 'past_due' ? 'text-amber-300' : 'text-brand-300'}`}>{subStatusLabel}</Text>
+              </View>
+            </View>
+            <Pressable
+              onPress={onManageSubscription}
+              disabled={portalBusy}
+              accessibilityRole="button"
+              accessibilityLabel="Manage or cancel your subscription"
+              className={`btn-primary mt-3.5 w-full items-center py-2.5 active:opacity-90 ${portalBusy ? 'opacity-60' : ''}`}
+            >
+              <Text className="text-sm font-semibold text-black">{portalBusy ? 'Opening…' : 'Manage or cancel subscription'}</Text>
+            </Pressable>
+            <Text className="mt-2 text-[11px] leading-4 text-white/35">
+              Opens Stripe's secure portal: change payment method, view invoices, or cancel any time. Cancelling keeps access until the period ends.
+            </Text>
+          </View>
+        </Group>
+      )}
 
       <Group label={t('settings.data')}>
         <Pressable onPress={() => { dispatch({ type: 'RESET_DEMO' }); toast('Demo data restored'); onDone?.() }} className="w-full flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-4 active:opacity-90">
@@ -389,10 +481,54 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
         )}
       </Group>
 
+      <Group label="Legal & support">
+        {([
+          { key: 'terms' as LegalDocKey, title: 'Terms of Service' },
+          { key: 'privacy' as LegalDocKey, title: 'Privacy Policy' },
+          { key: 'health-safety' as LegalDocKey, title: 'Health & Safety Notice' },
+        ]).map((docItem) => (
+          <Pressable
+            key={docItem.key}
+            onPress={() => setLegalDoc(docItem.key)}
+            accessibilityRole="button"
+            accessibilityLabel={`Open ${docItem.title}`}
+            className="w-full flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-4 active:opacity-90"
+          >
+            <Text className="flex-1 font-bold text-white">{docItem.title}</Text>
+            <ChevronRight size={16} color="rgba(255,255,255,0.35)" />
+          </Pressable>
+        ))}
+        <Pressable
+          onPress={() => void Linking.openURL('mailto:info@strengthhubonline.com')}
+          accessibilityRole="link"
+          accessibilityLabel="Email support at info@strengthhubonline.com"
+          className="w-full flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-4 active:opacity-90"
+        >
+          <View className="flex-1">
+            <Text className="font-bold text-white">Contact support</Text>
+            <Text className="text-[12px] text-white/45">info@strengthhubonline.com — billing, data, safety or anything else</Text>
+          </View>
+          <ChevronRight size={16} color="rgba(255,255,255,0.35)" />
+        </Pressable>
+      </Group>
+
       <View className="mt-7 items-center gap-2">
         <LogoMark size={34} />
-        <Text className="text-[12px] text-white/30">StrengthHub Online · v1.0</Text>
+        {/* Real runtime version/build (audit F-033) — what support needs to identify a build. */}
+        <Text className="text-[12px] text-white/30">
+          StrengthHub Online · v{Constants.expoConfig?.version ?? '1.0.0'}
+          {(() => {
+            const build = Platform.OS === 'ios'
+              ? Constants.expoConfig?.ios?.buildNumber
+              : Platform.OS === 'android'
+                ? Constants.expoConfig?.android?.versionCode
+                : null
+            return build ? ` (${build})` : ''
+          })()}
+        </Text>
       </View>
+
+      <LegalDocModal docKey={legalDoc} onClose={() => setLegalDoc(null)} />
     </>
   )
 }
@@ -505,17 +641,22 @@ export function MenuDrawer({ open, onClose }: { open: boolean; onClose: () => vo
         </View>
 
         <ScrollView className="flex-1 px-4" style={IS_WEB ? { minHeight: 0 } : undefined} contentContainerStyle={{ paddingBottom: insets.bottom + 32 }} showsVerticalScrollIndicator={false}>
-          <View className="flex-row items-center gap-4 pt-1">
-            <Avatar name={`${p.name} M`} size={64} />
+          <Pressable
+            onPress={() => nav.openInMenu('profile')}
+            accessibilityRole="button"
+            accessibilityLabel={`Open profile for ${p.name}`}
+            className="flex-row items-center gap-4 pt-1 active:opacity-80"
+          >
+            <Avatar name={p.name} size={64} />
             <View className="min-w-0 flex-1">
-              <Text numberOfLines={1} className="text-xl font-extrabold text-white">{p.name} Morgan</Text>
+              <Text numberOfLines={1} className="text-xl font-extrabold text-white">{p.name}</Text>
               <Text numberOfLines={1} className="mt-0.5 text-[13px] text-white/50">{p.university} · Age {p.age}</Text>
               <View className="mt-2 flex-row flex-wrap items-center gap-2">
                 <View className="rounded-full bg-brand-400/15 px-2.5 py-1"><Text className="text-[11px] font-bold text-brand-400">{goalLabel[p.goal]}</Text></View>
                 <Text className="text-[12px] text-white/40">Member since {joined}</Text>
               </View>
             </View>
-          </View>
+          </Pressable>
 
           {/* Quick display toggles up top for fast access. */}
           <View className="mt-6">
@@ -602,9 +743,9 @@ export function ProfileSheet({ open, onClose }: Props) {
   return (
     <Sheet open={open} onClose={onClose} title="Profile">
       <View className="flex-row items-center gap-4">
-        <Avatar name={`${state.profile.name} M`} size={64} />
+        <Avatar name={state.profile.name} size={64} />
         <View>
-          <Text className="text-xl font-extrabold text-white">{state.profile.name} Morgan</Text>
+          <Text className="text-xl font-extrabold text-white">{state.profile.name}</Text>
           <Text className="text-[13px] text-white/50">{state.profile.age} · {state.profile.university}</Text>
           <View className="mt-1 flex-row">
             <Chip color="green">{goalLabel[state.profile.goal]}</Chip>

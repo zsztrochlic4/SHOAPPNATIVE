@@ -10,7 +10,30 @@
  * byte-identical and diffable.
  */
 
-export const EXPORT_VERSION = 1
+export const EXPORT_VERSION = 2
+
+/**
+ * Explicit export scope (audit F-040): what "Download my data" does and does
+ * not contain, embedded in every export so the user can tell without asking.
+ * Keep in step with functions/src/account.ts (the deletion registry) and
+ * docs/PRIVACY.md.
+ */
+export const EXPORT_SCOPE = {
+  included: [
+    'Profile, settings and goals (users/{uid} root document)',
+    'Workout sessions, set logs, programs, workout instances, progression state',
+    'Weights, habits, meals, activities, food reviews, workout summaries',
+    'Chat and coach-thread transcripts, notifications, push token records',
+    'Coach workspace: consent/preferences, memories, conversation summaries, insights, proposals, actions, turns',
+    'Subscription entitlement record (status, period end — no payment details)',
+  ],
+  excluded: [
+    'Operational coach safety state (restricted; not client-readable by design)',
+    'Server rate-limit counters (auto-expire within days; no content)',
+    'Anonymised deletion audit records (retained for legal accountability)',
+    'Card/payment details (held by Stripe, never by StrengthHub)',
+  ],
+} as const
 
 export interface UserExport {
   /** Profile / settings scalars (the root user document, minus the log arrays). */
@@ -100,6 +123,7 @@ export function serializeUserExport(input: UserExport, now: Date = new Date()): 
       exportedAt: now.toISOString(),
       source: input.source ?? 'local',
       counts,
+      scope: EXPORT_SCOPE,
     },
     profile: normalizeForExport(input.profile ?? {}),
     collections: normalizeForExport(collections),

@@ -175,6 +175,15 @@ export async function collectUserExport(
       if (snap.size) collections[sub] = snap.docs.map((d) => d.data())
     }),
   )
+  // The subscription entitlement record is user-linked data too (audit F-040):
+  // status + period end, written by the Stripe webhook. No payment details
+  // exist here — those never leave Stripe.
+  try {
+    const entSnap = await getDoc(doc(db, 'entitlements', uid))
+    if (entSnap.exists()) profile.entitlement = entSnap.data()
+  } catch {
+    /* rules may deny in some configs — the export manifest documents scope */
+  }
   // Server-owned coach data lives outside users/{uid}; include every ordinary,
   // user-visible coach record in the user's explicit export. Restricted
   // operational safety state is intentionally excluded from this client read.

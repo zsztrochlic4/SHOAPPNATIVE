@@ -117,6 +117,7 @@ export type Action =
   | { type: 'COMPLETE_LESSON'; id: string }
   | { type: 'GIVE_KUDOS'; postId: string }
   | { type: 'CONNECT_PARTNER'; id: string }
+  | { type: 'CLEAR_COACH_CHAT' }
   | { type: 'RESET_DEMO' }
   | { type: 'RESET_EMPTY' }
 
@@ -636,6 +637,13 @@ function reducer(state: AppState, action: Action): AppState {
       const partners = state.partners.map((p) => (p.id === action.id ? { ...p, connected: !p.connected } : p))
       return { ...state, partners }
     }
+
+    // "Turn off coach & delete coach data" (audit F-015): the local transcript
+    // copies go with the server records. The diff-save then issues deletes for
+    // any chat/coachThread docs the cloud baseline still lists (harmless
+    // no-ops for docs the server purge already removed).
+    case 'CLEAR_COACH_CHAT':
+      return { ...state, chat: [], coachThread: [] }
 
     case 'RESET_DEMO':
       return buildSeed()

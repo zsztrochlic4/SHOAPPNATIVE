@@ -51,7 +51,7 @@ you across apps and websites owned by other companies?" → **No.**
 | Contact Info → **Name** | Yes | App Functionality | Optional display name |
 | Health & Fitness → **Fitness** | Yes | App Functionality | Workouts, activity, streaks; on-device Apple Health reads (steps/sleep/workouts) once the native build ships |
 | Health & Fitness → **Health** | Yes | App Functionality | Weight/body metrics, screening answers, nutrition you log |
-| User Content → **Other User Content** | Yes | App Functionality | AI Coach messages & saved coach memories (free text you type) |
+| User Content → **Other User Content** | **Only when the AI Coach is enabled (currently OFF)** | App Functionality | AI Coach messages & saved coach memories. Do **not** declare while `COACH_ENABLED = false`. |
 | User Content → **Photos or Videos** | Yes | App Functionality | Meal photos. **Linked to user = No** (analysed transiently, not stored). See ⚠️ below |
 | Purchases → **Purchase History** | Yes | App Functionality (+ Account) | Subscription plan / status / trial & renewal dates (via Stripe). We never receive the full card number. |
 | Identifiers → **Device ID** | Yes | App Functionality | Push-notification token |
@@ -95,7 +95,7 @@ App functionality / Account management* unless noted):
 | Personal info → **Date of birth** | Required | 18+ age-gating |
 | Health and fitness → **Health info** | Optional | Weight, screening answers, nutrition logs |
 | Health and fitness → **Fitness info** | Optional | Workouts, activity; on-device Health Connect reads (steps/sleep/workouts) once the native build ships |
-| Messages → **Other in-app messages** | Optional | AI Coach conversations & saved coach memories |
+| Messages → **Other in-app messages** | **Only when the AI Coach is enabled (currently OFF)** | AI Coach conversations & saved coach memories — do **not** declare while `COACH_ENABLED = false` |
 | Photos and videos → **Photos** | Optional | Meal photos — mark **"processed ephemerally"** if offered (not stored). See ⚠️ below |
 | Financial info → **Purchase history** | Optional | Subscription plan / status (via Stripe). Card details handled by Stripe; we never receive them. |
 | Device or other IDs → **Device or other IDs** | — | Push-notification token, for notifications |
@@ -121,11 +121,14 @@ info → Payment info** is not collected by us.)
    defensible position — if a lawyer prefers a more conservative declaration,
    follow their advice.
 
-2. **AI Coach messages.** The Coach is live and its conversations, plus any saved
-   coach memories, are stored per-user (you can pause memory, delete individual
-   memories, clear them, or delete the whole coach workspace). Declare as
+2. **AI Coach messages.** The AI Coach is **currently DISABLED** (`COACH_ENABLED =
+   false`; see [COACH_RELEASE_STATE.md](COACH_RELEASE_STATE.md)) — the server turn
+   refuses and the UI shows a "coming soon" surface, so **no coach messages are
+   collected today**. Do **not** declare coach data while it is off. When the Coach
+   is enabled, its conversations and saved memories are stored per-user
+   (pause/delete/clear/delete-workspace controls apply); at that point declare as
    *User Content* (Apple) / *Other in-app messages* (Google). Coach text may
-   contain health free-text, which is also covered by the Health declaration.
+   contain health free-text, also covered by the Health declaration.
 
 3. **Subscriptions.** Stripe processes checkout and card details; we store
    subscription **status/plan/dates** (not the card number). Declare *Purchases /

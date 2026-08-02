@@ -4,6 +4,7 @@ export type Overlay =
   | 'notifications'
   | 'settings'
   | 'addFood'
+  | 'profile'
   | 'activeWorkout'
   | 'createSession'
   | 'customize'

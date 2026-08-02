@@ -36,6 +36,7 @@ import Onboarding from './screens/Onboarding'
 import ActiveWorkout from './screens/ActiveWorkout'
 import {
   AddFoodSheet,
+  ProfileSheet,
   NotificationsSheet,
   SettingsSheet,
   MenuDrawer,
@@ -229,6 +230,7 @@ function Shell() {
       case 'notifications': return <NotificationsSheet open onClose={nav.close} />
       case 'settings': return <SettingsSheet open onClose={nav.close} />
       case 'addFood': return <AddFoodSheet open onClose={nav.close} params={params} />
+      case 'profile': return <ProfileSheet open onClose={nav.close} />
       case 'logWeight': return <LogWeightSheet open onClose={nav.close} />
       case 'logHabit': return <LogHabitSheet open onClose={nav.close} params={params} />
       case 'createPost': return <CreatePostSheet open onClose={nav.close} />

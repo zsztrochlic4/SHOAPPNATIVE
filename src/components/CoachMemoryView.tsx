@@ -14,6 +14,7 @@ import {
   updateCoachPreferences,
 } from '../lib/coachWorkspace'
 import { thud } from '../lib/haptics'
+import { useDispatch } from '../store/store'
 import { useColors } from '../theme'
 
 type Props = { onClose: () => void; onConsentChanged?: (consented: boolean) => void }
@@ -74,6 +75,7 @@ function MemorySkeleton() {
 export function CoachMemoryView({ onClose, onConsentChanged }: Props) {
   const colors = useColors()
   const net = useNetInfo()
+  const dispatch = useDispatch()
   const [workspace, setWorkspace] = useState<CoachWorkspaceSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -166,14 +168,19 @@ export function CoachMemoryView({ onClose, onConsentChanged }: Props) {
     if (!confirmDisable) { setConfirmDisable(true); return }
     setSaving(true)
     try {
+      // Server deletes the coach workspace, safety state AND the synced chat
+      // transcripts; mirror that locally (transcript copies in AppState + the
+      // uid-scoped workspace cache) so "delete coach data" is literally true
+      // everywhere the data lived (audit F-015 / J-11).
       const next = await revokeCoachConsent()
+      dispatch({ type: 'CLEAR_COACH_CHAT' })
       thud()
       setWorkspace(next)
       setConfirmDisable(false)
       onConsentChanged?.(false)
     } catch { setError(true) }
     finally { setSaving(false) }
-  }, [confirmDisable, onConsentChanged, saving])
+  }, [confirmDisable, dispatch, onConsentChanged, saving])
 
   const header = useMemo(() => (
     <View>
@@ -218,9 +225,13 @@ export function CoachMemoryView({ onClose, onConsentChanged }: Props) {
           </Pressable>
         )}
       </View>
-      <Pressable disabled={saving || net.isConnected === false} onPress={() => void disableCoach()} style={({ pressed }) => ({ opacity: saving || net.isConnected === false ? 0.4 : pressed ? 0.6 : 1 })} className="mx-[18px] mb-4 min-h-11 items-center justify-center rounded-xl border border-danger/20 bg-danger/[0.06] px-4">
+      <Pressable disabled={saving || net.isConnected === false} onPress={() => void disableCoach()} accessibilityRole="button" accessibilityLabel="Turn off coach and delete all coach data" style={({ pressed }) => ({ opacity: saving || net.isConnected === false ? 0.4 : pressed ? 0.6 : 1 })} className="mx-[18px] mb-2 min-h-11 items-center justify-center rounded-xl border border-danger/20 bg-danger/[0.06] px-4 py-2.5">
         <Text className="text-[12px] font-bold text-danger">{confirmDisable ? 'Tap again to turn off coach and delete its data' : 'Turn off coach & delete coach data'}</Text>
       </Pressable>
+      {/* Exact deletion scope — no vague claims (audit F-015). */}
+      <Text className="mx-[18px] mb-4 text-[10.5px] leading-4 text-white/35">
+        Deletes: consent, memories, coach safety state, and your coach conversation (cloud + this device). Kept: anonymised deletion audit and, until your subscription data is deleted with your account, billing records.
+      </Text>
     </View>
   ), [changeMemory, changeProactive, changeStyle, clearAll, colors, confirmClear, confirmDisable, disableCoach, net.isConnected, saving, workspace])
 
