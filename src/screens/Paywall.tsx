@@ -281,7 +281,10 @@ export function Paywall({ email, onBack }: { email?: string; onBack?: () => void
             badge={<Badge bg={tok.rgb('--brand-400')}><LockIcon color="#08140a" /></Badge>}
             eyebrow="Today"
             title="Full access, free"
-            body="Program, AI coach and nutrition — all unlocked."
+            // Honest scope (audit F-003 trust follow-through): the AI coach is
+            // gated off pending clinical validation, so the paywall must not
+            // sell it as live today.
+            body="Your program, nutrition and every feature — all unlocked. AI coach joins as soon as it clears final review."
           />
           <TimelineRow
             tok={tok}
@@ -346,11 +349,11 @@ export function Paywall({ email, onBack }: { email?: string; onBack?: () => void
 
         {/* links */}
         <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 16 }}>
-          <Pressable onPress={() => openDoc('terms')} hitSlop={6}><Text style={{ fontSize: 12.5, color: tok.rgb('--fg', 0.4) }}>Terms</Text></Pressable>
+          <Pressable onPress={() => openDoc('terms')} hitSlop={10} accessibilityRole="link" accessibilityLabel="Terms of Service"><Text style={{ fontSize: 12.5, color: tok.rgb('--fg', 0.4) }}>Terms</Text></Pressable>
           <Text style={{ fontSize: 12.5, color: tok.rgb('--fg', 0.28) }}>{'  ·  '}</Text>
-          <Pressable onPress={() => openDoc('privacy')} hitSlop={6}><Text style={{ fontSize: 12.5, color: tok.rgb('--fg', 0.4) }}>Privacy</Text></Pressable>
+          <Pressable onPress={() => openDoc('privacy')} hitSlop={10} accessibilityRole="link" accessibilityLabel="Privacy Policy"><Text style={{ fontSize: 12.5, color: tok.rgb('--fg', 0.4) }}>Privacy</Text></Pressable>
           <Text style={{ fontSize: 12.5, color: tok.rgb('--fg', 0.28) }}>{'  ·  '}</Text>
-          <Pressable onPress={restore} hitSlop={6}><Text style={{ fontSize: 12.5, color: tok.rgb('--fg', 0.4) }}>Restore</Text></Pressable>
+          <Pressable onPress={restore} hitSlop={10} accessibilityRole="button" accessibilityLabel="Restore an existing subscription"><Text style={{ fontSize: 12.5, color: tok.rgb('--fg', 0.4) }}>Restore</Text></Pressable>
         </View>
       </ScrollView>
       <LegalDocModal docKey={legalDoc} onClose={() => setLegalDoc(null)} />
