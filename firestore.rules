@@ -243,6 +243,56 @@ service cloud.firestore {
     }
 
     // ----------------------------------------------------------------- //
+    //  Per-user AI coach workspace — trusted-server writes only           //
+    // ----------------------------------------------------------------- //
+    // Users may inspect/export their own ordinary coach records. All writes
+    // go through authenticated Cloud Functions so a modified client cannot
+    // forge memories, proposals, audit history, consent or coach replies.
+    match /coachUsers/{uid} {
+      function isCoachOwner() {
+        return request.auth != null && request.auth.uid == uid;
+      }
+      allow get: if isCoachOwner();
+      allow list, write: if false;
+
+      match /memories/{id} {
+        allow get, list: if isCoachOwner();
+        allow write: if false;
+      }
+      match /conversationSummaries/{id} {
+        allow get, list: if isCoachOwner();
+        allow write: if false;
+      }
+      match /insights/{id} {
+        allow get, list: if isCoachOwner();
+        allow write: if false;
+      }
+      match /proposals/{id} {
+        allow get, list: if isCoachOwner();
+        allow write: if false;
+      }
+      match /actions/{id} {
+        allow get, list: if isCoachOwner();
+        allow write: if false;
+      }
+      match /proactiveState/{id} {
+        allow get, list: if isCoachOwner();
+        allow write: if false;
+      }
+      match /turns/{id} {
+        allow get, list: if isCoachOwner();
+        allow write: if false;
+      }
+    }
+
+    // Operational safety state is intentionally separate from ordinary coach
+    // memory. It is not client-readable or client-writable; only Admin SDK code
+    // may access it, and account deletion removes it.
+    match /coachSafety/{uid} {
+      allow read, write: if false;
+    }
+
+    // ----------------------------------------------------------------- //
     //  Global coach runtime config — exact path only (plan §4.6)         //
     // ----------------------------------------------------------------- //
     // Only config/coach exists (kill switch, message limits, guardrail prompt).

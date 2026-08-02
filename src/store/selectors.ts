@@ -8,6 +8,18 @@ import {
   volumeByWeekFromPoints,
 } from './workoutSummary'
 
+/**
+ * DEV-ONLY paywall preview. Set `EXPO_PUBLIC_PAYWALL_PREVIEW=1` in a local .env
+ * to force the entitlement gate closed so the Paywall renders even in demo mode
+ * (where Firebase is off and everyone is normally auto-entitled). Guarded two
+ * ways so it can NEVER ship: `__DEV__` (constant-folded out of release bundles)
+ * AND the opt-in flag (off by default). Purely a UI preview — the checkout
+ * button still has no backend in demo, so it just surfaces its "not configured"
+ * error, which is expected. To exit the preview, unset the flag.
+ */
+const PAYWALL_PREVIEW =
+  typeof __DEV__ !== 'undefined' && __DEV__ && process.env.EXPO_PUBLIC_PAYWALL_PREVIEW === '1'
+
 export function todayHabit(s: AppState): HabitDay {
   return habitForDay(s, todayKey)
 }
@@ -24,6 +36,7 @@ export function todayHabit(s: AppState): HabitDay {
  *   fallback so a returning user isn't briefly gated before the snapshot lands.
  */
 export function isEntitled(s: AppState, firebaseEnabled: boolean): boolean {
+  if (PAYWALL_PREVIEW) return false // dev-only: always show the paywall (see flag above)
   if (!firebaseEnabled) return true
   const status = s.subscription?.status
   if (status === 'trialing' || status === 'active') return true

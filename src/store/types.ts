@@ -1,5 +1,6 @@
 import type { Language } from '../lib/i18n'
 import type { ContactButton } from '../backend/coach/safety'
+import type { CoachActionProposal, CoachAnswerMode, CoachCitation, CoachMemory } from '../backend/coach/contracts'
 import type { UserDoc, WorkoutInstanceDoc } from '../backend/schema'
 import type { StoredProgram, ProgramStatus } from '../backend/runtime/activate'
 
@@ -123,6 +124,10 @@ export interface ChatMessage {
   buttons?: ContactButton[]
   /** The message this one is a reply to (quoted above the bubble). */
   replyTo?: { role: 'user' | 'coach'; text: string }
+  mode?: CoachAnswerMode | 'safety'
+  citations?: CoachCitation[]
+  learnedMemory?: CoachMemory
+  proposal?: CoachActionProposal
 }
 
 /** Per-category local-notification preferences (see lib/notifications). */

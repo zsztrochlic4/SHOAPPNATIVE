@@ -1,6 +1,7 @@
 import { httpsCallable } from 'firebase/functions'
 import { functions, firebaseEnabled } from './firebase'
 import type { ContactButton } from '../backend/coach/safety/types'
+import type { CoachActionProposal, CoachAnswerMode, CoachCitation, CoachMemory } from '../backend/coach/contracts'
 
 /**
  * Calls the TRUSTED backend coach (`coachMessage`). The crisis/red-flag precheck,
@@ -29,6 +30,10 @@ export interface CoachServerResult {
   text: string
   blocked: boolean
   buttons: ContactButton[]
+  mode: CoachAnswerMode | 'safety'
+  citations: CoachCitation[]
+  memory: CoachMemory | null
+  proposal: CoachActionProposal | null
 }
 
 export async function askCoachServer(input: CoachServerInput): Promise<CoachServerResult> {

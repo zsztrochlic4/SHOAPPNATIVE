@@ -7,6 +7,7 @@ import { migrateAppState } from './migrate'
 import { coachReply } from '../lib/coachChat'
 import { coachContext, coachOperational, coachPrecheck, guardOutgoing, sharedCoachSession } from '../lib/coachSafety'
 import type { ContactButton } from '../backend/coach/safety'
+import type { CoachActionProposal, CoachAnswerMode, CoachCitation, CoachMemory } from '../backend/coach/contracts'
 import type {
   AppNotification,
   AppState,
@@ -73,7 +74,7 @@ export type Action =
   | { type: 'SAVE_TEMPLATE'; template: WorkoutTemplate }
   | { type: 'REMOVE_TEMPLATE'; id: string }
   | { type: 'SEND_CHAT'; text: string }
-  | { type: 'PUSH_CHAT'; role: 'user' | 'coach'; text: string; buttons?: ContactButton[]; replyTo?: { role: 'user' | 'coach'; text: string } }
+  | { type: 'PUSH_CHAT'; role: 'user' | 'coach'; text: string; buttons?: ContactButton[]; replyTo?: { role: 'user' | 'coach'; text: string }; mode?: CoachAnswerMode | 'safety'; citations?: CoachCitation[]; learnedMemory?: CoachMemory; proposal?: CoachActionProposal }
   | { type: 'BUMP_COACH_USAGE' }
   | { type: 'SET_INTEGRATION'; id: string; patch: Partial<IntegrationState> }
   | {
@@ -392,6 +393,10 @@ function reducer(state: AppState, action: Action): AppState {
         read: action.role === 'user',
         buttons: action.buttons,
         replyTo: action.replyTo,
+        mode: action.mode,
+        citations: action.citations,
+        learnedMemory: action.learnedMemory,
+        proposal: action.proposal,
       }
       return { ...state, chat: [...state.chat, msg] }
     }

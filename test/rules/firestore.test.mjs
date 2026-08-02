@@ -142,6 +142,30 @@ test('unauthenticated is denied on the user tree', async () => {
   await assertFails(setDoc(doc(db, 'users', ALICE), rootDoc()))
 })
 
+/* -------------------------- coach workspace -------------------------- */
+
+test('coach workspace is owner-readable but server-write-only', async () => {
+  await seed(async (db) => {
+    await setDoc(doc(db, 'coachUsers', ALICE), { schemaVersion: 1, consentVersion: 1, memoryEnabled: true })
+    await setDoc(doc(db, 'coachUsers', ALICE, 'memories', 'm1'), { value: 'Prefers morning training' })
+  })
+  await assertSucceeds(getDoc(doc(aliceDb(), 'coachUsers', ALICE)))
+  await assertSucceeds(getDoc(doc(aliceDb(), 'coachUsers', ALICE, 'memories', 'm1')))
+  await assertSucceeds(getDocs(collection(aliceDb(), 'coachUsers', ALICE, 'memories')))
+  await assertFails(getDoc(doc(bobDb(), 'coachUsers', ALICE)))
+  await assertFails(getDocs(collection(bobDb(), 'coachUsers', ALICE, 'memories')))
+  await assertFails(setDoc(doc(aliceDb(), 'coachUsers', ALICE), { memoryEnabled: false }))
+  await assertFails(setDoc(doc(aliceDb(), 'coachUsers', ALICE, 'memories', 'm2'), { value: 'tampered' }))
+  await assertFails(deleteDoc(doc(aliceDb(), 'coachUsers', ALICE, 'memories', 'm1')))
+})
+
+test('coach safety state is inaccessible to all clients', async () => {
+  await seed((db) => setDoc(doc(db, 'coachSafety', ALICE), { activeStates: ['injury'] }))
+  await assertFails(getDoc(doc(aliceDb(), 'coachSafety', ALICE)))
+  await assertFails(getDoc(doc(bobDb(), 'coachSafety', ALICE)))
+  await assertFails(setDoc(doc(aliceDb(), 'coachSafety', ALICE), { activeStates: [] }))
+})
+
 /* ------------------------------ entitlement --------------------------- */
 
 test('cannot create root doc with premium true; false allowed', async () => {

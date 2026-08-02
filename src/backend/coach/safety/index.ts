@@ -140,8 +140,9 @@ export function coachEligibility(ctx: CoachContext): { eligible: boolean; respon
   try {
     const age = ageEligibility(ctx)
     if (age.band === 'under_18') return { eligible: false, response: localizedResponse('under_18', ctx.isAustralia) }
+    if (age.band === 'unverified' || age.blocked) return { eligible: false, response: localizedResponse('age_unverified', ctx.isAustralia) }
     return { eligible: true }
   } catch {
-    return { eligible: true } // engine failure must not itself block a legitimate adult; router still guards content
+    return { eligible: false, response: localizedResponse('age_unverified', ctx.isAustralia) }
   }
 }

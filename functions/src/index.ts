@@ -14,6 +14,15 @@ setGlobalOptions({ region: 'australia-southeast2', maxInstances: 10 })
 export { ping } from './ping'
 export { analyzeMeal } from './meal'
 export { coachMessage } from './coach'
+export {
+  getCoachWorkspace,
+  grantCoachConsent,
+  revokeCoachConsent,
+  updateCoachPreferences,
+  deleteCoachMemory,
+  clearCoachMemories,
+  respondToCoachProposal,
+} from './coachProfile'
 export { deleteAccount } from './account'
 export { sendNotification } from './notifications'
 export { createCheckoutSession, createBillingPortalSession, stripeWebhook } from './billing'
