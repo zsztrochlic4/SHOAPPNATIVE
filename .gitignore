@@ -66,3 +66,6 @@ migration-backups/
 # exercise media drop folder — files live in Cloud Storage, not git
 data/exercise-media/*
 !data/exercise-media/README.md
+/playwright-report/
+/test-results/
+/.playwright/

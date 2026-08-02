@@ -876,7 +876,7 @@ export function AddFoodSheet({ open, onClose, params }: Props) {
     <Sheet open={open} onClose={onClose} title="Add food">
       <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-1 mb-3" contentContainerStyle={{ gap: 8, paddingHorizontal: 4 }}>
         {(['Breakfast', 'Lunch', 'Snack', 'Dinner'] as MealName[]).map((m) => (
-          <Pressable key={m} onPress={() => setMeal(m)} className={`shrink-0 rounded-full px-4 py-1.5 active:opacity-90 ${meal === m ? 'bg-brand-400' : 'bg-ink-700'}`}>
+          <Pressable key={m} onPress={() => setMeal(m)} accessibilityRole="button" accessibilityLabel={m} accessibilityState={{ selected: meal === m }} className={`shrink-0 rounded-full px-4 py-1.5 active:opacity-90 ${meal === m ? 'bg-brand-400' : 'bg-ink-700'}`}>
             <Text className={`text-sm font-semibold ${meal === m ? 'text-black' : 'text-white/60'}`}>{m}</Text>
           </Pressable>
         ))}
@@ -893,13 +893,13 @@ export function AddFoodSheet({ open, onClose, params }: Props) {
             className="flex-1 bg-transparent py-3 text-sm text-white"
           />
         </View>
-        <Pressable onPress={scan} className="h-[46px] w-[46px] items-center justify-center rounded-xl bg-brand-400 active:opacity-90">
+        <Pressable onPress={scan} accessibilityRole="button" accessibilityLabel="Scan a barcode" className="h-[46px] w-[46px] items-center justify-center rounded-xl bg-brand-400 active:opacity-90">
           <ScanLine size={20} color="#000" />
         </Pressable>
       </View>
 
       <View className="mb-3 flex-row">
-        <Pressable onPress={() => setBudgetOnly((b) => !b)} className={`flex-row items-center gap-1.5 rounded-full px-3 py-1.5 active:opacity-90 ${budgetOnly ? 'bg-brand-400/20' : 'bg-ink-700'}`}>
+        <Pressable onPress={() => setBudgetOnly((b) => !b)} accessibilityRole="button" accessibilityLabel="Budget meals filter" accessibilityState={{ selected: budgetOnly }} className={`flex-row items-center gap-1.5 rounded-full px-3 py-1.5 active:opacity-90 ${budgetOnly ? 'bg-brand-400/20' : 'bg-ink-700'}`}>
           <Wallet size={13} color={budgetOnly ? brand[400] : 'rgba(255,255,255,0.55)'} />
           <Text className={`text-xs font-semibold ${budgetOnly ? 'text-brand-400' : 'text-white/55'}`}>Budget meals {budgetOnly ? 'on' : 'off'}</Text>
         </Pressable>
@@ -925,7 +925,7 @@ export function AddFoodSheet({ open, onClose, params }: Props) {
 function FoodRow({ id, onAdd }: { id: string; onAdd: (id: string) => void }) {
   const f = FOODS.find((x) => x.id === id)!
   return (
-    <Pressable onPress={() => onAdd(id)} className="w-full flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-3 active:opacity-90">
+    <Pressable onPress={() => onAdd(id)} accessibilityRole="button" accessibilityLabel={`Add ${f.name}`} className="w-full flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-3 active:opacity-90">
       <View className="min-w-0 flex-1">
         <Text numberOfLines={1} className="font-bold leading-tight text-white">{f.name}</Text>
         <Text className="text-[12px] text-white/45">{f.serving} · {f.kcal} kcal · {f.p}P {f.c}C {f.f}F</Text>
