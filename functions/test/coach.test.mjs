@@ -15,7 +15,13 @@ const baseDeps = (over = {}) => {
     classify: async () => '{"categories":["none"]}', // benign classification
     generateReply: async () => {
       replyCalls++
-      return 'Focus on hitting depth with a braced core.'
+      return JSON.stringify({
+        mode: 'general',
+        message: 'Focus on hitting depth with a braced core.',
+        citations: [],
+        memory: null,
+        proposal: { kind: 'none' },
+      })
     },
     enforceLimit: async () => {},
     killSwitchEngaged: () => false,
@@ -51,6 +57,24 @@ test('an allowed turn calls the model once and returns the validated reply', asy
   assert.equal(out.blocked, false)
   assert.equal(replyCalls(), 1)
   assert.match(out.text, /depth/i)
+  assert.equal(out.mode, 'general')
+})
+
+test('malformed model output fails closed to the structured fallback', async () => {
+  const { deps } = baseDeps({ generateReply: async () => 'not valid json' })
+  const out = await coachTurnCore('u1', { message: 'explain progressive overload' }, deps)
+  assert.equal(out.blocked, false)
+  assert.match(out.text, /couldn.t put together a reliable answer/i)
+  assert.deepEqual(out.citations, [])
+})
+
+test('unapproved citations are stripped from an otherwise valid answer', async () => {
+  const { deps } = baseDeps({ generateReply: async () => JSON.stringify({
+    mode: 'general', message: 'Progress gradually.', memory: null, proposal: { kind: 'none' },
+    citations: [{ sourceKey: 'random_blog', title: 'Random Blog' }],
+  }) })
+  const out = await coachTurnCore('u1', { message: 'explain progressive overload' }, deps)
+  assert.deepEqual(out.citations, [])
 })
 
 test('the server hard daily cap returns the limit response without calling the model', async () => {

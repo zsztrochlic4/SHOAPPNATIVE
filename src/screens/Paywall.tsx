@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { View, Text, Pressable, ScrollView, ActivityIndicator, Linking } from 'react-native'
+import { View, Text, Pressable, ScrollView, ActivityIndicator } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Path, Rect, Line, Circle, Defs, Stop, LinearGradient as SvgLinearGradient } from 'react-native-svg'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -7,6 +7,8 @@ import { PressableScale } from '../components/PressableScale'
 import { cssVars, useThemeName } from '../theme'
 import { tick, thud } from '../lib/haptics'
 import { startCheckout, openBillingPortal } from '../lib/billing'
+import { LegalDocModal } from '../components/LegalDocModal'
+import { type LegalDocKey } from '../content/legal'
 
 /**
  * Paywall — the post-account trial gate. Pixel-port of the "StrengthHub Paywall
@@ -190,6 +192,7 @@ export function Paywall({ email, onBack }: { email?: string; onBack?: () => void
   const [busy, setBusy] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [legalDoc, setLegalDoc] = useState<LegalDocKey | null>(null)
 
   async function start() {
     setError(null)
@@ -217,7 +220,7 @@ export function Paywall({ email, onBack }: { email?: string; onBack?: () => void
     }
   }
 
-  const openLink = (url: string) => { tick(); void Linking.openURL(url).catch(() => {}) }
+  const openDoc = (key: LegalDocKey) => { tick(); setLegalDoc(key) }
 
   return (
     <View style={{ flex: 1, backgroundColor: tok.rgb('--ink-900') }}>
@@ -330,13 +333,14 @@ export function Paywall({ email, onBack }: { email?: string; onBack?: () => void
 
         {/* links */}
         <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 16 }}>
-          <Pressable onPress={() => openLink('https://strengthhubonline.com/terms')} hitSlop={6}><Text style={{ fontSize: 12.5, color: tok.rgb('--fg', 0.4) }}>Terms</Text></Pressable>
+          <Pressable onPress={() => openDoc('terms')} hitSlop={6}><Text style={{ fontSize: 12.5, color: tok.rgb('--fg', 0.4) }}>Terms</Text></Pressable>
           <Text style={{ fontSize: 12.5, color: tok.rgb('--fg', 0.28) }}>{'  ·  '}</Text>
-          <Pressable onPress={() => openLink('https://strengthhubonline.com/privacy')} hitSlop={6}><Text style={{ fontSize: 12.5, color: tok.rgb('--fg', 0.4) }}>Privacy</Text></Pressable>
+          <Pressable onPress={() => openDoc('privacy')} hitSlop={6}><Text style={{ fontSize: 12.5, color: tok.rgb('--fg', 0.4) }}>Privacy</Text></Pressable>
           <Text style={{ fontSize: 12.5, color: tok.rgb('--fg', 0.28) }}>{'  ·  '}</Text>
           <Pressable onPress={restore} hitSlop={6}><Text style={{ fontSize: 12.5, color: tok.rgb('--fg', 0.4) }}>Restore</Text></Pressable>
         </View>
       </ScrollView>
+      <LegalDocModal docKey={legalDoc} onClose={() => setLegalDoc(null)} />
     </View>
   )
 }

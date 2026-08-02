@@ -1,59 +1,40 @@
-# Server-side AI coach (`coachMessage`)
+# Server-side AI coach
 
-The AI coach now runs on the **trusted backend**, not the client, so the
-deterministic safety floor cannot be bypassed by a modified app (DEVELOPMENT_PLAN
-§4.4). **It is still gated OFF** — `coachMessage` returns
-`failed-precondition / coach_disabled` until `COACH_ENABLED` is flipped, which is a
-separate, human-signed-off decision (see `src/backend/coach/safety/STATUS.md` and
-the coach-safety memory). This doc describes what's built and what enabling needs.
+The AI coach runs on the trusted Firebase backend. Its current architecture,
+data model, privacy boundary and operations are documented in
+[COACH_IMPLEMENTATION.md](./COACH_IMPLEMENTATION.md).
 
-## How the safety code is shared — one source, no drift
+## Shared safety code
 
-The guardrails the server runs are the **exact same code** the app runs. The
-single source of truth is `src/backend/**`. `functions/scripts/sync-shared.mjs`
-copies the transitive closure of the coach entry points (safety layer + engine
-bridge) **verbatim** into `functions/src/_shared/` as a **generated, gitignored**
-tree, as a prebuild step (`functions` `build`/`typecheck`/`test`). It follows only
-relative imports, so it can never pull an app-only module (the sole
-Firebase-client dependency in `src/backend` is `repo/**`, which the coach path
-never touches — the sync throws if a client-Firebase import is ever reached).
+`src/backend/**` is the source of truth. `functions/scripts/sync-shared.mjs`
+copies the coach contracts, operating rules, structured-response validator and
+safety modules into the backend's generated `_shared` tree before builds and
+tests. Never hand-edit generated shared files.
 
-Proof of parity: the app's full **218-assertion §18 safety suite** runs against the
-synced copy in the functions test gate — `Coach-safety suite PASSED … on the
-production build`. Never hand-edit `functions/src/_shared/`; edit `src/backend/**`
-and rebuild.
+## `coachMessage` turn order
 
-## What `coachMessage` does (per turn)
+1. Verify the signed-in user, enable gate and remote kill switch.
+2. Load consent, verified age, app context, memory, conversation history and
+   safety continuity state from Firestore. Client-supplied copies are ignored.
+3. Run the deterministic safety floor and server-side Gemini classifier.
+4. Enforce the authoritative daily limit.
+5. Generate a strict JSON reply with Gemini.
+6. Validate structure and approved sources, run outgoing safety validation,
+   persist the authoritative turn, and save only exact-quote memories.
 
-`functions/src/coach.ts` → `runCoachTurn` → `coachTurnCore`:
+A blocked message never reaches the answer model. Classifier failure fails safe.
+Backend failure does not fall back to a local coaching answer.
 
-1. **Gate** — `if (!COACH_ENABLED) throw coach_disabled` (the flip point) + remote kill switch.
-2. **Auth + App Check** — `requireVerifiedUser` (App Check enforced).
-3. **Server-trusted context** — reads the caller's **date of birth** from the
-   canonical user doc so the 18+ age gate can't be spoofed; takes `isAustralia` /
-   `recent` / injury context from the request.
-4. **`coachPrecheckAsync`** (the app's shared entry) — crisis/red-flag precheck
-   with the LLM classifier (server-side Gemini transport, temp 0) over the rules
-   floor. A **block never calls the model**; a classifier error **fails safe**
-   (service-unavailable + crisis options, never a silent allow).
-5. **Allowed** → server hard daily cap (`enforceDailyLimit`), then Gemini with
-   `buildCoachSystemPrompt()`, then **`guardOutgoing`** (post-response validator).
+## User controls
 
-The client (`src/lib/coachServer.ts`, wired in the coach chat) calls this when the
-coach is enabled and falls back to the on-device rules engine on any error. While
-the gate is off, that path is never reached (the chat shows "coming soon").
+The coach profile provides explicit consent, independent long-term memory
+control, inspect/delete/clear memory, proactive-check-in preference and coaching
+style. Any navigation proposal requires explicit confirmation and is audited.
 
-## Enabling — owner / clinical only (unchanged)
+## Release operations
 
-`COACH_ENABLED` stays `false` until ALL of:
-- **Independent clinical validation** of the classifier against a **fresh** holdout
-  the builder never saw (Jack §4): zero critical misses + agreed thresholds.
-- The **§19 privacy/consent** foundation (gates the dormant safety-state/analytics stores).
-- **App Check** configured + enforced (`docs/APP_CHECK.md`).
-- The four independent **§23** reviews (clinical / privacy / safety / security).
-
-## Deploy note (owner)
-`firebase deploy --only functions:coachMessage` — a full deploy also redeploys
-`analyzeMeal`, which needs the `GEMINI_API_KEY` secret set. `coachMessage` uses the
-same secret. Server-side kill-switch wiring (reading `config/coach`) and passing
-conversation history to the reply model are small follow-ups.
+- Remote off-switch: `config/coach.killSwitch`.
+- Secret: `GEMINI_API_KEY`.
+- App Check enforcement follows the app-wide `APP_CHECK_ENFORCED` setting.
+- Run the root app tests, functions tests and Firestore-rules emulator tests
+  before deploying through the normal owner release process.

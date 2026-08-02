@@ -1,6 +1,6 @@
 # Privacy Policy — StrengthHub Online
 
-**Last updated: 1 August 2026**
+**Last updated: 2 August 2026**
 
 StrengthHub Online ("StrengthHub", "we", "us", "our") is a fitness, training and
 nutrition app for university students. This policy explains what information we
@@ -34,6 +34,10 @@ We only collect what the app needs to work for you:
 - Body metrics you choose to enter, such as weight, and streaks/progress.
 - Any injuries, limitations or dietary preferences you tell the app so it can
   tailor guidance to you.
+- If you consent to the AI coach: coach conversations, useful details the coach
+  remembers, coach preferences, proposed actions and your responses. Minimal
+  operational safety state is stored separately and is not directly readable or
+  editable by the app.
 
 **Meal photos (only when you use the photo scan)**
 - When you take or upload a photo of a meal, the image is sent to Google's
@@ -60,6 +64,9 @@ We use your information to:
   nutrition guidance and reminders.
 - Personalise your experience (for example, respecting your goals, injuries and
   dietary preferences).
+- Provide the AI coach with selected profile, goal, training-history,
+  recovery/habit, nutrition-summary, coach-memory and recent-conversation
+  context after you give in-app consent.
 - Estimate the nutrition of meals you photograph, when you use that feature.
 - Send you the notifications you have enabled.
 - Keep the service safe, prevent abuse, and fix problems.
@@ -75,6 +82,11 @@ Some features use Google's Gemini AI:
   substitute for a nutrition label or professional dietary advice.
 - Any other AI-assisted guidance sends the relevant text you provide to Google's
   Gemini AI to generate a response.
+- **AI coach:** after in-app consent, your current message and selected
+  coach-relevant app context may be sent to Google Gemini. This can include your
+  profile and goals, training history, recovery/habit and nutrition summaries,
+  saved coach memories, and recent coach messages. Long-term coach memory is a
+  separate setting that you can pause, inspect and delete.
 
 When you use these features, the data you submit is processed by Google in
 accordance with Google's privacy terms. We ask you not to submit sensitive
@@ -121,6 +133,12 @@ You can:
   account, we remove your login and associated personal data.
 - **Control notifications** — turn reminders on or off in the app's settings or
   in your device settings.
+- **Control coach memory:** from the coach profile, pause long-term memory,
+  inspect individual memories, delete one memory, or clear all memories. Coach
+  records are included in the downloadable account export. Internal safety state
+  is excluded from that export to protect safety-control logic, but is deleted
+  with the account. You can also withdraw coach consent and delete the complete
+  coach workspace and its safety state without deleting the rest of your account.
 - **Contact us** about any privacy request at **info@strengthhubonline.com**.
 
 Depending on where you live, you may have additional rights under local privacy

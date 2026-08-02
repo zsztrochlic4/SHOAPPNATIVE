@@ -18,7 +18,7 @@ import {
  * error, which is expected. To exit the preview, unset the flag.
  */
 const PAYWALL_PREVIEW =
-  __DEV__ && process.env.EXPO_PUBLIC_PAYWALL_PREVIEW === '1'
+  typeof __DEV__ !== 'undefined' && __DEV__ && process.env.EXPO_PUBLIC_PAYWALL_PREVIEW === '1'
 
 export function todayHabit(s: AppState): HabitDay {
   return habitForDay(s, todayKey)

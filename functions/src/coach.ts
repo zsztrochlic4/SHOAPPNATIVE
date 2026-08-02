@@ -5,11 +5,29 @@ import { getFirestore } from 'firebase-admin/firestore'
 import { requireVerifiedUser, APP_CHECK_ENFORCED } from './lib/guards'
 import { enforceDailyLimit } from './lib/rateLimit'
 import { coachKillSwitch } from './killSwitchRemote'
+import {
+  loadCoachTurnData,
+  saveCoachTurn,
+  saveMemoryCandidate,
+  saveProposal,
+  saveSafetySession,
+  type CoachTurnData,
+} from './coachWorkspace'
 
 // SINGLE SOURCE: the guardrails run here are the exact same code the app runs,
 // copied verbatim into _shared by scripts/sync-shared.mjs (never hand-edited).
 import { COACH_ENABLED } from './_shared/backend/coach/coachGate'
-import { buildCoachSystemPrompt } from './_shared/backend/coach/operatingRules'
+import { APPROVED_KNOWLEDGE_SOURCES, buildCoachSystemPrompt } from './_shared/backend/coach/operatingRules'
+import {
+  STRUCTURED_COACH_RESPONSE_SCHEMA,
+  validateStructuredCoachReply,
+} from './_shared/backend/coach/structuredResponse'
+import type {
+  CoachActionProposal,
+  CoachAnswerMode,
+  CoachCitation,
+  CoachMemory,
+} from './_shared/backend/coach/contracts'
 import {
   coachPrecheckAsync,
   guardOutgoing,
@@ -41,13 +59,14 @@ const MAX_MESSAGE_LEN = 2000
 
 export interface CoachMessageInput {
   message: string
-  /** Recent turns (oldest first) for multi-turn classifier context. */
+  /** @deprecated Ignored in production; recent turns are loaded server-side. */
   recent?: string[]
+  /** @deprecated Ignored in production; safety/profile context is loaded server-side. */
   isAustralia?: boolean
   affectedRegions?: string[]
   engineExcludedExerciseIds?: string[]
   screeningOutcome?: string | null
-  /** Client's soft per-day usage; the server also enforces a hard cap. */
+  /** @deprecated Ignored in production; the server enforces the authoritative cap. */
   usage?: CoachUsage
 }
 
@@ -55,6 +74,10 @@ export interface CoachTurnResult {
   text: string
   blocked: boolean
   buttons: ContactButton[]
+  mode: CoachAnswerMode | 'safety'
+  citations: CoachCitation[]
+  memory: CoachMemory | null
+  proposal: CoachActionProposal | null
 }
 
 /** Injected side-effects so the orchestration is unit-testable without Firebase/Gemini. */
@@ -71,12 +94,22 @@ export interface CoachTurnDeps {
   killSwitchEngaged: () => boolean
   /** Today's key for the soft daily-limit check. */
   todayKey: string
+  /** Production uses server-trusted context; tests may omit this and use readDob. */
+  loadTurnData?: (uid: string) => Promise<CoachTurnData>
+  saveTurn?: typeof saveCoachTurn
+  persistSafety?: typeof saveSafetySession
+  saveMemory?: typeof saveMemoryCandidate
+  saveProposal?: typeof saveProposal
 }
 
 const asResponse = (r: { text: string; buttons: ContactButton[] }): CoachTurnResult => ({
   text: r.text,
   buttons: r.buttons,
   blocked: true,
+  mode: 'safety',
+  citations: [],
+  memory: null,
+  proposal: null,
 })
 
 /**
@@ -89,7 +122,17 @@ export async function runCoachTurn(uid: string, input: CoachMessageInput, deps: 
   // THE flip point — nothing below runs while the coach is gated off.
   if (!COACH_ENABLED) throw new HttpsError('failed-precondition', 'coach_disabled')
   if (deps.killSwitchEngaged()) throw new HttpsError('unavailable', 'coach_unavailable')
-  return coachTurnCore(uid, input, deps)
+  try {
+    return await coachTurnCore(uid, input, deps)
+  } catch (error) {
+    if (error instanceof Error && error.message === 'coach_consent_required') {
+      throw new HttpsError('failed-precondition', 'coach_consent_required')
+    }
+    if (error instanceof Error && error.message === 'user_profile_missing') {
+      throw new HttpsError('failed-precondition', 'user_profile_missing')
+    }
+    throw error
+  }
 }
 
 /**
@@ -103,13 +146,20 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
   const message = typeof input.message === 'string' ? input.message.slice(0, MAX_MESSAGE_LEN) : ''
   if (!message.trim()) throw new HttpsError('invalid-argument', 'Empty message.')
 
-  const ctx: CoachContext = {
-    dateOfBirth: await deps.readDob(uid),
-    affectedRegions: Array.isArray(input.affectedRegions) ? input.affectedRegions : [],
-    screeningOutcome: input.screeningOutcome ?? null,
-    engineExcludedExerciseIds: Array.isArray(input.engineExcludedExerciseIds) ? input.engineExcludedExerciseIds : [],
-    isAustralia: input.isAustralia !== false, // AU app; default true so AU crisis numbers show
-  }
+  const turnData = deps.loadTurnData
+    ? await deps.loadTurnData(uid)
+    : {
+        context: {
+          dateOfBirth: await deps.readDob(uid),
+          affectedRegions: [], screeningOutcome: null, engineExcludedExerciseIds: [], isAustralia: true,
+        } satisfies CoachContext,
+        contextText: 'No server user snapshot is available in this test.',
+        recent: [],
+        safetySession: newSafetySession(),
+        memoryEnabled: false,
+        coachingStyle: 'balanced' as const,
+      }
+  const ctx = turnData.context
 
   // Stored 18+ gate (engine age routing on the server-trusted DOB).
   const elig = coachEligibility(ctx)
@@ -119,31 +169,71 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
   // setting it here (idempotent) needs no per-request teardown / no race.
   setClassifierTransport(deps.classify)
 
-  const session = newSafetySession()
-  const recent = Array.isArray(input.recent) ? input.recent.filter((s) => typeof s === 'string') : []
-  const pre = await coachPrecheckAsync(message, ctx, session, input.usage, deps.todayKey, recent)
-  if (pre.kind === 'block') return asResponse(pre.response)
-  if (pre.kind === 'limit') return asResponse(pre.response)
+  const session = turnData.safetySession
+  const recent = turnData.recent
+  if (deps.saveTurn) await deps.saveTurn(uid, 'user', message)
+  const pre = await coachPrecheckAsync(message, ctx, session, deps.loadTurnData ? undefined : input.usage, deps.todayKey, recent)
+  if (deps.persistSafety) await deps.persistSafety(uid, session)
+  if (pre.kind === 'block' || pre.kind === 'limit') {
+    if (deps.saveTurn) await deps.saveTurn(uid, 'coach', pre.response.text, {
+      blocked: true,
+      category: pre.kind === 'block' ? pre.decision.category : 'daily_limit',
+      tier: pre.kind === 'block' ? pre.decision.tier : undefined,
+    })
+    return asResponse(pre.response)
+  }
 
   // Allowed → server-authoritative hard cap, then the model, then outgoing validation.
   try {
     await deps.enforceLimit(uid)
   } catch {
-    return asResponse(dailyLimitResponse())
+    const limited = dailyLimitResponse()
+    if (deps.saveTurn) await deps.saveTurn(uid, 'coach', limited.text, { blocked: true, category: 'daily_limit' })
+    return asResponse(limited)
   }
-  const reply = await deps.generateReply(buildCoachSystemPrompt(), message)
-  const safe = guardOutgoing(reply, pre.decision, ctx, session)
-  return { text: safe, blocked: false, buttons: [] }
+  const systemPrompt = `${buildCoachSystemPrompt()}\n\n${turnData.contextText}\n\nRECENT AUTHORITATIVE CONVERSATION:\n${recent.join('\n') || '(none)'}`
+  const raw = await deps.generateReply(systemPrompt, message)
+  const validated = validateStructuredCoachReply(raw)
+  const structured = validated.ok
+    ? validated.reply
+    : { mode: 'general' as const, message: validated.fallback, citations: [], memory: null, proposal: { kind: 'none' as const } }
+  const approved = new Map<string, string>(APPROVED_KNOWLEDGE_SOURCES.map((s) => [s.key, s.title]))
+  const citations = structured.citations
+    .filter((c) => approved.get(c.sourceKey) === c.title)
+    .slice(0, 5)
+  const safe = guardOutgoing(structured.message, pre.decision, ctx, session)
+
+  let memory: CoachMemory | null = null
+  if (turnData.memoryEnabled && structured.memory && deps.saveMemory) {
+    memory = await deps.saveMemory(uid, message, structured.memory)
+  }
+  let proposal: CoachActionProposal | null = null
+  if (structured.proposal.kind !== 'none' && structured.proposal.title && structured.proposal.summary && deps.saveProposal) {
+    proposal = await deps.saveProposal(uid, {
+      kind: structured.proposal.kind,
+      title: structured.proposal.title,
+      summary: structured.proposal.summary,
+      payload: structured.proposal.payload ?? {},
+    })
+  }
+  if (deps.saveTurn) await deps.saveTurn(uid, 'coach', safe, {
+    blocked: false,
+    mode: structured.mode,
+    citations,
+    memoryId: memory?.id ?? null,
+    proposalId: proposal?.id ?? null,
+  })
+  return { text: safe, blocked: false, buttons: [], mode: structured.mode, citations, memory, proposal }
 }
 
-/** Read the caller's stored DOB from the canonical user doc (best-effort field probing). */
+/** Read the caller's stored DOB from the canonical backendUser record. Missing/unreadable stays null (fail-closed). */
 async function readDobFromFirestore(uid: string): Promise<string | null> {
   try {
     const snap = await getFirestore().collection('users').doc(uid).get()
     const d = snap.data() as Record<string, any> | undefined
-    return d?.date_of_birth ?? d?.dateOfBirth ?? d?.profile?.dateOfBirth ?? null
+    return d?.backendUser?.date_of_birth ?? null
   } catch {
-    return null // engine failure must not itself block a legitimate adult; the router still guards content
+    return null
   }
 }
 
@@ -180,13 +270,23 @@ export const coachMessage = onCall<CoachMessageInput>(
         const m = geminiModel(systemPrompt)
         const r = await m.generateContent({
           contents: [{ role: 'user', parts: [{ text: userText }] }],
-          generationConfig: { temperature: 0.8, maxOutputTokens: 400 },
+          generationConfig: {
+            temperature: 0.5,
+            maxOutputTokens: 800,
+            responseMimeType: 'application/json',
+            responseSchema: STRUCTURED_COACH_RESPONSE_SCHEMA as any,
+          },
         })
         return (r.response.text() ?? '').trim()
       },
       enforceLimit: (u) => enforceDailyLimit('coach', u, DAILY_COACH_LIMIT),
       killSwitchEngaged: () => coachKillSwitch.engaged(), // remote source: config/coach.killSwitch (Firestore)
       todayKey: new Date().toISOString().slice(0, 10),
+      loadTurnData: loadCoachTurnData,
+      saveTurn: saveCoachTurn,
+      persistSafety: saveSafetySession,
+      saveMemory: saveMemoryCandidate,
+      saveProposal,
     })
   },
 )

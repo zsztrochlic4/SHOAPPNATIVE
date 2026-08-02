@@ -163,6 +163,14 @@ export const RESPONSES: Record<string, FixedResponse> = {
     noAI: true,
   },
 
+  age_unverified: {
+    text:
+      'I can’t start personalised coaching until your date of birth is verified in your StrengthHub profile. ' +
+      'Please update it in your account details, then try again.',
+    buttons: [],
+    noAI: true,
+  },
+
   unsafe_training: {
     text:
       'I won’t build that — training that hard with no recovery tends to cause injury and burnout rather than progress, and I won’t help you train while unwell, impaired, or by pushing through with painkillers or stimulants. ' +

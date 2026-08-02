@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
-import { View, Text, Pressable, Image, TextInput, Animated, Easing, ScrollView, KeyboardAvoidingView, Platform, PanResponder, useWindowDimensions } from 'react-native'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { View, Text, Pressable, Image, TextInput, Animated, Easing, ScrollView, FlatList, KeyboardAvoidingView, Platform, PanResponder, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
   Sparkles, Check, CheckCheck, ChevronRight, ChevronDown, ChevronLeft, Salad, Trophy, Flame,
   GraduationCap, Dumbbell, Lightbulb, ShieldQuestion, Share2, Plus, MapPin, Phone,
   Send, Video, Lock, Crown, Clock, Repeat, Heart, MessageCircle, Award, Swords, Users, X,
-  Search, Minus, Trash2, Play, Activity, Reply,
+  Search, Minus, Trash2, Play, Activity, Reply, Brain,
 } from 'lucide-react-native'
 import { Sheet } from '../components/Sheet'
 import { Avatar } from '../components/Avatar'
@@ -30,7 +30,9 @@ import { nextSetRecommendation } from '../store/training'
 import { coachThreadView } from '../store/coach'
 import { coachReply } from '../lib/coachChat'
 import { askCoachServer } from '../lib/coachServer'
-import { coachContext, coachOperational, COACH_PREVIEW, coachPrecheckAsync, guardOutgoing, newSafetySession } from '../lib/coachSafety'
+import { fetchCoachWorkspace, readCachedCoachWorkspace, respondToCoachProposal } from '../lib/coachWorkspace'
+import { CoachMemoryView } from '../components/CoachMemoryView'
+import { coachContext, coachOperational, COACH_PREVIEW, coachPrecheckAsync, newSafetySession } from '../lib/coachSafety'
 import { SafetyContactButtons } from '../components/SafetyContactButtons'
 import { CoachSafetyStrip } from '../components/CoachSafetyStrip'
 import { CoachComingSoon } from '../components/CoachComingSoon'
@@ -42,6 +44,7 @@ import { AppModal, IS_WEB, WEB_SCREEN } from '../components/WebFrame'
 import { thud } from '../lib/haptics'
 import type { ReactNode } from 'react'
 import type { CoachKind, TemplateExercise, ChatMessage } from '../store/types'
+import type { CoachActionProposal } from '../backend/coach/contracts'
 
 type Props = { open: boolean; onClose: () => void; params?: Record<string, unknown> }
 
@@ -472,13 +475,16 @@ function TypingDots() {
  *   • drag RIGHT → reply to this message (a reply glyph fades in; past the
  *     threshold it arms the reply banner). Vertical scroll still passes through.
  */
-function CoachMessageRow({ m, revealX, colors, onReply }: {
+function CoachMessageRow({ m, revealX, colors, onReply, onProposalConfirmed }: {
   m: ChatMessage
   revealX: Animated.Value
   colors: ReturnType<typeof useColors>
   onReply: (m: ChatMessage) => void
+  onProposalConfirmed: (proposal: CoachActionProposal) => void
 }) {
   const user = m.role === 'user'
+  const [proposalStatus, setProposalStatus] = useState(m.proposal?.status ?? null)
+  const [resolvingProposal, setResolvingProposal] = useState(false)
   const replyX = useRef(new Animated.Value(0)).current
   const iconOpacity = useRef(new Animated.Value(0)).current
   const enter = useRef(new Animated.Value(0)).current
@@ -526,6 +532,21 @@ function CoachMessageRow({ m, revealX, colors, onReply }: {
 
   const translateX = Animated.add(revealX, replyX)
 
+  const resolveProposal = useCallback(async (decision: 'confirm' | 'reject') => {
+    if (!m.proposal || resolvingProposal || proposalStatus !== 'pending') return
+    setResolvingProposal(true)
+    try {
+      const result = await respondToCoachProposal(m.proposal.id, decision)
+      setProposalStatus(result.status as CoachActionProposal['status'])
+      thud()
+      if (decision === 'confirm') onProposalConfirmed({ ...m.proposal, status: 'confirmed' })
+    } catch {
+      setProposalStatus('expired')
+    } finally {
+      setResolvingProposal(false)
+    }
+  }, [m.proposal, onProposalConfirmed, proposalStatus, resolvingProposal])
+
   return (
     <Animated.View
       {...pan.panHandlers}
@@ -556,6 +577,42 @@ function CoachMessageRow({ m, revealX, colors, onReply }: {
       <View style={{ maxWidth: '82%', paddingHorizontal: 15, paddingVertical: 12, borderRadius: 18, backgroundColor: user ? colors.brand400 : colors.ink800 }}>
         <Text style={{ fontSize: 15, lineHeight: 22, color: user ? '#0a0a0b' : colors.fg, fontWeight: user ? '500' : '400' }}>{m.text}</Text>
         {m.role === 'coach' && m.buttons && <SafetyContactButtons buttons={m.buttons} />}
+        {m.role === 'coach' && m.mode && m.mode !== 'safety' && (
+          <Text style={{ marginTop: 8, fontSize: 10.5, fontWeight: '700', color: withAlpha(colors.fg, 0.38) }}>
+            {m.mode === 'personalised' ? 'BASED ON YOUR STRENGTHHUB DATA' : m.mode === 'app_help' ? 'STRENGTHHUB HELP' : 'GENERAL GUIDANCE'}
+          </Text>
+        )}
+        {m.role === 'coach' && !!m.citations?.length && (
+          <Text style={{ marginTop: 5, fontSize: 11, lineHeight: 16, color: withAlpha(colors.fg, 0.45) }}>
+            Sources: {m.citations.map((citation) => citation.title).join(' · ')}
+          </Text>
+        )}
+        {m.role === 'coach' && m.learnedMemory && (
+          <View style={{ marginTop: 9, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: withAlpha(colors.brand400, 0.09) }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.brand400 }}>REMEMBERED</Text>
+            <Text style={{ marginTop: 2, fontSize: 12, lineHeight: 17, color: withAlpha(colors.fg, 0.64) }}>{m.learnedMemory.value}</Text>
+          </View>
+        )}
+        {m.role === 'coach' && m.proposal && (
+          <View style={{ marginTop: 10, borderRadius: 14, borderWidth: 1, borderColor: withAlpha(colors.brand400, 0.2), padding: 11 }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.fg }}>{m.proposal.title}</Text>
+            <Text style={{ marginTop: 3, fontSize: 12, lineHeight: 17, color: withAlpha(colors.fg, 0.55) }}>{m.proposal.summary}</Text>
+            {proposalStatus === 'pending' ? (
+              <View style={{ marginTop: 9, flexDirection: 'row', gap: 8 }}>
+                <Pressable disabled={resolvingProposal} onPress={() => void resolveProposal('confirm')} style={({ pressed }) => ({ minHeight: 44, flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: colors.brand400, opacity: resolvingProposal ? 0.5 : pressed ? 0.75 : 1 })}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#0a0a0b' }}>{resolvingProposal ? 'Saving…' : 'Confirm'}</Text>
+                </Pressable>
+                <Pressable disabled={resolvingProposal} onPress={() => void resolveProposal('reject')} style={({ pressed }) => ({ minHeight: 44, flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: withAlpha(colors.fg, 0.07), opacity: pressed ? 0.65 : 1 })}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: withAlpha(colors.fg, 0.7) }}>Not now</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <Text style={{ marginTop: 8, fontSize: 11.5, fontWeight: '700', color: proposalStatus === 'confirmed' ? colors.brand400 : withAlpha(colors.fg, 0.4) }}>
+                {proposalStatus === 'confirmed' ? 'Confirmed' : proposalStatus === 'rejected' ? 'Not now' : 'Proposal expired'}
+              </Text>
+            )}
+          </View>
+        )}
       </View>
 
       {/* Timestamp, off the right edge — revealed by a leftward drag. */}
@@ -568,13 +625,16 @@ function CoachMessageRow({ m, revealX, colors, onReply }: {
 
 export function CoachChatSheet({ open, onClose }: Props) {
   const { state, dispatch } = useStore()
+  const nav = useNav()
   const colors = useColors()
   const insets = useSafeAreaInsets()
-  const scrollRef = useRef<ScrollView>(null)
+  const listRef = useRef<FlatList<ChatMessage>>(null)
   const [text, setText] = useState('')
   const [typing, setTyping] = useState(false)
   const [focused, setFocused] = useState(false)
   const [replyingTo, setReplyingTo] = useState<{ role: 'user' | 'coach'; text: string } | null>(null)
+  const [coachConsented, setCoachConsented] = useState<boolean | null>(null)
+  const [showMemory, setShowMemory] = useState(false)
   // Shared offset: dragging any row left reveals every row's timestamp together.
   const revealX = useRef(new Animated.Value(0)).current
   // Per-conversation safety state (persistence + retraction across messages, spec §2).
@@ -588,6 +648,22 @@ export function CoachChatSheet({ open, onClose }: Props) {
   useEffect(() => {
     if (open) dispatch({ type: 'MARK_CHAT_READ' })
   }, [open, messages.length, typing, dispatch])
+
+  useEffect(() => {
+    if (!open || !coachOperational() || COACH_PREVIEW) return
+    let active = true
+    void (async () => {
+      const cached = await readCachedCoachWorkspace()
+      if (active && cached) setCoachConsented(cached.consentVersion === 1)
+      try {
+        const workspace = await fetchCoachWorkspace()
+        if (active) setCoachConsented(workspace.consentVersion === 1)
+      } catch {
+        if (active && !cached) setCoachConsented(false)
+      }
+    })()
+    return () => { active = false }
+  }, [open])
 
   async function send(t?: string) {
     if (!coachOperational() && !COACH_PREVIEW) return // HARD gate + server-side kill switch (spec §20).
@@ -622,24 +698,54 @@ export function CoachChatSheet({ open, onClose }: Props) {
       // TRUSTED BACKEND coach: the server re-runs the precheck (authoritative), the
       // model call, and the validator, so a modified client can't bypass safety
       // (§4.4). It may BLOCK even though the client's fast precheck allowed the turn.
-      const res = await askCoachServer({
-        message: msg,
-        recent,
-        isAustralia: ctx.isAustralia,
-        affectedRegions: ctx.affectedRegions,
-        engineExcludedExerciseIds: ctx.engineExcludedExerciseIds,
-        screeningOutcome: ctx.screeningOutcome,
-        usage: state.coachUsage,
-      })
+      const res = await askCoachServer({ message: msg })
       // Server already ran guardOutgoing; blocked replies carry crisis buttons.
-      dispatch({ type: 'PUSH_CHAT', role: 'coach', text: res.text, ...(res.blocked ? { buttons: res.buttons } : {}) })
+      dispatch({
+        type: 'PUSH_CHAT', role: 'coach', text: res.text,
+        ...(res.blocked ? { buttons: res.buttons } : {}),
+        mode: res.mode,
+        citations: res.citations,
+        learnedMemory: res.memory ?? undefined,
+        proposal: res.proposal ?? undefined,
+      })
     } catch {
       // Backend unavailable / gated off → on-device rules engine, SAME guardrails + validator.
-      dispatch({ type: 'PUSH_CHAT', role: 'coach', text: guardOutgoing(coachReply(state, msg), pre.decision, ctx, safety.current) })
+      dispatch({ type: 'PUSH_CHAT', role: 'coach', text: 'I can\'t reach the secure coach service right now. Your message was not answered. Please try again shortly.', mode: 'safety' })
     } finally {
       setTyping(false)
     }
   }
+
+  const handleProposalConfirmed = useCallback((proposal: CoachActionProposal) => {
+    if (proposal.kind !== 'navigation') return
+    const overlay = proposal.payload.overlay
+    const allowed = ['activeWorkout', 'workout', 'nutrition', 'progress', 'logHabit', 'logWeight', 'logActivity', 'budgetEats', 'beginner']
+    if (typeof overlay !== 'string' || !allowed.includes(overlay)) return
+    if (overlay === 'workout' || overlay === 'nutrition' || overlay === 'progress') nav.goTab(overlay)
+    else nav.open(overlay as 'activeWorkout' | 'logHabit' | 'logWeight' | 'logActivity' | 'budgetEats' | 'beginner')
+  }, [nav])
+
+  const renderMessage = useCallback(({ item, index }: { item: ChatMessage; index: number }) => {
+    const showDay = index === 0 || messages[index - 1]?.dateKey !== item.dateKey
+    return (
+      <View style={{ gap: 12 }}>
+        {showDay && (
+          <View style={{ alignItems: 'center', paddingVertical: 2 }}>
+            <Text style={{ fontSize: 11.5, color: withAlpha(colors.fg, 0.4) }}>
+              <Text style={{ fontWeight: '700', color: withAlpha(colors.fg, 0.55) }}>{relativeLabel(item.dateKey)}</Text>  {item.time}
+            </Text>
+          </View>
+        )}
+        <CoachMessageRow
+          m={item}
+          revealX={revealX}
+          colors={colors}
+          onReply={(message) => setReplyingTo({ role: message.role, text: message.text })}
+          onProposalConfirmed={handleProposalConfirmed}
+        />
+      </View>
+    )
+  }, [colors, handleProposalConfirmed, messages, revealX])
 
   if (!coachOperational() && !COACH_PREVIEW) {
     return (
@@ -649,24 +755,16 @@ export function CoachChatSheet({ open, onClose }: Props) {
     )
   }
 
-  // Thread rows with a day divider before the first message of each day.
-  const rows: ReactNode[] = []
-  let prevKey: string | null = null
-  messages.forEach((m) => {
-    if (m.dateKey !== prevKey) {
-      rows.push(
-        <View key={`d-${m.id}`} style={{ alignItems: 'center', paddingVertical: 2 }}>
-          <Text style={{ fontSize: 11.5, color: withAlpha(colors.fg, 0.4) }}>
-            <Text style={{ fontWeight: '700', color: withAlpha(colors.fg, 0.55) }}>{relativeLabel(m.dateKey)}</Text>  {m.time}
-          </Text>
-        </View>,
-      )
-      prevKey = m.dateKey
-    }
-    rows.push(
-      <CoachMessageRow key={m.id} m={m} revealX={revealX} colors={colors} onReply={(msg) => setReplyingTo({ role: msg.role, text: msg.text })} />,
+  if (!COACH_PREVIEW && (showMemory || coachConsented !== true)) {
+    return (
+      <Sheet open={open} onClose={onClose} title="Coach profile" full bare>
+        <CoachMemoryView
+          onClose={() => coachConsented ? setShowMemory(false) : onClose()}
+          onConsentChanged={setCoachConsented}
+        />
+      </Sheet>
     )
-  })
+  }
 
   return (
     <Sheet open={open} onClose={onClose} title="Coach" full bare>
@@ -677,6 +775,11 @@ export function CoachChatSheet({ open, onClose }: Props) {
             <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Close chat" style={{ position: 'absolute', left: 16, top: 4, width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }} className="active:opacity-60">
               <ChevronLeft size={22} color={colors.fg} strokeWidth={2.2} />
             </Pressable>
+            {!COACH_PREVIEW && (
+              <Pressable onPress={() => setShowMemory(true)} hitSlop={8} accessibilityLabel="Open coach memory" style={{ position: 'absolute', right: 16, top: 4, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }} className="active:opacity-60">
+                <Brain size={20} color={colors.fg} strokeWidth={2} />
+              </Pressable>
+            )}
             <View style={{ alignItems: 'center', gap: 6 }}>
               <View style={{ width: 40, height: 40 }}>
                 <View className="h-10 w-10 items-center justify-center rounded-full bg-brand-400">
@@ -695,17 +798,18 @@ export function CoachChatSheet({ open, onClose }: Props) {
           <CoachSafetyStrip isAustralia={coachContext(state).isAustralia} fg={colors.fg} brand={colors.brand400} />
 
           {/* Thread — fills the space, scrolls, sticks to newest */}
-          <ScrollView
-            ref={scrollRef}
+          <FlatList
+            ref={listRef}
+            data={messages}
+            keyExtractor={(item) => item.id}
+            renderItem={renderMessage}
             className="flex-1"
             contentContainerStyle={{ paddingHorizontal: 18, paddingTop: 14, paddingBottom: 8, gap: 12 }}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
-            onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
-          >
-            {rows}
-            {typing && <TypingDots />}
-          </ScrollView>
+            ListFooterComponent={typing ? <TypingDots /> : null}
+            onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
+          />
 
           {/* Footer: suggestion grid, reply banner and the input pill (design: padding 10px 18px 12px) */}
           <View style={{ paddingTop: 10, paddingHorizontal: 18, paddingBottom: insets.bottom + 12 }}>

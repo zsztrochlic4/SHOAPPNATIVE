@@ -57,7 +57,7 @@
     "test:rules": "firebase emulators:exec --only firestore,storage \"node --test test/rules/*.test.mjs\"",
     "test:safety": "tsc -p tsconfig.sweep.json && node --test \"test/safety/**/*.test.mjs\"",
     "test:unit": "tsc -p tsconfig.sweep.json && node --test \"test/unit/**/*.test.mjs\"",
-    "check": "tsc -p tsconfig.check.json && node .check-out/store/periods.check.js",
+    "check": "tsc -p tsconfig.check.json && node -e \"global.__DEV__=false; require('./.check-out/store/periods.check.js')\"",
     "sweep": "tsc -p tsconfig.sweep.json && node .sweep-out/backend/generator/runSweep.js",
     "lint": "prettier --check \"scripts/**/*.{mjs,js}\"",
     "lint:fix": "prettier --write \"scripts/**/*.{mjs,js}\"",

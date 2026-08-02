@@ -825,7 +825,7 @@ export function hasAnySafetyAdjacentSignal(text: string): boolean {
 /*  Option B: refer-by-default — the coach's on-topic allowlist        */
 /* ------------------------------------------------------------------ */
 
-/** Training / nutrition / recovery vocabulary — an affirmatively on-topic coaching request. */
+/** Health / fitness / wellbeing vocabulary — an affirmatively on-topic coaching request. */
 const FITNESS_TERMS = [
   'workout', 'work out', 'training', 'train', 'exercise', 'gym', 'lift', 'lifting', 'weight', 'weights',
   'squat', 'bench', 'deadlift', 'press', 'row', 'curl', 'pull up', 'push up', 'pullup', 'pushup', 'chin up',
@@ -841,6 +841,10 @@ const FITNESS_TERMS = [
   'protein', 'carb', 'carbs', 'calorie', 'calories', 'macro', 'macros', 'meal', 'meals', 'nutrition', 'eat',
   'eating', 'food', 'snack', 'hydration', 'water', 'creatine', 'preworkout', 'post workout', 'soreness',
   'sore', 'doms', 'sleep', 'fuel', 'recipe', 'diet',
+  // Bounded general health / wellbeing education (not diagnosis or treatment).
+  'wellbeing', 'wellness', 'healthy', 'health', 'stress', 'stressed', 'habit', 'habits', 'routine',
+  'energy', 'fatigue', 'focus', 'confidence', 'gym anxiety', 'mental wellbeing', 'physical activity',
+  'anatomy', 'adaptation', 'detraining', 'heart health', 'bone health', 'posture', 'sedentary',
 ]
 
 /** Very short in-flow affirmations — allowed only when the whole message is a brief continuation. */

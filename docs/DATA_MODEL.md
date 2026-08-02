@@ -25,7 +25,19 @@ users/{uid}/foodReviews/{dateKey}
 users/{uid}/chat/{id}
 users/{uid}/coachThread/{id}
 users/{uid}/notifications/{id}
+coachUsers/{uid}                 â† coach consent and preferences
+coachUsers/{uid}/turns/{id}      â† authoritative coach conversation
+coachUsers/{uid}/memories/{id}   â† confirmed, user-visible coach memories
+coachUsers/{uid}/proposals/{id}  â† expiring, confirmation-required proposals
+coachUsers/{uid}/actions/{id}    â† proposal decision audit trail
+coachSafety/{uid}                â† minimal server-only safety continuity state
 ```
+
+Coach data uses a separate per-user workspace so it can evolve independently of
+the main app document. The owner may read ordinary coach records but all writes
+are server-authoritative. `coachSafety/{uid}` is inaccessible to clients. Coach
+workspace data is included in account export and all three per-user roots are
+removed during server-side account deletion.
 
 ## Why not one document per user?
 

@@ -12,6 +12,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { route } from '../../.sweep-out/backend/coach/safety/router.js'
 import { newSafetySession } from '../../.sweep-out/backend/coach/safety/types.js'
+import { isOnTopicFitness } from '../../.sweep-out/backend/coach/safety/rules.js'
 
 const CTX = {
   dateOfBirth: '2000-01-01',
@@ -28,10 +29,20 @@ for (const msg of [
   'what should I eat post workout',
   'how many sets for hypertrophy',
   'im feeling unmotivated, any tips',
+  'what wellbeing habits can help with everyday stress',
+  'why do I lose fitness after time off',
   'yes',
   'thanks, sounds good',
 ]) {
   test(`allows on-topic: ${msg}`, () => assert.equal(decide(msg).action, 'allow'))
+}
+
+for (const msg of [
+  'how does exercise support heart and bone health',
+  'what is the difference between adaptation and detraining',
+  'how can physical activity support general wellbeing',
+]) {
+  test(`recognises bounded health/wellbeing scope: ${msg}`, () => assert.equal(isOnTopicFitness(msg), true))
 }
 
 // Off-topic / ambiguous → referred, NOT coached (the Option-B inversion).

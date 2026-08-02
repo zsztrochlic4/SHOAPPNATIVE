@@ -18,7 +18,7 @@ import type { ReactNode } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   View, Text, Pressable, ScrollView, TextInput, Animated, Easing, PanResponder,
-  Platform, useWindowDimensions, ActivityIndicator, Linking,
+  Platform, useWindowDimensions, ActivityIndicator,
   type NativeSyntheticEvent, type NativeScrollEvent, type ViewStyle, type TextStyle,
 } from 'react-native'
 import Svg, { Path, Line, Rect, Circle, Polygon, G, Text as SvgText } from 'react-native-svg'
@@ -44,6 +44,8 @@ import { writeBackendUser } from '../backend/repo/userRepo'
 import { writeActiveProgram } from '../backend/repo/programRepo'
 import { activateProgram } from '../backend/runtime/activate'
 import { ACTIVE_EXERCISE_NAMES, resolveExerciseIdsByName } from '../backend/runtime/logging'
+import { LegalDocModal } from '../components/LegalDocModal'
+import { LEGAL_DOCS, LEGAL_DOC_ORDER, type LegalDocKey } from '../content/legal'
 
 const NATIVE = Platform.OS !== 'web'
 /** Prototype motion curve (cubic-bezier(0.22,0.8,0.28,1)). */
@@ -1558,6 +1560,7 @@ function Under18({ onBack }: { onBack: () => void }) {
 function Terms({ answers, set, onContinue, onBack }: { answers: Answers; set: SetFn; onContinue: () => void; onBack: () => void }) {
   const tok = useTok()
   const checked = answers.terms
+  const [legalDoc, setLegalDoc] = useState<LegalDocKey | null>(null)
   return (
     <View style={{ flex: 1 }}>
       <TopBack onBack={onBack} label="Almost there" />
@@ -1570,13 +1573,9 @@ function Terms({ answers, set, onContinue, onBack }: { answers: Answers; set: Se
         </Reveal>
         <Reveal delay={230}>
           <View style={{ marginTop: 16 }}>
-            {([
-              ['Terms of Use', 'https://strengthhubonline.com/terms'],
-              ['Privacy Policy', 'https://strengthhubonline.com/privacy'],
-              ['Health & safety information', 'https://strengthhubonline.com/health-safety'],
-            ] as const).map(([l, url]) => (
-              <Pressable key={l} accessibilityRole="link" onPress={() => { Linking.openURL(url).catch(() => {}) }} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 2, borderBottomWidth: 1, borderBottomColor: tok.rgb('--fg', 0.05) }}>
-                <Text style={{ fontSize: 14.5, fontWeight: '600', color: tok.rgb('--brand-300') }}>{l}</Text>
+            {LEGAL_DOC_ORDER.map((key) => (
+              <Pressable key={key} accessibilityRole="link" onPress={() => setLegalDoc(key)} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 2, borderBottomWidth: 1, borderBottomColor: tok.rgb('--fg', 0.05) }}>
+                <Text style={{ fontSize: 14.5, fontWeight: '600', color: tok.rgb('--brand-300') }}>{LEGAL_DOCS[key].linkLabel}</Text>
                 <Icon name="forward" size={16} stroke={2.2} color={tok.rgb('--fg', 0.3)} />
               </Pressable>
             ))}
@@ -1584,6 +1583,7 @@ function Terms({ answers, set, onContinue, onBack }: { answers: Answers; set: Se
         </Reveal>
       </ScrollView>
       <ActionBar label="Agree & continue" disabled={!checked} onPress={onContinue} hint={!checked ? 'Please read and tick the box to continue' : undefined} />
+      <LegalDocModal docKey={legalDoc} onClose={() => setLegalDoc(null)} />
     </View>
   )
 }

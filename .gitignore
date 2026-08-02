@@ -47,6 +47,7 @@ migration-backups/
 
 # local env files
 .env*.local
+.claude/settings.local.json
 
 # typescript
 *.tsbuildinfo

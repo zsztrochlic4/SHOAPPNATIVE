@@ -24,6 +24,8 @@ export const deleteAccount = onCall(
 
     // 1. All Firestore data: the root doc + every subcollection, in one pass.
     await db.recursiveDelete(db.collection('users').doc(uid))
+    await db.recursiveDelete(db.collection('coachUsers').doc(uid))
+    await db.collection('coachSafety').doc(uid).delete()
 
     // 2. Any Storage objects for this user (best-effort; none are stored today).
     try {

@@ -206,6 +206,16 @@ export async function collectUserExport(
       if (snap.size) collections[sub] = snap.docs.map((d) => d.data())
     }),
   )
+  // Server-owned coach data lives outside users/{uid}; include every ordinary,
+  // user-visible coach record in the user's explicit export. Restricted
+  // operational safety state is intentionally excluded from this client read.
+  const coachRoot = await getDoc(doc(db, 'coachUsers', uid))
+  if (coachRoot.exists()) profile.coachWorkspace = coachRoot.data()
+  const coachCollections = ['memories', 'conversationSummaries', 'insights', 'proposals', 'actions', 'proactiveState', 'turns'] as const
+  await Promise.all(coachCollections.map(async (name) => {
+    const snap = await getDocs(collection(db!, 'coachUsers', uid, name))
+    if (snap.size) collections[`coach_${name}`] = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+  }))
   return { profile, collections }
 }
 

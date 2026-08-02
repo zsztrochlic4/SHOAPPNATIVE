@@ -29,6 +29,8 @@ const outRoot = join(repoRoot, 'functions', 'src', '_shared')
 const ENTRIES = [
   'backend/coach/coachGate.ts',
   'backend/coach/operatingRules.ts',
+  'backend/coach/contracts.ts',
+  'backend/coach/structuredResponse.ts',
   'backend/coach/safety/index.ts',
   'backend/coach/safety/llmClassifier.ts',
   'backend/coach/safety/types.ts',
