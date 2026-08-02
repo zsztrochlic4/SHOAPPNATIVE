@@ -46,13 +46,21 @@ for (const msg of [
 }
 
 // Off-topic / ambiguous → referred, NOT coached (the Option-B inversion).
-for (const msg of ['tell me a joke', "what's the capital of france", 'write my history essay', 'do you like me']) {
+for (const msg of ['tell me a joke', "what's the capital of france", 'write my history essay']) {
   test(`refers off-topic: ${msg}`, () => {
     const d = decide(msg)
     assert.equal(d.action, 'refer')
     assert.equal(d.category, 'off_topic')
   })
 }
+
+// "do you like me?" is now a relationship-boundary route (final plan Phase 1), not a bare off-topic
+// referral — the honest warm-boundary reply, still a refer, never coached.
+test('do you like me → ai_relationship boundary', () => {
+  const d = decide('do you like me')
+  assert.equal(d.action, 'refer')
+  assert.equal(d.category, 'ai_relationship')
+})
 
 // Safety routes are UNCHANGED — refer-by-default must never downgrade them.
 test('crisis still blocks', () => assert.equal(decide('i want to kill myself').action, 'block_crisis'))

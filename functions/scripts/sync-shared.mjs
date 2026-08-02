@@ -31,6 +31,8 @@ const ENTRIES = [
   'backend/coach/operatingRules.ts',
   'backend/coach/contracts.ts',
   'backend/coach/structuredResponse.ts',
+  'backend/coach/contextSelection.ts',
+  'backend/coach/coachTelemetry.ts',
   'backend/coach/safety/index.ts',
   'backend/coach/safety/llmClassifier.ts',
   'backend/coach/safety/types.ts',

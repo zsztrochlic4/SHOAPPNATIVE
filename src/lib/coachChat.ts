@@ -6,6 +6,16 @@ import { answerQuestion } from './nutritionCoach'
 /* ------------------------------------------------------------------ */
 /*  1:1 coach messenger: on-device, rules-based replies.              */
 /*  Warm, concise and personalised. No external API.                  */
+/*                                                                     */
+/*  PARITY (final plan Phase 4): this partial-context fallback shares  */
+/*  the live path's VOICE contract and its POLICY floor. It never      */
+/*  gives a supplement dose, never programs through an injury, and     */
+/*  never prescribes a fixed training frequency — those refer out,     */
+/*  exactly like the fixed safety responses. It acknowledges the       */
+/*  details the user actually gave (exercise, time, goal, action)      */
+/*  instead of answering generically. It is only reached in the dev    */
+/*  design preview and never bypasses the server-authoritative safety  */
+/*  precheck in production.                                            */
 /* ------------------------------------------------------------------ */
 
 const GOAL_LABEL: Record<string, string> = {
@@ -15,67 +25,88 @@ const GOAL_LABEL: Record<string, string> = {
   'stay-healthy': 'staying healthy',
 }
 
-type Rule = { keywords: string[]; reply: (s: AppState) => string }
+/** A few common lifts we can name back to the user when they mention one (detail acknowledgement). */
+const EXERCISE_TERMS = ['squat', 'bench', 'deadlift', 'press', 'overhead press', 'row', 'pull up', 'pull-up',
+  'chin up', 'curl', 'lunge', 'leg press', 'lat pulldown', 'pulldown', 'push up', 'push-up', 'plank', 'run']
+
+/** Extract the details the user actually gave, so a reply can acknowledge them instead of being generic. */
+export interface FallbackDetails {
+  exercise: string | null
+  minutes: number | null
+}
+export function extractDetails(text: string): FallbackDetails {
+  const clean = ` ${text.toLowerCase()} `
+  const exercise = EXERCISE_TERMS.find((e) => clean.includes(e)) ?? null
+  const mins = clean.match(/\b(\d{1,3})\s?(?:min|mins|minute|minutes)\b/)
+  const halfHour = /\bhalf an hour\b/.test(clean) ? 30 : null
+  return { exercise, minutes: mins ? parseInt(mins[1], 10) : halfHour }
+}
+
+type Rule = { keywords: string[]; reply: (s: AppState, d: FallbackDetails) => string }
 
 const RULES: Rule[] = [
   {
     keywords: ['change', 'swap', 'replace', 'different exercise', 'substitute', 'alternative', "don't like", 'dont like', 'hate'],
-    reply: (s) => `Totally fine to swap things out. The best exercise is one you'll actually do, ${name(s)}. Tell me which movement you want to change and what's bugging you (boredom, a niggle, no equipment) and I'll suggest a swap that hits the same muscles. You can also pick any alternative from the Exercises tab.`,
+    reply: (s, d) => `Totally fine to swap ${d.exercise ? `the ${d.exercise}` : 'something'} out, ${name(s)} — the best exercise is one you'll actually do. Tell me what's bugging you (boredom, a niggle, no kit) and I'll suggest a swap that hits the same muscles, or pick any alternative from the Exercises tab.`,
   },
   {
     keywords: ['sore', 'soreness', 'ache', 'aching', 'doms', 'stiff'],
-    reply: () => `Some soreness a day or two after training is normal, especially on something new. Keep moving gently, stay hydrated, and get your protein and sleep in. If it's sharp pain in a joint rather than dull muscle ache, ease off that movement and we'll find a pain-free alternative.`,
+    reply: () => `A day or two of dull muscle soreness after training is normal, especially on something new. Keep moving gently, get your protein and sleep in, and it settles. If it's sharp pain in a joint rather than muscle ache, that's one to get looked at rather than push through.`,
   },
   {
+    // Pain / injury: policy-safe referral. Never the injury-override "keep loading it" advice.
     keywords: ['injur', 'pain', 'hurt', 'tweak', 'strain'],
-    reply: () => `Sorry to hear that. Pain is a signal, so let's respect it: skip anything that reproduces it for now and train around it, since there's almost always a pain-free option. If it's severe, lingering, or from a fall, please get it checked by a professional. Tell me where it is and I'll adjust today's plan.`,
+    reply: () => `Sorry to hear that. Pain's a signal worth respecting, so I won't program you through it. If it's sharp, lingering, or from a knock or fall, please get it checked by a physio or GP — they can clear you and tell me what to avoid. Once you're cleared I'll adjust the plan around it.`,
   },
   {
     keywords: ['tired', 'exhausted', 'no energy', 'fatigued', 'burnt out', 'burnout', 'unmotivated', 'motivation', 'cant be bothered', "can't be bothered", 'lazy'],
-    reply: (s) => `We all get those days, ${name(s)}. The trick is to shrink the task: just do the first two exercises, or even a 15-minute quick session. Starting is the hard part, and momentum does the rest. And if you're genuinely run down, a rest day is training too. ${streakLine(s)}`,
+    reply: (s, d) => `We all get those days, ${name(s)}. Shrink the task: just the first two exercises, or a ${d.minutes ?? 15}-minute quick session. Starting is the hard part and momentum does the rest — and if you're genuinely run down, a rest day is training too. ${streakLine(s)}`,
   },
   {
     keywords: ['plateau', 'stuck', 'not progressing', 'no progress', 'stalled', 'not improving'],
-    reply: () => `Plateaus happen to everyone. A few things that usually break them: make sure you're truly progressing the weight or reps each week, eat and sleep enough to recover, and check your effort is close to failure on the last set. If a lift's been stuck for weeks, we can deload (drop ~10% and build back). Which lift is stalling?`,
+    reply: (_s, d) => `Plateaus hit everyone. The usual fixes: make sure you're truly adding weight or reps each week, eat and sleep enough to recover, and push the last set close to failure. If ${d.exercise ? `the ${d.exercise}` : 'a lift'} has been stuck for weeks we can deload — drop about 10% and build back. Which lift is stalling?`,
   },
   {
+    // Frequency: reference the days THEY set, don't prescribe a fixed 5–6 range.
     keywords: ['how often', 'how many days', 'days a week', 'frequency', 'rest day', 'overtraining'],
-    reply: (s) => `For ${GOAL_LABEL[s.profile.goal] ?? 'your goal'}, ${s.profile.daysPerWeek || 3}-${Math.min(6, (s.profile.daysPerWeek || 3) + 1)} sessions a week with at least one rest day works well. Consistency over weeks beats cramming. Recovery is when you actually adapt, so rest days are part of the plan, not a break from it.`,
+    reply: (s) => `Your plan's already built around the ${s.profile.daysPerWeek || 3} days a week you set, with rest days baked in — and consistency across weeks beats cramming. Recovery is when you actually adapt, so those rest days are part of the plan, not a break from it. Want to change how many days you train?`,
   },
   {
     keywords: ['weight', 'scale', 'heavier', 'not losing', 'gaining weight', 'lighter'],
-    reply: (s) => `Bodyweight bounces around day to day with water, food and sleep, so don't read too much into one reading. Look at the weekly trend instead. ${weightLine(s)} Pair the scale with how your clothes fit, your photos and your lifts for the full picture.`,
+    reply: (s) => `Bodyweight bounces day to day with water, food and sleep, so don't read one reading too hard — the weekly trend is the real signal. ${weightLine(s)} Pair the scale with how your clothes fit, your photos and your lifts for the full picture.`,
   },
   {
     keywords: ['form', 'technique', 'how do i do', 'how to do', 'right way'],
-    reply: () => `Great that you're thinking about form, because it's what keeps you progressing and injury-free. Open any exercise and tap "Not sure how? Show me" mid-workout for step-by-step cues and a form clip. Tell me which lift and I'll give you the two or three things that matter most.`,
+    reply: (_s, d) => `Good instinct — form is what keeps you progressing and injury-free. Open ${d.exercise ? `the ${d.exercise}` : 'any exercise'} and tap "Not sure how? Show me" mid-workout for step-by-step cues and a form clip. Tell me the lift and I'll give you the two or three things that matter most.`,
   },
   {
     keywords: ['sleep', 'sleeping', 'rest', 'recovery', 'recover'],
-    reply: () => `Sleep is the most underrated part of training. It's when you build muscle and recharge focus. Aim for a consistent 7-9 hours. If sessions feel flat, sleep is usually the first thing to fix, before any supplement or program tweak.`,
+    reply: () => `Sleep is the most underrated part of training — it's when you build muscle and recharge focus. Aim for a consistent 7–9 hours. If sessions feel flat, sleep is usually the first thing to fix, before any supplement or program tweak. How's yours been lately?`,
   },
   {
     keywords: ['exam', 'study', 'busy', 'no time', 'stressed', 'stress'],
-    reply: (s) => examState(s).active
-      ? `Exam mode is already on, so I've shortened your sessions and eased your targets. Three key lifts and good sleep is a full win right now. Protect your study and don't feel guilty about lighter weeks.`
-      : `When life gets busy, shorter and consistent beats long and perfect. Try the 15-minute quick sessions, and if exams are coming up, turn on Exam mode in settings and I'll automatically lighten your plan.`,
+    reply: (s, d) => examState(s).active
+      ? `Exam mode's already on, so your sessions are shorter and your targets eased. Three key lifts and good sleep is a full win right now — protect your study and don't feel guilty about a lighter week.`
+      : `When life's busy, short and consistent beats long and perfect. Try a ${d.minutes ?? 15}-minute quick session, and if exams are coming up, turn on Exam mode in settings and I'll lighten your plan automatically. Want me to walk you through that?`,
   },
   {
+    // Supplements: food-first, NO personal dose (that refers to a pharmacist/label, like the live path).
     keywords: ['supplement', 'creatine', 'protein powder', 'pre workout', 'pre-workout'],
-    reply: () => `Supplements are the cherry on top, not the cake. Food, sleep and consistent training do 95% of the work. If you want two with solid evidence: a protein powder for convenience, and creatine monohydrate (3-5g daily) for strength. Everything else is optional.`,
+    reply: () => `Supplements are the cherry, not the cake — food, sleep and consistent training do about 95% of the work. Two with solid evidence are a protein powder for convenience and creatine monohydrate. For how much to take, go by the label and a pharmacist rather than me. Everything else is optional.`,
   },
   {
     keywords: ['thank', 'thanks', 'cheers', 'appreciate', 'awesome', 'great', 'love'],
-    reply: (s) => `Anytime, ${name(s)}. That's what I'm here for. Keep showing up and the results follow. 💪`,
+    reply: (s) => `Anytime, ${name(s)}. Keep showing up and the results follow. What's next on your mind?`,
   },
   {
     keywords: ['hello', 'hi ', 'hey', 'yo ', 'morning', 'sup'],
-    reply: (s) => `Hey ${name(s)}! Good to hear from you. How's training going, and is there anything you want to tweak or talk through today?`,
+    reply: (s) => `Hey ${name(s)}, good to hear from you. How's training been feeling this week — anything you want to tweak or talk through?`,
   },
 ]
 
 export function coachReply(s: AppState, text: string): string {
   const clean = ` ${text.trim().toLowerCase()} `
+  const details = extractDetails(text)
 
   // Food questions → reuse the nutrition knowledge base.
   if (/\b(eat|food|protein|carb|carbs|diet|meal|snack|calorie|sugar|breakfast|lunch|dinner|hydrat|water|alcohol)\b/.test(clean)) {
@@ -84,11 +115,11 @@ export function coachReply(s: AppState, text: string): string {
   }
 
   for (const rule of RULES) {
-    if (rule.keywords.some((k) => clean.includes(k))) return rule.reply(s)
+    if (rule.keywords.some((k) => clean.includes(k))) return rule.reply(s, details)
   }
 
-  // Fallback: keep it human and useful, point to what I can help with.
-  return `I hear you, ${name(s)}. I can help with changing exercises, soreness or niggles, motivation, plateaus, form, sleep and nutrition, whatever's on your mind for ${GOAL_LABEL[s.profile.goal] ?? 'your goal'}. Tell me a bit more and I'll give you a clear next step.`
+  // Fallback: name what I can help with and ask for one detail — no empty filler.
+  return `Happy to help with that, ${name(s)}. I'm best on changing exercises, soreness and niggles, motivation, plateaus, form, sleep and nutrition for ${GOAL_LABEL[s.profile.goal] ?? 'your goal'}. Tell me a bit more and I'll give you a clear next step.`
 }
 
 /** Coach's opening message for a fresh thread. */

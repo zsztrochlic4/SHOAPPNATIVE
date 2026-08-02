@@ -538,8 +538,8 @@ function CoachMessageRow({ m, revealX, colors, onReply, onProposalConfirmed }: {
     try {
       const result = await respondToCoachProposal(m.proposal.id, decision)
       setProposalStatus(result.status as CoachActionProposal['status'])
-      thud()
-      if (decision === 'confirm') onProposalConfirmed({ ...m.proposal, status: 'confirmed' })
+      // Haptics only on a CONFIRMED action (final plan Phase 5) — declining is silent.
+      if (decision === 'confirm') { thud(); onProposalConfirmed({ ...m.proposal, status: 'confirmed' }) }
     } catch {
       setProposalStatus('expired')
     } finally {
@@ -582,15 +582,20 @@ function CoachMessageRow({ m, revealX, colors, onReply, onProposalConfirmed }: {
             {m.mode === 'personalised' ? 'BASED ON YOUR STRENGTHHUB DATA' : m.mode === 'app_help' ? 'STRENGTHHUB HELP' : 'GENERAL GUIDANCE'}
           </Text>
         )}
+        {/* Citations: quiet, and only worth surfacing for evidence-dependent claims (Phase 5). */}
         {m.role === 'coach' && !!m.citations?.length && (
-          <Text style={{ marginTop: 5, fontSize: 11, lineHeight: 16, color: withAlpha(colors.fg, 0.45) }}>
-            Sources: {m.citations.map((citation) => citation.title).join(' · ')}
+          <Text style={{ marginTop: 5, fontSize: 10.5, lineHeight: 15, color: withAlpha(colors.fg, 0.38) }}>
+            Source: {m.citations.map((citation) => citation.title).join(' · ')}
           </Text>
         )}
+        {/* Memory: a quiet, natural confirmation, not a loud badge (Phase 5). Manage/remove lives in
+            the coach memory view. */}
         {m.role === 'coach' && m.learnedMemory && (
-          <View style={{ marginTop: 9, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: withAlpha(colors.brand400, 0.09) }}>
-            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.brand400 }}>REMEMBERED</Text>
-            <Text style={{ marginTop: 2, fontSize: 12, lineHeight: 17, color: withAlpha(colors.fg, 0.64) }}>{m.learnedMemory.value}</Text>
+          <View style={{ marginTop: 7, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Check size={12} color={withAlpha(colors.fg, 0.4)} strokeWidth={2.4} />
+            <Text style={{ flex: 1, fontSize: 11.5, lineHeight: 16, color: withAlpha(colors.fg, 0.5) }}>
+              I'll keep that in mind{m.learnedMemory.value ? ` — ${m.learnedMemory.value}` : ''}.
+            </Text>
           </View>
         )}
         {m.role === 'coach' && m.proposal && (
@@ -709,8 +714,10 @@ export function CoachChatSheet({ open, onClose }: Props) {
         proposal: res.proposal ?? undefined,
       })
     } catch {
-      // Backend unavailable / gated off → on-device rules engine, SAME guardrails + validator.
-      dispatch({ type: 'PUSH_CHAT', role: 'coach', text: 'I can\'t reach the secure coach service right now. Your message was not answered. Please try again shortly.', mode: 'safety' })
+      // Backend unavailable / gated off. We never answer training questions without the
+      // server-authoritative safety layer, so keep the message in the thread, show a calm status (no
+      // raw error), and offer a plain retry (final plan Phase 4).
+      dispatch({ type: 'PUSH_CHAT', role: 'coach', text: "I couldn't reach the coach service just now, so I haven't answered yet — your message is still here. Give it another go in a moment and I'll pick it up.", mode: 'safety' })
     } finally {
       setTyping(false)
     }

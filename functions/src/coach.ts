@@ -17,7 +17,9 @@ import {
 // SINGLE SOURCE: the guardrails run here are the exact same code the app runs,
 // copied verbatim into _shared by scripts/sync-shared.mjs (never hand-edited).
 import { COACH_ENABLED } from './_shared/backend/coach/coachGate'
-import { APPROVED_KNOWLEDGE_SOURCES, buildCoachSystemPrompt } from './_shared/backend/coach/operatingRules'
+import { APPROVED_KNOWLEDGE_SOURCES, buildCoachSystemPrompt, buildConversationTurnHint } from './_shared/backend/coach/operatingRules'
+import { selectCoachContext, summarizeRecentTurns, type CoachContextSnapshot } from './_shared/backend/coach/contextSelection'
+import { recordCoachTelemetry, recordCoachTurn } from './_shared/backend/coach/coachTelemetry'
 import {
   STRUCTURED_COACH_RESPONSE_SCHEMA,
   validateStructuredCoachReply,
@@ -154,6 +156,11 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
           affectedRegions: [], screeningOutcome: null, engineExcludedExerciseIds: [], isAustralia: true,
         } satisfies CoachContext,
         contextText: 'No server user snapshot is available in this test.',
+        snapshot: {
+          coachingStyle: 'balanced', goal: '', experience: '', units: 'metric', constraints: '',
+          profile: '', canonicalProfile: '', program: '', recentTraining: '', trainingSummaries: '',
+          activity: '', readiness: '', weights: '', nutrition: '', nutritionCheckins: '', memories: [],
+        } satisfies CoachContextSnapshot,
         recent: [],
         safetySession: newSafetySession(),
         memoryEnabled: false,
@@ -174,6 +181,8 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
   if (deps.saveTurn) await deps.saveTurn(uid, 'user', message)
   const pre = await coachPrecheckAsync(message, ctx, session, deps.loadTurnData ? undefined : input.usage, deps.todayKey, recent)
   if (deps.persistSafety) await deps.persistSafety(uid, session)
+  // Content-free rollout telemetry (final plan Phase 6; dormant until activated).
+  recordCoachTelemetry('route', pre.kind === 'block' ? pre.decision.category : pre.kind === 'limit' ? 'daily_limit' : (pre.decision.intent ?? 'allow'))
   if (pre.kind === 'block' || pre.kind === 'limit') {
     if (deps.saveTurn) await deps.saveTurn(uid, 'coach', pre.response.text, {
       blocked: true,
@@ -191,8 +200,21 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
     if (deps.saveTurn) await deps.saveTurn(uid, 'coach', limited.text, { blocked: true, category: 'daily_limit' })
     return asResponse(limited)
   }
-  const systemPrompt = `${buildCoachSystemPrompt()}\n\n${turnData.contextText}\n\nRECENT AUTHORITATIVE CONVERSATION:\n${recent.join('\n') || '(none)'}`
+  // Intent-aware, budgeted context (final plan Phase 2) + per-turn conversational hint (Phase 1/3).
+  const selectedContext = selectCoachContext(turnData.snapshot, message, { intent: pre.decision.intent })
+  const turnHint = buildConversationTurnHint(pre.decision.intent)
+  const systemPrompt = [
+    buildCoachSystemPrompt(),
+    '',
+    selectedContext,
+    ...(turnHint ? ['', turnHint] : []),
+    '',
+    'RECENT AUTHORITATIVE CONVERSATION:',
+    summarizeRecentTurns(recent),
+  ].join('\n')
+  const startedAt = Date.now()
   const raw = await deps.generateReply(systemPrompt, message)
+  recordCoachTurn(pre.decision.intent ?? 'allow', Date.now() - startedAt) // route category + latency bucket
   const validated = validateStructuredCoachReply(raw)
   const structured = validated.ok
     ? validated.reply

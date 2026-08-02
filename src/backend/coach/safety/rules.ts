@@ -458,9 +458,12 @@ function detectSteroidsPED(n: Norm): DetectorHit[] {
   if (has(n, 'prescribed', 'my doctor prescribed', 'corticosteroid', 'cortico steroid', 'prednisone', 'inhaled steroid'))
     return []
   const ped = has(n, 'steroids', 'steroid cycle', 'anabolic', 'sarm', 'sarms', 'testosterone', 'test e',
-    'test cyp', 'trenbolone', 'tren', 'anavar', 'dianabol', 'winstrol', 'clenbuterol', 'peptide', 'peptides',
+    'test cyp', 'trenbolone', 'anavar', 'dianabol', 'winstrol', 'clenbuterol', 'peptide', 'peptides',
     'post cycle', 'post cycle therapy', 'pct', 'inject test', 'how much testosterone', 'best cycle', 'safest cycle',
-    'pass a drug test', 'beat a drug test', 'where can i buy sarms', 'buy steroids')
+    'pass a drug test', 'beat a drug test', 'where can i buy sarms', 'buy steroids') ||
+    // 'tren' (trenbolone slang) ONLY as a whole word — a bare substring wrongly fired inside common
+    // fitness words "s-TREN-gth" and "TREN-d", referring every strength/weight-trend question as a PED.
+    hasRe(n, /\btren\b/)
   if (ped) return [hit('steroids_ped', 'ped_request')]
   return []
 }
@@ -528,7 +531,14 @@ function detectUnsafeTraining(n: Norm): DetectorHit[] {
 function detectAiRelationship(n: Norm): DetectorHit[] {
   if (has(n, 'are you a real person', 'are you human', 'are you real', 'are you my therapist',
     'are you a therapist', 'you re the only one who understands', 'youre the only one', 'i love you',
-    'do you love me', 'will you be my', 'only one who gets me', 'you re all i have', 'marry me'))
+    'do you love me', 'will you be my', 'only one who gets me', 'you re all i have', 'marry me',
+    // "do you like me?" and close variants (final plan Phase 1): a direct feelings/relationship
+    // question about the coach → the honest warm-boundary reply (ai_relationship keeps noAI:false so
+    // the user may continue on a safe topic afterwards).
+    'do you like me', 'do you actually like me', 'do you really like me', 'do you even like me',
+    'are you my friend', 'will you be my friend', 'do you have feelings', 'do you have feelings for me',
+    'can we be friends', 'do you care about me', 'are you in love with me', 'do you think about me',
+    'will you always be here for me', 'are you my only friend', 'do you miss me'))
     return [hit('ai_relationship', 'relationship_boundary')]
   return []
 }
@@ -854,6 +864,42 @@ const CONTINUITY = [
 ]
 
 /**
+ * Bounded on-topic INTENT PATTERNS (final plan Phase 1 — "replace bare allowlist expansion with intent
+ * patterns"). Emotionally-loaded but benign coaching turns whose head word ("exam", "scale", "goal") is
+ * deliberately NOT a bare allowlist term (adding it alone would over-match). Each requires a training /
+ * recovery / progress co-occurrence, so the message is affirmatively about coaching, not the head word
+ * in isolation. Generalises to phrasing, not to a specific sentence.
+ */
+function matchesFitnessIntentPattern(n: Norm): boolean {
+  // exams / study / a busy academic period AND its effect on training, time or recovery.
+  const examContext = has(n, 'exam', 'exams', 'study', 'studying', 'assignment', 'deadline', 'deadlines',
+    'finals', 'midterm', 'midterms', 'placement', 'thesis')
+  const trainingBearing = has(n, 'train', 'training', 'workout', 'work out', 'session', 'sessions', 'gym',
+    'lift', 'recovery', 'recover', 'rest', 'sleep', 'schedule', 'time', 'busy', 'fit it in', 'fit in',
+    'maintain', 'maintenance', 'keep up', 'routine', 'program', 'energy', 'motivation')
+  if (examContext && trainingBearing) return true
+  // the scale / bodyweight AND a progress or tracking bearing.
+  const scaleContext = has(n, 'scale', 'the scales', 'weigh in', 'weigh-in', 'weighed', 'weighing', 'bodyweight')
+  const progressBearing = has(n, 'bodyweight', 'progress', 'trend', 'trending', 'track', 'tracking',
+    'going up', 'going down', 'gone up', 'gone down', 'went up', 'went down', 'plateau', 'dropped', 'gained',
+    'losing', 'lost', 'up or down', 'week', 'weeks', 'lately', 'the same', 'thing to watch')
+  if (scaleContext && progressBearing) return true
+  // a stated goal / results question AND training / program / progress.
+  const goalContext = has(n, 'my goal', 'the goal', 'goals', 'target', 'on track', 'on target', 'results',
+    'see results', 'making progress')
+  const goalBearing = has(n, 'train', 'training', 'workout', 'program', 'programme', 'progress', 'plan',
+    'track', 'reach', 'hit', 'toward', 'towards', 'get to', 'am i', 'making progress', 'how long until',
+    'see results', 'until i see')
+  if (goalContext && goalBearing) return true
+  // time available AND a "what do I do / session" bearing — a session-length question in a coach thread.
+  const timeContext = hasRe(n, /\b\d{1,3}\s?(min|mins|minute|minutes)\b/) || has(n, 'half an hour', 'quick session', 'short session', 'not much time', 'no time', 'limited time')
+  const sessionBearing = has(n, 'what should i do', 'what do i do', 'what can i do', 'session', 'train', 'training',
+    'workout', 'work out', 'today', 'gym', 'squeeze in', 'fit in')
+  if (timeContext && sessionBearing) return true
+  return false
+}
+
+/**
  * Option B "refer by default": the coach only free-coaches a message that is affirmatively an on-topic
  * training/nutrition request (or a short in-flow affirmation). Everything else — off-topic, ambiguous,
  * or a distress disclosure that slipped every safety detector — is NOT coached; the router routes it to
@@ -865,6 +911,7 @@ const CONTINUITY = [
 export function isOnTopicFitness(text: string): boolean {
   const n = normalize(text)
   if (has(n, ...FITNESS_TERMS)) return true
+  if (matchesFitnessIntentPattern(n)) return true
   const words = n.p.trim().split(/\s+/).filter(Boolean)
   return words.length <= 4 && has(n, ...CONTINUITY)
 }

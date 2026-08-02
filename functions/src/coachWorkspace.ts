@@ -6,6 +6,7 @@ import type {
   CoachMemoryCandidate,
   CoachWorkspaceSummary,
 } from './_shared/backend/coach/contracts'
+import type { CoachContextSnapshot } from './_shared/backend/coach/contextSelection'
 import type {
   CoachContext,
   PersistentState,
@@ -34,7 +35,10 @@ function iso(value: unknown): string | null {
 
 export interface CoachTurnData {
   context: CoachContext
+  /** Full flattened snapshot text — kept for back-compat / non-selective callers. */
   contextText: string
+  /** Section-labelled snapshot for intent-aware selection (final plan Phase 2). */
+  snapshot: CoachContextSnapshot
   recent: string[]
   safetySession: SafetySession
   memoryEnabled: boolean
@@ -142,19 +146,47 @@ export async function loadCoachTurnData(uid: string): Promise<CoachTurnData> {
   }
 
   const completed = sessions.filter((s) => s.completed === true)
+  const coachingStyleText = String(workspaceSnap.get('coachingStyle') ?? 'balanced')
+  const constraints = [
+    affectedRegions.length ? `affected regions: ${affectedRegions.join(', ')}` : '',
+    context.screeningOutcome ? `screening: ${context.screeningOutcome}` : '',
+  ].filter(Boolean).join('; ')
+
+  // Section-labelled snapshot for intent-aware selection (final plan Phase 2). The selector decides
+  // which sections a given turn actually needs; nothing here forces the whole snapshot into the prompt.
+  const snapshot: CoachContextSnapshot = {
+    coachingStyle: coachingStyleText,
+    goal: ordinary(backend.goal || profile.goal, 60),
+    experience: ordinary(backend.experience_level || profile.experience, 40),
+    units: ordinary(profile.units || 'metric', 20),
+    constraints,
+    profile: compact({ name: profile.name, goal: profile.goal, experience: profile.experience, daysPerWeek: profile.daysPerWeek, sessionMinutes: profile.sessionMinutes, equipment: profile.equipment, dietaryPrefs: profile.dietaryPrefs, motivation: profile.motivation }),
+    canonicalProfile: compact({ goal: backend.goal, experience: backend.experience_level, daysPerWeek: backend.days_per_week, sessionLength: backend.session_length_min, equipment: backend.equipment, trainsAlone: backend.trains_alone }),
+    program: compact(user.generatedProgram ?? user.program, 1800),
+    recentTraining: `${completed.length}/${sessions.length} recent sessions completed; latest ${compact(sessions.slice(0, 4), 1800)}`,
+    trainingSummaries: compact(workoutSummaries.slice(0, 8), 1200),
+    activity: compact(activities.slice(0, 8), 900),
+    readiness: `habits ${habits.length}/14 days; latest ${compact(habits.slice(0, 7), 1200)}`,
+    weights: compact(weights.slice(0, 8), 700),
+    nutrition: `${meals.length} entries; latest ${compact(meals.slice(0, 8), 1000)}`,
+    nutritionCheckins: compact(foodReviews.slice(0, 7), 900),
+    memories: memoryList.map((m) => ({ category: m.category, value: m.value, sensitivity: m.sensitivity, scope: m.scope })),
+  }
+
+  // Full flattened text kept for back-compat (tests, non-selective callers).
   const contextLines = [
     'SERVER-TRUSTED USER SNAPSHOT',
-    `Coach preference: ${String(workspaceSnap.get('coachingStyle') ?? 'balanced')} style.`,
-    `Profile: ${compact({ name: profile.name, goal: profile.goal, experience: profile.experience, daysPerWeek: profile.daysPerWeek, sessionMinutes: profile.sessionMinutes, equipment: profile.equipment, dietaryPrefs: profile.dietaryPrefs, motivation: profile.motivation })}`,
-    `Canonical training profile: ${compact({ goal: backend.goal, experience: backend.experience_level, daysPerWeek: backend.days_per_week, sessionLength: backend.session_length_min, equipment: backend.equipment, trainsAlone: backend.trains_alone })}`,
-    `Program: ${compact(user.generatedProgram ?? user.program, 1800)}`,
-    `Recent training: ${completed.length}/${sessions.length} recent sessions completed; latest ${compact(sessions.slice(0, 4), 1800)}`,
-    `Recent training summaries: ${compact(workoutSummaries.slice(0, 8), 1200)}`,
-    `Recent self-chosen activity: ${compact(activities.slice(0, 8), 900)}`,
-    `Recent readiness coverage: habits ${habits.length}/14 days; latest ${compact(habits.slice(0, 7), 1200)}`,
-    `Recent weight entries: ${compact(weights.slice(0, 8), 700)}`,
-    `Recent nutrition entries: ${meals.length}; latest ${compact(meals.slice(0, 8), 1000)}`,
-    `Recent nutrition check-ins: ${compact(foodReviews.slice(0, 7), 900)}`,
+    `Coach preference: ${coachingStyleText} style.`,
+    `Profile: ${snapshot.profile}`,
+    `Canonical training profile: ${snapshot.canonicalProfile}`,
+    `Program: ${snapshot.program}`,
+    `Recent training: ${snapshot.recentTraining}`,
+    `Recent training summaries: ${snapshot.trainingSummaries}`,
+    `Recent self-chosen activity: ${snapshot.activity}`,
+    `Recent readiness coverage: ${snapshot.readiness}`,
+    `Recent weight entries: ${snapshot.weights}`,
+    `Recent nutrition entries: ${snapshot.nutrition}`,
+    `Recent nutrition check-ins: ${snapshot.nutritionCheckins}`,
     `Confirmed coach memories: ${compact(memoryList.map((m) => ({ id: m.id, category: m.category, value: m.value, status: m.status, scope: m.scope, updatedAt: m.updatedAt })), 2500)}`,
     'Treat absent or incomplete data as unknown. Do not claim app data you cannot see.',
   ]
@@ -167,6 +199,7 @@ export async function loadCoachTurnData(uid: string): Promise<CoachTurnData> {
   return {
     context,
     contextText: contextLines.join('\n'),
+    snapshot,
     recent,
     safetySession: restoreSafety(safetySnap.data() as Record<string, unknown> | undefined),
     memoryEnabled: workspace?.consentVersion === 1 && workspace?.memoryEnabled === true,

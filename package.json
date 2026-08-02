@@ -74,6 +74,7 @@
     "audit:schema": "node scripts/audit-production-schema.mjs",
     "validate:holdouts": "node scripts/validate-safety-holdouts.mjs",
     "validate:coach": "tsc -p tsconfig.sweep.json && node scripts/validate-coach-router.mjs",
+    "benchmark:coach": "tsc -p tsconfig.sweep.json && node .sweep-out/backend/coach/eval/runConversationalBenchmark.js",
     "recipes:build": "node scripts/build-recipes.mjs",
     "recipes:upload": "node scripts/upload-recipes.mjs",
     "media:upload": "node scripts/upload-exercise-media.mjs",

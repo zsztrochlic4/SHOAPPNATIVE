@@ -9,8 +9,9 @@
  *   coachEligibility(ctx)                               → stored 18+ gate (calls the engine's age routing).
  *   coachKillSwitchEngaged()                            → server-side remote disable (spec §20).
  *
- * The coach ships DISABLED (coachGate.COACH_ENABLED === false). None of this enables it. Enabling
- * remains gated on the section 21/23 independent review — see ./STATUS.md.
+ * Enablement is governed solely by `coachGate.COACH_ENABLED` (true since 2026-08-01, post clinical
+ * validation) plus the remote kill switch; none of this enables or disables it. See ./STATUS.md and
+ * docs/COACH_RELEASE_STATE.md.
  */
 
 import type { CoachContext, FixedResponse, GuardOutcome, SafetyDecision, SafetySession } from './types'

@@ -13,6 +13,7 @@ import { CATEGORY_TIER } from './types'
 import { runRules, scopeClassifierHits, hasImmediacy, hasCurrentSafetySignal, normalize, isOnTopicFitness } from './rules'
 import { activeClassifier } from './classifier'
 import { correctionAdjust, isGenuineCorrection, stateHits, applyDecision } from './stateMachine'
+import { classifyConversationalIntent } from './conversationalIntent'
 
 /**
  * The 000/Poisons emergency FLOOR (spec §3/§6/§10). Once any detector asserts a category at or above
@@ -71,14 +72,30 @@ function failSafe(): SafetyDecision {
 }
 
 /**
- * Option B — REFER BY DEFAULT. The coach only free-coaches an affirmatively on-topic training/nutrition
- * request; anything else is referred, not coached. This only ever fires when the composed decision is
- * already `allow` (nothing was flagged), so it can NEVER downgrade a safety route — it only makes the
- * benign default safer: a message that slipped every detector but isn't a clear fitness request is
- * routed to the gentle off-topic referral instead of being freely coached.
+ * Additive conversational layer + REFER BY DEFAULT (final plan Phase 1). Runs ONLY when the composed
+ * decision is already `allow` (nothing was flagged), so it can NEVER downgrade a safety route — the
+ * conversational layer is additive only, exactly as the plan requires ("insert the benign
+ * conversational-intent step immediately before referByDefault; never allow it to downgrade a safety
+ * decision"). It tags the benign turn so the model can answer it naturally:
+ *   1. an affirmatively on-topic training/nutrition request → `coaching` (keeps its full context);
+ *   2. otherwise a benign conversational intent (greeting, capability, vague wellbeing, mild
+ *      relational, in-flow continuation) → tagged, still allowed, answered like a person;
+ *   3. everything else (not fitness, not conversational) → the gentle off-topic referral, unchanged.
+ * The intent is content-free metadata; it only ever relaxes the off-topic bounce for benign turns and
+ * never turns a refer/block into an allow.
  */
-function referByDefault(decision: SafetyDecision, text: string): SafetyDecision {
-  if (decision.action !== 'allow' || isOnTopicFitness(text)) return decision
+function applyConversationalLayer(decision: SafetyDecision, text: string): SafetyDecision {
+  if (decision.action !== 'allow') return decision
+  if (isOnTopicFitness(text)) {
+    decision.intent = 'coaching'
+    return decision
+  }
+  const intent = classifyConversationalIntent(text)
+  if (intent !== 'none') {
+    decision.intent = intent
+    return decision
+  }
+  // Not fitness, not a recognised conversational turn → refer by default (unchanged behaviour).
   return decide([{ category: 'off_topic', source: 'rules', reason: 'refer_by_default_not_fitness' }])
 }
 
@@ -163,7 +180,7 @@ export function route(text: string, ctx: CoachContext, session: SafetySession): 
     // composed decision came out lower, the emergency wins. Most-protective route always prevails.
     const floor = emergencyFloor([...ruleHits, ...escalated])
     if (floor && decision.tier < CATEGORY_TIER[floor.category]) decision = decide([floor])
-    decision = referByDefault(decision, text) // Option B: coach fitness only; refer everything else
+    decision = applyConversationalLayer(decision, text) // additive; refer non-fitness/non-conversational
     decision.suppressions = [...rules.suppressions, ...clsScoped.suppressions]
     applyDecision(session, decision)
     return decision
@@ -211,7 +228,7 @@ export async function routeAsync(
     if (floor && decision.tier < CATEGORY_TIER[floor.category]) decision = decide([floor])
     // Fail-safe: classifier unavailable AND nothing else caught it → never allow normal coaching.
     if (clsUnavailable && decision.action === 'allow') return failSafe()
-    decision = referByDefault(decision, text) // Option B: coach fitness only; refer everything else
+    decision = applyConversationalLayer(decision, text) // additive; refer non-fitness/non-conversational
     decision.suppressions = [...rules.suppressions, ...clsScoped.suppressions]
     applyDecision(session, decision)
     return decision

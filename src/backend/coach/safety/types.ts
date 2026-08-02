@@ -11,7 +11,8 @@
  * the CONVERSATIONAL safety the engine never had (crisis, disordered eating, meal plans,
  * medical emergencies, PEDs, pregnancy, concussion, harm-to-others, etc.).
  *
- * The coach ships DISABLED (coachGate.COACH_ENABLED === false). Nothing here enables it.
+ * Enablement is governed solely by `coachGate.COACH_ENABLED` (true since 2026-08-01, post clinical
+ * validation) plus the remote kill switch; nothing in this file changes that. See docs/COACH_RELEASE_STATE.md.
  */
 
 /* ------------------------------------------------------------------ */
@@ -71,6 +72,22 @@ export const CATEGORY_TIER: Record<SafetyCategory, number> = {
   off_topic: 10,
   none: 0,
 }
+
+/**
+ * Benign conversational intent (final plan Phase 1). Set ONLY on an `allow` decision by the additive
+ * conversational layer — it can never change what a safety route does. `coaching` = an affirmatively
+ * on-topic training/nutrition request; the rest are ordinary human turns (a greeting, a "what can you
+ * do", a vague "I feel off", a mild relational remark, an in-flow follow-up) that must be answered
+ * naturally instead of being bounced to the off-topic referral. `none` = no benign intent recognised.
+ */
+export type ConversationalIntent =
+  | 'coaching'
+  | 'greeting'
+  | 'capability'
+  | 'wellbeing_ambiguous'
+  | 'relational'
+  | 'continuation'
+  | 'none'
 
 /** What the coach layer does with a message once a category is assigned. */
 export type SafetyAction =
@@ -154,6 +171,12 @@ export interface SafetyDecision {
   reason: string
   /** Scoping suppressions applied this turn (audit trail for no-flag decisions). Jack §3-log. */
   suppressions?: Suppression[]
+  /**
+   * Benign conversational intent — set ONLY when `action === 'allow'`, by the additive conversational
+   * layer (final plan Phase 1). Downstream uses it to select context and shape the reply; it never
+   * changes the safety route. Absent/`undefined` on any enforced (block/refer/suspend) decision.
+   */
+  intent?: ConversationalIntent
 }
 
 /**
