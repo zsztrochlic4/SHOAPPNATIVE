@@ -195,6 +195,7 @@ function GoalRow({ label, unit, children }: { label: string; unit: string; child
 export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: () => void }) {
   const { state, dispatch } = useStore()
   const toast = useToast()
+  const nav = useNav()
   const { enabled: authEnabled, deleteAccount, user } = useAuth()
   const [exporting, setExporting] = useState(false)
   const { notificationsEnabled } = state.settings
@@ -328,6 +329,21 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
     <>
       <Group label={t('settings.goals')}>
         <GoalsSettings />
+        {/* Core training inputs (goal / experience / days / length / equipment)
+            are editable with a preview-before-regenerate flow (audit §5). */}
+        <Pressable
+          onPress={() => nav.open('trainingProfile')}
+          accessibilityRole="button"
+          accessibilityLabel="Edit training profile and regenerate program"
+          className="w-full flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-4 active:opacity-90"
+        >
+          <Dumbbell size={18} color={brand[400]} />
+          <View className="flex-1">
+            <Text className="font-bold text-white">Training profile</Text>
+            <Text className="text-[12px] text-white/50">Goal, experience, days, session length, equipment — preview a new program before applying</Text>
+          </View>
+          <ChevronRight size={16} color="rgba(255,255,255,0.35)" />
+        </Pressable>
       </Group>
 
       <Group label={t('settings.language')}>

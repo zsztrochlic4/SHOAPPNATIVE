@@ -63,6 +63,7 @@ export type Action =
   | { type: 'SET_PROFILE'; patch: Partial<Profile> }
   | { type: 'SET_SUBSCRIPTION'; subscription: Subscription }
   | { type: 'COMPLETE_ONBOARDING'; profile: Partial<Profile>; backendUser?: UserDoc; generatedProgram?: StoredProgram | null; programStatus?: ProgramStatus | null; workoutInstances?: WorkoutInstanceDoc[] }
+  | { type: 'APPLY_TRAINING_PROFILE'; profilePatch: Partial<Profile>; backendUser: UserDoc; generatedProgram?: StoredProgram | null; programStatus?: ProgramStatus | null; workoutInstances?: WorkoutInstanceDoc[] }
   | { type: 'START_PROGRAM_DAY'; dateKey: string }
   | { type: 'LOG_WEIGHT'; kg: number }
   | { type: 'ADJUST_WATER'; deltaL: number }
@@ -219,6 +220,21 @@ function reducer(state: AppState, action: Action): AppState {
         demo: false,
         profile: { ...state.profile, ...action.profile, onboarded: true },
         backendUser: action.backendUser ?? state.backendUser,
+        generatedProgram: action.generatedProgram ?? null,
+        programStatus: action.programStatus ?? null,
+        workoutInstances: action.workoutInstances ?? undefined,
+      }
+
+    // Post-onboarding edit of the core training inputs (audit settings matrix:
+    // goal / experience / availability / session length / equipment). The new
+    // program replaces the plan going FORWARD only — completed sessions, set
+    // logs and history are never touched, and the deterministic gate +
+    // generator ran (with preview) BEFORE this commits.
+    case 'APPLY_TRAINING_PROFILE':
+      return {
+        ...state,
+        profile: { ...state.profile, ...action.profilePatch },
+        backendUser: action.backendUser,
         generatedProgram: action.generatedProgram ?? null,
         programStatus: action.programStatus ?? null,
         workoutInstances: action.workoutInstances ?? undefined,

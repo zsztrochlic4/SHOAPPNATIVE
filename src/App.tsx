@@ -62,6 +62,7 @@ import {
   CreateSessionSheet,
 } from './overlays'
 import { PlanAroundLifeSheet } from './overlays/planAroundLife'
+import { TrainingProfileSheet } from './overlays/trainingProfile'
 
 export type TabKey = 'dashboard' | 'workout' | 'nutrition' | 'progress' | 'community'
 
@@ -233,6 +234,7 @@ function Shell() {
       case 'settings': return <SettingsSheet open onClose={nav.close} />
       case 'addFood': return <AddFoodSheet open onClose={nav.close} params={params} />
       case 'profile': return <ProfileSheet open onClose={nav.close} />
+      case 'trainingProfile': return <TrainingProfileSheet open onClose={nav.close} />
       case 'logWeight': return <LogWeightSheet open onClose={nav.close} />
       case 'logHabit': return <LogHabitSheet open onClose={nav.close} params={params} />
       case 'createPost': return <CreatePostSheet open onClose={nav.close} />

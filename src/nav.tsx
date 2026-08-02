@@ -5,6 +5,7 @@ export type Overlay =
   | 'settings'
   | 'addFood'
   | 'profile'
+  | 'trainingProfile'
   | 'activeWorkout'
   | 'createSession'
   | 'customize'
