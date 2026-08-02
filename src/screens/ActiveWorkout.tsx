@@ -622,7 +622,7 @@ function ListScreen(props: any) {
       {/* Persistent progress header */}
       <View style={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: dim(0.06) }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-          <PressableScale onPress={onClose} scaleTo={0.9} className="items-center justify-center rounded-full" style={{ width: 34, height: 34, backgroundColor: dim(0.08) }}>
+          <PressableScale onPress={onClose} scaleTo={0.9} accessibilityLabel="Close workout" className="items-center justify-center rounded-full" style={{ width: 34, height: 34, backgroundColor: dim(0.08) }}>
             <X size={17} strokeWidth={2.4} color={dim(0.8)} />
           </PressableScale>
           <Text style={{ fontSize: 12, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase', color: dim(0.4) }}>Active Workout</Text>
@@ -863,7 +863,7 @@ function ExpandedForm({ ex, idx, c, units, detail, onAdjWeight, onAdjReps, onTog
             <View key={j} style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
               <Text style={{ width: 16, fontSize: 12, fontWeight: '700', color: dim(0.4) }}>{j + 1}</Text>
               <Text style={{ flex: 1, fontSize: 13, fontWeight: '600', color: dim(0.6) }}>Round {j + 1} · {ex.durationSec ?? 0}s{ex.perSide ? '/side' : ''}</Text>
-              <PressableScale haptic={false} scaleTo={0.9} onPress={() => onToggleSet(idx, j)} className="items-center justify-center" style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: st.done ? c.brand400 : 'transparent', borderWidth: 2, borderColor: st.done ? c.brand400 : dim(0.2) }}>
+              <PressableScale haptic={false} scaleTo={0.9} onPress={() => onToggleSet(idx, j)} accessibilityLabel={`Set ${j + 1}`} accessibilityState={{ checked: st.done }} className="items-center justify-center" style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: st.done ? c.brand400 : 'transparent', borderWidth: 2, borderColor: st.done ? c.brand400 : dim(0.2) }}>
                 {st.done && <Check size={15} strokeWidth={3.4} color="#0a0a0b" />}
               </PressableScale>
             </View>
@@ -872,7 +872,7 @@ function ExpandedForm({ ex, idx, c, units, detail, onAdjWeight, onAdjReps, onTog
               <Text style={{ width: 16, fontSize: 12, fontWeight: '700', color: dim(0.4) }}>{j + 1}</Text>
               <Stepper c={c} value={`${fmtWeightNum(st.weightKg, units, units === 'imperial' ? 0 : 1)}`} unit={u} onDown={() => onAdjWeight(idx, j, -1)} onUp={() => onAdjWeight(idx, j, 1)} />
               <Stepper c={c} value={`${st.reps}`} unit="reps" onDown={() => onAdjReps(idx, j, -1)} onUp={() => onAdjReps(idx, j, 1)} />
-              <PressableScale haptic={false} scaleTo={0.9} onPress={() => onToggleSet(idx, j)} className="items-center justify-center" style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: st.done ? c.brand400 : 'transparent', borderWidth: 2, borderColor: st.done ? c.brand400 : dim(0.2) }}>
+              <PressableScale haptic={false} scaleTo={0.9} onPress={() => onToggleSet(idx, j)} accessibilityLabel={`Set ${j + 1}`} accessibilityState={{ checked: st.done }} className="items-center justify-center" style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: st.done ? c.brand400 : 'transparent', borderWidth: 2, borderColor: st.done ? c.brand400 : dim(0.2) }}>
                 {st.done && <Check size={15} strokeWidth={3.4} color="#0a0a0b" />}
               </PressableScale>
             </View>
@@ -887,11 +887,11 @@ function Stepper({ c, value, unit, onDown, onUp }: { c: any; value: string; unit
   const dim = (o: number) => `rgba(255,255,255,${o})`
   return (
     <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6, backgroundColor: c.ink700, borderWidth: 1, borderColor: dim(0.08), borderRadius: 11, paddingHorizontal: 8, paddingVertical: 5 }}>
-      <PressableScale haptic={false} scaleTo={0.85} onPress={onDown} className="items-center justify-center rounded-lg" style={{ width: 26, height: 26, backgroundColor: dim(0.08) }}>
+      <PressableScale haptic={false} scaleTo={0.85} onPress={onDown} accessibilityLabel="Decrease weight" className="items-center justify-center rounded-lg" style={{ width: 26, height: 26, backgroundColor: dim(0.08) }}>
         <Minus size={14} color={c.fg} />
       </PressableScale>
       <Text style={{ fontSize: 13, fontWeight: '700', color: c.fg }}>{value}<Text style={{ fontSize: 10, fontWeight: '600', color: dim(0.4) }}> {unit}</Text></Text>
-      <PressableScale haptic={false} scaleTo={0.85} onPress={onUp} className="items-center justify-center rounded-lg" style={{ width: 26, height: 26, backgroundColor: dim(0.08) }}>
+      <PressableScale haptic={false} scaleTo={0.85} onPress={onUp} accessibilityLabel="Increase weight" className="items-center justify-center rounded-lg" style={{ width: 26, height: 26, backgroundColor: dim(0.08) }}>
         <Plus size={14} color={c.fg} />
       </PressableScale>
     </View>
@@ -1006,7 +1006,7 @@ function HowToDialog({ c, ex, detail, onClose }: any) {
       <Animated.View style={{ width: '100%', maxHeight: '100%', backgroundColor: c.ink800, borderWidth: 1, borderColor: dim(0.1), borderRadius: 24, overflow: 'hidden', transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.93, 1] }) }] }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, paddingBottom: 10 }}>
           <Text style={{ fontSize: 15, fontWeight: '700', color: c.fg }}>How to · {ex.name}</Text>
-          <Pressable onPress={onClose} className="items-center justify-center rounded-full active:opacity-80" style={{ width: 32, height: 32, backgroundColor: dim(0.1) }}><X size={17} strokeWidth={2.4} color={dim(0.7)} /></Pressable>
+          <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" className="items-center justify-center rounded-full active:opacity-80" style={{ width: 32, height: 32, backgroundColor: dim(0.1) }}><X size={17} strokeWidth={2.4} color={dim(0.7)} /></Pressable>
         </View>
         <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 18 }} showsVerticalScrollIndicator={false}>
           <TechniqueClip exerciseId={ex.defId} poster={ex.image} label="Form clip · coming soon" accent={c.brand400} />
@@ -1119,13 +1119,13 @@ function RestScreen({ colors: c, blue, units, remaining, total, rail, nextEx, ne
       {/* controls */}
       <View style={{ paddingHorizontal: 22, paddingTop: 22, paddingBottom: 26 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20 }}>
-          <PressableScale onPress={onSub} className="items-center justify-center rounded-full" style={{ width: 62, height: 62, backgroundColor: dim(0.08) }}>
+          <PressableScale onPress={onSub} accessibilityLabel="Subtract 15 seconds of rest" className="items-center justify-center rounded-full" style={{ width: 62, height: 62, backgroundColor: dim(0.08) }}>
             <Text style={{ fontSize: 14, fontWeight: '700', color: c.fg }}>−15s</Text>
           </PressableScale>
-          <PressableScale onPress={() => { thud(); onSkip() }} haptic={false} className="items-center justify-center rounded-full" style={{ width: 78, height: 78, backgroundColor: c.brand400, shadowColor: c.brand400, shadowOpacity: 0.45, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 6 }}>
+          <PressableScale onPress={() => { thud(); onSkip() }} haptic={false} accessibilityLabel="Skip rest" className="items-center justify-center rounded-full" style={{ width: 78, height: 78, backgroundColor: c.brand400, shadowColor: c.brand400, shadowOpacity: 0.45, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 6 }}>
             <Play size={24} color="#000" fill="#000" />
           </PressableScale>
-          <PressableScale onPress={onAdd} className="items-center justify-center rounded-full" style={{ width: 62, height: 62, backgroundColor: dim(0.08) }}>
+          <PressableScale onPress={onAdd} accessibilityLabel="Add 15 seconds of rest" className="items-center justify-center rounded-full" style={{ width: 62, height: 62, backgroundColor: dim(0.08) }}>
             <Text style={{ fontSize: 14, fontWeight: '700', color: c.fg }}>+15s</Text>
           </PressableScale>
         </View>
