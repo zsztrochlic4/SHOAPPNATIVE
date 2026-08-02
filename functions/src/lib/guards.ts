@@ -53,9 +53,21 @@ export function requireAppCheck(req: CallableRequest): void {
   }
 }
 
-/** Convenience: assert App Check + auth in one call. Returns the caller's uid. */
-export function requireVerifiedUser(req: CallableRequest): string {
-  requireAppCheck(req)
+/**
+ * Convenience: auth + App Check in one call, honouring the rollout mode.
+ * Returns the caller's uid.
+ *
+ * MONITOR mode (`APP_CHECK_ENFORCED === false`, the current state): a missing
+ * App Check token is logged (`auditAppCheck`) but never rejected — the native
+ * app cannot attest yet (no App Attest / Play Integrity in the client), so
+ * hard-requiring `req.app` here would break every iOS/Android call while the
+ * function option `enforceAppCheck: APP_CHECK_ENFORCED` claims monitor mode
+ * (audit F-006). ENFORCED mode: the token is required outright, matching the
+ * `enforceAppCheck: true` option that rejects before the handler anyway.
+ */
+export function requireVerifiedUser(req: CallableRequest, label = 'callable'): string {
+  if (APP_CHECK_ENFORCED) requireAppCheck(req)
+  else auditAppCheck(req, label)
   return requireAuth(req)
 }
 

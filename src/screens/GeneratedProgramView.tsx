@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { View, Text, Pressable, Linking } from 'react-native'
-import { ShieldCheck, HeartPulse, Info, Clock3, ChevronDown, Mail } from 'lucide-react-native'
+import { ShieldCheck, HeartPulse, Info, Clock3, ChevronDown, Mail, Zap } from 'lucide-react-native'
 import { Chip } from '../components/ui'
+import { useNav } from '../nav'
 import { brand } from '../theme'
 import type { StoredProgram, ProgramStatus } from '../backend/runtime/activate'
 
@@ -13,13 +14,18 @@ type Tone = 'brand' | 'warn' | 'danger'
 
 const SUPPORT_EMAIL = 'info@strengthhubonline.com'
 
-function holdingCopy(reason: string | null): { title: string; body: string; tone: Tone; support?: boolean } {
+function holdingCopy(reason: string | null): { title: string; body: string; tone: Tone; support?: boolean; quick?: boolean } {
   const r = reason ?? ''
   if (r === 'awaiting_professional_signoff' || r.startsWith('signoff'))
     return {
       tone: 'brand',
       title: 'Your program is being finalised',
-      body: 'We’re completing the final safety checks before your personalised program goes live. Your profile is saved — we’ll let you know the moment it’s ready.',
+      body: 'We’re completing the final safety checks before your personalised program goes live. Your profile is saved — we’ll let you know the moment it’s ready. In the meantime, Quick Workouts below are ready to go.',
+      // While the personalised promise is held, the safe general product —
+      // time-based quick circuits that need no per-user prescription — keeps
+      // the user training (audit F-007: never a paying dead end).
+      quick: true,
+      support: true,
     }
   if (r === 'screening_do_not_generate')
     return {
@@ -68,7 +74,8 @@ const TONE_STYLE: Record<Tone, { ring: string; bg: string; color: string }> = {
 }
 
 export function ProgramHolding({ status }: { status: ProgramStatus }) {
-  const { title, body, tone, support } = holdingCopy(status.reason)
+  const nav = useNav()
+  const { title, body, tone, support, quick } = holdingCopy(status.reason)
   const st = TONE_STYLE[tone]
   const IconCmp = tone === 'brand' ? ShieldCheck : tone === 'danger' ? HeartPulse : Info
   return (
@@ -78,6 +85,17 @@ export function ProgramHolding({ status }: { status: ProgramStatus }) {
       </View>
       <Text className="mt-5 text-center text-xl font-extrabold text-white">{title}</Text>
       <Text className="mt-2.5 max-w-[320px] text-center text-[14px] leading-6 text-white/60">{body}</Text>
+      {quick && (
+        <Pressable
+          onPress={() => nav.open('quick')}
+          accessibilityRole="button"
+          accessibilityLabel="Start a quick workout"
+          className="btn-primary mt-6 flex-row items-center gap-2 px-5 py-3 active:opacity-90"
+        >
+          <Zap size={15} color="#000" />
+          <Text className="text-[13.5px] font-bold text-black">Start a quick workout</Text>
+        </Pressable>
+      )}
       {support && (
         // A blocked/held user shouldn't be at a dead end — give them a way to reach
         // a human. (Re-screening after clearance stays a manual, human-in-the-loop

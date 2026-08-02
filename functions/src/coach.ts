@@ -276,7 +276,7 @@ export const coachMessage = onCall<CoachMessageInput>(
   // attest); App Check is rolled out app-wide later per docs/APP_CHECK.md — the coach comes along then.
   { enforceAppCheck: APP_CHECK_ENFORCED, timeoutSeconds: 60, secrets: [GEMINI_API_KEY] },
   async (req: CallableRequest<CoachMessageInput>): Promise<CoachTurnResult> => {
-    const uid = requireVerifiedUser(req)
+    const uid = requireVerifiedUser(req, 'coachMessage')
     const classify: ClassifierTransport = async (prompt) => {
       const m = geminiModel()
       const r = await m.generateContent({

@@ -18,13 +18,13 @@ const validId = (value: unknown): value is string => typeof value === 'string' &
 
 export const getCoachWorkspace = onCall(
   { enforceAppCheck: APP_CHECK_ENFORCED, timeoutSeconds: 30 },
-  async (req: CallableRequest) => getWorkspaceSummary(requireVerifiedUser(req)),
+  async (req: CallableRequest) => getWorkspaceSummary(requireVerifiedUser(req, 'getCoachWorkspace')),
 )
 
 export const grantCoachConsent = onCall<ConsentInput>(
   { enforceAppCheck: APP_CHECK_ENFORCED, timeoutSeconds: 30 },
   async (req: CallableRequest<ConsentInput>) => {
-    const uid = requireVerifiedUser(req)
+    const uid = requireVerifiedUser(req, 'grantCoachConsent')
     await getFirestore().collection('coachUsers').doc(uid).set({
       schemaVersion: 1,
       consentVersion: 1,
@@ -39,12 +39,18 @@ export const grantCoachConsent = onCall<ConsentInput>(
 )
 
 export const revokeCoachConsent = onCall(
-  { enforceAppCheck: APP_CHECK_ENFORCED, timeoutSeconds: 60 },
+  { enforceAppCheck: APP_CHECK_ENFORCED, timeoutSeconds: 120 },
   async (req: CallableRequest) => {
-    const uid = requireVerifiedUser(req)
+    const uid = requireVerifiedUser(req, 'revokeCoachConsent')
     const db = getFirestore()
+    // "Turn off coach & delete coach data" must be literally true (audit
+    // F-015): the coach workspace AND safety state AND the synced chat
+    // transcripts (users/{uid}/chat + coachThread hold the coach conversation)
+    // are all removed. The client clears its local copies alongside.
     await db.recursiveDelete(db.collection('coachUsers').doc(uid))
     await db.collection('coachSafety').doc(uid).delete()
+    await db.recursiveDelete(db.collection('users').doc(uid).collection('chat'))
+    await db.recursiveDelete(db.collection('users').doc(uid).collection('coachThread'))
     return getWorkspaceSummary(uid)
   },
 )
@@ -52,7 +58,7 @@ export const revokeCoachConsent = onCall(
 export const updateCoachPreferences = onCall<PreferenceInput>(
   { enforceAppCheck: APP_CHECK_ENFORCED, timeoutSeconds: 30 },
   async (req: CallableRequest<PreferenceInput>) => {
-    const uid = requireVerifiedUser(req)
+    const uid = requireVerifiedUser(req, 'updateCoachPreferences')
     const input = req.data ?? {}
     const current = await getFirestore().collection('coachUsers').doc(uid).get()
     if (current.get('consentVersion') !== 1) throw new HttpsError('failed-precondition', 'Coach consent is required.')
@@ -71,7 +77,7 @@ export const updateCoachPreferences = onCall<PreferenceInput>(
 export const deleteCoachMemory = onCall<IdInput>(
   { enforceAppCheck: APP_CHECK_ENFORCED, timeoutSeconds: 30 },
   async (req: CallableRequest<IdInput>) => {
-    const uid = requireVerifiedUser(req)
+    const uid = requireVerifiedUser(req, 'deleteCoachMemory')
     if (!validId(req.data?.id)) throw new HttpsError('invalid-argument', 'Invalid memory id.')
     await getFirestore().collection('coachUsers').doc(uid).collection('memories').doc(req.data.id).delete()
     return { ok: true }
@@ -81,7 +87,7 @@ export const deleteCoachMemory = onCall<IdInput>(
 export const clearCoachMemories = onCall(
   { enforceAppCheck: APP_CHECK_ENFORCED, timeoutSeconds: 60 },
   async (req: CallableRequest) => {
-    const uid = requireVerifiedUser(req)
+    const uid = requireVerifiedUser(req, 'clearCoachMemories')
     await getFirestore().recursiveDelete(getFirestore().collection('coachUsers').doc(uid).collection('memories'))
     return { ok: true }
   },
@@ -90,7 +96,7 @@ export const clearCoachMemories = onCall(
 export const respondToCoachProposal = onCall<ProposalDecisionInput>(
   { enforceAppCheck: APP_CHECK_ENFORCED, timeoutSeconds: 30 },
   async (req: CallableRequest<ProposalDecisionInput>) => {
-    const uid = requireVerifiedUser(req)
+    const uid = requireVerifiedUser(req, 'respondToCoachProposal')
     const { id, decision } = req.data ?? {}
     if (!validId(id) || (decision !== 'confirm' && decision !== 'reject')) {
       throw new HttpsError('invalid-argument', 'Invalid proposal response.')
