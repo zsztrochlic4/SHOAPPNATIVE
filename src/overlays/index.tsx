@@ -24,7 +24,7 @@ import { useToast } from '../components/Toast'
 import { useNav } from '../nav'
 import { FOODS } from '../data/catalog'
 import { useQuickWorkouts } from '../data/quickWorkouts'
-import type { QuickWorkout } from '../store/types'
+import type { QuickWorkout, UserMeal } from '../store/types'
 import { buildCustomSession, imageForMuscle } from '../store/programSession'
 import { collectUserExport } from '../store/cloudRepo'
 import { serializeUserExport, splitLocalState, buildExportFilename } from '../lib/dataExport'
@@ -858,9 +858,23 @@ export function AddFoodSheet({ open, onClose, params }: Props) {
     return FOODS.filter((f) => f.name.toLowerCase().includes(q.toLowerCase())).filter((f) => (budgetOnly ? f.budget : true))
   }, [q, budgetOnly])
 
+  // The user's own saved meals ("My meals"), searchable alongside the food catalog
+  // so a saved meal can be logged straight into today's food log in one tap.
+  const myMeals = state.myMeals ?? []
+  const myResults = useMemo(
+    () => myMeals.filter((m) => m.name.toLowerCase().includes(q.toLowerCase())),
+    [myMeals, q],
+  )
+
   function add(foodId: string) {
     const f = FOODS.find((x) => x.id === foodId)!
     dispatch({ type: 'ADD_MEAL', meal: { meal, name: f.name, qty: 1, kcal: f.kcal, p: f.p, c: f.c, f: f.f } })
+    toast(`Added to ${meal}`)
+    onClose()
+  }
+
+  function addUserMeal(m: UserMeal) {
+    dispatch({ type: 'ADD_MEAL', meal: { meal, name: m.name, qty: 1, kcal: m.kcal, p: m.p, c: m.c, f: m.f } })
     toast(`Added to ${meal}`)
     onClose()
   }
@@ -912,13 +926,42 @@ export function AddFoodSheet({ open, onClose, params }: Props) {
         </View>
       )}
 
+      {myResults.length > 0 && (
+        <View className="mb-4">
+          <Text className="mb-2 text-[12px] font-extrabold uppercase tracking-wide text-white/40">My meals</Text>
+          <View className="gap-2">
+            {myResults.map((m) => (
+              <MyMealRow key={m.id} m={m} onAdd={addUserMeal} />
+            ))}
+          </View>
+        </View>
+      )}
+
       <View className="gap-2">
+        {myResults.length > 0 && results.length > 0 && (
+          <Text className="mb-1 text-[12px] font-extrabold uppercase tracking-wide text-white/40">Foods</Text>
+        )}
         {results.map((f) => (
           <FoodRow key={f.id} id={f.id} onAdd={add} />
         ))}
-        {results.length === 0 && <Text className="py-6 text-center text-sm text-white/40">No foods found.</Text>}
+        {results.length === 0 && myResults.length === 0 && <Text className="py-6 text-center text-sm text-white/40">No foods found.</Text>}
       </View>
     </Sheet>
+  )
+}
+
+function MyMealRow({ m, onAdd }: { m: UserMeal; onAdd: (m: UserMeal) => void }) {
+  return (
+    <Pressable onPress={() => onAdd(m)} className="w-full flex-row items-center gap-3 rounded-2xl border border-brand-400/25 bg-brand-400/[0.06] p-3 active:opacity-90">
+      <View className="h-9 w-9 items-center justify-center rounded-xl bg-brand-400/15">
+        <Sparkles size={16} color={brand[400]} />
+      </View>
+      <View className="min-w-0 flex-1">
+        <Text numberOfLines={1} className="font-bold leading-tight text-white">{m.name}</Text>
+        <Text className="text-[12px] text-white/45">Saved meal · {m.kcal} kcal · {m.p}P {m.c}C {m.f}F</Text>
+      </View>
+      <View className="h-7 w-7 items-center justify-center rounded-full bg-brand-400"><Plus size={16} strokeWidth={3} color="#000" /></View>
+    </Pressable>
   )
 }
 

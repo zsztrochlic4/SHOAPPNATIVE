@@ -53,7 +53,8 @@ export function buildUserContext(s: AppState): string {
   const diet = [...(p.dietaryPrefs ?? [])]
   if (p.budgetMode) diet.push('on a tight budget')
   if (diet.length) add('Diet', diet.join(', '))
-  add('Daily targets', `${p.calorieTarget} kcal, ${p.proteinTarget}g protein`)
+  // APP-WIDE RULE — no calorie or nutritional goals. We never tell the coach the
+  // user's "daily targets", so it can't push a calorie/macro number to hit.
 
   // Only a period the user is *inside* right now changes how the coach should
   // talk to them — one scheduled for next month, or one that already finished,

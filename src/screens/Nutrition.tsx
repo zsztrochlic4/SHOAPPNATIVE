@@ -16,6 +16,7 @@ import { useNav } from '../nav'
 import { useBudgetMeals } from '../data/recipes'
 import { NUTRITION_TAGS, type TagTone } from '../data/nutrition'
 import { nutritionForDay, nutritionTagsForDay } from '../store/selectors'
+import { todayKey, fromKey } from '../lib/date'
 import { useColors } from '../theme'
 import { analyzeMealPhoto } from '../lib/mealScan'
 import type { Confidence, Rec, MealFood } from '../lib/mealScan'
@@ -616,15 +617,14 @@ function TodayLogCard({ onAddFood }: { onAddFood: () => void }) {
   const toast = useToast()
   const c = useColors()
   const day = nutritionForDay(state)
-  const target = state.profile.calorieTarget
-  const pct = target > 0 ? Math.min(100, Math.round((day.kcal / target) * 100)) : 0
   return (
     <View className="mt-4 rounded-[22px] border border-white/5 bg-ink-800 px-[18px] py-5">
       <View className="flex-row items-center justify-between">
         <View>
           <Text className="text-[18px] font-extrabold tracking-tight text-white">Today’s food log</Text>
+          {/* Descriptive only — we don't set a calorie goal to hit (app-wide rule). */}
           <Text className="mt-0.5 text-[12px] text-white/45">
-            {target > 0 ? `${Math.round(day.kcal)} of ~${target} kcal` : `${Math.round(day.kcal)} kcal logged`}
+            {`${Math.round(day.kcal)} kcal logged`}
           </Text>
         </View>
         <Pressable
@@ -637,11 +637,6 @@ function TodayLogCard({ onAddFood }: { onAddFood: () => void }) {
           <Text className="text-[12.5px] font-extrabold text-black">Add food</Text>
         </Pressable>
       </View>
-      {target > 0 && (
-        <View className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/[0.08]">
-          <View style={{ width: `${pct}%`, backgroundColor: c.brand400 }} className="h-full rounded-full" />
-        </View>
-      )}
       <View className="mt-3 flex-row gap-4">
         {[
           { label: 'Protein', v: Math.round(day.p), color: c.accentBlue },
@@ -874,6 +869,14 @@ function MealPlanTab() {
   const wItems = plan.filter((p) => (p.w ?? 0) === weekOffset)
   const plannedCount = wItems.length
 
+  // Today's actual food log pulls through to today's card (this week only). We key
+  // "today" off todayKey (the same clock the log uses) so it stays correct when the
+  // demo clock is frozen. The log remains the source of truth on the Overview tab;
+  // here it's a read-only mirror so the plan reflects what you really ate today.
+  const isThisWeek = weekOffset === 0
+  const todayD = PLAN_DAYS[(fromKey(todayKey).getDay() + 6) % 7]
+  const todayMeals = nutritionForDay(state).meals
+
   const BUDGET_MEALS = useBudgetMeals()
   const pq = planSearch.trim().toLowerCase()
   const wordStart = (name: string) => name.toLowerCase().split(/[^a-z0-9]+/).some((w) => w.startsWith(pq))
@@ -1020,13 +1023,19 @@ function MealPlanTab() {
       <View className="mt-3 gap-2.5">
         {PLAN_DAYS.map((d) => {
           const items = wItems.filter((p) => p.day === d)
+          const isToday = isThisWeek && d === todayD
+          const logged = isToday ? todayMeals : []
+          const empty = items.length === 0 && logged.length === 0
           return (
-            <View key={d} className="rounded-[18px] border border-white/[0.06] bg-ink-800 px-4 py-3.5">
+            <View key={d} className="rounded-[18px] border border-white/[0.06] bg-ink-800 px-4 py-3.5" style={isToday ? { borderColor: alpha(c.brand400, 0.35) } : undefined}>
               <View className="mb-2 flex-row items-center justify-between">
-                <Text className="text-[15px] font-extrabold text-white">{d}</Text>
-                <Text className="text-[11px] font-semibold text-white/35">{items.length ? `${items.length} planned` : 'None'}</Text>
+                <View className="flex-row items-center gap-2">
+                  <Text className="text-[15px] font-extrabold text-white">{d}</Text>
+                  {isToday && <Text className="text-[10px] font-extrabold uppercase tracking-wide text-brand-400">Today</Text>}
+                </View>
+                <Text className="text-[11px] font-semibold text-white/35">{items.length ? `${items.length} planned` : logged.length ? '' : 'None'}</Text>
               </View>
-              {items.length === 0 ? (
+              {empty ? (
                 <Text className="text-[12.5px] text-white/30">Nothing planned</Text>
               ) : (
                 <View className="gap-2.5">
@@ -1037,6 +1046,21 @@ function MealPlanTab() {
                       <Pressable onPress={() => dispatch({ type: 'REMOVE_PLANNED_MEAL', id: it.id })} className="h-7 w-7 items-center justify-center rounded-full bg-white/5 active:opacity-70"><Trash2 size={13} color={alpha(c.fg, 0.45)} /></Pressable>
                     </View>
                   ))}
+                  {logged.length > 0 && (
+                    <>
+                      <View className="mt-0.5 flex-row items-center gap-1.5">
+                        <Check size={11} color={c.brand400} strokeWidth={3.2} />
+                        <Text className="text-[10px] font-extrabold uppercase tracking-wide text-white/40">Logged today</Text>
+                      </View>
+                      {logged.map((m) => (
+                        <View key={m.id} className="flex-row items-center gap-3">
+                          <Text className="w-[66px] text-[10.5px] font-extrabold uppercase tracking-wide text-white/45">{m.meal}</Text>
+                          <Text numberOfLines={1} className="min-w-0 flex-1 text-[13px] text-white/80">{m.name}</Text>
+                          <Text className="text-[11px] font-semibold text-white/40">~{Math.round(m.kcal * m.qty)} kcal</Text>
+                        </View>
+                      ))}
+                    </>
+                  )}
                 </View>
               )}
             </View>
