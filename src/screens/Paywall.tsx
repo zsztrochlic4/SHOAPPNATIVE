@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { View, Text, Pressable, ScrollView, ActivityIndicator, Linking } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import Svg, { Path, Rect, Line, Circle } from 'react-native-svg'
+import Svg, { Path, Rect, Line, Circle, Defs, Stop, LinearGradient as SvgLinearGradient } from 'react-native-svg'
 import { LinearGradient } from 'expo-linear-gradient'
 import { PressableScale } from '../components/PressableScale'
 import { cssVars, useThemeName } from '../theme'
@@ -73,15 +73,72 @@ function AppleGlyph({ color }: { color: string }) {
   )
 }
 
-/** Small rising area chart echoing the design's <sho-graph-wave>. */
+/**
+ * Live undulating wave — a 1:1 port of the design's `<sho-graph-wave>`
+ * (graphs.js). A perpetually rippling area that still trends upward: a rising
+ * baseline (0.72 → 0.10 of the inner height, left→right), an amplitude that
+ * grows toward the right, and a phase that advances every frame. Geometry and
+ * constants match the source exactly (viewBox 320×150, N=60, phase step 0.045,
+ * 0.3→0 vertical gradient), scaled into the card's 120×56 slot with
+ * preserveAspectRatio="none" just as the web design does.
+ *
+ * The design redraws the path each rAF tick; we mirror that with a per-frame
+ * `d` update on this small isolated component (works identically on web and
+ * native — no reliance on setNativeProps). Paused automatically when the page
+ * isn't visible, since rAF doesn't fire then.
+ */
+const WAVE = { W: 320, H: 150, padX: 6, padTop: 14, padB: 10, N: 60 } as const
+const WAVE_IW = WAVE.W - WAVE.padX * 2
+const WAVE_IH = WAVE.H - WAVE.padTop - WAVE.padB
+
+/** Sample the wave at a given phase as an SVG line + closed area path (design math). */
+function wavePaths(phase: number): { line: string; area: string } {
+  const { padX, padTop, H, padB, N } = WAVE
+  const pts: [number, number][] = []
+  for (let i = 0; i <= N; i++) {
+    const f = i / N
+    const x = padX + WAVE_IW * f
+    const trend = WAVE_IH * (0.72 - 0.62 * f) // rising baseline
+    const amp = WAVE_IH * 0.11 * (0.4 + f) // grows to the right
+    const y = padTop + trend + Math.sin(f * 7 + phase) * amp
+    pts.push([x, y])
+  }
+  let line = `M ${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`
+  for (let i = 1; i <= N; i++) line += ` L ${pts[i][0].toFixed(1)} ${pts[i][1].toFixed(1)}`
+  const area = `${line} L ${(padX + WAVE_IW).toFixed(1)} ${H - padB} L ${padX} ${H - padB} Z`
+  return { line, area }
+}
+
 function WaveGraph({ tok }: { tok: Tok }) {
   const stroke = tok.rgb('--brand-400')
-  const fill = tok.rgb('--brand-400', 0.14)
+  const gradId = useRef('shoWave' + Math.random().toString(36).slice(2, 7)).current
+  const [paths, setPaths] = useState(() => wavePaths(0))
+
+  useEffect(() => {
+    let raf = 0
+    let phase = 0
+    const loop = () => {
+      phase += 0.045
+      setPaths(wavePaths(phase))
+      raf = requestAnimationFrame(loop)
+    }
+    raf = requestAnimationFrame(loop)
+    return () => cancelAnimationFrame(raf)
+  }, [])
+
   return (
-    <Svg width={120} height={56} viewBox="0 0 120 56">
-      <Path d="M0 44 C 24 40, 40 34, 60 26 S 96 10, 120 6 L 120 56 L 0 56 Z" fill={fill} />
-      <Path d="M0 44 C 24 40, 40 34, 60 26 S 96 10, 120 6" fill="none" stroke={stroke} strokeWidth={2.5} strokeLinecap="round" />
-    </Svg>
+    <View style={{ width: 120, height: 56 }}>
+      <Svg width={120} height={56} viewBox={`0 0 ${WAVE.W} ${WAVE.H}`} preserveAspectRatio="none">
+        <Defs>
+          <SvgLinearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0%" stopColor={stroke} stopOpacity={0.3} />
+            <Stop offset="100%" stopColor={stroke} stopOpacity={0} />
+          </SvgLinearGradient>
+        </Defs>
+        <Path d={paths.area} fill={`url(#${gradId})`} />
+        <Path d={paths.line} fill="none" stroke={stroke} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
+      </Svg>
+    </View>
   )
 }
 
