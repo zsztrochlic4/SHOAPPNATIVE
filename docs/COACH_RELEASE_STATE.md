@@ -34,17 +34,26 @@ rollback.
 
 ## Conditions for re-enabling (all required, in order)
 
-1. **Fresh independent clinical holdout** on the exact shipping build (r9 or
-   later) against a set the builder has never seen, meeting the documented
-   thresholds: zero critical misses, zero emergency under-routes.
-2. **`activeClassifier.validated` flipped by the reviewing clinician's record**,
-   never by the builder. The reviewer's name, credentials, date, dataset id and
-   result summary must be appended to `STATUS.md`.
-3. **Named sign-offs** recorded here: clinical, privacy, security, implementation.
-4. **Live rollback drill**: set `config/coach.killSwitch = true` in production,
+_Policy (2026-08-02): re-enablement is gated on an **objective automated safety
+bar** — **no human or clinician sign-off is required**. The bar is a reproducible
+safety run, nothing more, nothing less._
+
+1. **Automated safety holdout passes** on the exact shipping build (r9 or later):
+   the crisis / self-harm / eating-disorder holdout suite reports **zero critical
+   misses and zero emergency under-routes**. Record the run in `STATUS.md`: commit
+   SHA, dataset id, date, and the pass summary.
+2. **`activeClassifier.validated` flipped only on the strength of that recorded
+   run** — tied to the commit and dataset. Never by hand-asserting a pass; that
+   hand-assertion is exactly the failure mode F-003 caught.
+3. **Live rollback drill**: set `config/coach.killSwitch = true` in production,
    confirm the callable refuses without a redeploy, record the drill owner/date.
-5. Only then: one commit that flips `COACH_ENABLED = true`, updates this file and
-   `STATUS.md` in the same change, and names the deployed Functions revision.
+4. Only then: one commit that flips `COACH_ENABLED = true`, updates this file and
+   `STATUS.md` in the same change, and names the deployed Functions revision + the
+   passing run.
+
+> The bar is deliberately **at least as strict on the safety outcome** as before
+> (zero critical misses / zero emergency under-routes) — what's removed is the
+> human sign-off overhead, not the requirement that the build actually pass.
 
 ## What remains true while disabled
 

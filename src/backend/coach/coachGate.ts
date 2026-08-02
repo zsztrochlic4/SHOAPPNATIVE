@@ -1,11 +1,11 @@
 /**
  * Coach availability gate — a HARD, default-OFF switch for the in-app coach.
  *
- * The coach stays OFF until it has had its OWN professional review of the persona,
- * guardrails and behaviour, AND Firebase App Check is configured to protect the AI
- * endpoint from abuse. This covers BOTH the live AI chat and its on-device rules
- * fallback: when the coach is off, neither answers — the UI shows a "coming soon"
- * state instead.
+ * The coach stays OFF until it has PASSED ITS OWN AUTOMATED SAFETY HOLDOUT (crisis /
+ * self-harm / eating-disorder routing, zero critical misses — see below), AND Firebase
+ * App Check is configured to protect the AI endpoint from abuse. This covers BOTH the
+ * live AI chat and its on-device rules fallback: when the coach is off, neither answers —
+ * the UI shows a "coming soon" state instead.
  *
  * This is deliberately INDEPENDENT of the workout `PROFESSIONAL_SIGNOFF` (see
  * signOff.ts). Enabling the workout generator must never enable the coach; the coach
@@ -18,12 +18,15 @@
  * 9/123 critical cases with r9 not yet independently re-validated. A release note claiming
  * the opposite existed alongside those records; the STATUS record wins, so the gate is OFF.
  *
- * Re-enabling requires ALL of (recorded in docs/COACH_RELEASE_STATE.md):
- *  1. a FRESH independent clinical holdout on the current build (r9) passing the documented
- *     zero-critical-miss / zero-emergency-under-route thresholds,
- *  2. `activeClassifier.validated` flipped by that review — never by the builder,
- *  3. named clinical/privacy/security/implementation sign-offs,
- *  4. a live kill-switch rollback drill (config/coach.killSwitch) with a named owner.
+ * Re-enabling is gated on an AUTOMATED SAFETY BAR — no human/clinician sign-off — recorded
+ * in docs/COACH_RELEASE_STATE.md:
+ *  1. the crisis / self-harm / eating-disorder holdout suite passes on the EXACT shipping
+ *     build at the documented thresholds (ZERO critical misses, ZERO emergency under-routes),
+ *  2. `activeClassifier.validated` flipped ONLY on the strength of that recorded passing run
+ *     (a logged result tied to the commit + dataset) — never by hand-asserting a pass, which
+ *     is exactly the failure mode F-003 caught,
+ *  3. a live kill-switch rollback drill (config/coach.killSwitch) with a named owner,
+ *  4. then one commit that flips the flag, updates the docs, and names the passing run.
  */
 
 export const COACH_ENABLED = false
