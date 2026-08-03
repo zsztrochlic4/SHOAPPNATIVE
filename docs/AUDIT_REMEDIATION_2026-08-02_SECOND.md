@@ -137,9 +137,10 @@ enforcement effort.
 These are release gates the audit correctly flags; the code + reviewer/test artifacts are ready, but
 the final action is the owner's. Each now has a prepared, signable/runnable artifact:
 
-1. **SA-006 — Generated-program sign-off** — gate enforced in `signOff.ts` (`platformCleared()` stays
-   closed until reviewer + accreditation are recorded). Reviewer checklist + record:
-   **`docs/PROGRAM_SIGNOFF.md`**. Owner: get a qualified professional to sign, enter their details.
+1. **SA-006 — Generated-program sign-off** — **CLEARED.** The owner recorded the accredited
+   reviewer + accreditation number in `signOff.ts` `PROFESSIONAL_SIGNOFF`, so `platformCleared()`
+   now returns ok and real-user program generation is enabled. (The AI coach remains a separate
+   gate — `COACH_ENABLED` — still off pending SA-010.) Reviewer checklist: **`docs/PROGRAM_SIGNOFF.md`**.
 2. **SA-010 — Coach shipping-SHA holdout** — harness + datasets exist (`npm run validate:holdouts`).
    Signable reviewer record + fresh-set process: **`docs/COACH_HOLDOUT_SIGNOFF.md`**. Owner: run a
    fresh holdout, an independent reviewer signs (0 critical misses, FP<5%). Coach stays `COACH_ENABLED=false`.

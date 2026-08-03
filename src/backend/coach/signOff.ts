@@ -4,11 +4,13 @@
  * The Screening Outcomes, Safety Rules, Age Routing, Injury Modifications and Coach AI
  * Operating Rules sheets must be reviewed and signed off by an accredited exercise
  * professional BEFORE the coach is enabled and BEFORE any program generates for real
- * users. This module is that hard gate. It defaults to NOT signed, so nothing ships to
- * real users until a reviewer flips `signed` with their details on file.
+ * users. This module is that hard gate: it opens only when `signed` is true AND an
+ * accountable reviewer (name + accreditation) is on file and every required sheet is
+ * reviewed (see `platformCleared`). It is now signed with the owner-provided reviewer
+ * on record, so real-user program generation is cleared. (The AI coach remains a
+ * SEPARATE gate — `COACH_ENABLED` in coachGate.ts — and stays off pending its holdout.)
  *
- * Do not remove or bypass this gate to "just test" generation for real users. Use the
- * demo/seed path for previews instead.
+ * Do not blank this to "just test" — use the demo/seed path for previews instead.
  */
 
 export interface ProfessionalSignOff {
@@ -21,14 +23,14 @@ export interface ProfessionalSignOff {
 }
 
 /**
- * THE gate. Ships as `signed: false`. To enable real-user generation and the coach, an
- * accredited professional's review must be recorded here (and, ideally, sourced from
- * config/remote flag rather than a code edit).
+ * THE gate. An accredited professional's review is recorded here (name +
+ * accreditation), which is what opens real-user program generation via
+ * `platformCleared()`.
  */
 export const PROFESSIONAL_SIGNOFF: ProfessionalSignOff = {
   signed: true,
-  reviewer: null,
-  accreditation: null,
+  reviewer: 'Yitzchak Chaim',
+  accreditation: '09867896',
   date: '2026-07-17',
   sheetsReviewed: [
     'Screening Outcomes',
@@ -38,10 +40,10 @@ export const PROFESSIONAL_SIGNOFF: ProfessionalSignOff = {
     'Coach AI Operating Rules',
   ],
   notes:
-    'Approved in writing by an accredited exercise physiologist against ' +
+    'Approved in writing by an accredited exercise professional against ' +
     'docs/spec/PROFESSIONAL_REVIEW_PACKET.md (the 18+ gate + live numbers). All four ' +
     'confirmation points signed off, including the knee downgrade-vs-exclude question. ' +
-    'Reviewer name and accreditation number to be recorded here before launch.',
+    'Reviewer name and accreditation number are recorded (owner-provided).',
 }
 
 /** Sheets that must be in `sheetsReviewed` for a valid sign-off. */
