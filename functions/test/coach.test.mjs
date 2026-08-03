@@ -133,3 +133,15 @@ test('C-006: the server DOWNGRADES a workout_action when actioning is disabled s
   const out = await coachTurnCore('u1', { message: 'can you set up a deload week for me?', allowActions: true }, deps)
   assert.equal(out.proposal, null) // a modified/stale client cannot force an action through
 })
+
+test('U-003: a cold-start action switch that resolves DISABLED after being read blocks the action (fail-closed freshness)', async () => {
+  // Simulate the real makeRemoteKillSwitch cold start: engaged() would return a stale false, but the
+  // awaited engagedFresh(true) resolves the true value before the action gate decides.
+  let resolvedDisabled = false
+  const deps = actionReplyDeps({
+    actionsDisabledFresh: async () => { resolvedDisabled = true; return true }, // fresh read says disabled
+  })
+  const out = await coachTurnCore('u1', { message: 'can you set up a deload week for me?', allowActions: true }, deps)
+  assert.equal(resolvedDisabled, true)
+  assert.equal(out.proposal, null) // no stale-false fail-open on cold start
+})

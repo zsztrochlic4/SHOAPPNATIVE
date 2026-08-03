@@ -35,7 +35,7 @@ import { fetchCoachWorkspace, readCachedCoachWorkspace, respondToCoachProposal, 
 import { useReducedMotion, motionDuration } from '../lib/a11y'
 import { useAuth } from '../auth/AuthProvider'
 import { writeBackendUser } from '../backend/repo/userRepo'
-import { writeActiveProgram } from '../backend/repo/programRepo'
+import { commitCoachAction } from '../backend/repo/programRepo'
 import { resolveCoachAction, applyCoachSwapChoice, type SwapOption, type CoachActionOutcome } from '../backend/runtime/coachActionResolver'
 import { deriveLocalProfile } from '../backend/mapping/projection'
 import { newPeriodDraft, periodModeForAbsence, plannedPeriods } from '../store/periods'
@@ -511,6 +511,9 @@ function CoachMessageRow({ m, revealX, colors, onReply, onProposalConfirmed, und
   const user = m.role === 'user'
   const [proposalStatus, setProposalStatus] = useState(m.proposal?.status ?? null)
   const [resolvingProposal, setResolvingProposal] = useState(false)
+  // U-012: set when a CONFIRM/REJECT failed on a transient transport fault (offline/timeout) — the
+  // proposal stays pending and retryable, distinct from a server-side "expired".
+  const [resolveError, setResolveError] = useState(false)
   const reduceMotion = useReducedMotion()
   const replyX = useRef(new Animated.Value(0)).current
   const iconOpacity = useRef(new Animated.Value(0)).current
@@ -563,6 +566,7 @@ function CoachMessageRow({ m, revealX, colors, onReply, onProposalConfirmed, und
   const resolveProposal = useCallback(async (decision: 'confirm' | 'reject') => {
     if (!m.proposal || resolvingProposal || proposalStatus !== 'pending') return
     setResolvingProposal(true)
+    setResolveError(false)
     try {
       const result = await respondToCoachProposal(m.proposal.id, decision)
       setProposalStatus(result.status as CoachActionProposal['status'])
@@ -570,8 +574,15 @@ function CoachMessageRow({ m, revealX, colors, onReply, onProposalConfirmed, und
       // Pass the server actionId through so the terminal outcome (applied/failed) can be
       // recorded against the durable action journal (C-018).
       if (decision === 'confirm') { thud(); onProposalConfirmed({ ...m.proposal, status: 'confirmed' }, result.actionId) }
-    } catch {
-      setProposalStatus('expired')
+    } catch (e: unknown) {
+      // U-012: only a SERVER "no longer pending / expired / not found" retires the proposal. A
+      // transient transport fault (offline/timeout/unavailable) keeps it pending + retryable rather
+      // than mislabelling it expired and removing the buttons.
+      const code = String((e as { code?: string })?.code ?? '')
+      const detail = String((e as { message?: string })?.message ?? '')
+      const trulyGone = code.includes('failed-precondition') || code.includes('not-found') || /expired|no longer pending|not found/i.test(detail)
+      if (trulyGone) setProposalStatus('expired')
+      else setResolveError(true) // stays 'pending' → Confirm/Not now remain tappable
     } finally {
       setResolvingProposal(false)
     }
@@ -633,6 +644,7 @@ function CoachMessageRow({ m, revealX, colors, onReply, onProposalConfirmed, und
             <Text style={{ fontSize: 13, fontWeight: '700', color: colors.fg }}>{m.proposal.title}</Text>
             <Text style={{ marginTop: 3, fontSize: 12, lineHeight: 17, color: withAlpha(colors.fg, 0.55) }}>{m.proposal.summary}</Text>
             {proposalStatus === 'pending' ? (
+              <>
               <View style={{ marginTop: 9, flexDirection: 'row', gap: 8 }}>
                 <Pressable disabled={resolvingProposal} onPress={() => void resolveProposal('confirm')} accessibilityRole="button" accessibilityLabel={`Confirm: ${m.proposal.title}`} accessibilityHint="Applies this change to your plan" accessibilityState={{ disabled: resolvingProposal, busy: resolvingProposal }} style={({ pressed }) => ({ minHeight: 44, flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: colors.brand400, opacity: resolvingProposal ? 0.5 : pressed ? 0.75 : 1 })}>
                   <Text style={{ fontSize: 12, fontWeight: '700', color: '#0a0a0b' }}>{resolvingProposal ? 'Saving…' : 'Confirm'}</Text>
@@ -641,6 +653,13 @@ function CoachMessageRow({ m, revealX, colors, onReply, onProposalConfirmed, und
                   <Text style={{ fontSize: 12, fontWeight: '700', color: withAlpha(colors.fg, 0.7) }}>Not now</Text>
                 </Pressable>
               </View>
+              {/* U-012: transient network fault on confirm/reject — honest, retryable, not "expired". */}
+              {resolveError && (
+                <Text style={{ marginTop: 6, fontSize: 11, color: colors.danger }} accessibilityRole="text" accessibilityLabel="Couldn't reach the server, your choice is still here, tap Confirm to try again">
+                  Couldn’t reach the server — your choice is still here, tap again to retry.
+                </Text>
+              )}
+              </>
             ) : proposalStatus === 'confirmed' && applying ? (
               // C-003: the confirmed change is being persisted — do NOT claim "Applied" yet.
               <View style={{ marginTop: 9, flexDirection: 'row', alignItems: 'center', gap: 8 }} accessibilityRole="text" accessibilityLabel="Applying your change">
@@ -748,7 +767,15 @@ export function CoachChatSheet({ open, onClose }: Props) {
   const hasText = text.trim().length > 0
 
   // The undo / swap-choice / share-draft / apply-state affordances are session-scoped — drop on close.
-  useEffect(() => { if (!open) { setUndoTarget(null); setSwapChoice(null); setShareDraft(null); setApplyingProposalId(null); setFailedApply(null) } }, [open])
+  // U-002: a confirmed action left UNresolved when the sheet closes (an offered swap the user never
+  // picked, or a PR draft never published) is terminalised as failed so its journal entry can't sit
+  // at pending_apply forever.
+  useEffect(() => {
+    if (open) return
+    if (swapChoice?.actionId) void recordCoachActionOutcome(swapChoice.actionId, 'failed', 'swap_choice_abandoned')
+    if (shareDraft?.actionId) void recordCoachActionOutcome(shareDraft.actionId, 'failed', 'share_abandoned')
+    setUndoTarget(null); setSwapChoice(null); setShareDraft(null); setApplyingProposalId(null); setFailedApply(null)
+  }, [open, swapChoice, shareDraft])
 
   // Mark coach messages read whenever the thread is open and grows.
   useEffect(() => {
@@ -909,10 +936,14 @@ export function CoachChatSheet({ open, onClose }: Props) {
     setFailedApply(null)
     setApplyingProposalId(proposalId)
     try {
-      await writeBackendUser(uid, outcome.nextUser)
       // A swap leaves the split/schedule (programDoc) unchanged; a regen supplies a new programDoc.
       const programDocToWrite = outcome.apply === 'patch' ? state.programDoc : outcome.programDoc
-      if (programDocToWrite) await writeActiveProgram(uid, programDocToWrite, outcome.instances)
+      if (programDocToWrite) {
+        // U-001: user + program + instances (+ stale cleanup) commit ATOMICALLY — no partial state.
+        await commitCoachAction(uid, outcome.nextUser, programDocToWrite, outcome.instances)
+      } else {
+        await writeBackendUser(uid, outcome.nextUser)
+      }
       applyToStore()
       succeed()
     } catch {
@@ -950,7 +981,9 @@ export function CoachChatSheet({ open, onClose }: Props) {
         { backendUser, program: state.generatedProgram ?? null, instances: state.workoutInstances ?? [], programDoc: state.programDoc ?? null },
         proposal.payload,
       )
-      if (!outcome.ok) { toast(outcome.message); return }
+      // U-002: a post-confirm resolver rejection is a TERMINAL outcome for the journal, not a silent
+      // early-exit that leaves the entry stuck at pending_apply.
+      if (!outcome.ok) { toast(outcome.message); if (actionId) void recordCoachActionOutcome(actionId, 'failed', 'resolver_rejected'); return }
 
       // Navigation / nudge outcomes change no program state — just route + inform.
       if (outcome.apply === 'navigate') {
@@ -1004,7 +1037,7 @@ export function CoachChatSheet({ open, onClose }: Props) {
       // OUTWARD: draft a PR post grounded in a REAL logged PR; require a second explicit confirm.
       if (outcome.apply === 'share_pr') {
         const pr = recentPR(state)
-        if (!pr) { toast("I don't see a fresh PR to celebrate yet — log a session and I'll spot it."); return }
+        if (!pr) { toast("I don't see a fresh PR to celebrate yet — log a session and I'll spot it."); if (actionId) void recordCoachActionOutcome(actionId, 'failed', 'no_pr'); return }
         const weight = fmtWeight(pr.weightKg, state.settings.units)
         const text = `New ${pr.name} best — ${weight} for ${pr.reps} reps. Proof that showing up works. 💪`
         setUndoTarget(null); setSwapChoice(null)
@@ -1047,8 +1080,9 @@ export function CoachChatSheet({ open, onClose }: Props) {
     const uid = user?.uid
     const persist = async () => {
       if (!uid || uid === 'local') return
-      await writeBackendUser(uid, snapshot.backendUser)
-      if (snapshot.programDoc) await writeActiveProgram(uid, snapshot.programDoc, snapshot.workoutInstances ?? [])
+      // U-001: the rollback is atomic too — restore user + program + instances in one batch.
+      if (snapshot.programDoc) await commitCoachAction(uid, snapshot.backendUser, snapshot.programDoc, snapshot.workoutInstances ?? [])
+      else await writeBackendUser(uid, snapshot.backendUser)
     }
     void persist()
       .then(() => { if (actionId) void recordCoachActionOutcome(actionId, 'rolled_back') })

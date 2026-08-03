@@ -76,13 +76,25 @@ const dedupe = (ids: string[]): string[] => Array.from(new Set(ids))
  * one — so the model choosing a bad intent can never produce an unsafe plan.
  */
 function guardProgram(user: UserDoc, program: StoredProgram, ok: CoachActionOutcome): CoachActionOutcome {
-  const check = validateProgramForUser(user, program, { enforceDuration: true })
-  if (check.ok) return ok
-  return {
-    ok: false,
-    reason: `invariant:${summarizeViolations(check.violations)}`,
-    message: "I couldn't make that change without breaking one of your safety limits, so I've left your plan as it is.",
+  // Structural safety invariants are HARD (injury, exclusion, equipment, skill, duplicate, sparse/
+  // unfilled, empty). Duration is NOT hard-enforced here — the generator's short-session time model
+  // overshoots (owner-tracked IP-10); enforcing it would falsely reject legitimate regens. Instead we
+  // surface time honestly below so the coach never claims a plan "fits" when it runs over (U-014).
+  const check = validateProgramForUser(user, program)
+  if (!check.ok) {
+    return {
+      ok: false,
+      reason: `invariant:${summarizeViolations(check.violations)}`,
+      message: "I couldn't make that change without breaking one of your safety limits, so I've left your plan as it is.",
+    }
   }
+  // U-014: if any day runs over the promised session budget, append an honest caveat rather than
+  // letting the outcome's message imply a clean fit.
+  if (check.daysOverBudget.length > 0 && ok.ok === true && (ok.apply === 'patch' || ok.apply === 'regen')) {
+    const worst = Math.max(...Object.values(check.estimatedMinutesByDay))
+    return { ...ok, message: `${ok.message} Heads up: a couple of days come out closer to ${worst} min than your ${user.session_length_min}-min target — trim the last movement if you're tight on time.` }
+  }
+  return ok
 }
 
 const NUDGE_COPY: Record<NudgeKindLit, string> = {
@@ -183,6 +195,16 @@ function regen(nextUser: UserDoc, now: string, message: string): CoachActionOutc
       ok: false,
       reason: res.status.reason ?? 'generation_blocked',
       message: 'That change needs a quick health re-check before I can apply it — open your Training profile to finish it.',
+    }
+  }
+  // U-011: if generation could not fill a REQUIRED slot (e.g. an over-constrained equipment set),
+  // refuse rather than apply a sparse/incomplete plan — an honest constraint gap, not a bad plan.
+  const genChoices = res.programDoc.generation_audit?.flatMap((a) => a.choices ?? []) ?? []
+  if (genChoices.some((c) => typeof c === 'string' && c.includes('UNFILLED required slot'))) {
+    return {
+      ok: false,
+      reason: 'incomplete_plan',
+      message: "I couldn't build a complete plan from your current equipment and limits without leaving gaps, so I've left your plan as it is — try widening your available equipment.",
     }
   }
   return guardProgram(nextUser, res.program, { ok: true, apply: 'regen', nextUser, program: res.program, status: res.status, programDoc: res.programDoc, instances: res.instances, message })

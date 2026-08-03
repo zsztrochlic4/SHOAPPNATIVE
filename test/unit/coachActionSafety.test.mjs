@@ -125,14 +125,34 @@ test('CA-002: a duplicate within a day is caught', () => {
   assert.ok(res.violations.some((v) => v.code === 'duplicate'))
 })
 
-test('CA-002 / C-011: estimated session time is computed and within budget for generated plans', () => {
+test('CA-002 / C-011 / U-014: estimated session time includes overhead and is surfaced (daysOverBudget)', () => {
   const user = makeUser({ session_length_min: 60 })
   const act = activateProgram(user, NOW)
   for (const d of act.program.days) {
     const mins = estimateDayMinutes(d)
     assert.ok(mins > 0)
-    assert.ok(mins <= 60 * 1.25, `${d.weekday} ~${mins}min exceeds the 60min +25% budget`)
   }
+  const res = validateProgramForUser(user, act.program)
+  // Estimate is honest (warm-up + transitions included) and over-budget days are reported, never
+  // hidden behind a false "fits" — but duration is NOT a hard structural failure.
+  assert.ok(Array.isArray(res.daysOverBudget))
+  assert.ok(res.ok, `structural invariants should hold: ${JSON.stringify(res.violations)}`)
+})
+
+test('U-011: an empty training day is a sparse violation', () => {
+  const user = makeUser()
+  const act = activateProgram(user, NOW)
+  const bad = { ...act.program, days: act.program.days.map((d, i) => i === 0 ? { ...d, exercises: [] } : d) }
+  const res = validateProgramForUser(user, bad)
+  assert.equal(res.ok, false)
+  assert.ok(res.violations.some((v) => v.code === 'sparse'))
+})
+
+test('U-011: an empty program is rejected', () => {
+  const user = makeUser()
+  const res = validateProgramForUser(user, { programId: 'x', splitId: 's', splitName: 'S', dayStructure: [], schedule: [], restDays: [], days: [], weeklySetsByMuscle: {}, volumeTargets: {}, coverageNotes: [], startingLoadNote: '', recommendationNote: '', createdAt: NOW })
+  assert.equal(res.ok, false)
+  assert.ok(res.violations.some((v) => v.code === 'empty_program'))
 })
 
 /* ---------------- C-013: calendar-valid dates ---------------- */

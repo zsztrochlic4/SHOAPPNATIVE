@@ -121,6 +121,9 @@ export interface CoachTurnDeps {
    *  regardless of the client's allowActions payload. Advisory chat still works. Optional in
    *  tests; production always supplies the remote switch. */
   actionsDisabled?: () => boolean
+  /** Freshness-bound, fail-closed action switch (audit U-003) — awaited so a cold-start first
+   *  request can't serve a stale `false`. Preferred over `actionsDisabled` when present. */
+  actionsDisabledFresh?: () => Promise<boolean>
   /** Today's key for the soft daily-limit check. */
   todayKey: string
   /** Production uses server-trusted context; tests may omit this and use readDob. */
@@ -232,8 +235,13 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
   const turnHint = buildConversationTurnHint(pre.decision.intent)
   // COACH_ACTIONING gate: the client may OPT IN, but the SERVER is authoritative on whether
   // actions are permitted (audit C-006). A modified/stale client sending allowActions=true is
-  // still refused when the owner has disabled actioning server-side. Advisory chat is unaffected.
-  const allowActions = input.allowActions === true && !(deps.actionsDisabled?.() ?? false)
+  // still refused when the owner has disabled actioning server-side. The switch is read with
+  // freshness + fail-closed semantics (audit U-003) so a cold-start first request can't serve a
+  // stale `false`. Advisory chat is unaffected either way.
+  const actionsOff = deps.actionsDisabledFresh
+    ? await deps.actionsDisabledFresh()
+    : (deps.actionsDisabled?.() ?? false)
+  const allowActions = input.allowActions === true && !actionsOff
   const systemPrompt = [
     buildCoachSystemPrompt({ allowWorkoutActions: allowActions }),
     '',
@@ -381,7 +389,8 @@ export const coachMessage = onCall<CoachMessageInput>(
         await enforceDailyLimit('coach', u, DAILY_COACH_LIMIT)
       },
       killSwitchEngaged: () => coachKillSwitch.engaged(), // remote source: config/coach.killSwitch (Firestore)
-      actionsDisabled: () => coachActionsSwitch.engaged(), // remote source: config/coach.actionsDisabled (Firestore)
+      // Freshness-bound + fail-closed for plan-mutating actions (audit U-003).
+      actionsDisabledFresh: () => coachActionsSwitch.engagedFresh(true), // remote source: config/coach.actionsDisabled (Firestore)
       todayKey: new Date().toISOString().slice(0, 10),
       loadTurnData: loadCoachTurnData,
       saveTurn: saveCoachTurn,

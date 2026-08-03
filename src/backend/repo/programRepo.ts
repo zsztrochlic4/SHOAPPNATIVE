@@ -15,7 +15,7 @@
 
 import { collection, doc, getDocs, query, where, writeBatch } from 'firebase/firestore'
 import { db } from '../../lib/firebase'
-import type { ProgramDoc, WorkoutInstanceDoc } from '../schema'
+import type { ProgramDoc, UserDoc, WorkoutInstanceDoc } from '../schema'
 
 /** Strip `undefined` (Firestore rejects it) via a plain-data round-trip. */
 function clean<T>(value: T): T {
@@ -58,6 +58,38 @@ export async function writeActiveProgram(
   for (const inst of instances) {
     batch.set(doc(instancesCol, inst.instance_id), clean(inst), { merge: false })
   }
+  for (const id of stale) batch.delete(doc(instancesCol, id))
+  await batch.commit()
+}
+
+/**
+ * ATOMIC commit of a whole coach action (audit U-001 / U-008): the canonical user doc, the program
+ * doc, the new instances AND the deletion of obsolete instances all land in ONE Firestore batch, so
+ * a signed-in user can never end up with the profile changed but the program not (or vice-versa), and
+ * a stale schedule can never linger.
+ *
+ * FAIL CLOSED (U-008): the obsolete-instance discovery query is NOT swallowed — if it throws, this
+ * throws and the caller keeps the prior plan, rather than committing a write that could orphan docs.
+ *
+ * No-op without Firebase or for the anonymous/local uid.
+ */
+export async function commitCoachAction(
+  uid: string,
+  backendUser: UserDoc,
+  program: ProgramDoc,
+  instances: WorkoutInstanceDoc[],
+): Promise<void> {
+  if (!db || !uid || uid === 'local') return
+  const instancesCol = collection(db, 'users', uid, 'workout_instances')
+  const keep = new Set(instances.map((i) => i.instance_id))
+  // Discover obsolete instances; a failure here ABORTS the commit (fail closed) — no try/catch.
+  const existing = await getDocs(query(instancesCol, where('program_id', '==', program.program_id)))
+  const stale = existing.docs.map((d) => d.id).filter((id) => !keep.has(id))
+
+  const batch = writeBatch(db)
+  batch.set(doc(db, 'users', uid), { backendUser: clean(backendUser) }, { merge: true })
+  batch.set(doc(db, 'users', uid, 'programs', program.program_id), clean(program), { merge: true })
+  for (const inst of instances) batch.set(doc(instancesCol, inst.instance_id), clean(inst), { merge: false })
   for (const id of stale) batch.delete(doc(instancesCol, id))
   await batch.commit()
 }
