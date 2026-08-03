@@ -60,3 +60,35 @@ export function initAppCheck(app: FirebaseApp): AppCheck | null {
 export function appCheckReady(): boolean {
   return appCheck !== null
 }
+
+export interface AppCheckStatus {
+  platform: typeof Platform.OS
+  /** A reCAPTCHA Enterprise site key is configured (web attestation possible). */
+  siteKeyConfigured: boolean
+  /** A debug token is set — DEV/STAGING only; must be empty in production. */
+  debugToken: boolean
+  /** App Check actually initialised on this client. */
+  active: boolean
+  /**
+   * Whether this platform can attest with the CURRENT (JS SDK) wiring. Web can
+   * (reCAPTCHA Enterprise). Native attestation (App Attest / Play Integrity)
+   * needs the native module + a dev build — see docs/APP_CHECK.md — so it reports
+   * false until that path ships.
+   */
+  attestableNow: boolean
+}
+
+/**
+ * Diagnostic snapshot for the App Check rollout (audit SA-019). Lets a settings/
+ * diagnostics view — and the owner during the monitor phase — confirm the client
+ * is actually attesting before enforcement is switched on, without exposing keys.
+ */
+export function appCheckStatus(): AppCheckStatus {
+  return {
+    platform: Platform.OS,
+    siteKeyConfigured: !!RECAPTCHA_SITE_KEY,
+    debugToken: !!DEBUG_TOKEN,
+    active: appCheck !== null,
+    attestableNow: Platform.OS === 'web' && !!RECAPTCHA_SITE_KEY,
+  }
+}

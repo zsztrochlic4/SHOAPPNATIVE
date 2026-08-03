@@ -13,14 +13,22 @@ own calls (e.g. the meal scan), because the client isn't attesting yet.
 ## Where it lives in the code
 
 - `functions/src/lib/guards.ts`
-  - `APP_CHECK_ENFORCED` — the single on/off switch (currently `false`).
+  - `APP_CHECK_ENFORCED` — the single on/off switch, now **config-driven**
+    (audit SA-019): `process.env.APPCHECK_ENFORCE === '1'`. Default OFF. Flip it
+    per environment with an env var + redeploy — **no code edit**, easy rollback.
   - `auditAppCheck(req, label)` — soft observability: logs `appcheck.missing`
     when a call arrives without a verified token, but never rejects.
   - `requireAppCheck` / `requireVerifiedUser` — hard checks (used by the gated
     `coachMessage`).
-- Each callable (`analyzeMeal`, `deleteAccount`, `sendNotification`) sets
-  `enforceAppCheck: APP_CHECK_ENFORCED` and calls `auditAppCheck(...)` first, so
-  flipping the one flag enforces everywhere consistently.
+- Each callable (`analyzeMeal`, `deleteAccount`, `reportClientError`,
+  `sendNotification`, `coachMessage`) sets `enforceAppCheck: APP_CHECK_ENFORCED`
+  and calls `auditAppCheck(...)` first, so enabling the env var enforces
+  everywhere consistently.
+- `src/lib/appCheck.ts` — client wiring, invoked at startup from
+  `src/lib/firebase.ts` (`initAppCheck(app)`).
+  - **Web is fully wired** (reCAPTCHA Enterprise, debug-token support, auto-refresh).
+  - `appCheckStatus()` — a diagnostic snapshot (platform / key configured / active /
+    attestable-now) to confirm the client is attesting during the monitor phase.
 
 ## Rollout — monitor, then enforce
 
@@ -31,9 +39,21 @@ own calls (e.g. the meal scan), because the client isn't attesting yet.
   `EXPO_PUBLIC_APPCHECK_RECAPTCHA_KEY`).
 
 ### 2. Initialise App Check in the client
-- Initialise the App Check SDK at app start (after `initializeApp`), using the
-  provider(s) from step 1, so the client starts attaching tokens to every
-  callable + Firestore request. Ship this in an app build.
+- **Web: already done.** `initAppCheck(app)` runs at startup once
+  `EXPO_PUBLIC_APPCHECK_RECAPTCHA_ENTERPRISE_KEY` is set and the console is
+  configured. Set the key in your web build env and the client starts attaching
+  tokens automatically. Verify with `appCheckStatus().active === true`.
+- **Native (iOS/Android): a build step you still own.** The `firebase` **JS SDK**
+  only supports the web reCAPTCHA provider — it cannot do App Attest / Play
+  Integrity. Native attestation requires the native module:
+  1. `npx expo install @react-native-firebase/app @react-native-firebase/app-check`
+  2. Register the **iOS** and **Android** apps in the Firebase project (only a WEB
+     app is registered today — see the firebase-verified-state note), with App
+     Attest (needs the paid Apple Developer account) and Play Integrity.
+  3. Initialise `@react-native-firebase/app-check` in a **dev/EAS build** (it does
+     not work in Expo Go), then ship it.
+  Until native ships, keep enforcement scoped so native calls aren't rejected
+  (enforce per-service, or keep monitor mode for the mobile clients).
 
 ### 3. Monitor (no enforcement yet)
 - With `APP_CHECK_ENFORCED = false`, calls still succeed, but every untokened
@@ -44,22 +64,25 @@ own calls (e.g. the meal scan), because the client isn't attesting yet.
   unverified; give them time to update.
 
 ### 4. Enforce
-- Flip **`APP_CHECK_ENFORCED = true`** in `functions/src/lib/guards.ts`.
-- (Optional, stricter) In the console, enable enforcement for **Firestore** and
-  **Storage** too.
-- `cd functions && npm run build` then `firebase deploy --only functions`.
+- Set the env var **`APPCHECK_ENFORCE=1`** for the functions (no code edit):
+  - `firebase functions:secrets:set APPCHECK_ENFORCE` (or a param/`.env`), then
+  - `cd functions && npm run build && firebase deploy --only functions`.
   > Note: a functions deploy also redeploys `analyzeMeal` — confirm the
   > `GEMINI_API_KEY` secret is set first, or that function will fail at runtime.
+- (Optional, stricter) In the console, enable enforcement for **Firestore** and
+  **Storage** too.
 
 ### 5. Rollback
 - If legitimate users get `failed-precondition` / App-Check errors: set
-  `APP_CHECK_ENFORCED = false`, rebuild, redeploy. One line, one place. Disable
-  Firestore/Storage enforcement in the console if you enabled it.
+  `APPCHECK_ENFORCE=0` (or unset it) and redeploy. One env var, easy to roll back.
+  Disable Firestore/Storage enforcement in the console if you enabled it.
 
 ## Guardrails
 - Do **not** enable enforcement in the console or set the flag `true` until steps
   1–3 are done and metrics show the live app is attesting.
 - `coachMessage` already hard-requires App Check, but it is a disabled stub, so it
   has no effect on the live app.
-- Tests (`functions/test/guards.test.mjs`) assert `APP_CHECK_ENFORCED === false`,
-  so an accidental flip in the repo fails CI — intentional flips update the test.
+- Enforcement is now driven by `APPCHECK_ENFORCE` (default OFF), so there is no
+  hardcoded flag to flip by accident in the repo; turning it on is an explicit,
+  reversible deploy-env change. CI runs without the var set, so it stays in
+  monitor mode there.
