@@ -58,16 +58,23 @@ export function coachOperational(): boolean {
 export const COACH_PREVIEW = process.env.EXPO_PUBLIC_COACH_PREVIEW === '1' && !coachOperational()
 
 /**
- * DEV-ONLY COACH ACTIONING FLAG (Coach Capability Plan). When on, the coach may PROPOSE
- * engine-resolvable workout/program changes (swap, goal change, deload, …) and the client
- * PERFORMS a confirmed proposal through the deterministic engine (which re-clamps against
- * the Safety Rules). Opt-in via `EXPO_PUBLIC_COACH_ACTIONING=1`, off by default and absent
- * from production, so real users never receive an actionable proposal until the owner rolls
- * actioning out as a separate decision. Unlike COACH_PREVIEW this layers on the LIVE coach,
- * so it requires the coach to actually be operational (honours the kill switch too). The
- * safety envelope is unaffected either way — the engine re-clamps every change regardless.
+ * COACH ACTIONING FLAG (Coach Capability Plan). When on, the coach may PROPOSE
+ * engine-resolvable workout/program changes (swap, goal change, deload, exam mode, …) and the
+ * client PERFORMS a user-confirmed proposal through the deterministic engine, which re-clamps
+ * every change against the Safety Rules. Outward actions (share_pr) require a second explicit
+ * confirm.
+ *
+ * LIVE (owner decision 2026-08-03) — actioning is enabled for all users wherever the coach is
+ * operational. It layers on the LIVE coach, so it inherits the coach's remote kill switch:
+ * engaging `config/coach.killSwitch` disables the coach AND actioning with it, no redeploy.
+ *
+ * Surgical off-switch (keeps the coach, disables only actioning): build with
+ * `EXPO_PUBLIC_COACH_ACTIONING=0`. Any other value (or unset) leaves actioning ON.
+ *
+ * The safety envelope is unaffected either way — the deterministic engine re-clamps every
+ * change regardless of who triggers it, so a modified client cannot bypass a safety floor.
  */
-export const COACH_ACTIONING = process.env.EXPO_PUBLIC_COACH_ACTIONING === '1' && coachOperational()
+export const COACH_ACTIONING = coachOperational() && process.env.EXPO_PUBLIC_COACH_ACTIONING !== '0'
 
 /**
  * Retained in-memory safety session for non-component coach callers (the reducer `SEND_CHAT` path),

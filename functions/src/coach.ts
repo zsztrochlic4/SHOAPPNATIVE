@@ -87,10 +87,10 @@ export interface CoachMessageInput {
   usage?: CoachUsage
   /**
    * Coach Capability Plan: when true, the coach may emit an engine-resolvable
-   * `workout_action` proposal (swap / goal change / deload / …). Gated by the client
-   * `COACH_ACTIONING` dev flag so live users never receive actionable proposals until
-   * the owner rolls actioning out. Absent/false ⇒ the prompt omits the action allowlist
-   * and any workout_action the model emits anyway is downgraded to a non-proposal here.
+   * `workout_action` proposal (swap / goal change / deload / …). Mirrors the client
+   * `COACH_ACTIONING` flag (LIVE as of 2026-08-03; the client sends true wherever the
+   * coach is operational, and off when actioning is disabled). Absent/false ⇒ the prompt
+   * omits the action allowlist and any workout_action the model emits is downgraded here.
    */
   allowActions?: boolean
 }

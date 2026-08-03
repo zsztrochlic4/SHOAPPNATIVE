@@ -28,7 +28,7 @@ export interface CoachServerInput {
   screeningOutcome?: string | null
   usage?: { dateKey: string; count: number }
   /** Coach Capability Plan: opt into engine-resolvable workout_action proposals
-   *  (mirrors the client `COACH_ACTIONING` dev flag). Server gates the allowlist on it. */
+   *  (mirrors the client `COACH_ACTIONING` flag, LIVE). Server gates the allowlist on it. */
   allowActions?: boolean
 }
 
