@@ -59,3 +59,18 @@ export async function fetchCoachKillSwitch(): Promise<boolean> {
 
 /** The process-wide production instance, warmed on cold start. */
 export const coachKillSwitch: KillSwitchReader = makeRemoteKillSwitch(fetchCoachKillSwitch)
+
+/**
+ * SERVER-OWNED action capability switch (audit C-006 / CA-004). The action-only off switch must
+ * NOT be a client build flag: a modified or stale client can set allowActions=true, so the server
+ * is the authority on whether plan-mutating actions are permitted. Actions are disabled server-side
+ * when config/coach.actionsDisabled === true (an owner can flip it live, no redeploy). Advisory
+ * chat is unaffected. FAIL-SAFE to the last known value like the kill switch.
+ */
+export async function fetchCoachActionsDisabled(): Promise<boolean> {
+  const snap = await getFirestore().doc('config/coach').get()
+  return snap.exists && snap.get('actionsDisabled') === true
+}
+
+/** Process-wide action capability switch (`disabled` == engaged), warmed on cold start. */
+export const coachActionsSwitch: KillSwitchReader = makeRemoteKillSwitch(fetchCoachActionsDisabled)

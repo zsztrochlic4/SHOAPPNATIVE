@@ -62,6 +62,9 @@ export interface CoachContextSnapshot {
   recentPRs?: string
   plateaus?: string
   recovery7d?: string
+  /** C-015: human-readable list of context reads that FAILED this turn (not merely empty), so
+   *  the model discloses a gap instead of treating a failed read as "no history / no injury". */
+  contextGaps?: string
 }
 
 /** The conflict precedence the model must follow (plan Phase 2). Higher wins. */
@@ -168,6 +171,9 @@ export function selectCoachContext(snapshot: CoachContextSnapshot, message: stri
     `Core: goal ${snapshot.goal || 'unknown'}; experience ${snapshot.experience || 'unknown'}; units ${snapshot.units || 'metric'}.`,
   ]
   if (snapshot.constraints) out.push(`Safety-approved constraints: ${snapshot.constraints}`)
+  // C-015: a FAILED read is not the same as "no data". Disclose the gap so the coach asks or
+  // qualifies rather than confidently asserting the user has no history/injury/etc.
+  if (snapshot.contextGaps) out.push(`INCOMPLETE CONTEXT — these were unavailable this turn (a read failed, not confirmed empty): ${snapshot.contextGaps}. Do not assume they are empty; if the question depends on one, say you couldn't load it and ask, rather than guessing.`)
 
   // Prompt-injection containment (audit F-029): every value below derives from
   // user-entered content (logs, free text, learned memories). Delimit it and

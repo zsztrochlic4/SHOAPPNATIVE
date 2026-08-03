@@ -56,11 +56,30 @@ function compact(value: unknown, max = 1200): string {
 
 const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
+/** The app's market is Australia; used as the timezone fallback when none is stored (C-008). */
+const DEFAULT_TIMEZONE = 'Australia/Sydney'
+
+/**
+ * The user's LOCAL weekday name (C-008). UTC would name the wrong day in Australia for the
+ * evening hours (e.g. 20:00 UTC Monday is already Tuesday in Sydney). Uses the stored IANA
+ * timezone when available, falling back to the app's Australian market timezone.
+ */
+function localWeekdayName(tz: string, now: Date = new Date()): string {
+  try {
+    const name = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: tz }).format(now)
+    if (WEEKDAY_NAMES.includes(name)) return name
+  } catch { /* invalid tz → fall through to the market default */ }
+  try {
+    return new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: DEFAULT_TIMEZONE }).format(now)
+  } catch {
+    return WEEKDAY_NAMES[now.getUTCDay()]
+  }
+}
+
 /** "Today (Wednesday) is a Push day: Bench Press, …" from the stored program's schedule. */
-function programDayText(program: any): string {
+function programDayText(program: any, today: string): string {
   const days = program && Array.isArray(program.days) ? program.days : null
   if (!days) return ''
-  const today = WEEKDAY_NAMES[new Date().getUTCDay()]
   const day = days.find((d: any) => d?.weekday === today)
   if (!day) return `Today (${today}) is a rest day in the current program.`
   const lifts = Array.isArray(day.exercises)
@@ -127,12 +146,15 @@ function recovery7dText(habits: Record<string, unknown>[]): string {
   return parts.join('; ') + '.'
 }
 
-async function recentDocs(uid: string, name: string, limitCount: number): Promise<Record<string, unknown>[]> {
+async function recentDocs(uid: string, name: string, limitCount: number, onFail?: () => void): Promise<Record<string, unknown>[]> {
   try {
     const snap = await getFirestore().collection('users').doc(uid).collection(name)
       .orderBy('dateKey', 'desc').limit(limitCount).get()
     return snap.docs.map((d) => ({ id: d.id, ...d.data() }))
   } catch {
+    // C-015: a FAILED read is recorded so the coach can disclose the gap rather than treat it
+    // as "no data". Still returns [] so downstream shaping is unaffected.
+    onFail?.()
     return []
   }
 }
@@ -180,19 +202,22 @@ function restoreSafety(data: Record<string, unknown> | undefined): SafetySession
 
 export async function loadCoachTurnData(uid: string): Promise<CoachTurnData> {
   const db = getFirestore()
+  // C-015: record which context reads FAILED (vs were genuinely empty) so we can disclose gaps.
+  const gaps: string[] = []
+  const track = (label: string) => () => gaps.push(label)
   const [userSnap, workspaceSnap, memoryList, turnSnap, safetySnap, sessions, habits, weights, meals, activities, foodReviews, workoutSummaries] = await Promise.all([
     db.collection('users').doc(uid).get(),
     db.collection('coachUsers').doc(uid).get(),
     loadMemories(uid),
     db.collection('coachUsers').doc(uid).collection('turns').orderBy('createdAt', 'desc').limit(MAX_RECENT_TURNS).get(),
     db.collection('coachSafety').doc(uid).get(),
-    recentDocs(uid, 'sessions', 12),
-    recentDocs(uid, 'habits', 14),
-    recentDocs(uid, 'weights', 12),
-    recentDocs(uid, 'meals', 20),
-    recentDocs(uid, 'activities', 12),
-    recentDocs(uid, 'foodReviews', 14),
-    recentDocs(uid, 'workoutSummaries', 12),
+    recentDocs(uid, 'sessions', 12, track('recent sessions')),
+    recentDocs(uid, 'habits', 14, track('sleep/hydration habits')),
+    recentDocs(uid, 'weights', 12, track('weight history')),
+    recentDocs(uid, 'meals', 20, track('nutrition log')),
+    recentDocs(uid, 'activities', 12, track('activity log')),
+    recentDocs(uid, 'foodReviews', 14, track('nutrition check-ins')),
+    recentDocs(uid, 'workoutSummaries', 12, track('training summaries')),
   ])
 
   if (!userSnap.exists) throw new Error('user_profile_missing')
@@ -211,15 +236,28 @@ export async function loadCoachTurnData(uid: string): Promise<CoachTurnData> {
   const user = userSnap.data() as Record<string, any>
   const backend = (user.backendUser && typeof user.backendUser === 'object') ? user.backendUser : {}
   const profile = (user.profile && typeof user.profile === 'object') ? user.profile : {}
+  const settings = (user.settings && typeof user.settings === 'object') ? user.settings : {}
   const screening = (backend.screening && typeof backend.screening === 'object') ? backend.screening : {}
-  const injuries = Array.isArray(backend.injuries) ? backend.injuries : []
-  const affectedRegions = injuries.map((i: any) => ordinary(i?.region, 40)).filter(Boolean)
+  // C-001 (P0): read the CANONICAL fields the onboarding contract actually writes —
+  // `affected_regions` and `excluded_exercise_ids` — not the non-existent `backend.injuries`
+  // (which was always empty) nor a hardcoded empty exclusion list.
+  const affectedRegions: string[] = Array.isArray(backend.affected_regions)
+    ? backend.affected_regions.map((r: any) => ordinary(r, 40)).filter(Boolean)
+    : []
+  const excludedExerciseIds: string[] = Array.isArray(backend.excluded_exercise_ids)
+    ? backend.excluded_exercise_ids.map((id: any) => ordinary(id, 40)).filter(Boolean)
+    : []
+  // C-007: the unit preference lives in the app's settings (settings.units), NOT profile.units.
+  const units = ordinary(settings.units || profile.units || 'metric', 20)
+  // C-008: name the day in the user's local timezone (stored IANA tz, else the AU market default).
+  const timezone = ordinary(settings.timezone || backend.timezone, 60) || DEFAULT_TIMEZONE
+  const todayName = localWeekdayName(timezone)
 
   const context: CoachContext = {
     dateOfBirth: ordinary(backend.date_of_birth, 20) || null,
     affectedRegions,
     screeningOutcome: ordinary(screening.outcome ?? backend.screening_outcome, 80) || null,
-    engineExcludedExerciseIds: [],
+    engineExcludedExerciseIds: excludedExerciseIds,
     isAustralia: true,
   }
 
@@ -227,6 +265,7 @@ export async function loadCoachTurnData(uid: string): Promise<CoachTurnData> {
   const coachingStyleText = String(workspaceSnap.get('coachingStyle') ?? 'balanced')
   const constraints = [
     affectedRegions.length ? `affected regions: ${affectedRegions.join(', ')}` : '',
+    excludedExerciseIds.length ? `excluded exercises: ${excludedExerciseIds.slice(0, 12).join(', ')}` : '',
     context.screeningOutcome ? `screening: ${context.screeningOutcome}` : '',
   ].filter(Boolean).join('; ')
 
@@ -236,7 +275,7 @@ export async function loadCoachTurnData(uid: string): Promise<CoachTurnData> {
     coachingStyle: coachingStyleText,
     goal: ordinary(backend.goal || profile.goal, 60),
     experience: ordinary(backend.experience_level || profile.experience, 40),
-    units: ordinary(profile.units || 'metric', 20),
+    units,
     constraints,
     profile: compact({ name: profile.name, goal: profile.goal, experience: profile.experience, daysPerWeek: profile.daysPerWeek, sessionMinutes: profile.sessionMinutes, equipment: profile.equipment, dietaryPrefs: profile.dietaryPrefs, motivation: profile.motivation }),
     canonicalProfile: compact({ goal: backend.goal, experience: backend.experience_level, daysPerWeek: backend.days_per_week, sessionLength: backend.session_length_min, equipment: backend.equipment, trainsAlone: backend.trains_alone }),
@@ -250,10 +289,12 @@ export async function loadCoachTurnData(uid: string): Promise<CoachTurnData> {
     nutritionCheckins: compact(foodReviews.slice(0, 7), 900),
     memories: memoryList.map((m) => ({ category: m.category, value: m.value, sensitivity: m.sensitivity, scope: m.scope })),
     // Coach Capability Plan — enriched signals (all from the docs already loaded above).
-    programDay: programDayText(user.generatedProgram ?? user.program),
+    programDay: programDayText(user.generatedProgram ?? user.program, todayName),
     recentPRs: recentPRsText(workoutSummaries),
     plateaus: plateausText(workoutSummaries),
     recovery7d: recovery7dText(habits),
+    // C-015: disclose reads that failed this turn (empty string when everything loaded).
+    contextGaps: gaps.length ? gaps.join(', ') : undefined,
   }
 
   // Full flattened text kept for back-compat (tests, non-selective callers).

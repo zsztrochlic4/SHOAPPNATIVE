@@ -24,12 +24,13 @@ import {
   type StoredDay,
   type ProgramStatus,
 } from './activate'
-import { contextForUser, generateProgram } from '../generator/generate'
+import { contextForUser } from '../generator/generate'
 import { swapCandidates, requestSpecific, type SwapResult, type SwapReason } from '../generator/swaps'
-import { adjustProgram, DELOAD } from '../generator/deload'
+import { DELOAD } from '../generator/deload'
 import { changeGoal } from '../generator/goalChange'
 import { EXERCISE_BY_ID } from '../data/index'
 import { validateWorkoutActionPayload, SWAP_REASONS, type NudgeKindLit } from '../coach/workoutActions'
+import { validateProgramForUser, summarizeViolations } from './programInvariants'
 
 /** The slice of app state the resolver reads. */
 export interface CoachActionState {
@@ -66,6 +67,23 @@ export type CoachActionOutcome =
   | { ok: true; apply: 'share_pr'; message: string }
 
 const dedupe = (ids: string[]): string[] => Array.from(new Set(ids))
+
+/**
+ * CA-002 — the shared post-transform safety gate. Every program-mutating outcome (swap patch,
+ * goal/day/session regen, deload) is run through `validateProgramForUser` here BEFORE it is
+ * returned for preview/commit. If any hard user constraint (injury, exclusion, equipment,
+ * skill, duplicate) is broken we refuse and keep the prior plan rather than surface an illegal
+ * one — so the model choosing a bad intent can never produce an unsafe plan.
+ */
+function guardProgram(user: UserDoc, program: StoredProgram, ok: CoachActionOutcome): CoachActionOutcome {
+  const check = validateProgramForUser(user, program, { enforceDuration: true })
+  if (check.ok) return ok
+  return {
+    ok: false,
+    reason: `invariant:${summarizeViolations(check.violations)}`,
+    message: "I couldn't make that change without breaking one of your safety limits, so I've left your plan as it is.",
+  }
+}
 
 const NUDGE_COPY: Record<NudgeKindLit, string> = {
   water: 'Quick one — log your water so we can keep an eye on hydration.',
@@ -119,7 +137,18 @@ function applySwap(state: CoachActionState, swap: SwapResult): CoachActionOutcom
   const nextUser: UserDoc = swap.excludeOriginal
     ? { ...state.backendUser, excluded_exercise_ids: dedupe([...state.backendUser.excluded_exercise_ids, fromId]) }
     : state.backendUser
-  return { ok: true, apply: 'patch', nextUser, program, instances, message: swap.note }
+  return guardProgram(nextUser, program, { ok: true, apply: 'patch', nextUser, program, instances, message: swap.note })
+}
+
+/** Deload the CURRENT stored plan in place (C-012): hold every load/rep/identity, cut sets
+ *  ~40% and add one RIR. Never regenerates — substitutions and logged loads are preserved. */
+function deloadStoredProgram(program: StoredProgram): StoredProgram {
+  const scaleSets = (sets: number) => Math.max(1, Math.round(sets * DELOAD.setMultiplier))
+  const days: StoredDay[] = program.days.map((d) => ({
+    ...d,
+    exercises: d.exercises.map((e) => ({ ...e, sets: scaleSets(e.sets), rirMin: e.rirMin + DELOAD.rirBump })),
+  }))
+  return { ...program, days, weeklySetsByMuscle: recomputeWeeklySets(days, program.weeklySetsByMuscle) }
 }
 
 /**
@@ -156,7 +185,7 @@ function regen(nextUser: UserDoc, now: string, message: string): CoachActionOutc
       message: 'That change needs a quick health re-check before I can apply it — open your Training profile to finish it.',
     }
   }
-  return { ok: true, apply: 'regen', nextUser, program: res.program, status: res.status, programDoc: res.programDoc, instances: res.instances, message }
+  return guardProgram(nextUser, res.program, { ok: true, apply: 'regen', nextUser, program: res.program, status: res.status, programDoc: res.programDoc, instances: res.instances, message })
 }
 
 /**
@@ -180,11 +209,20 @@ export function resolveCoachAction(
       }
       const ctx = contextForUser(state.backendUser)
 
-      // A user-named specific lift: no choice, place it directly (SW07).
+      // A user-named specific lift: no choice, place it directly (SW07). Excludes lifts already
+      // in the program (no duplicates) and enforces compatibility + injury exclusions (C-002/C-004).
       if (action.reason === 'specific' && action.wantedExerciseId) {
-        const raw = requestSpecific(action.fromExerciseId, action.wantedExerciseId, ctx)
+        const raw = requestSpecific(action.fromExerciseId, action.wantedExerciseId, ctx, otherProgramIds(state.program, action.fromExerciseId))
         if ('ok' in raw && raw.ok === false) {
-          return { ok: false, reason: 'no_eligible_swap', message: "I couldn't place that lift with your equipment and level — want me to suggest an alternative instead?" }
+          const reason = raw.reason
+          const message = reason === 'injury_excluded'
+            ? "That lift isn't safe with one of your injuries, so I can't add it — want me to suggest a safe alternative instead?"
+            : reason === 'already_in_program'
+              ? "That lift is already in your program — want me to suggest a different alternative instead?"
+              : reason === 'not_compatible'
+                ? "That isn't a like-for-like replacement for what it'd swap out, so I'd rather not unbalance your plan — want me to suggest a closer match?"
+                : "I couldn't place that lift with your equipment and level — want me to suggest an alternative instead?"
+          return { ok: false, reason: `no_eligible_swap:${reason}`, message }
         }
         return applySwap(state, raw as SwapResult)
       }
@@ -216,11 +254,11 @@ export function resolveCoachAction(
       }
       const nextUser: UserDoc = { ...state.backendUser, goal: action.newGoal }
       const projected = projectProgram(nextUser.uid, now, result.program, result.version)
-      return {
+      return guardProgram(nextUser, projected.program, {
         ok: true, apply: 'regen', nextUser,
         program: projected.program, status: { ok: true, reason: null }, programDoc: projected.programDoc, instances: projected.instances,
         message: `Switched your goal to ${action.newGoal} and rebuilt your plan around it — your logged loads carry over. Take the first week one notch easier so the change doesn't spike your intensity.`,
-      }
+      })
     }
 
     case 'set_training_days': {
@@ -232,15 +270,20 @@ export function resolveCoachAction(
     }
 
     case 'deload': {
-      const gen = generateProgram(state.backendUser)
-      if (!gen.ok) return { ok: false, reason: `gen_${gen.reason}`, message: "I couldn't prepare a deload just now." }
-      const deloaded = adjustProgram(gen.program, DELOAD, 'COACH_DELOAD')
-      const projected = projectProgram(state.backendUser.uid, now, deloaded)
-      return {
-        ok: true, apply: 'regen', nextUser: state.backendUser,
-        program: projected.program, status: { ok: true, reason: null }, programDoc: projected.programDoc, instances: projected.instances,
+      // C-012: deload the CURRENT plan in place — do not regenerate. Exercise identity, any
+      // user substitutions and the logged loads are all preserved; only sets (−40%) and RIR
+      // (+1) move. This transforms both the render projection and the canonical instances.
+      if (!state.program) return { ok: false, reason: 'no_program', message: "You don't have an active program to deload yet." }
+      const program = deloadStoredProgram(state.program)
+      const scaleSets = (sets: number) => Math.max(1, Math.round(sets * DELOAD.setMultiplier))
+      const instances = state.instances.map((inst) => ({
+        ...inst,
+        exercises: inst.exercises.map((pe) => ({ ...pe, sets: scaleSets(pe.sets), rir_min: pe.rir_min + DELOAD.rirBump })),
+      }))
+      return guardProgram(state.backendUser, program, {
+        ok: true, apply: 'patch', nextUser: state.backendUser, program, instances,
         message: 'Set up a deload week — sets cut back about 40% and intensity eased a notch, with your working loads held, not lost.',
-      }
+      })
     }
 
     case 'start_session': {

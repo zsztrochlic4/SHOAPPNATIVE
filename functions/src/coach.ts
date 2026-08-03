@@ -4,7 +4,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 import { getFirestore } from 'firebase-admin/firestore'
 import { requireVerifiedUser, APP_CHECK_ENFORCED } from './lib/guards'
 import { enforceDailyLimit, enforceBurstLimit, enforceGlobalDailyLimit } from './lib/rateLimit'
-import { coachKillSwitch } from './killSwitchRemote'
+import { coachKillSwitch, coachActionsSwitch } from './killSwitchRemote'
 import { FieldValue, Timestamp } from 'firebase-admin/firestore'
 import {
   isValidRequestKey,
@@ -117,6 +117,10 @@ export interface CoachTurnDeps {
   enforceLimit: (uid: string) => Promise<void>
   /** Remote kill switch (spec §20) — true ⇒ coach off regardless of the model. */
   killSwitchEngaged: () => boolean
+  /** Server-owned action capability (audit C-006) — true ⇒ plan-mutating actions are disabled
+   *  regardless of the client's allowActions payload. Advisory chat still works. Optional in
+   *  tests; production always supplies the remote switch. */
+  actionsDisabled?: () => boolean
   /** Today's key for the soft daily-limit check. */
   todayKey: string
   /** Production uses server-trusted context; tests may omit this and use readDob. */
@@ -226,9 +230,10 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
   // Intent-aware, budgeted context (final plan Phase 2) + per-turn conversational hint (Phase 1/3).
   const selectedContext = selectCoachContext(turnData.snapshot, message, { intent: pre.decision.intent })
   const turnHint = buildConversationTurnHint(pre.decision.intent)
-  // COACH_ACTIONING gate: only advertise the workout_action allowlist when the client
-  // opted in. Live users (flag off) get the same coach with actioning omitted entirely.
-  const allowActions = input.allowActions === true
+  // COACH_ACTIONING gate: the client may OPT IN, but the SERVER is authoritative on whether
+  // actions are permitted (audit C-006). A modified/stale client sending allowActions=true is
+  // still refused when the owner has disabled actioning server-side. Advisory chat is unaffected.
+  const allowActions = input.allowActions === true && !(deps.actionsDisabled?.() ?? false)
   const systemPrompt = [
     buildCoachSystemPrompt({ allowWorkoutActions: allowActions }),
     '',
@@ -300,8 +305,10 @@ function geminiModel(systemInstruction?: string) {
   })
 }
 
-// Warm the remote kill switch on cold start so the first request serves a fresh value.
+// Warm the remote kill switch + action capability switch on cold start so the first request
+// serves a fresh value.
 void coachKillSwitch.refresh()
+void coachActionsSwitch.refresh()
 
 export const coachMessage = onCall<CoachMessageInput>(
   // App Check is enforced consistently with every other callable via APP_CHECK_ENFORCED (currently
@@ -374,6 +381,7 @@ export const coachMessage = onCall<CoachMessageInput>(
         await enforceDailyLimit('coach', u, DAILY_COACH_LIMIT)
       },
       killSwitchEngaged: () => coachKillSwitch.engaged(), // remote source: config/coach.killSwitch (Firestore)
+      actionsDisabled: () => coachActionsSwitch.engaged(), // remote source: config/coach.actionsDisabled (Firestore)
       todayKey: new Date().toISOString().slice(0, 10),
       loadTurnData: loadCoachTurnData,
       saveTurn: saveCoachTurn,

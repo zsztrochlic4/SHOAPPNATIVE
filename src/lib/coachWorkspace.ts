@@ -89,7 +89,26 @@ export async function clearCoachMemories(): Promise<void> {
 export async function respondToCoachProposal(id: string, decision: 'confirm' | 'reject') {
   const result = await callable<
     { id: string; decision: 'confirm' | 'reject' },
-    { id: string; kind: string; payload: Record<string, string | number | boolean>; status: string }
+    { id: string; actionId?: string; kind: string; payload: Record<string, string | number | boolean>; status: string }
   >('respondToCoachProposal')({ id, decision })
   return result.data
+}
+
+/**
+ * Report the terminal outcome of a confirmed action so the server-side journal reaches
+ * applied/failed/rolled_back (audit C-018 / CA-008). Best-effort: never throws into the UI —
+ * the local apply/undo has already happened; this just keeps the audit trail honest.
+ */
+export async function recordCoachActionOutcome(
+  actionId: string,
+  outcome: 'applied' | 'failed' | 'rolled_back',
+  reasonCode?: string,
+): Promise<void> {
+  try {
+    await callable<{ actionId: string; outcome: string; reasonCode?: string }, { ok: true }>(
+      'recordCoachActionOutcome',
+    )({ actionId, outcome, ...(reasonCode ? { reasonCode } : {}) })
+  } catch {
+    /* audit-trail write is best-effort; a failure here must not disrupt the user. */
+  }
 }
