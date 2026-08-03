@@ -134,15 +134,20 @@ enforcement effort.
 
 ## Owner-only items (cannot be closed in code)
 
-These are release gates the audit correctly flags; the code is ready but the action is the owner's:
+These are release gates the audit correctly flags; the code + reviewer/test artifacts are ready, but
+the final action is the owner's. Each now has a prepared, signable/runnable artifact:
 
-1. **SA-006 — Generated-program sign-off** — the gate stays closed until a qualified professional
-   signs off the program logic (docs/COACH_RELEASE_STATE.md pattern). Intentional.
-2. **SA-010 — Coach shipping-SHA holdout** — an independent, fresh holdout with zero critical misses
-   remains the coach release blocker. The coach stays `COACH_ENABLED=false`.
+1. **SA-006 — Generated-program sign-off** — gate enforced in `signOff.ts` (`platformCleared()` stays
+   closed until reviewer + accreditation are recorded). Reviewer checklist + record:
+   **`docs/PROGRAM_SIGNOFF.md`**. Owner: get a qualified professional to sign, enter their details.
+2. **SA-010 — Coach shipping-SHA holdout** — harness + datasets exist (`npm run validate:holdouts`).
+   Signable reviewer record + fresh-set process: **`docs/COACH_HOLDOUT_SIGNOFF.md`**. Owner: run a
+   fresh holdout, an independent reviewer signs (0 critical misses, FP<5%). Coach stays `COACH_ENABLED=false`.
 3. **SA-015 (live)** — run `npm run record:release` against the real deploy and commit the attestation.
-4. **SA-019 (live)** — enable native App Check attestation, then `APPCHECK_ENFORCE=1`.
-5. **Device / load evidence** — iOS+Android E2E, screen-reader traversal, large-text matrix,
-   multi-year hydration, real push/billing lifecycle, and a coach burst/kill-switch drill.
-6. Attach the Cloud Logging **alert policy / SLO** to the `client_error` and `slo_breach` signals now
-   emitted by `functions/src/observability.ts`.
+4. **SA-019 (live)** — web attestation is wired; add native (`@react-native-firebase/app-check` in a
+   dev build) per **`docs/APP_CHECK.md`**, then set `APPCHECK_ENFORCE=1`.
+5. **SA-014 (live)** — run **`scripts/setup-monitoring.sh`** (see `docs/monitoring/ALERTING.md`) to
+   attach the alert policy to the `client_error` / `slo_breach` signals.
+6. **Device / load evidence** — plans + a k6 skeleton are ready:
+   **`docs/DEVICE_TEST_PLAN.md`**, **`docs/LOAD_TEST_PLAN.md`**, `scripts/load/coach-load.js`. Owner:
+   run on real iOS/Android + staging load, incl. a coach burst/kill-switch drill.
