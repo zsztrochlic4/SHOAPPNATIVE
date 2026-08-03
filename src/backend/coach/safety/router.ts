@@ -172,7 +172,7 @@ export function route(text: string, ctx: CoachContext, session: SafetySession): 
     const correctionHits = correctionAdjust(session, text)
     const sHits = stateHits(session, text, ctx)
     const genuine = isGenuineCorrection(text)
-    const clsScoped = scopeClassifierHits(text, genuine ? [] : activeClassifier.classify(text, ctx))
+    const clsScoped = scopeClassifierHits(text, genuine ? [] : activeClassifier.classify(text, ctx), ctx)
     const detected = [...ruleHits, ...sHits, ...clsScoped.hits]
     const escalated = [...escalateImmediacy(detected, text), ...escalateToEmergency(detected, text)]
     let decision = decide([...correctionHits, ...detected, ...escalated])
@@ -220,7 +220,7 @@ export async function routeAsync(
         clsRaw = activeClassifier.classify(text, ctx) // no async model wired → sync stub floor
       }
     }
-    const clsScoped = scopeClassifierHits(text, clsRaw)
+    const clsScoped = scopeClassifierHits(text, clsRaw, ctx)
     const detected = [...ruleHits, ...sHits, ...clsScoped.hits]
     const escalated = [...escalateImmediacy(detected, text), ...escalateToEmergency(detected, text)]
     let decision = decide([...correctionHits, ...detected, ...escalated])

@@ -13,6 +13,7 @@
  */
 
 import type { CoachContext, DetectorHit, SafetyCategory, Suppression } from './types'
+import { ageFromDob } from '../../safety/ageRouting'
 
 export interface Norm {
   /** lowercased, punctuation→space, whitespace-collapsed, space-padded. */
@@ -698,7 +699,7 @@ const SCOPED: Partial<Record<SafetyCategory, ('third_party' | 'historical' | 'ne
   prescribed_medication: ['third_party', 'historical', 'negation'],
   injury_override: ['third_party', 'historical', 'negation'],
   pregnancy: ['third_party', 'historical', 'negation', 'topical'],
-  under_18: ['third_party', 'historical', 'negation'],
+  under_18: ['third_party', 'historical', 'negation', 'topical'],
 }
 
 /** Trigger terms per category, used by the subject/negation checks. */
@@ -714,12 +715,26 @@ const CATEGORY_TERMS: Partial<Record<SafetyCategory, string[]>> = {
   under_18: ['16', '15', '14', '13', '17', 'year old', 'years old', 'teenager', 'teenage'],
 }
 
+/** Scoping options. `adult` = the server-trusted DOB proves the account holder is 18+. */
+export interface ScopeOpts { adult?: boolean }
+
+/** True when the stored DOB proves the account holder is an adult (18+). */
+function isAdultCtx(ctx: CoachContext): boolean {
+  const age = ageFromDob(ctx.dateOfBirth)
+  return age != null && age >= 18
+}
+
 /** Decide whether a hit is suppressed by scoping, returning the rule name (or null to keep it). */
-function suppressionRule(n: Norm, category: SafetyCategory): string | null {
+function suppressionRule(n: Norm, category: SafetyCategory, opts: ScopeOpts = {}): string | null {
   const rules = SCOPED[category]
   if (!rules) return null
   if (hasCurrentSafetySignal(n)) return null // PARAMOUNT: any live distress/intent/action blocks ALL suppression
   if (firstPersonPresent(n, category)) return null // current first-person disclosure of this category wins
+  // Server-trusted age (audit SA-010 FP-reduction): an `under_18` flag on a user whose STORED DOB
+  // proves they are an adult — with NO current first-person minor disclosure (both guarded above) —
+  // is a false positive. The authoritative minor handling runs off the DOB age gate, not this
+  // backstop, so suppressing it here only removes noise, never real minor protection.
+  if (category === 'under_18' && opts.adult) return 'server_dob_adult'
   const terms = CATEGORY_TERMS[category] ?? []
   if (rules.includes('third_party') && subjectThirdParty(n, terms)) return 'third_party_subject'
   if (rules.includes('historical') && historicalResolved(n)) return 'historical_resolved'
@@ -735,18 +750,18 @@ export interface RulesResult { hits: DetectorHit[]; suppressions: Suppression[] 
 /* ------------------------------------------------------------------ */
 
 /** Apply scoping suppression to a set of hits (shared by rules and classifier hits). */
-function scope(n: Norm, raw: DetectorHit[]): RulesResult {
+function scope(n: Norm, raw: DetectorHit[], opts: ScopeOpts = {}): RulesResult {
   const hits: DetectorHit[] = []
   const suppressions: Suppression[] = []
   for (const h of raw) {
-    const rule = suppressionRule(n, h.category)
+    const rule = suppressionRule(n, h.category, opts)
     if (rule) suppressions.push({ category: h.category, rule })
     else hits.push(h)
   }
   return { hits, suppressions }
 }
 
-export function runRules(text: string, _ctx: CoachContext): RulesResult {
+export function runRules(text: string, ctx: CoachContext): RulesResult {
   const n = normalize(text)
   const detectors = [
     detectCrisis, detectConcealedIntent, detectThirdPartyAcute, detectHarmToOthers, detectMedicalEmergency, detectOverdose, detectInjuryOverride,
@@ -757,15 +772,21 @@ export function runRules(text: string, _ctx: CoachContext): RulesResult {
   ]
   const raw: DetectorHit[] = []
   for (const d of detectors) raw.push(...d(n))
+  // NOTE: the rules `under_18` detector keys on EXPLICIT first-person age cues ("im 15",
+  // "eighteenth birthday next month") — those must NEVER be DOB-suppressed, so scope() here runs
+  // WITHOUT the adult flag. The server-DOB suppression applies ONLY to CLASSIFIER hits
+  // (scopeClassifierHits), which is where the benign over-flagging comes from (audit SA-010).
   return scope(n, raw)
 }
 
 /**
  * Apply the SAME scoping to CLASSIFIER hits — the LLM over-flags the same third-party / historical /
  * negated / topical contexts, and the scoping guards (first-person present ALWAYS wins) keep it safe.
+ * `ctx` enables the server-DOB `under_18` suppression (audit SA-010 FP-reduction); omitting it simply
+ * skips that one rule (fail-open toward keeping the hit — never less safe).
  */
-export function scopeClassifierHits(text: string, hits: DetectorHit[]): RulesResult {
-  return scope(normalize(text), hits)
+export function scopeClassifierHits(text: string, hits: DetectorHit[], ctx?: CoachContext): RulesResult {
+  return scope(normalize(text), hits, { adult: ctx ? isAdultCtx(ctx) : false })
 }
 
 /** A known benign false-positive (workout hyperbole, or a bare crisis denial). */
