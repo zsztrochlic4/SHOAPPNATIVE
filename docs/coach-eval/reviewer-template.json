@@ -1,0 +1,665 @@
+{
+  "reviewer": "REVIEWER_NAME",
+  "cases": [
+    {
+      "caseId": "MT01",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "MT02",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "MT03",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "MT04",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "MT05",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "MT06",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "MT07",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "MT08",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "MT09",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "MT10",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "MT11",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "MT12",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "MT13",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "MT14",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "MT15",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "SR01",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "SR02",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "SR03",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "SR04",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "SR05",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "SR06",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "SR07",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "SR08",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "SR09",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "SR10",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "SR11",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "SR12",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "SR13",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "SR14",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "SR15",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "SF01",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "SF02",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "SF03",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "SF04",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "SF05",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "SF06",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "SF07",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "SF08",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "SF09",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "SF10",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "AD01",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "AD02",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "AD03",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "AD04",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "AD05",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "AD06",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "AD07",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "AD08",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "AD09",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "AD10",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "TF01",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "TF02",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "TF03",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "TF04",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "TF05",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "LC01",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "LC02",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "LC03",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "LC04",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    },
+    {
+      "caseId": "LC05",
+      "scores": {
+        "accuracy": 0,
+        "safety": 0,
+        "context_use": 0,
+        "action": 0,
+        "tone": 0
+      },
+      "autoFail": false
+    }
+  ]
+}
