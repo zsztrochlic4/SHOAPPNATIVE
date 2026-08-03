@@ -181,16 +181,27 @@ test('set_training_days regenerates around the new days', () => {
   assert.deepEqual(r.nextUser.days_available, ['Monday', 'Wednesday', 'Friday'])
 })
 
-test('deload cuts sets and raises RIR while holding the program shape', () => {
+test('deload TRANSFORMS the current plan in place (C-012): preserves exercise identity, cuts sets, raises RIR', () => {
   const state = baseState()
   const r = resolveCoachAction(state, { action: 'deload' }, NOW)
   assert.equal(r.ok, true)
-  assert.equal(r.apply, 'regen')
-  // Compare against the un-deloaded baseline: every exercise trains at >= the base RIR.
-  const base = state.activation.program
+  // C-012: a deload no longer regenerates — it patches the current program so identity/loads/history hold.
+  assert.equal(r.apply, 'patch')
+  const base = state.program
+  // Same exercises, in the same order, on the same days — only sets/RIR move.
+  assert.deepEqual(
+    r.program.days.map((d) => d.exercises.map((e) => e.exerciseId)),
+    base.days.map((d) => d.exercises.map((e) => e.exerciseId)),
+    'deload must not change which exercises are in the plan',
+  )
   const baseRir = base.days.flatMap((d) => d.exercises).reduce((s, e) => s + e.rirMin, 0)
   const deRir = r.program.days.flatMap((d) => d.exercises).reduce((s, e) => s + e.rirMin, 0)
   assert.ok(deRir >= baseRir, 'deload should not lower RIR anywhere')
+  const baseSets = base.days.flatMap((d) => d.exercises).reduce((s, e) => s + e.sets, 0)
+  const deSets = r.program.days.flatMap((d) => d.exercises).reduce((s, e) => s + e.sets, 0)
+  assert.ok(deSets < baseSets, 'deload should cut total sets')
+  // Instances are transformed in lockstep (rir bumped, sets cut) — none dropped.
+  assert.equal(r.instances.length, state.instances.length)
 })
 
 test('start_session and open_budget_eats are navigation-only', () => {

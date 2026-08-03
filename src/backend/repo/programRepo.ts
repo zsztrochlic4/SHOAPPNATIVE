@@ -13,7 +13,7 @@
  * store's AsyncStorage persistence covers the render projection.
  */
 
-import { doc, setDoc } from 'firebase/firestore'
+import { collection, doc, getDocs, query, where, writeBatch } from 'firebase/firestore'
 import { db } from '../../lib/firebase'
 import type { ProgramDoc, WorkoutInstanceDoc } from '../schema'
 
@@ -23,9 +23,16 @@ function clean<T>(value: T): T {
 }
 
 /**
- * Persist the active program document and its scheduled-day instances. No-op without
- * Firebase or for the anonymous/local uid. Writes are merges keyed by the stable
- * program/instance ids, so re-activating (e.g. regeneration) overwrites cleanly.
+ * Persist the active program document and its scheduled-day instances ATOMICALLY, removing any
+ * obsolete instances left by a previous schedule (C-005).
+ *
+ * Instance ids are keyed by weekday (`${program_id}_${weekday}`), so a Mon/Wed/Fri → Tue/Thu
+ * change used to write the new Tue/Thu docs while the stale Mon/Wed/Fri docs lingered, leaving
+ * contradictory canonical data (schedule/export/sync disagree). We now write the program doc,
+ * write the new instances, AND delete every existing instance for this program that is not in
+ * the new set — all in a single batched commit so the canonical state can never be half-updated.
+ *
+ * No-op without Firebase or for the anonymous/local uid.
  */
 export async function writeActiveProgram(
   uid: string,
@@ -33,10 +40,24 @@ export async function writeActiveProgram(
   instances: WorkoutInstanceDoc[],
 ): Promise<void> {
   if (!db || !uid || uid === 'local') return
-  await setDoc(doc(db, 'users', uid, 'programs', program.program_id), clean(program), { merge: true })
-  await Promise.all(
-    instances.map((inst) =>
-      setDoc(doc(db!, 'users', uid, 'workout_instances', inst.instance_id), clean(inst), { merge: true }),
-    ),
-  )
+  const instancesCol = collection(db, 'users', uid, 'workout_instances')
+
+  // Find instances currently stored for this program so we can drop the ones the new schedule
+  // no longer includes. Best-effort: if the query fails we still write the new set below.
+  const keep = new Set(instances.map((i) => i.instance_id))
+  let stale: string[] = []
+  try {
+    const existing = await getDocs(query(instancesCol, where('program_id', '==', program.program_id)))
+    stale = existing.docs.map((d) => d.id).filter((id) => !keep.has(id))
+  } catch {
+    stale = []
+  }
+
+  const batch = writeBatch(db)
+  batch.set(doc(db, 'users', uid, 'programs', program.program_id), clean(program), { merge: true })
+  for (const inst of instances) {
+    batch.set(doc(instancesCol, inst.instance_id), clean(inst), { merge: false })
+  }
+  for (const id of stale) batch.delete(doc(instancesCol, id))
+  await batch.commit()
 }

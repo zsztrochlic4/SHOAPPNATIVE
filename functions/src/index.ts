@@ -22,6 +22,7 @@ export {
   deleteCoachMemory,
   clearCoachMemories,
   respondToCoachProposal,
+  recordCoachActionOutcome,
 } from './coachProfile'
 export { deleteAccount, resumeAccountDeletions } from './account'
 export { reportClientError, monitorSlo } from './observability'

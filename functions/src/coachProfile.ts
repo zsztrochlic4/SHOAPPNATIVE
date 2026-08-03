@@ -119,12 +119,57 @@ export const respondToCoachProposal = onCall<ProposalDecisionInput>(
         proposalId: id,
         kind: data.kind,
         decision,
-        outcome: decision === 'confirm' ? 'approved_by_user' : 'rejected_by_user',
+        // Audit trail (C-018 / CA-008): a confirm records the APPROVAL and enters a
+        // `pending_apply` terminal-pending state. The client reports the real terminal
+        // outcome (applied / failed / rolled_back) via recordCoachActionOutcome, so the
+        // journal reflects what actually happened, not merely that the user tapped confirm.
+        approvedByUser: decision === 'confirm',
+        outcome: decision === 'confirm' ? 'pending_apply' : 'rejected_by_user',
         payload: data.payload ?? {},
         createdAt: FieldValue.serverTimestamp(),
       })
-      return { id, kind: data.kind, payload: data.payload ?? {}, status: decision === 'confirm' ? 'confirmed' : 'rejected' }
+      return { id, actionId: actionRef.id, kind: data.kind, payload: data.payload ?? {}, status: decision === 'confirm' ? 'confirmed' : 'rejected' }
     })
     return result
+  },
+)
+
+/**
+ * Record the TERMINAL outcome of a confirmed action (audit C-018 / CA-008). The client calls this
+ * after it has applied (or failed to apply / rolled back) a confirmed program change, so the
+ * server-side action journal reaches a durable applied/failed/rolled_back state instead of
+ * stopping at "approved_by_user". Only a redacted reason CODE is stored — never free text or
+ * user data. Idempotent: a terminal state can only advance to rolled_back, never regress.
+ */
+interface ActionOutcomeInput { actionId?: string; outcome?: 'applied' | 'failed' | 'rolled_back'; reasonCode?: string }
+const OUTCOME_VALUES = ['applied', 'failed', 'rolled_back'] as const
+const REASON_CODE = /^[a-z0-9_:,-]{1,120}$/
+
+export const recordCoachActionOutcome = onCall<ActionOutcomeInput>(
+  { enforceAppCheck: APP_CHECK_ENFORCED, timeoutSeconds: 30 },
+  async (req: CallableRequest<ActionOutcomeInput>) => {
+    const uid = requireVerifiedUser(req, 'recordCoachActionOutcome')
+    const { actionId, outcome, reasonCode } = req.data ?? {}
+    if (!validId(actionId) || !outcome || !(OUTCOME_VALUES as readonly string[]).includes(outcome)) {
+      throw new HttpsError('invalid-argument', 'Invalid action outcome.')
+    }
+    if (reasonCode != null && !REASON_CODE.test(String(reasonCode))) {
+      throw new HttpsError('invalid-argument', 'Invalid reason code.')
+    }
+    const ref = getFirestore().collection('coachUsers').doc(uid).collection('actions').doc(actionId)
+    await getFirestore().runTransaction(async (tx) => {
+      const snap = await tx.get(ref)
+      if (!snap.exists) throw new HttpsError('not-found', 'Action not found.')
+      const current = String(snap.get('outcome') ?? '')
+      // Terminal states are final except that an already-applied action may still be rolled back.
+      if ((current === 'applied' || current === 'failed') && outcome !== 'rolled_back') return
+      if (current === 'rolled_back') return
+      tx.update(ref, {
+        outcome,
+        ...(reasonCode ? { reasonCode: String(reasonCode) } : {}),
+        terminalAt: FieldValue.serverTimestamp(),
+      })
+    })
+    return { ok: true }
   },
 )

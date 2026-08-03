@@ -36,6 +36,10 @@ jobs:
         env:
           # GitHub Pages serves this project under the /sho-app-native/ sub-path.
           EXPO_WEB_BASE_URL: /SHOAPPNATIVE
+          # App Check (audit C-016): the reCAPTCHA Enterprise site key is public (it ships in the
+          # client bundle), so it lives in a repo Variable, not a secret. When set, initAppCheck()
+          # attaches an attestation token to Firebase calls; absent, the client stays a safe no-op.
+          EXPO_PUBLIC_APPCHECK_RECAPTCHA_ENTERPRISE_KEY: ${{ vars.APPCHECK_RECAPTCHA_ENTERPRISE_KEY }}
         run: npx expo export --platform web
       - run: touch dist/.nojekyll
       - uses: actions/upload-pages-artifact@v3
