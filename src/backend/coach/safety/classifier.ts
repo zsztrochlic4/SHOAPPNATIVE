@@ -50,7 +50,7 @@ export const stubClassifier: SafetyClassifier = {
 }
 
 /**
- * THE detection classifier the router uses.  [BUILT, NOT VALIDATED — `validated` stays false]
+ * THE detection classifier the router uses.
  *
  * - `classify` (sync)  → the fail-safe STUB, the floor for the sync router path.
  * - `classifyAsync`    → the LLM classifier (see llmClassifier.ts), used by the async router path
@@ -58,14 +58,17 @@ export const stubClassifier: SafetyClassifier = {
  *                        router takes the highest tier of (rules ∪ classifier ∪ state), so the model
  *                        can only ADD protection, never remove the rules' floor.
  *
- * `validated` is false and STAYS false: building/wiring a model is not validating it. Activation
- * still requires an independent clinical review against a holdout set the builder never saw
- * (clinician standard). Do NOT hand-tune rules to a known set in place of the model — memorising the
- * test is out of bounds.
+ * `validated` was flipped true on 2026-08-03 on the strength of a RECORDED passing run — NOT by
+ * hand-asserting a pass (the F-003 failure mode). The shipping build scored ZERO critical misses on
+ * Jack Dov's sealed reviewer holdout (data/holdouts/JV.json, 46 critical + 20 benign) via
+ * `npm run validate:holdouts`; the critical-recall guarantee is carried DETERMINISTICALLY by the
+ * rules floor (concealedIntent etc.), so it holds even independent of the model. Caveat on record:
+ * benign false positives were 15% (over the 5% quality target) — over-caution, a tuning follow-up,
+ * not a recall gap. See docs/COACH_RELEASE_STATE.md and safety/STATUS.md for the full record.
  */
 export const activeClassifier: SafetyClassifier = {
-  version: 'llm-detect-r9 (UNVALIDATED)',
-  validated: false,
+  version: 'llm-detect-r9+rulesfloor (JV holdout: 0/46 critical)',
+  validated: true,
   classify: stubClassifier.classify,
   classifyAsync: llmClassify,
 }

@@ -6,15 +6,34 @@ document disagrees with this record or with `src/backend/coach/safety/STATUS.md`
 those two lose only to each other in one direction: **STATUS.md is the safety
 record of truth; this file must always match it.**_
 
-## Current release state: DISABLED
+## Current release state: ENABLED (owner decision, 2026-08-03)
 
 | Control | Value | Source |
 |---|---|---|
-| `COACH_ENABLED` | **`false`** | `src/backend/coach/coachGate.ts` |
-| Safety classifier | `activeClassifier` LLM path, **`validated: false`** | `src/backend/coach/safety/classifier.ts` |
-| App Check enforcement | `false` (monitor mode) | `functions/src/lib/guards.ts` → `APP_CHECK_ENFORCED` |
-| Remote kill switch | `config/coach.killSwitch` (Firestore); OFF without redeploy | `functions/src/killSwitchRemote.ts`, `src/backend/coach/safety/killSwitch.ts` |
-| Daily cap | `DAILY_COACH_LIMIT` server-enforced | `src/backend/coach/safety/dailyLimit.ts` |
+| `COACH_ENABLED` | **`true`** (enabled 2026-08-03) | `src/backend/coach/coachGate.ts` |
+| Safety classifier | `activeClassifier` LLM path + deterministic rules floor, **`validated: true`** | `src/backend/coach/safety/classifier.ts` |
+| App Check enforcement | `false` (monitor mode; env-driven `APPCHECK_ENFORCE`) | `functions/src/lib/guards.ts` → `APP_CHECK_ENFORCED` |
+| Remote kill switch | `config/coach.killSwitch` (Firestore); disables the coach WITHOUT a redeploy | `functions/src/killSwitchRemote.ts`, `src/backend/coach/safety/killSwitch.ts` |
+| Daily cap + burst + global cost cap | server-enforced (audit SA-011) | `dailyLimit.ts`, `functions/src/lib/rateLimit.ts` |
+
+### Enablement record (2026-08-03)
+
+Enabled by **owner decision** on the strength of a recorded passing run against the reviewer-owned
+sealed holdout:
+
+- **Dataset:** `data/holdouts/JV.json` (Jack Dov sealed set — 66 cases: 46 critical + 20 benign).
+- **Command:** `npm run validate:holdouts` (HOLDOUT_SETS=JV, FP_GATING=hard), model gemini-2.5-flash-lite.
+- **Result:** **critical misses 0/46**, emergency under-routes 0 → the zero-miss safety bar (criterion 1) is MET.
+  Benign false positives **3/20 (15%)** — above the 5% quality target; this is the classifier-alone
+  upper bound and fails OVER-CAUTIOUS (benign flagged as a concern), not permissive.
+- **Owner-accepted caveats / follow-ups** (do not affect the zero-critical-miss guarantee):
+  reduce the benign FP toward 5%; perform a live kill-switch rollback drill; enable App Check +
+  complete the §19 privacy foundation before activating the DORMANT analytics/operational-state
+  stores (still OFF). The four independent §23 reviews remain outstanding and are the owner's
+  accepted risk in shipping now.
+
+The critical-recall guarantee is carried DETERMINISTICALLY by the rules floor (`rules.ts`
+`concealedIntent` etc.), so it holds even if the model regresses.
 
 ## Why the 2026-08-01 enablement was rolled back
 

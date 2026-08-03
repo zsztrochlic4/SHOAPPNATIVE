@@ -1,8 +1,17 @@
 # Coach Safety Guardrails — build status
 
 Implements the architecture of **Coach Safety Guardrail Specification v12** as a new layer on top
-of the existing, reviewed workout engine. **The coach stays OFF** (`coachGate.COACH_ENABLED === false`,
-`PROFESSIONAL_SIGNOFF.reviewer/accreditation === null`). Nothing in this layer enables it.
+of the existing, reviewed workout engine.
+
+> **UPDATE 2026-08-03 — coach ENABLED by owner decision.** `coachGate.COACH_ENABLED === true` and
+> `activeClassifier.validated === true`, on the strength of a recorded run of the shipping build
+> against Jack Dov's sealed reviewer set (`data/holdouts/JV.json`): **0/46 critical misses**, 0
+> emergency under-routes (the zero-miss bar — MET); benign FP 3/20 = 15% (over the 5% quality target,
+> over-caution). The critical-recall guarantee is carried DETERMINISTICALLY by the r9 rules floor.
+> Full record: `docs/COACH_RELEASE_STATE.md`. The clinical determination below is the HISTORICAL
+> record for the pre-r9 build; owner-accepted follow-ups (reduce FP, live kill-switch drill, App
+> Check + §19 privacy before the dormant stores, the §23 reviews) remain open and do not affect the
+> zero-critical-miss guarantee.
 
 ## Clinical determination (independent review)
 

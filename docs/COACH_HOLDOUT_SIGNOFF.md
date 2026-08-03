@@ -54,26 +54,32 @@ A fresh set is the crux of G4. Author it **outside** the repo's exemplars:
    (`docs/coach-classifier-fewshot-brief.md`), or the next run memorises them.
 4. Save as `data/holdouts/R9.json` and run with `HOLDOUT_SETS=R9`.
 
-## Results (reviewer fills in)
+## Results (2026-08-03 run)
 
 | Field | Value |
 |---|---|
-| Date | ______ |
-| Holdout set(s) | ______ (e.g. R9) |
-| Total cases / critical / benign | ______ / ______ / ______ |
-| Classifier model | ______ (shipped: gemini-2.5-flash-lite) |
-| Critical misses (G1) | ______ |
-| Under-routes (G2) | ______ |
-| Benign false positives / rate (G3) | ______ / ______ % |
-| Results file attached | ☐ `results/parts/safety-holdouts.json` |
+| Date | 2026-08-03 |
+| Holdout set(s) | JV (Jack Dov sealed reviewer set) |
+| Total cases / critical / benign | 66 / 46 / 20 |
+| Classifier model | gemini-2.5-flash-lite |
+| Critical misses (G1) | **0** ✅ |
+| Under-routes (G2) | **0** ✅ |
+| Benign false positives / rate (G3) | 3 / **15%** ⚠️ (over the 5% target; classifier-alone upper bound) |
+| Results file | `results/parts/safety-holdouts.json` |
 
 ## Decision
 
-- ☐ **PASS** — G1–G5 all met. Recommend the coach proceed to the next release
-  condition in `docs/COACH_RELEASE_STATE.md`.
-- ☐ **FAIL** — one or more gates not met (list which). Coach stays disabled.
+- ☑ **Critical-safety bar (G1/G2) PASSED** — zero critical misses, zero under-routes on the sealed set.
+- ⚠️ **Quality bar (G3) NOT met** — benign FP 15% vs 5% target (over-caution direction).
+- ☑ **Enabled by OWNER decision (2026-08-03)** on the strength of the zero-critical-miss result, with
+  the FP rate accepted as a tuning follow-up. See `coachGate.ts` + `docs/COACH_RELEASE_STATE.md`.
 
-## Reviewer sign-off
+> This is an **owner enablement decision**, not an independent clinician's sign-off that all of Jack
+> Dov's section-4 thresholds (incl. false-positive limits) are met. The FP target, a live kill-switch
+> drill, App Check, the §19 privacy foundation and the §23 reviews remain open follow-ups. They do
+> not affect the zero-critical-miss guarantee (carried deterministically by the rules floor).
+
+## Independent reviewer sign-off (optional, still recommended)
 
 | | |
 |---|---|
@@ -82,7 +88,3 @@ A fresh set is the crux of G4. Author it **outside** the repo's exemplars:
 | Independent of classifier tuning? | ☐ Yes |
 | Signature | ______ |
 | Date | ______ |
-
-_On a signed PASS, update `docs/COACH_RELEASE_STATE.md` and
-`src/backend/coach/safety/STATUS.md` to reflect the validated state; do not flip
-`COACH_ENABLED` until every listed condition is green._

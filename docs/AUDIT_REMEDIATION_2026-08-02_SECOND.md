@@ -141,9 +141,14 @@ the final action is the owner's. Each now has a prepared, signable/runnable arti
    reviewer + accreditation number in `signOff.ts` `PROFESSIONAL_SIGNOFF`, so `platformCleared()`
    now returns ok and real-user program generation is enabled. (The AI coach remains a separate
    gate — `COACH_ENABLED` — still off pending SA-010.) Reviewer checklist: **`docs/PROGRAM_SIGNOFF.md`**.
-2. **SA-010 — Coach shipping-SHA holdout** — harness + datasets exist (`npm run validate:holdouts`).
-   Signable reviewer record + fresh-set process: **`docs/COACH_HOLDOUT_SIGNOFF.md`**. Owner: run a
-   fresh holdout, an independent reviewer signs (0 critical misses, FP<5%). Coach stays `COACH_ENABLED=false`.
+2. **SA-010 — Coach shipping-SHA holdout** — **coach ENABLED by owner decision 2026-08-03.** The
+   shipping build was run against Jack Dov's sealed reviewer set (`data/holdouts/JV.json`) via
+   `npm run validate:holdouts`: **0/46 critical misses**, 0 under-routes (the zero-miss safety bar —
+   MET); benign FP 15% (over the 5% quality target, over-caution — accepted as a tuning follow-up).
+   `COACH_ENABLED=true`, `activeClassifier.validated=true`. Record: **`docs/COACH_RELEASE_STATE.md`**,
+   `docs/COACH_HOLDOUT_SIGNOFF.md`, `safety/STATUS.md`. Open follow-ups (do NOT affect the zero-miss
+   guarantee, which the deterministic rules floor carries): reduce FP, live kill-switch drill,
+   App Check + §19 privacy before the dormant analytics/state stores, the §23 independent reviews.
 3. **SA-015 (live)** — run `npm run record:release` against the real deploy and commit the attestation.
 4. **SA-019 (live)** — web attestation is wired; add native (`@react-native-firebase/app-check` in a
    dev build) per **`docs/APP_CHECK.md`**, then set `APPCHECK_ENFORCE=1`.
