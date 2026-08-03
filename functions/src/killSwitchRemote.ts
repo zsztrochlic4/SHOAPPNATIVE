@@ -17,6 +17,13 @@ import { getFirestore } from 'firebase-admin/firestore'
 export interface KillSwitchReader {
   /** Cached engaged state (synchronous). */
   engaged(): boolean
+  /**
+   * Freshness-bound read (audit U-003). Awaits a refresh when the cache was never populated (cold
+   * start) or has gone stale, so the FIRST request after a cold start can't serve a stale `false`.
+   * `failClosed` (for plan-mutating actions): if freshness still can't be confirmed after the
+   * awaited refresh, return `true` (engaged / disabled) rather than fail open.
+   */
+  engagedFresh(failClosed?: boolean): Promise<boolean>
   /** Force a refresh now (awaited) — used to warm on cold start and in tests. */
   refresh(): Promise<void>
 }
@@ -45,6 +52,12 @@ export function makeRemoteKillSwitch(fetchEngaged: Fetcher, ttlMs = 30_000): Kil
   return {
     engaged() {
       if (Date.now() - lastOk > ttlMs) void refresh() // non-blocking; serves the cached value now
+      return engaged
+    },
+    async engagedFresh(failClosed = false) {
+      if (lastOk === 0 || Date.now() - lastOk > ttlMs) await refresh()
+      // Never confirmed (first read failed): fail closed for actions, fail safe otherwise.
+      if (lastOk === 0) return failClosed ? true : engaged
       return engaged
     },
     refresh,

@@ -34,7 +34,7 @@ const TIER_RANK: Record<string, number> = { Bodyweight: 0, 'Basic Gym': 1, 'Full
 const SKILL_RANK: Record<string, number> = { Beginner: 0, Intermediate: 1, Advanced: 2 }
 
 export interface InvariantViolation {
-  code: 'injury' | 'exclusion' | 'equipment' | 'skill' | 'duplicate' | 'unknown_exercise' | 'duration'
+  code: 'injury' | 'exclusion' | 'equipment' | 'skill' | 'duplicate' | 'unknown_exercise' | 'duration' | 'sparse' | 'empty_program'
   exerciseId?: string
   weekday?: string
   detail: string
@@ -45,10 +45,23 @@ export interface InvariantResult {
   violations: InvariantViolation[]
   /** Estimated minutes per day (weekday → minutes) — surfaced for duration-aware callers. */
   estimatedMinutesByDay: Record<string, number>
+  /** Weekdays whose estimated time exceeds the promised session budget (U-014 — honest messaging). */
+  daysOverBudget: string[]
 }
 
-/** Session-length tolerance: a generated/transformed day may run up to this factor over budget. */
-export const DURATION_TOLERANCE = 1.25
+/**
+ * Session-length TARGET tolerance (audit U-014): the product target is +10%. Kept as the tolerance
+ * the opt-in `enforceDuration` flag checks. The resolver does NOT hard-enforce it (the generator's
+ * short-session time model overshoots and is a separate owner-tracked defect, IP-10); instead it
+ * reports `daysOverBudget` so the coach never falsely claims a plan "fits" the promised time.
+ */
+export const DURATION_TARGET_TOLERANCE = 1.10
+
+/** Fixed per-session overhead the earlier estimate omitted (U-014): general warm-up + transitions. */
+export const SESSION_OVERHEAD_SEC = 300
+
+/** Minimum exercises a scheduled training day must contain — fewer is a sparse/unfilled plan (U-011). */
+export const MIN_EXERCISES_PER_TRAINING_DAY = 2
 
 function equipmentOk(ex: Exercise, user: UserDoc): boolean {
   if ((TIER_RANK[ex.equipmentTier] ?? 9) > (TIER_RANK[user.equipment_tier] ?? 0)) return false
@@ -77,12 +90,14 @@ export function estimateExerciseSeconds(e: StoredExercise): number {
 }
 
 export function estimateDayMinutes(day: StoredDay): number {
-  const sec = day.exercises.reduce((n, e) => n + estimateExerciseSeconds(e), 0)
+  // Include the whole-session warm-up/transition overhead the earlier estimate omitted (U-014).
+  const sec = SESSION_OVERHEAD_SEC + day.exercises.reduce((n, e) => n + estimateExerciseSeconds(e), 0)
   return Math.round(sec / 60)
 }
 
 export interface ValidateOptions {
-  /** Treat a day running over `session_length_min * DURATION_TOLERANCE` as a hard violation. */
+  /** Treat a day running over `session_length_min * DURATION_TARGET_TOLERANCE` as a hard violation.
+   *  Opt-in only (tests / future generator work) — the resolver does NOT set this. */
   enforceDuration?: boolean
 }
 
@@ -99,9 +114,20 @@ export function validateProgramForUser(
   const injuryExcluded = injuryExcludeIds(user.affected_regions as InjuryRegion[])
   const userExcluded = new Set(user.excluded_exercise_ids)
   const estimatedMinutesByDay: Record<string, number> = {}
-  const durationCapMin = user.session_length_min * DURATION_TOLERANCE
+  const daysOverBudget: string[] = []
+  const durationCapMin = user.session_length_min * DURATION_TARGET_TOLERANCE
+
+  // U-011: an empty program (no scheduled days) is never a valid plan.
+  if (program.days.length === 0) {
+    violations.push({ code: 'empty_program', detail: 'The plan has no scheduled training days.' })
+  }
 
   for (const day of program.days) {
+    // U-011: a scheduled training day must not be empty / near-empty (an unfilled/sparse plan —
+    // the harm behind the bodyweight required-slot defect). Rest days are not in program.days.
+    if (day.exercises.length < MIN_EXERCISES_PER_TRAINING_DAY) {
+      violations.push({ code: 'sparse', weekday: day.weekday, detail: `${day.weekday} has only ${day.exercises.length} exercise(s) — an incomplete plan.` })
+    }
     const seenInDay = new Set<string>()
     for (const e of day.exercises) {
       const ex = EXERCISE_BY_ID[e.exerciseId]
@@ -128,12 +154,14 @@ export function validateProgramForUser(
     }
     const minutes = estimateDayMinutes(day)
     estimatedMinutesByDay[day.weekday] = minutes
+    // Over the PROMISED budget at all → surfaced so the coach is honest (U-014), never a false "fits".
+    if (minutes > user.session_length_min) daysOverBudget.push(day.weekday)
     if (opts.enforceDuration && minutes > durationCapMin) {
-      violations.push({ code: 'duration', weekday: day.weekday, detail: `${day.weekday} is ~${minutes} min, over the ${user.session_length_min} min budget (+${Math.round((DURATION_TOLERANCE - 1) * 100)}% tolerance).` })
+      violations.push({ code: 'duration', weekday: day.weekday, detail: `${day.weekday} is ~${minutes} min, over the ${user.session_length_min} min budget (+${Math.round((DURATION_TARGET_TOLERANCE - 1) * 100)}% target).` })
     }
   }
 
-  return { ok: violations.length === 0, violations, estimatedMinutesByDay }
+  return { ok: violations.length === 0, violations, estimatedMinutesByDay, daysOverBudget }
 }
 
 /** Compact one-line summary for logs / action-journal reason codes (no PII). */

@@ -86,12 +86,18 @@ function emitSheet() {
 
 function scoreFilled() {
   const files = (process.env.SHEETS || '').split(',').map((s) => s.trim()).filter(Boolean)
-  if (files.length < 2) {
+  if (files.length === 0) {
     console.error('MODE=score needs SHEETS=fileA.json,fileB.json (two independent reviewers).')
     process.exit(2)
   }
+  // The gate itself enforces "exactly two distinct reviewers"; pass through whatever is given so a
+  // wrong count fails with a precise reason rather than being silently rejected here.
   const sheets = files.map((f) => JSON.parse(readFileSync(f, 'utf8')))
-  const result = evaluateResponseQuality(sheets)
+  // Bind the manifest when supplied so an unbound (placeholder) manifest fails the gate (U-006).
+  let manifest
+  const manifestPath = process.env.MANIFEST || 'docs/coach-eval/response-eval-manifest.json'
+  try { manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) } catch { manifest = undefined }
+  const result = evaluateResponseQuality(sheets, manifest)
   console.log(JSON.stringify(result, null, 2))
   process.exit(result.pass ? 0 : 1)
 }

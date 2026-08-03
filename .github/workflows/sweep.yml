@@ -32,6 +32,8 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
+      - name: Lint (eslint, zero warnings)
+        run: npm run lint
       - name: Typecheck
         run: npm run typecheck
       - name: App domain checks (planned periods + dashboard stats)
