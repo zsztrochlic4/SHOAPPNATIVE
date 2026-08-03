@@ -35,6 +35,21 @@ sealed holdout:
 The critical-recall guarantee is carried DETERMINISTICALLY by the rules floor (`rules.ts`
 `concealedIntent` etc.), so it holds even if the model regresses.
 
+### FP-reduction round (2026-08-03)
+
+After enablement, the benign false-positive rate was reduced with generalising (not
+holdout-tuned) changes: server-DOB suppression of benign `under_18` classifier hits,
+wider `under_18` scoping, and prompt disambiguation for `under_18` / `meal_plan` /
+`off_topic`. Re-measured on a LARGE fresh 100-case set (`data/holdouts/R10.json`):
+
+- **Production path** (rules ∪ classifier ∪ scoping ∪ DOB — what users actually hit,
+  via `scripts/validate-coach-production.mjs`): **critical misses 0/40, FP 3.3% (2/60)** —
+  under the 5% target. The 2 FPs are gentle `off_topic` refers, not safety over-flags.
+- Classifier-alone (harness upper bound): FP 8.3% (down from R9's 25%), critical misses 0/40.
+
+Recall held at 0 critical misses throughout. FP monitoring is now a repeatable
+production-path measurement, not ad-hoc.
+
 ## Why the 2026-08-01 enablement was rolled back
 
 The gate was flipped to `true` on 2026-08-01 citing an "R8 clinical validation".
