@@ -16,15 +16,10 @@ on:
       - 'app.config.js'
       - 'metro.config.js'
       - '.github/workflows/e2e.yml'
+  # Runs on EVERY PR to main (no path filter) so it can be a reliable required check — a
+  # path-filtered required check silently blocks PRs that don't touch those paths (audit C-009).
   pull_request:
-    paths:
-      - 'src/**'
-      - 'e2e/**'
-      - 'playwright.config.ts'
-      - 'app.json'
-      - 'app.config.js'
-      - 'metro.config.js'
-      - '.github/workflows/e2e.yml'
+    branches: [main]
   workflow_dispatch:
 
 permissions:

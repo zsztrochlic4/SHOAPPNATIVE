@@ -122,10 +122,13 @@ policy.
 These are process / infrastructure / human-review actions. The code scaffolding each needs is in
 place; the owner must perform the action and record it.
 
-- **C-009 — Branch protection / exact-SHA release gate.** Configure GitHub branch protection so
-  `main` cannot merge with a red or missing app / functions / rules / E2E / coach-eval check, and
-  require the exact merge-queue SHA to be green. The stale `coach_disabled` functions test that
-  caused the red gate is corrected in this branch; the gate itself is a repo setting.
+- **C-009 — Branch protection / exact-SHA release gate.** A `main` ruleset requires status checks +
+  "branches up to date". **Required checks must be `sweep`, `e2e`, `Rules + sanitisation tests`** —
+  these run on every PR to `main`. Do **NOT** require `validate` (it is the nightly
+  `backend-validation` job; it never runs on a PR, so requiring it blocks every merge). This branch
+  loosened the `e2e` and `security-rules` `pull_request` triggers to run on all PRs to `main` (a
+  path-filtered required check silently blocks PRs that don't touch those paths). The stale
+  `coach_disabled` functions test that caused the original red gate is also corrected here.
 - **C-016 — App Check enforcement.** `APP_CHECK_ENFORCED` is still monitor-mode by design (no native
   app is attesting yet). Follow `docs/APP_CHECK.md`: measure legitimate-attestation telemetry, then
   flip enforcement with a rollback drill. Owner decision + release build.
