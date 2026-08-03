@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthProvider'
 import { useStore, useStoreMeta, type WindowedHistory } from './store'
 import { resetSharedCoachSession } from '../lib/coachSafety'
 import { loadUserState, loadRemainingHistory, saveUserState } from './cloudRepo'
+import { canSyncSnapshot } from './resetGuards'
 import { saveBackoffMs, MAX_SAVE_RETRIES } from './saveRetry'
 import { mergeById, type HistoryEntry } from './historyMerge'
 import { registerEnsureFullHistory } from './historySync'
@@ -213,6 +214,13 @@ export function CloudSync() {
     const u = userRef.current
     // Don't write mid-merge: state and baseline are briefly being reconciled.
     if (!u || !syncedRef.current || hydratingHistoryRef.current || incompatibleCloudRef.current) return
+    // P0 STRUCTURAL GUARD (audit SA-001): a `demo` snapshot is fabricated seed
+    // data (buildSeed() sets demo:true). It must NEVER reach an authenticated
+    // account's cloud copy — diffing seed against the real baseline would delete
+    // or overwrite genuine documents. Even if a RESET_DEMO ever slipped through
+    // to a signed-in state, the seed can never be synced. Real user state always
+    // has demo:false (COMPLETE_ONBOARDING / emptyState / RESET_EMPTY).
+    if (!canSyncSnapshot(stateRef.current)) return
     if (savingRef.current) {
       savePendingRef.current = true // a change landed during a save — save again after
       return

@@ -222,6 +222,12 @@ export interface WorkoutInstanceDoc {
   day_type: DayType
   status: InstanceStatus
   exercises: PrescribedExercise[]
+  /**
+   * Idempotency marker for the Progression Engine (audit SA-003). Set to true in
+   * the same transaction that advances progression for this instance, so a retry
+   * (or a second device) can never advance the same session twice.
+   */
+  progression_applied?: boolean
 }
 
 /* ------------------------------------------------------------------ */

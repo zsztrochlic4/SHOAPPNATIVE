@@ -7,14 +7,20 @@ if (getApps().length === 0) initializeApp()
 
 /**
  * Single switch for App Check enforcement across every callable (Blocker #4 /
- * Option B). Kept OFF until the app is attesting: turning it on before the client
- * sends App Check tokens would reject the live app's own calls (e.g. the meal
- * scan). Rollout is monitor-then-enforce — see docs/APP_CHECK.md:
+ * Option B, audit F-006 / SA-019). Kept OFF by default until the app is
+ * attesting: turning it on before the client sends App Check tokens would reject
+ * the live app's own calls (e.g. the meal scan). Rollout is monitor-then-enforce
+ * — see docs/APP_CHECK.md:
  *   1. ship `auditAppCheck` (this file) and watch the logs until essentially all
  *      real traffic carries a token,
- *   2. flip this to `true` and redeploy. One line, one place, easy to roll back.
+ *   2. enable enforcement and redeploy.
+ *
+ * Enforcement is now CONFIG-DRIVEN rather than a hardcoded edit (audit SA-019):
+ * set the function env var `APPCHECK_ENFORCE=1` (Firebase config / `.env` /
+ * `firebase functions:secrets`/params) and redeploy to flip monitor → enforce
+ * per environment, with no code change and an easy rollback. Defaults to OFF.
  */
-export const APP_CHECK_ENFORCED = false
+export const APP_CHECK_ENFORCED = process.env.APPCHECK_ENFORCE === '1'
 
 /**
  * Soft App Check observability, safe to run while enforcement is OFF. When a call

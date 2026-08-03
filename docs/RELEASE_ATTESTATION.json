@@ -1,0 +1,17 @@
+{
+  "recordedAt": "2026-08-03T01:11:21.939Z",
+  "tag": "audit-remediation-2026-08",
+  "gitSha": "895c167cbc97905781bc3e587ddd6b7927ab0bca",
+  "project": "strengthhub-2ab33",
+  "appCheckEnforced": false,
+  "artefacts": {
+    "firestore.rules": "2f44f7efec7bf1815a635737b66ba881b360564feb9e0d32f730affb9fd771d5",
+    "storage.rules": "4debae6b70420bb047617623adbaa8d8b9ccf0aee6439704c12cd0160d7f834d",
+    "firestore.indexes.json": "c9db33026c4ec1fba42b41747cc33b093586639130f91287f49790f5b48fe366",
+    "firebase.json": "192a4578247453cecc7e4a7a72fb01dc2a3332dfa819e2d3cb1e8fd8b3c934f1",
+    "functions/src": {
+      "digest": "32adc78470547682e01b048baa966302e8bc732a237a78ff1f871af55edea9f7",
+      "fileCount": 11
+    }
+  }
+}

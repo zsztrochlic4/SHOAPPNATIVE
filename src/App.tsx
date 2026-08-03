@@ -23,11 +23,14 @@ import { ToastProvider } from './components/Toast'
 import { NavProvider, type Overlay } from './nav'
 import { themeVars, useThemeName, cssVars } from './theme'
 import { setSoundEnabled } from './lib/sound'
+import { setHapticsEnabled } from './lib/haptics'
+import { setReducedMotionPreference } from './lib/a11y'
 import { initBudgetMeals } from './data/recipes'
 import { initExerciseInfo } from './data/exerciseInfo'
 import { initQuickWorkouts } from './data/quickWorkouts'
 import { Skeleton, SkeletonLines } from './components/Skeleton'
 import { installGlobalErrorHooks } from './lib/reportError'
+import { installRemoteErrorReporter } from './lib/remoteErrorReporter'
 import { OfflineBanner } from './components/OfflineBanner'
 import Dashboard from './screens/Dashboard'
 import Workout from './screens/Workout'
@@ -75,6 +78,8 @@ const screens: Record<TabKey, React.ComponentType> = {
 }
 const TAB_KEYS = Object.keys(screens) as TabKey[]
 const selectSoundEnabled = (state: AppState) => state.settings.soundEnabled ?? true
+const selectHapticsEnabled = (state: AppState) => state.settings.hapticsEnabled ?? true
+const selectReducedMotion = (state: AppState) => state.settings.reducedMotion ?? 'system'
 const selectOnboarded = (state: AppState) => state.profile.onboarded
 
 /**
@@ -294,11 +299,23 @@ function Shell() {
 function ThemedRoot() {
   const name = useThemeName()
   const soundOn = useStoreSelector(selectSoundEnabled)
+  const hapticsOn = useStoreSelector(selectHapticsEnabled)
+  const reducedMotion = useStoreSelector(selectReducedMotion)
 
   // Keep the (asset-free) sound engine in sync with Settings → "Sounds & cues".
   useEffect(() => {
     setSoundEnabled(soundOn)
   }, [soundOn])
+
+  // Apply the haptics + reduced-motion preferences to their lib singletons
+  // (audit SA-013/SA-017) so a user's Settings choice takes effect app-wide,
+  // independent of sound and the OS setting.
+  useEffect(() => {
+    setHapticsEnabled(hapticsOn !== false)
+  }, [hapticsOn])
+  useEffect(() => {
+    setReducedMotionPreference(reducedMotion ?? 'system')
+  }, [reducedMotion])
 
   // Load the recipe catalogue once: bundled seed shows instantly, then the
   // Firestore `recipes` overlay (edited via the spreadsheet) is applied. No-op
@@ -441,6 +458,10 @@ function DevSafetyHarnessGate(): React.ReactElement | null {
 // they flow through the reportError seam into the redacted local diagnostics
 // buffer (and any crash service registered later via setErrorReporter).
 installGlobalErrorHooks()
+// Wire the reportError seam to the trusted backend (audit SA-014): production
+// crashes now emit an alertable, redacted remote signal (throttled, best-effort),
+// not just a local buffer. No-op when Firebase isn't configured.
+installRemoteErrorReporter()
 
 export default function App() {
   const devHarness = DevSafetyHarnessGate()

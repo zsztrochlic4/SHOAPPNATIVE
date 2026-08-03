@@ -30,6 +30,7 @@ import { nextSetRecommendation } from '../store/training'
 import { coachThreadView } from '../store/coach'
 import { coachReply } from '../lib/coachChat'
 import { askCoachServer } from '../lib/coachServer'
+import { newCoachRequestKey } from '../lib/coachRequestKey'
 import { fetchCoachWorkspace, readCachedCoachWorkspace, respondToCoachProposal } from '../lib/coachWorkspace'
 import { CoachMemoryView } from '../components/CoachMemoryView'
 import { coachContext, coachOperational, COACH_PREVIEW, coachPrecheckAsync, newSafetySession } from '../lib/coachSafety'
@@ -644,6 +645,8 @@ export function CoachChatSheet({ open, onClose }: Props) {
   // retry, and a send sequence so Cancel/supersede drops a stale response.
   const [retryMsg, setRetryMsg] = useState<string | null>(null)
   const sendSeqRef = useRef(0)
+  // Idempotency key for the in-flight coach turn, reused across retries (audit SA-011).
+  const requestKeyRef = useRef<string | null>(null)
   // Shared offset: dragging any row left reveals every row's timestamp together.
   const revealX = useRef(new Animated.Value(0)).current
   // Per-conversation safety state (persistence + retraction across messages, spec §2).
@@ -707,11 +710,16 @@ export function CoachChatSheet({ open, onClose }: Props) {
     const seq = ++sendSeqRef.current
     setRetryMsg(null)
     setTyping(true)
+    // Idempotency key (audit SA-011): a fresh key per NEW message, REUSED on a
+    // retry of the same message, so a retry returns the first turn server-side
+    // rather than paying for a second model call + stored turn.
+    const requestKey = opts?.resend && requestKeyRef.current ? requestKeyRef.current : newCoachRequestKey()
+    requestKeyRef.current = requestKey
     try {
       // TRUSTED BACKEND coach: the server re-runs the precheck (authoritative), the
       // model call, and the validator, so a modified client can't bypass safety
       // (§4.4). It may BLOCK even though the client's fast precheck allowed the turn.
-      const res = await askCoachServer({ message: msg })
+      const res = await askCoachServer({ message: msg, requestKey })
       if (seq !== sendSeqRef.current) return // cancelled / superseded — drop stale reply
       // Server already ran guardOutgoing; blocked replies carry crisis buttons.
       dispatch({

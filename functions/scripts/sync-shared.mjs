@@ -28,6 +28,7 @@ const outRoot = join(repoRoot, 'functions', 'src', '_shared')
 // Everything else is discovered by following relative imports from these.
 const ENTRIES = [
   'backend/coach/coachGate.ts',
+  'backend/coach/requestControls.ts',
   'backend/coach/operatingRules.ts',
   'backend/coach/contracts.ts',
   'backend/coach/structuredResponse.ts',

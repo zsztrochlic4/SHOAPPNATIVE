@@ -10,7 +10,11 @@
  * Only cursor/timer context is stored (no set data — the session itself lives
  * in AppState, which is identity-scoped separately). A stored runtime resumes
  * only for the exact same session id, and expires after RESUME_MAX_AGE_MS.
+ *
+ * Storage is UID-scoped (audit SA-005): the runtime lives under the active
+ * identity's own key, so account B can never resume account A's workout.
  */
+import { getActiveIdentity, type Identity } from '../store/identity'
 
 export interface WorkoutRuntime {
   sessionId: string
@@ -76,7 +80,18 @@ export function resumableRuntime(
 
 /* ------------------------- storage (app side) ------------------------- */
 
-const STORAGE_KEY = 'sho.activeWorkout.runtime.v1'
+// UID-scoped storage key (audit SA-005). The pre-scoping build used ONE global
+// key, so account B could resume account A's interrupted workout on a shared
+// device. The runtime now lives under the active identity's own key; account B
+// simply finds nothing under its key. The unsuffixed legacy key is treated as
+// stale and cleaned up.
+const RUNTIME_KEY_BASE = 'sho.activeWorkout.runtime.v1'
+const LEGACY_RUNTIME_KEY = RUNTIME_KEY_BASE
+
+/** The runtime storage key for an identity (defaults to the active one). */
+export function runtimeStorageKey(identity: Identity = getActiveIdentity()): string {
+  return `${RUNTIME_KEY_BASE}.${identity}`
+}
 
 async function storage() {
   const { default: AsyncStorage } = await import('@react-native-async-storage/async-storage')
@@ -85,7 +100,7 @@ async function storage() {
 
 export async function saveWorkoutRuntime(rt: WorkoutRuntime): Promise<void> {
   try {
-    await (await storage()).setItem(STORAGE_KEY, JSON.stringify(rt))
+    await (await storage()).setItem(runtimeStorageKey(), JSON.stringify(rt))
   } catch {
     /* best-effort */
   }
@@ -93,16 +108,32 @@ export async function saveWorkoutRuntime(rt: WorkoutRuntime): Promise<void> {
 
 export async function loadWorkoutRuntime(): Promise<WorkoutRuntime | null> {
   try {
-    const raw = await (await storage()).getItem(STORAGE_KEY)
+    const raw = await (await storage()).getItem(runtimeStorageKey())
     return raw ? (JSON.parse(raw) as WorkoutRuntime) : null
   } catch {
     return null
   }
 }
 
+/** Clear the CURRENT identity's runtime (workout finished / abandoned). */
 export async function clearWorkoutRuntime(): Promise<void> {
   try {
-    await (await storage()).removeItem(STORAGE_KEY)
+    await (await storage()).removeItem(runtimeStorageKey())
+  } catch {
+    /* best-effort */
+  }
+}
+
+/**
+ * Clear a specific identity's runtime plus the legacy global key (audit
+ * SA-020) — used by sign-out / account deletion so no workout timing context
+ * for that account survives on the device.
+ */
+export async function clearWorkoutRuntimeFor(identity: Identity): Promise<void> {
+  try {
+    const s = await storage()
+    await s.removeItem(runtimeStorageKey(identity))
+    await s.removeItem(LEGACY_RUNTIME_KEY)
   } catch {
     /* best-effort */
   }

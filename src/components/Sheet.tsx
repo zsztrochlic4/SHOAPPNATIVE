@@ -15,6 +15,7 @@ import Reanimated, {
   Easing as ReEasing,
 } from 'react-native-reanimated'
 import { AppModal, IS_WEB, WEB_SCREEN } from './WebFrame'
+import { useFocusOnOpen } from '../lib/a11y'
 
 // Menu → detail transition: 280ms ease-out, both directions — a short slide
 // crossfaded with opacity (see MenuDetailPanel), calm enough to read as a clean,
@@ -61,6 +62,11 @@ export function Sheet({
   if (open && !wasOpen.current && menuMode !== nav.menuStack) setMenuMode(nav.menuStack)
   wasOpen.current = open
 
+  // Move screen-reader focus onto the sheet header when it opens (audit SA-012),
+  // so VoiceOver/TalkBack lands on the new content instead of the hidden trigger.
+  const headerRef = useRef<View | null>(null)
+  useFocusOnOpen(headerRef, open && !menuMode && !bare)
+
   if (bare) {
     return <BarePanel open={open} onClose={onClose}>{children}</BarePanel>
   }
@@ -92,7 +98,7 @@ export function Sheet({
           // screen edge-to-edge. Otherwise a bottom sheet capped at 88%.
           style={{ height: full ? height : undefined, maxHeight: full ? height : height * 0.88 }}
         >
-          <View className="px-5 pb-2 pt-4">
+          <View ref={headerRef} accessible accessibilityRole="header" accessibilityLabel={title} className="px-5 pb-2 pt-4">
             {!full && (
               <View
                 style={{ position: 'absolute', left: '50%', top: 8, marginLeft: -20, height: 4, width: 40, borderRadius: 999 }}
@@ -158,6 +164,8 @@ function MenuDetailPanel({
   const height = IS_WEB ? WEB_SCREEN.height : win.height
 
   const [render, setRender] = useState(open)
+  const headerRef = useRef<Text | null>(null)
+  useFocusOnOpen(headerRef, open)
   const progress = useSharedValue(0)
   // Clean "rise into place": a short left-anchored slide (a fraction of the
   // width, not a full-screen sweep) crossfaded with opacity, so the detail
@@ -187,6 +195,9 @@ function MenuDetailPanel({
     <AppModal visible={render} animationType="none" onRequestClose={onBack}>
       <GestureDetector gesture={gesture}>
       <Reanimated.View
+        // Isolate the pane for assistive tech (audit SA-012): the screen reader
+        // stays inside it instead of reading the menu behind.
+        accessibilityViewIsModal
         className="flex-1 bg-ink-900"
         style={[{ paddingTop: insets.top }, animStyle, IS_WEB ? { flex: 1, minHeight: 0 } : null]}
       >
@@ -194,7 +205,7 @@ function MenuDetailPanel({
           <Pressable onPress={onBack} hitSlop={10} accessibilityRole="button" accessibilityLabel="Back to menu" className="h-9 w-9 items-center justify-center rounded-full active:opacity-70">
             <ChevronLeft size={24} color={colors.fg} />
           </Pressable>
-          <Text numberOfLines={1} accessibilityRole="header" className="flex-1 text-[17px] font-bold text-white">{title}</Text>
+          <Text ref={headerRef} accessible numberOfLines={1} accessibilityRole="header" className="flex-1 text-[17px] font-bold text-white">{title}</Text>
           <Pressable onPress={onDashboard} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close to dashboard" className="h-9 w-9 items-center justify-center rounded-full bg-white/10 active:opacity-70">
             <X size={18} color={colors.fg} />
           </Pressable>
@@ -250,7 +261,7 @@ function BarePanel({ open, onClose, children }: { open: boolean; onClose: () => 
         {/* Opaque surface set inline, not just via `bg-ink-900`: on web the class
          *  doesn't paint a background on an Animated.View, leaving the panel
          *  see-through over the dashboard. */}
-        <Animated.View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: colors.ink900, opacity, transform: [{ translateX }] }}>
+        <Animated.View accessibilityViewIsModal style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: colors.ink900, opacity, transform: [{ translateX }] }}>
           {children}
         </Animated.View>
       </View>

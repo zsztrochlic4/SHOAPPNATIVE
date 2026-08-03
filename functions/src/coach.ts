@@ -3,8 +3,17 @@ import { defineSecret } from 'firebase-functions/params'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { getFirestore } from 'firebase-admin/firestore'
 import { requireVerifiedUser, APP_CHECK_ENFORCED } from './lib/guards'
-import { enforceDailyLimit } from './lib/rateLimit'
+import { enforceDailyLimit, enforceBurstLimit, enforceGlobalDailyLimit } from './lib/rateLimit'
 import { coachKillSwitch } from './killSwitchRemote'
+import { FieldValue, Timestamp } from 'firebase-admin/firestore'
+import {
+  isValidRequestKey,
+  coachClaimDocId,
+  burstBucketId,
+  COACH_BURST_MAX,
+  COACH_BURST_WINDOW_SEC,
+  COACH_GLOBAL_DAILY_MAX,
+} from './_shared/backend/coach/requestControls'
 import {
   loadCoachTurnData,
   saveCoachTurn,
@@ -61,6 +70,12 @@ const MAX_MESSAGE_LEN = 2000
 
 export interface CoachMessageInput {
   message: string
+  /**
+   * Client-generated idempotency key (audit SA-011), stable per user message and
+   * REUSED on retry, so a retry/double-tap returns the first turn's result rather
+   * than triggering a second Gemini call, usage increment and stored turn.
+   */
+  requestKey?: string
   /** @deprecated Ignored in production; recent turns are loaded server-side. */
   recent?: string[]
   /** @deprecated Ignored in production; safety/profile context is loaded server-side. */
@@ -278,9 +293,39 @@ export const coachMessage = onCall<CoachMessageInput>(
   // App Check is enforced consistently with every other callable via APP_CHECK_ENFORCED (currently
   // false, monitor-mode). This avoids the coach uniquely rejecting the native app (which does not yet
   // attest); App Check is rolled out app-wide later per docs/APP_CHECK.md — the coach comes along then.
-  { enforceAppCheck: APP_CHECK_ENFORCED, timeoutSeconds: 60, secrets: [GEMINI_API_KEY] },
+  // Capacity controls (audit SA-011): the coach is the one expensive, Gemini-calling callable, so it
+  // caps its own fan-out (maxInstances) and per-instance concurrency independently of the global
+  // maxInstances, bounding worst-case model spend and cold-start blast radius when it is activated.
+  { enforceAppCheck: APP_CHECK_ENFORCED, timeoutSeconds: 60, secrets: [GEMINI_API_KEY], maxInstances: 8, concurrency: 4 },
   async (req: CallableRequest<CoachMessageInput>): Promise<CoachTurnResult> => {
     const uid = requireVerifiedUser(req, 'coachMessage')
+
+    // Idempotency (audit SA-011): claim the request key once. A retry with the
+    // same key returns the first result (no second model call); an in-flight
+    // duplicate is rejected. Best-effort — if the key is absent/invalid we fall
+    // through to the normal (non-deduped) path.
+    const db = getFirestore()
+    const requestKey = isValidRequestKey(req.data?.requestKey) ? req.data.requestKey : null
+    const claimRef = requestKey ? db.collection('coachRequests').doc(coachClaimDocId(uid, requestKey)) : null
+    if (claimRef) {
+      const existing = await claimRef.get()
+      if (existing.exists) {
+        const cached = existing.get('result') as CoachTurnResult | undefined
+        if (cached) return cached
+        throw new HttpsError('already-exists', 'duplicate_request')
+      }
+      try {
+        await claimRef.create({
+          uid,
+          createdAt: FieldValue.serverTimestamp(),
+          expiresAt: Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000),
+        })
+      } catch {
+        // A racing duplicate created the claim first — treat as duplicate.
+        throw new HttpsError('already-exists', 'duplicate_request')
+      }
+    }
+
     const classify: ClassifierTransport = async (prompt) => {
       const m = geminiModel()
       const r = await m.generateContent({
@@ -289,7 +334,7 @@ export const coachMessage = onCall<CoachMessageInput>(
       })
       return r.response.text() ?? ''
     }
-    return runCoachTurn(uid, req.data ?? { message: '' }, {
+    const result = await runCoachTurn(uid, req.data ?? { message: '' }, {
       readDob: readDobFromFirestore,
       classify,
       generateReply: async (systemPrompt, userText) => {
@@ -305,7 +350,15 @@ export const coachMessage = onCall<CoachMessageInput>(
         })
         return (r.response.text() ?? '').trim()
       },
-      enforceLimit: (u) => enforceDailyLimit('coach', u, DAILY_COACH_LIMIT),
+      // Layered cost controls (audit SA-011), all enforced before the model call:
+      //  1. per-user burst (spike within a minute), 2. global daily budget across
+      //  ALL users, 3. the per-user hard daily cap. Any breach throws
+      //  resource-exhausted and no Gemini call is made.
+      enforceLimit: async (u) => {
+        await enforceBurstLimit(burstBucketId(u, Date.now(), COACH_BURST_WINDOW_SEC), u, COACH_BURST_MAX, COACH_BURST_WINDOW_SEC)
+        await enforceGlobalDailyLimit('coach', COACH_GLOBAL_DAILY_MAX)
+        await enforceDailyLimit('coach', u, DAILY_COACH_LIMIT)
+      },
       killSwitchEngaged: () => coachKillSwitch.engaged(), // remote source: config/coach.killSwitch (Firestore)
       todayKey: new Date().toISOString().slice(0, 10),
       loadTurnData: loadCoachTurnData,
@@ -314,5 +367,11 @@ export const coachMessage = onCall<CoachMessageInput>(
       saveMemory: saveMemoryCandidate,
       saveProposal,
     })
+
+    // Cache the result under the idempotency claim so a retry returns it verbatim.
+    if (claimRef) {
+      await claimRef.set({ result, completedAt: FieldValue.serverTimestamp() }, { merge: true }).catch(() => {})
+    }
+    return result
   },
 )

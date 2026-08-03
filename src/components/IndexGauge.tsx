@@ -4,6 +4,8 @@ import Svg, { Path, G, Polygon, Circle, Defs, LinearGradient, Stop } from 'react
 import type { WeeklyIndex } from '../store/selectors'
 import { useColors } from '../theme'
 import { useCountUp } from '../lib/useCountUp'
+import { AccessibleChart } from './AccessibleChart'
+import { prefersReducedMotion } from '../lib/a11y'
 
 /**
  * Compact semicircular performance gauge. The needle sits in the middle when
@@ -44,6 +46,9 @@ export function IndexGauge({ index }: { index: WeeklyIndex }) {
   const [deg, setDeg] = useState(-90)
   const anim = useRef(new Animated.Value(-90)).current
   useEffect(() => {
+    // Respect reduced motion (audit SA-013): show the needle at its final angle
+    // immediately instead of sweeping it in.
+    if (prefersReducedMotion()) { setDeg(targetDeg); return }
     const id = anim.addListener(({ value }) => setDeg(value))
     const a = Animated.timing(anim, { toValue: targetDeg, duration: 950, easing: Easing.out(Easing.cubic), useNativeDriver: false })
     a.start()
@@ -55,23 +60,25 @@ export function IndexGauge({ index }: { index: WeeklyIndex }) {
 
   return (
     <View className="items-center">
-      <Svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} style={{ maxWidth: 228 }}>
-        <Defs>
-          <LinearGradient id="gaugeArc" x1="0" y1="0" x2="1" y2="0">
-            <Stop offset="0%" stopColor={colors.danger} />
-            <Stop offset="38%" stopColor={colors.accentOrange} />
-            <Stop offset="62%" stopColor={colors.brand300} />
-            <Stop offset="100%" stopColor={colors.brand400} />
-          </LinearGradient>
-        </Defs>
-        <Path d={d} fill="none" stroke="rgba(130,130,130,0.18)" strokeWidth={stroke + 5} strokeLinecap="round" />
-        <Path d={d} fill="none" stroke="url(#gaugeArc)" strokeWidth={stroke} strokeLinecap="round" />
-        <G transform={`rotate(${deg} ${cx} ${cy})`}>
-          <Polygon points={`${cx - baseW},${cy} ${cx},${cy - rN} ${cx + baseW},${cy}`} fill={colors.needle} />
-        </G>
-        <Circle cx={cx} cy={cy} r={9} fill={colors.needle} />
-        <Circle cx={cx} cy={cy} r={4} fill={colors.ink900} />
-      </Svg>
+      <AccessibleChart summary={`Weekly readiness: ${index.label}. Score ${index.score} of 100 over the last 7 days.`} style={{ width: '100%', alignItems: 'center' }}>
+        <Svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} style={{ maxWidth: 228 }}>
+          <Defs>
+            <LinearGradient id="gaugeArc" x1="0" y1="0" x2="1" y2="0">
+              <Stop offset="0%" stopColor={colors.danger} />
+              <Stop offset="38%" stopColor={colors.accentOrange} />
+              <Stop offset="62%" stopColor={colors.brand300} />
+              <Stop offset="100%" stopColor={colors.brand400} />
+            </LinearGradient>
+          </Defs>
+          <Path d={d} fill="none" stroke="rgba(130,130,130,0.18)" strokeWidth={stroke + 5} strokeLinecap="round" />
+          <Path d={d} fill="none" stroke="url(#gaugeArc)" strokeWidth={stroke} strokeLinecap="round" />
+          <G transform={`rotate(${deg} ${cx} ${cy})`}>
+            <Polygon points={`${cx - baseW},${cy} ${cx},${cy - rN} ${cx + baseW},${cy}`} fill={colors.needle} />
+          </G>
+          <Circle cx={cx} cy={cy} r={9} fill={colors.needle} />
+          <Circle cx={cx} cy={cy} r={4} fill={colors.ink900} />
+        </Svg>
+      </AccessibleChart>
 
       {/* readable anchors under the arc */}
       <View className="mt-1.5 w-full max-w-[236px] flex-row items-center justify-between">

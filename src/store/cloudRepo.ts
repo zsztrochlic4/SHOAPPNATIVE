@@ -1,9 +1,11 @@
 import {
-  doc, collection, getDoc, getDocs, query, orderBy, limit, writeBatch, serverTimestamp,
+  doc, collection, getDoc, getDocs, query, orderBy, limit, startAfter, writeBatch, serverTimestamp,
+  type QueryConstraint,
 } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { sanitizeForPersist, sanitizeEntry } from '../lib/sanitize'
 import { mergeById } from './historyMerge'
+import { hasMorePage, resolveRootConflict } from './conflict'
 import type { AppState } from './types'
 
 /**
@@ -250,10 +252,55 @@ export async function loadUserState(uid: string): Promise<LoadedState | null> {
   }
 }
 
+/** Page size for cursor-based category loads (audit SA-008). */
+export const HISTORY_PAGE_SIZE = 300
+
+/** One page of a single windowed category, plus the cursor to resume after it. */
+export interface CategoryPage {
+  entries: unknown[]
+  /** Ordering value (dateKey) to pass as `after` for the next page, or null when done. */
+  cursor: string | null
+  hasMore: boolean
+}
+
 /**
- * Fetch the FULL contents of every WINDOWED collection — used on demand when an
- * all-time screen (e.g. Progress) needs the complete history that the bounded
- * cold-start load deliberately skipped. Returns one array per windowed key.
+ * Load ONE windowed category, one page at a time, oldest-relevant first via a
+ * cursor (audit SA-008). This replaces the "fetch every windowed collection in
+ * full, together" pattern: a screen loads only the category it needs (e.g.
+ * Progress → sessions) and pages through it with a bounded first render, rather
+ * than pulling unrelated categories and unbounded doc counts on one call.
+ *
+ * Ordering is on the single `dateKey` field (covered by the automatic index).
+ * `after` is the previous page's `cursor` (a dateKey); omit it for the first page.
+ */
+export async function loadCategoryPage(
+  uid: string,
+  key: SubKey,
+  opts: { after?: string | null; pageSize?: number } = {},
+): Promise<CategoryPage> {
+  if (!db) return { entries: [], cursor: null, hasMore: false }
+  const pageSize = opts.pageSize ?? HISTORY_PAGE_SIZE
+  // Newest first so paging walks backwards through history from the recent edge.
+  const constraints: QueryConstraint[] = [orderBy('dateKey', 'desc'), limit(pageSize)]
+  if (opts.after != null) constraints.splice(1, 0, startAfter(opts.after))
+  const snap = await getDocs(query(collection(db, COL, uid, key), ...constraints))
+  const entries = snap.docs.map((d) => d.data())
+  const last = entries[entries.length - 1] as { dateKey?: string } | undefined
+  const hasMore = hasMorePage(snap.size, pageSize)
+  return {
+    entries,
+    cursor: hasMore && last?.dateKey != null ? last.dateKey : null,
+    hasMore,
+  }
+}
+
+/**
+ * Fetch the FULL contents of the requested WINDOWED collections — used on demand
+ * when an all-time screen needs the complete history the bounded cold-start load
+ * skipped. Category-specific (audit SA-008): pass only the keys a screen needs so
+ * unrelated categories aren't pulled; defaults to all windowed keys for the
+ * legacy "load everything" caller. Internally pages via `loadCategoryPage` so no
+ * single call issues an unbounded read.
  *
  * The caller (CloudSync.ensureFullHistory) merges these into the store and the
  * save baseline together via `mergeById`, so the recent window and the older
@@ -261,15 +308,24 @@ export async function loadUserState(uid: string): Promise<LoadedState | null> {
  */
 export async function loadRemainingHistory(
   uid: string,
+  keys: SubKey[] = WINDOWED_KEYS,
 ): Promise<Partial<Record<SubKey, unknown[]>>> {
   if (!db) return {}
-  const snaps = await Promise.all(
-    WINDOWED_KEYS.map((k) => getDocs(collection(db!, COL, uid, k))),
-  )
   const out: Partial<Record<SubKey, unknown[]>> = {}
-  WINDOWED_KEYS.forEach((k, i) => {
-    out[k] = snaps[i].docs.map((d) => d.data())
-  })
+  await Promise.all(
+    keys.map(async (k) => {
+      const all: unknown[] = []
+      let after: string | null | undefined = undefined
+      // Page until the category is exhausted — each page is bounded by HISTORY_PAGE_SIZE.
+      for (;;) {
+        const page: CategoryPage = await loadCategoryPage(uid, k, { after })
+        all.push(...page.entries)
+        if (!page.hasMore || page.cursor == null) break
+        after = page.cursor
+      }
+      out[k] = all
+    }),
+  )
   return out
 }
 
@@ -280,8 +336,19 @@ export async function loadRemainingHistory(
  *
  * @param prev the previously-saved state (or its subcollection baseline). When
  *   omitted, every entry is treated as new — the correct behaviour for a first
- *   save or a legacy→subcollection migration.
+ *   save or a legacy→subcollection migration. `prev` also serves as the 3-way
+ *   base for the root-conflict merge below (audit SA-009).
  */
+function rootFieldsOf(source: Partial<AppState>): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const key of Object.keys(source) as (keyof AppState)[]) {
+    if ((SUB_KEYS as string[]).includes(key as string)) continue
+    if (LOCAL_ONLY.includes(key)) continue
+    out[key] = source[key]
+  }
+  return out
+}
+
 export async function saveUserState(
   uid: string,
   state: AppState,
@@ -293,11 +360,29 @@ export async function saveUserState(
 
   // Root doc = everything that is neither an unbounded subcollection nor a
   // device-local field. This is bounded in size, so a full rewrite is cheap.
-  const root: Record<string, unknown> = {}
-  for (const key of Object.keys(state) as (keyof AppState)[]) {
-    if ((SUB_KEYS as string[]).includes(key as string)) continue
-    if (LOCAL_ONLY.includes(key)) continue
-    root[key] = state[key]
+  let root: Record<string, unknown> = rootFieldsOf(state)
+
+  // Cross-device conflict resolution (audit SA-009). The per-entry subcollection
+  // diff already merges losslessly, but the root doc is otherwise last-writer-
+  // wins: another device's profile/settings edit since our last save would be
+  // silently clobbered. When we have a base (`prev` carries root fields, i.e.
+  // after the first save), re-read the current remote root and 3-way merge — a
+  // field only THAT device changed is kept; a field WE changed wins. Predictable,
+  // and no edit is silently lost. First save / legacy accounts (no base root)
+  // keep the straight write.
+  const baseRoot = prev ? rootFieldsOf(prev) : {}
+  if (Object.keys(baseRoot).length > 0) {
+    try {
+      const remoteSnap = await getDoc(rootRef)
+      if (remoteSnap.exists()) {
+        const remoteRoot = { ...(remoteSnap.data() as Record<string, unknown>) }
+        delete remoteRoot.updatedAt
+        root = resolveRootConflict(baseRoot, root, remoteRoot)
+      }
+    } catch {
+      // Re-read failed (offline/transient) — fall back to the straight write.
+      // The debounced retry will reconcile on the next successful save.
+    }
   }
 
   // Diff each subcollection against the previous state.

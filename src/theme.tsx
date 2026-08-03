@@ -1,4 +1,5 @@
 import { vars } from 'nativewind'
+import { useColorScheme } from 'react-native'
 import { useStoreSelector } from './store/store'
 import type { AccentKey } from './store/periods'
 
@@ -162,7 +163,15 @@ export type Palette = (typeof palette)[ThemeName]
 const selectTheme = (state: import('./store/types').AppState) => state.settings.theme
 
 export function useThemeName(): ThemeName {
-  return useStoreSelector(selectTheme) === 'light' ? 'light' : 'dark'
+  const pref = useStoreSelector(selectTheme)
+  // 'system' follows the OS light/dark setting (audit SA-017 "Follow system").
+  // An explicit 'light'/'dark' always wins; anything else (incl. undefined
+  // legacy saves defaulting via the store) falls back to dark.
+  const os = useColorScheme()
+  if (pref === 'light') return 'light'
+  if (pref === 'dark') return 'dark'
+  if (pref === 'system') return os === 'light' ? 'light' : 'dark'
+  return 'dark'
 }
 
 /** Raw colour palette for the current theme. */

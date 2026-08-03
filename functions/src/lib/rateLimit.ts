@@ -57,3 +57,65 @@ export async function enforceDailyLimit(key: string, uid: string, max: number): 
     )
   })
 }
+
+/**
+ * Per-user BURST limit (audit SA-011): at most `max` calls per rolling
+ * `windowSec` window. The daily cap alone would allow the whole day's budget to
+ * be spent in one second; this bounds the spike. `docId` embeds a window index so
+ * old buckets naturally stop being written; the TTL field reaps them.
+ */
+export async function enforceBurstLimit(
+  docId: string,
+  uid: string,
+  max: number,
+  windowSec: number,
+): Promise<void> {
+  const db = getFirestore()
+  const now = Date.now()
+  const ref = db.collection('rateLimits').doc(docId)
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref)
+    const count = snap.exists ? Number(snap.get('count')) || 0 : 0
+    if (count >= max) {
+      throw new HttpsError('resource-exhausted', 'You are sending messages too quickly. Please wait a moment.')
+    }
+    tx.set(
+      ref,
+      {
+        count: count + 1,
+        uid,
+        updatedAt: FieldValue.serverTimestamp(),
+        expiresAt: Timestamp.fromMillis(now + Math.max(windowSec, 60) * 1000 + 60_000),
+      },
+      { merge: true },
+    )
+  })
+}
+
+/**
+ * GLOBAL per-day cost cap across ALL users (audit SA-011): protects the overall
+ * model budget from a coordinated spike. The bucket id is NOT scoped by uid.
+ * Throws `resource-exhausted` once the aggregate ceiling for the day is reached.
+ */
+export async function enforceGlobalDailyLimit(key: string, max: number): Promise<void> {
+  const db = getFirestore()
+  const now = Date.now()
+  const ref = db.collection('rateLimits').doc(`${key}_GLOBAL_${dayBucket(now)}`)
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref)
+    const count = snap.exists ? Number(snap.get('count')) || 0 : 0
+    if (count >= max) {
+      throw new HttpsError('resource-exhausted', 'The coach is at capacity right now. Please try again later.')
+    }
+    tx.set(
+      ref,
+      {
+        count: count + 1,
+        scope: 'global',
+        updatedAt: FieldValue.serverTimestamp(),
+        expiresAt: Timestamp.fromMillis(rateLimitExpiryMs(now)),
+      },
+      { merge: true },
+    )
+  })
+}

@@ -16,7 +16,7 @@
  * anonymous/local uid, where the store's AsyncStorage persistence covers the render state.
  */
 
-import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { doc, setDoc, runTransaction } from 'firebase/firestore'
 import { db } from '../../lib/firebase'
 import { buildSetLogs, progressionFromSession, type LoggedSetInput } from '../runtime/logging'
 import type { ProgressionStateDoc, UserDoc, WorkoutInstanceDoc } from '../schema'
@@ -30,9 +30,23 @@ const progressionDocId = (uid: string, exerciseId: string) => `${uid}_${exercise
 
 /**
  * Persist a finished program session: the completed set logs, and the resulting per-exercise
- * progression. No-op without Firebase or for the local uid. Idempotent — set-log and
- * progression ids are stable, so re-finishing a session overwrites cleanly rather than
- * doubling up.
+ * progression. No-op without Firebase or for the local uid.
+ *
+ * ── Atomic + idempotent progression (audit SA-003) ─────────────────────────
+ * Progression is read-advance-write: reading the prior `progression_state`, computing
+ * the next state from THIS session's sets, and writing it back. Done naively that is
+ * neither atomic (two concurrent retries/devices both read the pre-advance state and
+ * both advance) nor idempotent (a plain retry re-reads the already-advanced state and
+ * advances a SECOND time from the same performance — a double-advance).
+ *
+ * Both are closed by running the read/advance/write inside a single Firestore
+ * transaction gated on a per-instance applied marker (`progression_applied` on the
+ * `workout_instances/{instance_id}` doc — no new collection/rule needed):
+ *   • Atomic: the transaction's optimistic concurrency serialises concurrent runs, so
+ *     only one advance can commit; the loser retries, sees the marker, and no-ops.
+ *   • Idempotent: once the marker is set, re-running skips the advance entirely.
+ * Set logs (stable ids) and the instance status flip stay outside the transaction —
+ * they are already merge-idempotent and re-writing them is harmless.
  */
 export async function logCompletedProgramSession(
   uid: string,
@@ -42,14 +56,15 @@ export async function logCompletedProgramSession(
   now: string = new Date().toISOString(),
 ): Promise<void> {
   if (!db || !uid || uid === 'local') return
+  const database = db
 
   // 1. Set logs (one document per completed set, keyed by the backend exercise_id).
+  //    Stable ids + merge → re-finishing overwrites cleanly rather than doubling up.
   const logs = buildSetLogs(uid, instance, loggedByExerciseId, now)
   await Promise.all(
-    logs.map((log) => setDoc(doc(db!, 'users', uid, 'set_logs', log.log_id), clean(log), { merge: true })),
+    logs.map((log) => setDoc(doc(database, 'users', uid, 'set_logs', log.log_id), clean(log), { merge: true })),
   )
 
-  // 2. Read the prior progression_state for each performed exercise.
   const performedIds = Array.from(
     new Set(
       instance.exercises
@@ -57,31 +72,43 @@ export async function logCompletedProgramSession(
         .filter((id) => (loggedByExerciseId[id] ?? []).some((r) => r.done)),
     ),
   )
-  const priorStates: Record<string, ProgressionStateDoc> = {}
-  await Promise.all(
-    performedIds.map(async (id) => {
-      const snap = await getDoc(doc(db!, 'users', uid, 'progression_state', progressionDocId(uid, id)))
-      if (snap.exists()) priorStates[id] = snap.data() as ProgressionStateDoc
-    }),
-  )
+  const instanceRef = doc(database, 'users', uid, 'workout_instances', instance.instance_id)
 
-  // 3. Run the Progression Engine (re-clamps through the Safety Rules) and persist next state.
-  const progressions = progressionFromSession(uid, user.goal, instance, loggedByExerciseId, priorStates)
-  await Promise.all(
-    progressions.map(({ exerciseId, result }) => {
-      const next: ProgressionStateDoc = { ...result.nextState, uid, exercise_id: exerciseId }
-      return setDoc(
-        doc(db!, 'users', uid, 'progression_state', progressionDocId(uid, exerciseId)),
-        clean(next),
-        { merge: true },
-      )
-    }),
-  )
+  // 2–3. Atomic, idempotent progression advance (see header). ALL reads happen before
+  //      ANY write, as Firestore transactions require.
+  await runTransaction(database, async (tx) => {
+    const instSnap = await tx.get(instanceRef)
+    const alreadyApplied = instSnap.exists() && instSnap.data()?.progression_applied === true
 
-  // 4. Mark the instance done so a re-open reflects it (undated template: status only).
-  await setDoc(
-    doc(db!, 'users', uid, 'workout_instances', instance.instance_id),
-    { status: 'done' },
-    { merge: true },
-  )
+    // Read prior progression_state for each performed exercise (only when we still
+    // need to advance — but always before writes to satisfy the read-before-write rule).
+    const priorStates: Record<string, ProgressionStateDoc> = {}
+    if (!alreadyApplied) {
+      for (const id of performedIds) {
+        const snap = await tx.get(doc(database, 'users', uid, 'progression_state', progressionDocId(uid, id)))
+        if (snap.exists()) priorStates[id] = snap.data() as ProgressionStateDoc
+      }
+    }
+
+    if (!alreadyApplied) {
+      const progressions = progressionFromSession(uid, user.goal, instance, loggedByExerciseId, priorStates)
+      for (const { exerciseId, result } of progressions) {
+        const next: ProgressionStateDoc = { ...result.nextState, uid, exercise_id: exerciseId }
+        tx.set(
+          doc(database, 'users', uid, 'progression_state', progressionDocId(uid, exerciseId)),
+          clean(next),
+          { merge: true },
+        )
+      }
+    }
+
+    // Mark the instance done AND record that progression has been applied — the
+    // idempotency marker for any later retry (this write, being in the transaction,
+    // is what makes "advance at most once" atomic across concurrent runs).
+    tx.set(
+      instanceRef,
+      clean({ uid, instance_id: instance.instance_id, status: 'done', progression_applied: true }),
+      { merge: true },
+    )
+  })
 }

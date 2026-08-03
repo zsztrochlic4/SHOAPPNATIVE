@@ -187,6 +187,9 @@ export default function ActiveWorkout({ open, onClose, onComplete, params }: { o
   const [expanded, setExpanded] = useState<number | null>(null)
   const [showHow, setShowHow] = useState(false)
   const [confirmEnd, setConfirmEnd] = useState(false)
+  // Set when a finished program session could not be durably recorded (audit
+  // SA-004): the completion is shown, but we must NOT imply it is safely saved.
+  const [saveAtRisk, setSaveAtRisk] = useState(false)
 
   const finishStatsRef = useRef<{ time: number; volume: number; sets: number } | null>(null)
   const finishPRRef = useRef<PR | null>(null)
@@ -419,12 +422,19 @@ export default function ActiveWorkout({ open, onClose, onComplete, params }: { o
     // durable, idempotent completion queue (audit F-011): it tries immediately,
     // survives restarts, retries on foreground, and surfaces a visible pending
     // status on the Workout screen instead of silently discarding failures.
+    setSaveAtRisk(false)
     if (session!.instanceId && state.backendUser) {
       const instance = (state.workoutInstances ?? []).find((i) => i.instance_id === session!.instanceId)
       if (instance) {
         const logged: Record<string, LoggedSetInput[]> = {}
         for (const ex of session!.exercises) logged[ex.defId] = ex.sets.map((st) => ({ weightKg: st.weightKg, reps: st.reps, done: st.done }))
-        void enqueueCompletion(state.backendUser.uid, state.backendUser.goal, instance, logged).catch(() => {})
+        // Durable, idempotent completion (audit SA-003/SA-004). If neither the
+        // local queue persist nor an immediate sync succeeded, the completion is
+        // at risk — surface it honestly in the finish sheet rather than implying
+        // it was safely saved.
+        void enqueueCompletion(state.backendUser.uid, state.backendUser.goal, instance, logged)
+          .then((r) => { if (!r.durable) setSaveAtRisk(true) })
+          .catch(() => setSaveAtRisk(true))
       }
     }
     // The workout is over — a stored runtime must never resurrect it (F-010).
@@ -576,6 +586,7 @@ export default function ActiveWorkout({ open, onClose, onComplete, params }: { o
             weekTarget={weekTarget}
             stats={finishStatsRef.current}
             pr={finishPRRef.current}
+            saveAtRisk={saveAtRisk}
             onDone={finishClose}
           />
         )}
@@ -1171,7 +1182,7 @@ const RAYS: { deg: number; accent: 'brand' | 'yellow' }[] = [
   { deg: 309, accent: 'brand' },
 ]
 
-function FinishSheet({ colors: c, units, name, firstName, streakN, weekDone, weekTarget, stats, pr, onDone }: any) {
+function FinishSheet({ colors: c, units, name, firstName, streakN, weekDone, weekTarget, stats, pr, saveAtRisk, onDone }: any) {
   const dim = (o: number) => `rgba(255,255,255,${o})`
   const insets = useSafeAreaInsets()
 
@@ -1186,6 +1197,13 @@ function FinishSheet({ colors: c, units, name, firstName, streakN, weekDone, wee
   const rise = useRef(new Animated.Value(0)).current   // text / pr / stats reveal
 
   useEffect(() => {
+    // Respect reduced motion (audit SA-013): skip the celebration sweep/pop/rays
+    // and present the completed state instantly instead of animating into it.
+    if (prefersReducedMotion()) {
+      scrim.setValue(1); sheet.setValue(0); disc.setValue(1); ring.setValue(0)
+      check.setValue(0); rise.setValue(1); halo.setValue(1); rays.setValue(0); pop.setValue(0)
+      return
+    }
     const HIT = 950 // ring finishes sweeping and the check lands
     Animated.timing(scrim, { toValue: 1, duration: 300, easing: Easing.out(Easing.quad), useNativeDriver: USE_NATIVE }).start()
     Animated.timing(sheet, { toValue: 0, duration: 520, easing: Easing.out(Easing.cubic), useNativeDriver: USE_NATIVE }).start()
@@ -1278,7 +1296,17 @@ function FinishSheet({ colors: c, units, name, firstName, streakN, weekDone, wee
           <FinishStat value={stats ? String(stats.sets) : '0'} label="Sets" c={c} />
         </Animated.View>
 
-        <PressableScale onPress={onDone} className="items-center rounded-full" style={{ marginTop: 20, height: 48, justifyContent: 'center', backgroundColor: c.brand400 }}>
+        {/* Honest save state (audit SA-004): if the completion could not be
+            durably recorded, say so instead of implying it was saved. */}
+        {saveAtRisk && (
+          <Animated.View style={[{ marginTop: 12, paddingVertical: 9, paddingHorizontal: 12, borderRadius: 14, backgroundColor: rgbaOf(c.accentYellow, 0.1), borderWidth: 1, borderColor: rgbaOf(c.accentYellow, 0.28) }, riseStyle]}>
+            <Text style={{ fontSize: 12.5, fontWeight: '600', lineHeight: 17, color: dim(0.85), textAlign: 'center' }}>
+              Saved on this device, but we couldn't sync it yet. It'll upload automatically once you're back online.
+            </Text>
+          </Animated.View>
+        )}
+
+        <PressableScale onPress={onDone} accessibilityRole="button" accessibilityLabel="Continue" className="items-center rounded-full" style={{ marginTop: 20, height: 48, justifyContent: 'center', backgroundColor: c.brand400 }}>
           <Text style={{ fontSize: 15, fontWeight: '800', color: c.ink900 }}>Continue</Text>
         </PressableScale>
       </Animated.View>

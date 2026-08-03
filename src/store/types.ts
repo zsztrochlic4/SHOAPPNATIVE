@@ -5,7 +5,10 @@ import type { UserDoc, WorkoutInstanceDoc } from '../backend/schema'
 import type { StoredProgram, ProgramStatus } from '../backend/runtime/activate'
 
 export type Units = 'metric' | 'imperial'
-export type Theme = 'dark' | 'light'
+/** 'system' follows the OS light/dark setting (audit SA-017 "Follow system"). */
+export type Theme = 'dark' | 'light' | 'system'
+/** Reduced-motion preference: follow the OS, or force it either way (audit SA-013/SA-017). */
+export type ReducedMotionSetting = 'system' | 'reduce' | 'full'
 export type NotificationConsent = 'unknown' | 'granted' | 'denied'
 export type Goal = 'build-muscle' | 'lose-fat' | 'gain-strength' | 'stay-healthy'
 export type Experience = 'beginner' | 'intermediate' | 'advanced'
@@ -156,6 +159,10 @@ export interface Settings {
   notificationPrefs?: NotificationPrefs
   /** Play the rest-timer beeps/tick and the workout-complete chime. Defaults on. */
   soundEnabled?: boolean
+  /** Haptic feedback on taps/actions, separate from sound (audit SA-017). Defaults on. */
+  hapticsEnabled?: boolean
+  /** Reduced-motion override (audit SA-013/SA-017). Defaults to 'system'. */
+  reducedMotion?: ReducedMotionSetting
   /** UI language. Defaults to English when absent (older saves). */
   language?: Language
   /** Connected third-party integrations, e.g. { strava: true }. */

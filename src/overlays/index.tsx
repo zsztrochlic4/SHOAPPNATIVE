@@ -27,6 +27,7 @@ import { useQuickWorkouts } from '../data/quickWorkouts'
 import type { QuickWorkout, UserMeal } from '../store/types'
 import { buildCustomSession, imageForMuscle } from '../store/programSession'
 import { collectUserExport } from '../store/cloudRepo'
+import { canOfferDemoReset } from '../store/resetGuards'
 import { serializeUserExport, splitLocalState, buildExportFilename } from '../lib/dataExport'
 import { deliverExport } from '../lib/exportDeliver'
 import { pick, makeRng } from '../lib/rng'
@@ -201,6 +202,8 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
   const { notificationsEnabled } = state.settings
   const notificationConsent = state.settings.notificationConsent ?? 'unknown'
   const soundEnabled = state.settings.soundEnabled ?? true
+  const hapticsEnabled = state.settings.hapticsEnabled ?? true
+  const reducedMotion = state.settings.reducedMotion ?? 'system'
   const lang = state.settings.language ?? 'en'
   const t = translator(lang)
   // Two-step inline confirm for the destructive wipe — works on web and native
@@ -250,14 +253,26 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
       toast('Your account has been deleted')
       onDone?.()
     } catch (e: unknown) {
-      // Deletion is server-only and non-destructive on failure (audit F-002):
-      // nothing has been removed, so the honest message is simply "retry".
-      const code = (e as { code?: string })?.code ?? ''
+      // Truthful failure copy (audit SA-002). The callable is AUTH-FIRST and
+      // reports how far it got via `details.accountDisabled`:
+      //  • not disabled → nothing was destroyed; safe to retry.
+      //  • disabled     → the account is already revoked and deletion is in
+      //    progress; NEVER claim "nothing was deleted". A scheduled backend
+      //    sweep finishes any job the (now unusable) account can't retry itself.
+      const err = e as { code?: string; details?: { accountDisabled?: boolean } }
+      const code = err?.code ?? ''
       const offline = code === 'functions/unavailable' || code === 'unavailable'
-      toast(offline
-        ? 'Could not reach our servers. Nothing was deleted — please try again once you are online.'
-        : 'Could not delete your account. Nothing was deleted — please try again.')
-      setConfirmingDelete(false)
+      if (err?.details?.accountDisabled) {
+        toast('Your account is being deleted and access has been revoked. Some data is still being removed — this will finish automatically.')
+        // The session is dead; drop local state so we don't show a half-account.
+        dispatch({ type: 'RESET_EMPTY' })
+        onDone?.()
+      } else {
+        toast(offline
+          ? 'Could not reach our servers. Nothing was deleted — please try again once you are online.'
+          : 'Could not delete your account. Nothing was deleted — please try again.')
+        setConfirmingDelete(false)
+      }
     } finally {
       setDeleting(false)
     }
@@ -318,6 +333,14 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
     const next = !soundEnabled
     dispatch({ type: 'SET_SETTINGS', patch: { soundEnabled: next } })
     toast(next ? t('toast.soundOn') : t('toast.soundOff'))
+  }
+
+  // Haptics preference — separate from sound (audit SA-017). Applied app-wide via
+  // ThemedRoot → setHapticsEnabled.
+  function toggleHaptics() {
+    const next = !hapticsEnabled
+    dispatch({ type: 'SET_SETTINGS', patch: { hapticsEnabled: next } })
+    toast(next ? 'Haptics on' : 'Haptics off')
   }
 
   function setLang(code: Language) {
@@ -421,6 +444,29 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
         <Row icon={<Volume2 size={18} color={brand[400]} />} title={t('settings.sound')} sub={t('settings.soundSub')}>
           <Toggle on={soundEnabled} onPress={toggleSound} label={t('settings.sound')} />
         </Row>
+        <Row icon={<Zap size={18} color={brand[400]} />} title="Haptics" sub="Vibration feedback on taps and actions">
+          <Toggle on={hapticsEnabled} onPress={toggleHaptics} label="Haptics" />
+        </Row>
+      </Group>
+
+      {/* Accessibility (audit SA-013/SA-017): an in-app reduced-motion override,
+          independent of the OS setting. */}
+      <Group label="Accessibility">
+        <View className="rounded-2xl border border-white/5 bg-ink-800 p-4">
+          <Text className="mb-1 font-bold text-white">Motion</Text>
+          <Text className="mb-3 text-[12px] leading-4 text-white/50">
+            Reduce animations and celebratory effects. "Auto" follows your device's Reduce Motion setting.
+          </Text>
+          <Segmented<'system' | 'reduce' | 'full'>
+            value={reducedMotion}
+            options={[
+              { v: 'system', l: 'Auto' },
+              { v: 'reduce', l: 'Reduced' },
+              { v: 'full', l: 'Full' },
+            ]}
+            onChange={(v) => dispatch({ type: 'SET_SETTINGS', patch: { reducedMotion: v } })}
+          />
+        </View>
       </Group>
 
       {hasSubscription && (
@@ -458,13 +504,20 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
 
       <Group label={t('settings.data')}>
         {authEnabled && user && <SyncStatusRow />}
-        <Pressable onPress={() => { dispatch({ type: 'RESET_DEMO' }); toast('Demo data restored'); onDone?.() }} className="w-full flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-4 active:opacity-90">
-          <RotateCcw size={18} color={brand[400]} />
-          <View className="flex-1">
-            <Text className="font-bold text-white">{t('settings.resetDemo')}</Text>
-            <Text className="text-[12px] text-white/50">{t('settings.resetDemoSub')}</Text>
-          </View>
-        </Pressable>
+        {/* P0 (audit SA-001): "Reset demo data" restores fabricated seed history.
+            For a signed-in account that would overwrite/delete real cloud data on
+            the next sync, so the control is only ever shown in the anonymous
+            demo/preview (no real account signed in). The store dispatch and
+            CloudSync both enforce this structurally too. */}
+        {canOfferDemoReset({ authEnabled, signedIn: !!user }) && (
+          <Pressable onPress={() => { dispatch({ type: 'RESET_DEMO' }); toast('Demo data restored'); onDone?.() }} accessibilityRole="button" accessibilityLabel={t('settings.resetDemo')} className="w-full flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-4 active:opacity-90">
+            <RotateCcw size={18} color={brand[400]} />
+            <View className="flex-1">
+              <Text className="font-bold text-white">{t('settings.resetDemo')}</Text>
+              <Text className="text-[12px] text-white/50">{t('settings.resetDemoSub')}</Text>
+            </View>
+          </Pressable>
+        )}
         <Pressable
           onPress={() => {
             if (!confirmingClear) { setConfirmingClear(true); return }
@@ -623,9 +676,14 @@ export function DisplaySettings() {
       </Group>
 
       <Group label={t('settings.appearance')}>
+        {/* Follow-system theme added (audit SA-017): 'Auto' tracks the OS light/dark setting. */}
         <Segmented<Theme>
           value={theme}
-          options={[{ v: 'dark', l: t('settings.dark'), icon: <Moon size={15} color={theme === 'dark' ? '#000' : 'rgba(255,255,255,0.6)'} /> }, { v: 'light', l: t('settings.light'), icon: <Sun size={15} color={theme === 'light' ? '#000' : 'rgba(255,255,255,0.6)'} /> }]}
+          options={[
+            { v: 'dark', l: t('settings.dark'), icon: <Moon size={15} color={theme === 'dark' ? '#000' : 'rgba(255,255,255,0.6)'} /> },
+            { v: 'light', l: t('settings.light'), icon: <Sun size={15} color={theme === 'light' ? '#000' : 'rgba(255,255,255,0.6)'} /> },
+            { v: 'system', l: 'Auto' },
+          ]}
           onChange={(v) => dispatch({ type: 'SET_SETTINGS', patch: { theme: v } })}
         />
       </Group>
@@ -860,10 +918,9 @@ export function AddFoodSheet({ open, onClose, params }: Props) {
 
   // The user's own saved meals ("My meals"), searchable alongside the food catalog
   // so a saved meal can be logged straight into today's food log in one tap.
-  const myMeals = state.myMeals ?? []
   const myResults = useMemo(
-    () => myMeals.filter((m) => m.name.toLowerCase().includes(q.toLowerCase())),
-    [myMeals, q],
+    () => (state.myMeals ?? []).filter((m) => m.name.toLowerCase().includes(q.toLowerCase())),
+    [state.myMeals, q],
   )
 
   function add(foodId: string) {

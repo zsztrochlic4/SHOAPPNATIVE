@@ -12,6 +12,8 @@ import {
   type Identity,
 } from './identity'
 import { buildSeed, emptyState } from './seed'
+import { canDispatchDemoReset } from './resetGuards'
+import { boundStateForLocalPersist } from './localPersistBound'
 import { migrateAppState } from './migrate'
 import { coachReply } from '../lib/coachChat'
 import { coachContext, coachOperational, coachPrecheck, guardOutgoing, sharedCoachSession } from '../lib/coachSafety'
@@ -515,13 +517,20 @@ function reducer(state: AppState, action: Action): AppState {
       const sessions = state.sessions.map((s) =>
         s.id === action.id ? recalc({ ...s, completed: true }) : s,
       )
-      const habits = state.habits.map((h) => (h.dateKey === todayKey ? { ...h, workout: true } : h))
+      // Mark the habit for the SESSION's OWN day, never today (audit SA-016):
+      // finishing a back-dated session must never flip today's workout flag or
+      // streak. Upsert the day's habit record if it doesn't exist yet.
+      const day = target.dateKey
+      const hasHabit = state.habits.some((h) => h.dateKey === day)
+      const habits = hasHabit
+        ? state.habits.map((h) => (h.dateKey === day ? { ...h, workout: true } : h))
+        : [...state.habits, { dateKey: day, steps: 0, sleepH: 0, waterL: 0, mindsetMin: 0, nutritionScore: 0, workout: true }]
       const notif: AppNotification = {
         id: `n-${action.id}`,
         type: 'workout',
         title: 'Workout logged',
         body: 'Nice work. Your stats, streak and next session weights are updated.',
-        dateKey: todayKey,
+        dateKey: day,
         time: nowTime(),
         read: false,
       }
@@ -715,6 +724,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }), [])
   const meta = useMemo(() => ({ hydrated, persistenceError, identity }), [hydrated, persistenceError, identity])
   const dispatch = useCallback<React.Dispatch<Action>>((action) => {
+    // P0 (audit SA-001): "Reset demo data" seeds a fabricated history. For a
+    // signed-in account that state would diff against the cloud baseline and
+    // delete/overwrite real data on the next sync. It is only ever meaningful
+    // for the anonymous demo/preview identity, so it is dropped for any real
+    // account here — a structural guard independent of whether the UI happens
+    // to hide the control. RESET_EMPTY (the user's own "start fresh") stays
+    // available to everyone.
+    if (action.type === 'RESET_DEMO' && !canDispatchDemoReset(getActiveIdentity())) return
     if (action.type === 'RESET_DEMO' || action.type === 'RESET_EMPTY') {
       persistenceBlockedRef.current = false
       setPersistenceError(false)
@@ -838,7 +855,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
     const snapshot = stateRef.current
     savingRef.current = true
-    AsyncStorage.setItem(persistKeyRef.current, JSON.stringify(snapshot))
+    // Bound the on-device write so a multi-year account never exceeds the
+    // AsyncStorage size limit (audit SA-007). The cloud holds the full history;
+    // the local copy is a bounded recent cache.
+    AsyncStorage.setItem(persistKeyRef.current, JSON.stringify(boundStateForLocalPersist(snapshot)))
       .then(() => setPersistenceError(false))
       .catch(() => setPersistenceError(true))
       .finally(() => {

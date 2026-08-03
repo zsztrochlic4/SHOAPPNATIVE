@@ -18,6 +18,9 @@ import type { CoachActionProposal, CoachAnswerMode, CoachCitation, CoachMemory }
  */
 export interface CoachServerInput {
   message: string
+  /** Idempotency key (audit SA-011): stable per user message, REUSED on retry so
+   *  a retry returns the first turn instead of triggering a second model call. */
+  requestKey?: string
   recent?: string[]
   isAustralia?: boolean
   affectedRegions?: string[]

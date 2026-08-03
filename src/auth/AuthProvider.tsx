@@ -17,6 +17,8 @@ import { ANON_IDENTITY, clearStoredStateFor, setActiveIdentity } from '../store/
 import { requestCloudFlush } from '../store/cloudFlush'
 import { clearCoachWorkspaceCache } from '../lib/coachWorkspace'
 import { cancelAllReminders, unregisterPush } from '../lib/notifications'
+import { clearWorkoutRuntimeFor } from '../screens/activeWorkoutRuntime'
+import { clearCompletionQueueFor } from '../backend/repo/completionQueue'
 
 type AuthState = {
   /** True while we're still figuring out if someone is logged in. */
@@ -106,37 +108,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function deleteAccount() {
     if (!auth || !auth.currentUser) throw new Error('You are not signed in.')
     const uid = auth.currentUser.uid
-    // Deletion is SERVER-ONLY (audit F-002). The callable removes data, Storage
-    // and the login atomically with Admin privileges (no recent-login step), and
-    // is idempotent/resumable server-side. If it fails, NOTHING has been
-    // destroyed client-side and the user can simply retry — the old client
-    // fallback that deleted cloud data before `deleteUser` could leave the
-    // login alive with the data already gone, which is worse than failing.
+    // Deletion is SERVER-ONLY (audit F-002 / SA-002). The callable is AUTH-FIRST:
+    // it revokes the login BEFORE destroying data, tracks its phase in a
+    // tombstone, and is idempotent/resumable (a scheduled sweep finishes any job
+    // a disabled account can no longer retry itself). On failure the thrown
+    // error carries `details.accountDisabled` / `details.dataDeleted` so the UI
+    // can tell the user the truth instead of a blanket "nothing was deleted".
     if (!functions) {
       throw new Error('Account deletion needs a connection to our servers. Please try again once you are back online.')
     }
     await httpsCallable(functions, 'deleteAccount', { timeout: 300_000 })()
     // Server purge succeeded — scrub every local trace of the account.
+    await scrubLocalAccount(uid)
+    await fbSignOut(auth).catch(() => {}) // clear the now-defunct local session
+  }
+
+  // Remove every on-device trace of an account (audit SA-020). Shared by
+  // deletion and sign-out so the two can never drift on what "local health data"
+  // covers: AppState, coach cache, active-workout runtime, completion queue,
+  // local reminders and the push token.
+  async function scrubLocalAccount(uid: string) {
     await unregisterPush(uid).catch(() => {})
     await cancelAllReminders().catch(() => {})
     await clearCoachWorkspaceCache(uid).catch(() => {})
+    await clearWorkoutRuntimeFor(uid).catch(() => {}) // audit SA-005/SA-020
+    await clearCompletionQueueFor(uid).catch(() => {}) // audit SA-020
     await clearStoredStateFor(uid).catch(() => {})
-    await fbSignOut(auth).catch(() => {}) // clear the now-defunct local session
   }
 
   async function signOut() {
     if (!auth) return
     const uid = auth.currentUser?.uid
     if (uid) {
-      // While still authenticated: push any last pending edit to the cloud,
-      // release this device's push token (Firestore rules are owner-only) and
-      // stop local reminders, then drop the local caches so nothing of this
-      // account stays readable on a shared device (audit F-001/F-004/F-005).
+      // While still authenticated: push any last pending edit to the cloud, then
+      // scrub every on-device trace of this account (audit F-001/F-004/F-005/
+      // SA-020) — AppState, coach cache, active-workout runtime, completion
+      // queue, local reminders and the push token — so nothing stays readable
+      // or resumable on a shared device.
       await requestCloudFlush()
-      await unregisterPush(uid).catch(() => {})
-      await cancelAllReminders().catch(() => {})
-      await clearCoachWorkspaceCache(uid).catch(() => {})
-      await clearStoredStateFor(uid).catch(() => {})
+      await scrubLocalAccount(uid)
     }
     await fbSignOut(auth)
   }

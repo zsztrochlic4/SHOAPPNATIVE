@@ -23,6 +23,7 @@ export {
   clearCoachMemories,
   respondToCoachProposal,
 } from './coachProfile'
-export { deleteAccount } from './account'
+export { deleteAccount, resumeAccountDeletions } from './account'
+export { reportClientError, monitorSlo } from './observability'
 export { sendNotification, dedupePushToken } from './notifications'
 export { createCheckoutSession, createBillingPortalSession, stripeWebhook } from './billing'

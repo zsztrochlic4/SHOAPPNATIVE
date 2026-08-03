@@ -584,7 +584,7 @@ function CustomiseSheet({ open, onClose, colors }: { open: boolean; onClose: () 
           <SheetLabel colors={colors}>Time range</SheetLabel>
           <View style={{ flexDirection: 'row', gap: 4, marginTop: 9, backgroundColor: colors.ink700, padding: 4, borderRadius: 13 }}>
             {STAT_TIMEFRAMES.map((t) => (
-              <Pressable key={t} onPress={() => setTf(t)} style={tabStyle(tf === t)}>
+              <Pressable key={t} onPress={() => setTf(t)} accessibilityRole="button" accessibilityState={{ selected: tf === t }} accessibilityLabel={`Time range ${RANGE_LABEL[t]}`} style={tabStyle(tf === t)}>
                 <Text style={{ fontSize: 13.5, fontWeight: '700', color: tf === t ? '#0a0a0b' : `${colors.fg}8c` }}>{RANGE_LABEL[t]}</Text>
               </Pressable>
             ))}

@@ -70,6 +70,7 @@
     "format:scripts:fix": "prettier --write \"scripts/**/*.{mjs,js}\"",
     "holdouts:build": "node scripts/build-holdouts.mjs",
     "validate:backend": "node scripts/validate-backend.mjs",
+    "record:release": "node scripts/record-release.mjs",
     "validate:data": "node scripts/validate-data-sync.mjs",
     "validate:firestore": "node scripts/firestore-seed.js",
     "audit:schema": "node scripts/audit-production-schema.mjs",
