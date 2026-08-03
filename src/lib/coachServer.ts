@@ -27,6 +27,9 @@ export interface CoachServerInput {
   engineExcludedExerciseIds?: string[]
   screeningOutcome?: string | null
   usage?: { dateKey: string; count: number }
+  /** Coach Capability Plan: opt into engine-resolvable workout_action proposals
+   *  (mirrors the client `COACH_ACTIONING` flag, LIVE). Server gates the allowlist on it. */
+  allowActions?: boolean
 }
 
 export interface CoachServerResult {

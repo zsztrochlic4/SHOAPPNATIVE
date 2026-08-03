@@ -85,6 +85,14 @@ export interface CoachMessageInput {
   screeningOutcome?: string | null
   /** @deprecated Ignored in production; the server enforces the authoritative cap. */
   usage?: CoachUsage
+  /**
+   * Coach Capability Plan: when true, the coach may emit an engine-resolvable
+   * `workout_action` proposal (swap / goal change / deload / …). Mirrors the client
+   * `COACH_ACTIONING` flag (LIVE as of 2026-08-03; the client sends true wherever the
+   * coach is operational, and off when actioning is disabled). Absent/false ⇒ the prompt
+   * omits the action allowlist and any workout_action the model emits is downgraded here.
+   */
+  allowActions?: boolean
 }
 
 export interface CoachTurnResult {
@@ -218,8 +226,11 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
   // Intent-aware, budgeted context (final plan Phase 2) + per-turn conversational hint (Phase 1/3).
   const selectedContext = selectCoachContext(turnData.snapshot, message, { intent: pre.decision.intent })
   const turnHint = buildConversationTurnHint(pre.decision.intent)
+  // COACH_ACTIONING gate: only advertise the workout_action allowlist when the client
+  // opted in. Live users (flag off) get the same coach with actioning omitted entirely.
+  const allowActions = input.allowActions === true
   const systemPrompt = [
-    buildCoachSystemPrompt(),
+    buildCoachSystemPrompt({ allowWorkoutActions: allowActions }),
     '',
     selectedContext,
     ...(turnHint ? ['', turnHint] : []),
@@ -249,7 +260,10 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
     memory = await deps.saveMemory(uid, message, structured.memory)
   }
   let proposal: CoachActionProposal | null = null
-  if (structured.proposal.kind !== 'none' && structured.proposal.title && structured.proposal.summary && deps.saveProposal) {
+  // Defence in depth: a workout_action is only ever surfaced when the client opted into
+  // actioning. If the model emits one with the flag off, drop it rather than persist it.
+  const proposalAllowed = structured.proposal.kind !== 'workout_action' || allowActions
+  if (proposalAllowed && structured.proposal.kind !== 'none' && structured.proposal.title && structured.proposal.summary && deps.saveProposal) {
     proposal = await deps.saveProposal(uid, {
       kind: structured.proposal.kind,
       title: structured.proposal.title,

@@ -41,20 +41,23 @@ export interface SwapResult {
 }
 
 /**
- * Resolve a swap. Walks the from-exercise's substitutions to the first eligible option;
- * pain swaps additionally skip anything loading a flagged region; too-hard swaps prefer a
- * lower/equal skill, more supported option. Returns null only if nothing compatible exists.
+ * Resolve swap candidates. Walks the from-exercise's substitutions in priority order and
+ * collects up to `limit` eligible options; pain swaps additionally skip anything loading a
+ * flagged region; too-hard swaps stay at/below skill, too-easy at/above. Each option is
+ * re-prescribed AND re-clamped by the Safety Rules. Returns [] if nothing compatible exists.
+ * `swapExercise` (first option) is the single-answer form used by the generator.
  */
-export function swapExercise(fromId: string, reason: SwapReason, ctx: BuildContext, extraExclude: Set<string> = new Set()): SwapResult | null {
+export function swapCandidates(fromId: string, reason: SwapReason, ctx: BuildContext, extraExclude: Set<string> = new Set(), limit = 1): SwapResult[] {
   const from = EXERCISE_BY_ID[fromId]
-  if (!from) return null
+  if (!from) return []
   const exclude = new Set<string>([...ctx.excludedIds, ...extraExclude, fromId])
   const injuryRegions = reason === 'pain'
     ? injuryStressRegions(ctx.affectedRegions).concat(ctx.affectedRegions as InjuryRegion[])
     : injuryStressRegions(ctx.affectedRegions)
 
-  const candidateIds = substitutesFor(fromId)
-  for (const id of candidateIds) {
+  const out: SwapResult[] = []
+  for (const id of substitutesFor(fromId)) {
+    if (out.length >= limit) break
     const ex = EXERCISE_BY_ID[id]
     if (!ex || !eligibleForUser(ex, ctx, exclude)) continue
     // Pain (SW02): never swap into an exercise that loads the aggravated region.
@@ -64,14 +67,22 @@ export function swapExercise(fromId: string, reason: SwapReason, ctx: BuildConte
     // Too easy (SW06): same group at equal-or-higher skill.
     if (reason === 'too_easy' && (SKILL_RANK[ex.skillLevel] ?? 0) < (SKILL_RANK[from.skillLevel] ?? 0)) continue
 
-    return {
+    out.push({
       fromId, toId: ex.id, toName: ex.name, reasonCode: REASON_CODE[reason],
       prescribed: prescribe(ex, ctx), // re-worked AND re-clamped by the Safety Rules
       excludeOriginal: reason === 'dislike' || reason === 'pain',
       note: `Swapped ${from.name} → ${ex.name} (${REASON_CODE[reason]}). Re-worked into a safety-clamped recommendation for the new lift.`,
-    }
+    })
   }
-  return null
+  return out
+}
+
+/**
+ * Resolve a single swap — the first eligible option. Returns null only if nothing
+ * compatible exists. Thin wrapper over `swapCandidates` so the two can never diverge.
+ */
+export function swapExercise(fromId: string, reason: SwapReason, ctx: BuildContext, extraExclude: Set<string> = new Set()): SwapResult | null {
+  return swapCandidates(fromId, reason, ctx, extraExclude, 1)[0] ?? null
 }
 
 /**

@@ -49,6 +49,84 @@ function compact(value: unknown, max = 1200): string {
   try { return JSON.stringify(value).slice(0, max) } catch { return '' }
 }
 
+/* ------------------------------------------------------------------ */
+/*  Enriched context signals (Coach Capability Plan)                   */
+/*  All derived from already-loaded docs — no extra Firestore reads.   */
+/* ------------------------------------------------------------------ */
+
+const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+/** "Today (Wednesday) is a Push day: Bench Press, …" from the stored program's schedule. */
+function programDayText(program: any): string {
+  const days = program && Array.isArray(program.days) ? program.days : null
+  if (!days) return ''
+  const today = WEEKDAY_NAMES[new Date().getUTCDay()]
+  const day = days.find((d: any) => d?.weekday === today)
+  if (!day) return `Today (${today}) is a rest day in the current program.`
+  const lifts = Array.isArray(day.exercises)
+    ? day.exercises.map((e: any) => e?.name).filter(Boolean).slice(0, 6).join(', ')
+    : ''
+  return `Today (${today}) is a ${day.dayType ?? 'training'} day${lifts ? `: ${lifts}` : ''}.`
+}
+
+/** A one-line note on the most recent session and whether it was completed. */
+function lastSessionText(sessions: Record<string, unknown>[]): string {
+  const last = sessions[0] as any
+  if (!last) return 'No sessions logged yet.'
+  const vol = typeof last.volumeKg === 'number' ? `, ${Math.round(last.volumeKg)}kg volume` : ''
+  return `Last session ${last.dateKey ?? '?'}: ${last.completed ? 'completed' : 'not completed'}${vol}.`
+}
+
+/** New per-lift est-1RM bests in the latest workout summary vs all earlier ones. */
+function recentPRsText(summaries: Record<string, unknown>[]): string {
+  if (summaries.length < 2) return ''
+  const [latest, ...earlier] = summaries as any[]
+  const latestLifts = latest?.lifts && typeof latest.lifts === 'object' ? latest.lifts : {}
+  const prs: string[] = []
+  for (const [defId, est] of Object.entries(latestLifts)) {
+    if (typeof est !== 'number') continue
+    let prevBest = 0
+    for (const s of earlier) { const v = s?.lifts?.[defId]; if (typeof v === 'number' && v > prevBest) prevBest = v }
+    if (prevBest > 0 && est > prevBest + 0.5) prs.push(`${defId} est-1RM ${Math.round(est)}kg (was ${Math.round(prevBest)}kg)`)
+  }
+  return prs.length ? `New bests in the latest session (${latest?.dateKey ?? '?'}): ${prs.slice(0, 4).join('; ')}.` : ''
+}
+
+/** Lifts whose est-1RM has not improved over the last ~3 summaries and sits below their peak. */
+function plateausText(summaries: Record<string, unknown>[]): string {
+  if (summaries.length < 3) return ''
+  const chron = [...summaries].reverse() as any[] // oldest → newest
+  const series: Record<string, number[]> = {}
+  for (const s of chron) {
+    const lifts = s?.lifts
+    if (lifts && typeof lifts === 'object') {
+      for (const [id, v] of Object.entries(lifts)) if (typeof v === 'number') (series[id] ||= []).push(v)
+    }
+  }
+  const flags: string[] = []
+  for (const [id, vals] of Object.entries(series)) {
+    if (vals.length < 3) continue
+    const recent = vals[vals.length - 1]
+    const threeAgo = vals[vals.length - 3]
+    const peak = Math.max(...vals)
+    if (recent <= threeAgo + 0.5 && recent < peak - 0.5) flags.push(id)
+  }
+  return flags.length ? `Lifts that have stalled (flat/declining est-1RM over recent sessions): ${flags.slice(0, 5).join(', ')}.` : ''
+}
+
+/** 7-day averages for sleep and water from the habit log. */
+function recovery7dText(habits: Record<string, unknown>[]): string {
+  const week = habits.slice(0, 7) as any[]
+  const sleeps = week.map((h) => h?.sleepH).filter((v) => typeof v === 'number' && v > 0) as number[]
+  const waters = week.map((h) => h?.waterL).filter((v) => typeof v === 'number' && v > 0) as number[]
+  if (!sleeps.length && !waters.length) return ''
+  const avg = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length
+  const parts: string[] = []
+  if (sleeps.length) parts.push(`sleep avg ${avg(sleeps).toFixed(1)}h over ${sleeps.length} logged night${sleeps.length > 1 ? 's' : ''}`)
+  if (waters.length) parts.push(`water avg ${avg(waters).toFixed(1)}L over ${waters.length} logged day${waters.length > 1 ? 's' : ''}`)
+  return parts.join('; ') + '.'
+}
+
 async function recentDocs(uid: string, name: string, limitCount: number): Promise<Record<string, unknown>[]> {
   try {
     const snap = await getFirestore().collection('users').doc(uid).collection(name)
@@ -163,7 +241,7 @@ export async function loadCoachTurnData(uid: string): Promise<CoachTurnData> {
     profile: compact({ name: profile.name, goal: profile.goal, experience: profile.experience, daysPerWeek: profile.daysPerWeek, sessionMinutes: profile.sessionMinutes, equipment: profile.equipment, dietaryPrefs: profile.dietaryPrefs, motivation: profile.motivation }),
     canonicalProfile: compact({ goal: backend.goal, experience: backend.experience_level, daysPerWeek: backend.days_per_week, sessionLength: backend.session_length_min, equipment: backend.equipment, trainsAlone: backend.trains_alone }),
     program: compact(user.generatedProgram ?? user.program, 1800),
-    recentTraining: `${completed.length}/${sessions.length} recent sessions completed; latest ${compact(sessions.slice(0, 4), 1800)}`,
+    recentTraining: `${completed.length}/${sessions.length} recent sessions completed. ${lastSessionText(sessions)} Latest ${compact(sessions.slice(0, 4), 1500)}`,
     trainingSummaries: compact(workoutSummaries.slice(0, 8), 1200),
     activity: compact(activities.slice(0, 8), 900),
     readiness: `habits ${habits.length}/14 days; latest ${compact(habits.slice(0, 7), 1200)}`,
@@ -171,6 +249,11 @@ export async function loadCoachTurnData(uid: string): Promise<CoachTurnData> {
     nutrition: `${meals.length} entries; latest ${compact(meals.slice(0, 8), 1000)}`,
     nutritionCheckins: compact(foodReviews.slice(0, 7), 900),
     memories: memoryList.map((m) => ({ category: m.category, value: m.value, sensitivity: m.sensitivity, scope: m.scope })),
+    // Coach Capability Plan — enriched signals (all from the docs already loaded above).
+    programDay: programDayText(user.generatedProgram ?? user.program),
+    recentPRs: recentPRsText(workoutSummaries),
+    plateaus: plateausText(workoutSummaries),
+    recovery7d: recovery7dText(habits),
   }
 
   // Full flattened text kept for back-compat (tests, non-selective callers).

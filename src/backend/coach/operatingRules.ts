@@ -139,7 +139,22 @@ export const APPROVED_KNOWLEDGE_SOURCES = [
  * string embeds it so the model has the hard nevers and consult order inline. Keep it
  * pointing at the sheet as the authority, not at ad-hoc instructions.
  */
-export function buildCoachSystemPrompt(): string {
+/**
+ * The engine-resolvable actions the coach may PROPOSE (Coach Capability Plan). Appended
+ * to the prompt only when the caller opts into actioning (`allowWorkoutActions`), so the
+ * coach never offers an action the client cannot perform. This is additive guidance that
+ * sits BELOW the HARD_NEVERS — it can never relax the safety envelope; the deterministic
+ * engine performs and re-clamps every change through the Safety Rules.
+ */
+export const WORKOUT_ACTION_ALLOWLIST: string[] = [
+  'A workout_action proposal may only use payload.action with one of: swap, change_goal, set_training_days, reschedule_days, set_session_length, deload, catch_up, exam_mode, planned_absence, start_session, open_budget_eats, nudge_log, share_pr — each with only its own bounded params (swap: fromExerciseId, reason ∈ {dislike,pain,equipment,too_hard,too_easy,specific,variety}, wantedExerciseId only when reason is specific; change_goal: newGoal ∈ {Hypertrophy,Fat Loss,Strength,General Fitness}; set_training_days / reschedule_days: days as a comma-separated Weekday list of 2–6 days; set_session_length: sessionLengthMin ∈ {30,45,60,75,90}; catch_up: mode ∈ {exempt,shift_forward,fold_into_next,replan} — use exempt to mark a missed day as no-penalty rest; exam_mode: startDate + endDate as YYYY-MM-DD; planned_absence: mode ∈ {full_pause,maintenance,minimal_movement,reduced_frequency,active_rest,no_change} + startDate + endDate; nudge_log: kind ∈ {water,sleep,steps,nutrition,weight}; start_session: variant ∈ {full,quick15}; open_budget_eats: no params; share_pr: prExerciseId + prValue — only propose it when the user actually has a recent personal record to celebrate, and the app takes a second explicit confirm before anything is posted).',
+  'You PROPOSE the change; the deterministic engine performs it and re-clamps it against the Safety Rules. You never write to the program yourself, never invent an exercise/weight/rep/RIR, and never pick a change that bypasses the prescription floors or the Exercise Database.',
+  'Only propose an action the user has clearly asked for or agreed to. Explain a swap’s trade-off in a sentence first; if there is no eligible option, say so rather than inventing one.',
+  'Pain or a stop-symptom is never a silent swap — it routes through the safety layer. Never propose an action for a user the screening flagged.',
+  'Outward or irreversible actions (share_pr) always require an explicit user confirmation before anything leaves the app.',
+]
+
+export function buildCoachSystemPrompt(opts: { allowWorkoutActions?: boolean } = {}): string {
   const nevers = HARD_NEVERS.map((n) => `- ${n}`).join('\n')
   const consult = CONSULT_ORDER.map((c) => `- When the user ${c.when}: consult ${c.consult.join(', ')} → ${c.then}`).join('\n')
   const scope = OUT_OF_SCOPE.map((o) => `- ${o.request}: ${o.response}`).join('\n')
@@ -178,8 +193,14 @@ export function buildCoachSystemPrompt(): string {
     'APPROVED GENERAL-KNOWLEDGE SOURCES (cite a source only when the claim is supported by its reviewed note; never invent what a source says. Low-stakes established explanations may be uncited. Refer higher-stakes or current claims that are not covered by these notes):',
     knowledge,
     '',
-    'STRUCTURED OUTPUT: Return JSON only with mode, message, citations, memory and proposal. Memory is null unless the user explicitly supplied a stable coach-relevant fact in the current message. evidenceQuote must be an exact quote from that current message. Proposal kind must be none unless it is a bounded navigation or memory confirmation proposal.',
-    'A navigation proposal may only use payload.overlay with one of: activeWorkout, workout, nutrition, progress, logHabit, logWeight, logActivity, budgetEats, beginner. Never propose an automatic health, training, nutrition, account, purchase, or social action. The app will require an explicit user confirmation before navigation.',
+    'STRUCTURED OUTPUT: Return JSON only with mode, message, citations, memory and proposal. Memory is null unless the user explicitly supplied a stable coach-relevant fact in the current message. evidenceQuote must be an exact quote from that current message.',
+    opts.allowWorkoutActions
+      ? 'Proposal kind must be none unless it is a bounded navigation, memory confirmation, or workout_action proposal.'
+      : 'Proposal kind must be none unless it is a bounded navigation or memory confirmation proposal.',
+    'A navigation proposal may only use payload.overlay with one of: activeWorkout, workout, nutrition, progress, logHabit, logWeight, logActivity, budgetEats, beginner. The app will require an explicit user confirmation before navigation.',
+    ...(opts.allowWorkoutActions
+      ? ['', 'WORKOUT ACTIONS (you may propose a workout_action — the engine performs & re-clamps it):', ...WORKOUT_ACTION_ALLOWLIST.map((r) => `- ${r}`)]
+      : ['Never propose an automatic health, training, nutrition, account, purchase, or social action.']),
     '',
     `TONE & BOUNDARIES: ${TONE}`,
   ].join('\n')

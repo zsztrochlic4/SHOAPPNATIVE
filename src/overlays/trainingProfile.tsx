@@ -131,6 +131,7 @@ export function TrainingProfileSheet({ open, onClose }: Props) {
         backendUser: doc,
         generatedProgram: preview.program,
         programStatus: preview.status,
+        programDoc: preview.programDoc,
         workoutInstances: preview.instances,
       })
       const uid = user?.uid

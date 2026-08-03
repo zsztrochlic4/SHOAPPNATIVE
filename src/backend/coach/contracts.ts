@@ -34,7 +34,7 @@ export interface CoachWorkspaceSummary {
   updatedAt: string | null
 }
 
-export type CoachProposalKind = 'none' | 'navigation' | 'memory'
+export type CoachProposalKind = 'none' | 'navigation' | 'memory' | 'workout_action'
 
 export interface CoachActionProposal {
   id: string

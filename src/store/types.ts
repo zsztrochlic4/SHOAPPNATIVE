@@ -1,8 +1,19 @@
 import type { Language } from '../lib/i18n'
 import type { ContactButton } from '../backend/coach/safety'
 import type { CoachActionProposal, CoachAnswerMode, CoachCitation, CoachMemory } from '../backend/coach/contracts'
-import type { UserDoc, WorkoutInstanceDoc } from '../backend/schema'
+import type { UserDoc, WorkoutInstanceDoc, ProgramDoc } from '../backend/schema'
 import type { StoredProgram, ProgramStatus } from '../backend/runtime/activate'
+
+/** A restorable snapshot of the program-related state, taken before a coach-actioned
+ *  change so the user can UNDO it (Coach Capability Plan). */
+export interface ProgramSnapshot {
+  backendUser: UserDoc
+  generatedProgram: StoredProgram | null
+  programStatus: ProgramStatus | null
+  programDoc: ProgramDoc | null
+  workoutInstances: WorkoutInstanceDoc[] | undefined
+  plannedPeriods: PlannedPeriod[] | undefined
+}
 
 export type Units = 'metric' | 'imperial'
 /** 'system' follows the OS light/dark setting (audit SA-017 "Follow system"). */
@@ -703,6 +714,10 @@ export interface AppState {
   /** Generation-gate status. `{ ok:false, reason }` drives the "program being finalised"
    *  holding screen; `{ ok:true }` means `generatedProgram` is present. */
   programStatus?: ProgramStatus | null
+  /** The canonical `ProgramDoc` for the active program (schema.ts). Held so a coach-actioned
+   *  change (coachActionResolver) can persist via writeActiveProgram and be restored on undo.
+   *  Written alongside `generatedProgram` whenever the program is (re)generated. */
+  programDoc?: ProgramDoc | null
   /** True only for the seeded "Alex" demo, which runs on a frozen clock so its
    *  40-day history lines up. Real onboarded users are false and run on live
    *  device time (see lib/date setLiveClock). */

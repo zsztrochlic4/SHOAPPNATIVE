@@ -23,6 +23,7 @@ import type {
   AppNotification,
   AppState,
   ChatMessage,
+  CommunityScope,
   IntegrationState,
   LoggedActivity,
   LoggedExercise,
@@ -32,13 +33,14 @@ import type {
   Post,
   PostComment,
   Profile,
+  ProgramSnapshot,
   Settings,
   Subscription,
   UserMeal,
   WorkoutSession,
   WorkoutTemplate,
 } from './types'
-import type { UserDoc, WorkoutInstanceDoc } from '../backend/schema'
+import type { UserDoc, WorkoutInstanceDoc, ProgramDoc } from '../backend/schema'
 import type { StoredProgram, ProgramStatus } from '../backend/runtime/activate'
 import { sessionFromInstance, fullWeekday } from './programSession'
 import { sessionForDay } from './selectors'
@@ -64,8 +66,12 @@ export type Action =
   | { type: 'SET_SETTINGS'; patch: Partial<Settings> }
   | { type: 'SET_PROFILE'; patch: Partial<Profile> }
   | { type: 'SET_SUBSCRIPTION'; subscription: Subscription }
-  | { type: 'COMPLETE_ONBOARDING'; profile: Partial<Profile>; backendUser?: UserDoc; generatedProgram?: StoredProgram | null; programStatus?: ProgramStatus | null; workoutInstances?: WorkoutInstanceDoc[] }
-  | { type: 'APPLY_TRAINING_PROFILE'; profilePatch: Partial<Profile>; backendUser: UserDoc; generatedProgram?: StoredProgram | null; programStatus?: ProgramStatus | null; workoutInstances?: WorkoutInstanceDoc[] }
+  | { type: 'COMPLETE_ONBOARDING'; profile: Partial<Profile>; backendUser?: UserDoc; generatedProgram?: StoredProgram | null; programStatus?: ProgramStatus | null; workoutInstances?: WorkoutInstanceDoc[]; programDoc?: ProgramDoc | null }
+  | { type: 'APPLY_TRAINING_PROFILE'; profilePatch: Partial<Profile>; backendUser: UserDoc; generatedProgram?: StoredProgram | null; programStatus?: ProgramStatus | null; workoutInstances?: WorkoutInstanceDoc[]; programDoc?: ProgramDoc | null }
+  // Coach Capability Plan: a confirmed single-exercise swap (coachActionResolver 'patch').
+  | { type: 'APPLY_COACH_SWAP'; backendUser: UserDoc; generatedProgram: StoredProgram; workoutInstances: WorkoutInstanceDoc[] }
+  // Coach Capability Plan: undo — restore the pre-action program snapshot.
+  | { type: 'RESTORE_PROGRAM_SNAPSHOT'; snapshot: ProgramSnapshot }
   | { type: 'START_PROGRAM_DAY'; dateKey: string }
   | { type: 'LOG_WEIGHT'; kg: number }
   | { type: 'ADJUST_WATER'; deltaL: number }
@@ -108,7 +114,7 @@ export type Action =
   | { type: 'COMPLETE_WORKOUT'; id: string }
   | { type: 'TOGGLE_LIKE'; postId: string }
   | { type: 'TOGGLE_BOOKMARK'; postId: string }
-  | { type: 'ADD_POST'; text: string; image?: string }
+  | { type: 'ADD_POST'; text: string; image?: string; pr?: { lift: string; weight: string }; scope?: CommunityScope }
   | { type: 'JOIN_CHALLENGE'; id: string }
   | { type: 'RSVP_EVENT'; id: string }
   | { type: 'JOIN_GROUP'; id: string }
@@ -224,6 +230,7 @@ function reducer(state: AppState, action: Action): AppState {
         backendUser: action.backendUser ?? state.backendUser,
         generatedProgram: action.generatedProgram ?? null,
         programStatus: action.programStatus ?? null,
+        programDoc: action.programDoc ?? null,
         workoutInstances: action.workoutInstances ?? undefined,
       }
 
@@ -239,8 +246,38 @@ function reducer(state: AppState, action: Action): AppState {
         backendUser: action.backendUser,
         generatedProgram: action.generatedProgram ?? null,
         programStatus: action.programStatus ?? null,
+        programDoc: action.programDoc ?? null,
         workoutInstances: action.workoutInstances ?? undefined,
       }
+
+    // Coach Capability Plan: apply a confirmed single-exercise swap. Only the forward
+    // plan projection + instance templates + (for dislike/pain) the excluded set change;
+    // programDoc/status are untouched (the split & schedule are unchanged), and completed
+    // sessions / logs are never modified. Undo restores via RESTORE_PROGRAM_SNAPSHOT.
+    case 'APPLY_COACH_SWAP':
+      return {
+        ...state,
+        backendUser: action.backendUser,
+        generatedProgram: action.generatedProgram,
+        workoutInstances: action.workoutInstances,
+      }
+
+    // Coach Capability Plan: undo a coach-actioned change by restoring the snapshot taken
+    // before it was applied. Planned periods route through withPeriods so examMode /
+    // planned_absences stay coherent with the restored backendUser.
+    case 'RESTORE_PROGRAM_SNAPSHOT': {
+      const restored: AppState = {
+        ...state,
+        backendUser: action.snapshot.backendUser,
+        generatedProgram: action.snapshot.generatedProgram ?? null,
+        programStatus: action.snapshot.programStatus ?? null,
+        programDoc: action.snapshot.programDoc ?? null,
+        workoutInstances: action.snapshot.workoutInstances ?? undefined,
+      }
+      return action.snapshot.plannedPeriods
+        ? withPeriods(restored, action.snapshot.plannedPeriods)
+        : restored
+    }
 
     case 'START_PROGRAM_DAY': {
       // Materialise a loggable session for the given day from the generated program's
@@ -597,6 +634,8 @@ function reducer(state: AppState, action: Action): AppState {
         comments: 0,
         liked: false,
         bookmarked: false,
+        ...(action.pr ? { pr: action.pr } : {}),
+        ...(action.scope ? { scope: action.scope } : {}),
       }
       return { ...state, posts: [post, ...state.posts] }
     }

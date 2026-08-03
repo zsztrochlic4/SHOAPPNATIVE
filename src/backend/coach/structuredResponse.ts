@@ -7,9 +7,10 @@ import type {
   CoachProposalKind,
   StructuredCoachReply,
 } from './contracts'
+import { validateWorkoutActionPayload } from './workoutActions'
 
 const MODES: CoachAnswerMode[] = ['general', 'personalised', 'app_help']
-const PROPOSALS: CoachProposalKind[] = ['none', 'navigation', 'memory']
+const PROPOSALS: CoachProposalKind[] = ['none', 'navigation', 'memory', 'workout_action']
 const SENSITIVITIES: CoachMemorySensitivity[] = ['ordinary', 'sensitive']
 const SCOPES: CoachMemoryCandidate['scope'][] = [
   'stable', 'current_program', 'current_period', 'current_week', 'current_session',
@@ -99,6 +100,13 @@ export function validateStructuredCoachReply(raw: unknown): StructuredReplyValid
           return { ok: false, fallback: STRUCTURED_COACH_FALLBACK, reason: 'bad_proposal_payload' }
         }
         payload[key] = value as string | number | boolean
+      }
+      // A workout_action carries an engine-resolvable change: enforce the bounded,
+      // per-action schema on top of the generic payload check. The resolver
+      // (coachActionResolver.ts) trusts only a payload that passes here.
+      if (kind === 'workout_action') {
+        const wa = validateWorkoutActionPayload(payload)
+        if (!wa.ok) return { ok: false, fallback: STRUCTURED_COACH_FALLBACK, reason: `bad_workout_action:${wa.reason}` }
       }
       proposal.title = title
       proposal.summary = summary
