@@ -19,7 +19,7 @@
 import type { UserDoc, ProgramDoc, WorkoutInstanceDoc, PrescribedExercise, Weekday, DayType } from '../schema'
 import { canGenerate } from '../mapping/onboardingContract'
 import { generateProgram, type GeneratedProgram } from '../generator/generate'
-import type { BuiltExercise } from '../generator/build'
+import type { BuiltExercise, PrescribedFields } from '../generator/build'
 import { EXERCISE_BY_ID } from '../data/index'
 
 /* ------------------------------------------------------------------ */
@@ -81,39 +81,48 @@ export interface ActivationResult {
 /*  Mapping helpers                                                     */
 /* ------------------------------------------------------------------ */
 
-function toStoredExercise(e: BuiltExercise): StoredExercise {
+/**
+ * Project a clamped `PrescribedFields` (from the generator OR a runtime swap) into the
+ * app-facing `StoredExercise`. SINGLE source of the render projection so a swapped
+ * exercise (coachActionResolver.ts) can never diverge from a generated one.
+ */
+export function storedExerciseFromPrescription(p: PrescribedFields): StoredExercise {
   return {
-    exerciseId: e.exerciseId,
-    name: e.name,
-    muscleGroup: e.muscleGroup,
-    prescriptionClass: e.prescriptionClass,
-    sets: e.sets,
-    repsMin: e.repsMin,
-    repsMax: e.repsMax,
-    durationSecMax: e.durationSecMax,
-    rirMin: e.rirMin,
-    restSecMin: e.restSecMin,
-    pct1rmMax: e.pct1rmMax,
-    injuryAdjusted: e.appliedRules.includes('INJURY_RIR'),
+    exerciseId: p.exerciseId,
+    name: p.name,
+    muscleGroup: p.muscleGroup,
+    prescriptionClass: p.prescriptionClass,
+    sets: p.sets,
+    repsMin: p.repsMin,
+    repsMax: p.repsMax,
+    durationSecMax: p.durationSecMax,
+    rirMin: p.rirMin,
+    restSecMin: p.restSecMin,
+    pct1rmMax: p.pct1rmMax,
+    injuryAdjusted: p.appliedRules.includes('INJURY_RIR'),
   }
 }
 
-function toPrescribedExercise(e: BuiltExercise): PrescribedExercise {
-  const ex = EXERCISE_BY_ID[e.exerciseId]
+/** Project a clamped `PrescribedFields` into the canonical `PrescribedExercise` (instance). */
+export function prescribedExerciseFromPrescription(slotId: string, p: PrescribedFields, substitutedFrom: string | null): PrescribedExercise {
+  const ex = EXERCISE_BY_ID[p.exerciseId]
   return {
-    slot_id: e.slotId,
-    exercise_id: e.exerciseId,
-    substituted_from: null,
+    slot_id: slotId,
+    exercise_id: p.exerciseId,
+    substituted_from: substitutedFrom,
     measurement_type: ex?.measurementType ?? 'weight_reps',
-    sets: e.sets,
-    reps_min: e.repsMin ?? undefined,
-    reps_max: e.repsMax ?? undefined,
-    duration_sec: e.durationSecMax ?? undefined,
-    rest_sec: e.restSecMin ?? undefined,
+    sets: p.sets,
+    reps_min: p.repsMin ?? undefined,
+    reps_max: p.repsMax ?? undefined,
+    duration_sec: p.durationSecMax ?? undefined,
+    rest_sec: p.restSecMin ?? undefined,
     load_unit: ex?.loadUnit,
-    rir_min: e.rirMin,
+    rir_min: p.rirMin,
   }
 }
+
+const toStoredExercise = (e: BuiltExercise): StoredExercise => storedExerciseFromPrescription(e)
+const toPrescribedExercise = (e: BuiltExercise): PrescribedExercise => prescribedExerciseFromPrescription(e.slotId, e, null)
 
 function toStoredProgram(programId: string, createdAt: string, g: GeneratedProgram): StoredProgram {
   return {
@@ -137,13 +146,13 @@ function toStoredProgram(programId: string, createdAt: string, g: GeneratedProgr
   }
 }
 
-function toProgramDoc(programId: string, createdAt: string, uid: string, g: GeneratedProgram): ProgramDoc {
+function toProgramDoc(programId: string, createdAt: string, uid: string, g: GeneratedProgram, version = 1): ProgramDoc {
   const schedule: Partial<Record<Weekday, DayType>> = {}
   for (const p of g.placements) schedule[p.weekday as Weekday] = p.dayType
   return {
     program_id: programId,
     uid,
-    version: 1,
+    version,
     split_id: g.splitId,
     day_structure: g.dayStructure.join('|'),
     custom: false,
@@ -179,6 +188,25 @@ const blocked = (reason: string | null): ActivationResult => ({
 })
 
 /**
+ * Project a (possibly runtime-adjusted, e.g. deloaded) `GeneratedProgram` into the three
+ * stored records. Shared by `activateProgram` and the coach action resolver's deload path
+ * so both produce identical projections. The program is already safety-clamped by the
+ * generator; this only reshapes it.
+ */
+export function projectProgram(uid: string, createdAt: string, g: GeneratedProgram, version = 1): {
+  program: StoredProgram
+  programDoc: ProgramDoc
+  instances: WorkoutInstanceDoc[]
+} {
+  const programId = `${uid}_v1`
+  return {
+    program: toStoredProgram(programId, createdAt, g),
+    programDoc: toProgramDoc(programId, createdAt, uid, g, version),
+    instances: toInstances(programId, uid, g),
+  }
+}
+
+/**
  * Run the gate, then (only if it opens) the generator. Deterministic. `createdAt` is
  * injectable so callers/tests can pin it; defaults to now.
  */
@@ -189,11 +217,6 @@ export function activateProgram(user: UserDoc, createdAt: string = new Date().to
   const gen = generateProgram(user)
   if (!gen.ok) return blocked(`generation_failed:${gen.reason}`)
 
-  const programId = `${user.uid}_v1`
-  return {
-    status: { ok: true, reason: null },
-    program: toStoredProgram(programId, createdAt, gen.program),
-    programDoc: toProgramDoc(programId, createdAt, user.uid, gen.program),
-    instances: toInstances(programId, user.uid, gen.program),
-  }
+  const projected = projectProgram(user.uid, createdAt, gen.program)
+  return { status: { ok: true, reason: null }, ...projected }
 }

@@ -30,6 +30,10 @@ const SNAP = {
   weights: '{"trend":"down 0.4kg"}',
   nutrition: '12 entries; latest chicken and rice',
   nutritionCheckins: '{"protein":"ok"}',
+  programDay: 'Today (Wednesday) is a Push day: Bench Press.',
+  recentPRs: 'New bests in the latest session: BENCH est-1RM 100kg (was 95kg).',
+  plateaus: 'Lifts that have stalled: SQUAT.',
+  recovery7d: 'sleep avg 6.5h over 7 logged nights; water avg 2.1L over 6 logged days.',
   memories: [
     { category: 'preference', value: 'trains at 6am', sensitivity: 'ordinary', scope: 'stable' },
     { category: 'injury history', value: 'past shoulder surgery', sensitivity: 'sensitive', scope: 'stable' },
@@ -74,6 +78,29 @@ test('nutrition turn includes meals, excludes program', () => {
 test('progress turn includes weight trend', () => {
   const out = selectCoachContext(SNAP, 'is my weight trending the right way', { intent: 'coaching' })
   assert.match(out, /down 0\.4kg/)
+})
+
+/* -------- Enriched context gaps (Coach Capability Plan) surface in the right topic -------- */
+test('training turn surfaces the current program day, not PRs/recovery averages', () => {
+  const out = selectCoachContext(SNAP, 'what should I train today', { intent: 'coaching' })
+  assert.match(out, /Push day/)
+  assert.ok(!out.includes('sleep avg 6.5h'), 'recovery averages leaked into a training turn')
+})
+test('progress turn surfaces recent PRs and plateau flags', () => {
+  const out = selectCoachContext(SNAP, 'am I making progress or have I plateaued', { intent: 'coaching' })
+  assert.match(out, /est-1RM 100kg/)
+  assert.match(out, /have stalled/)
+})
+test('recovery turn surfaces the 7-day sleep and water averages', () => {
+  const out = selectCoachContext(SNAP, 'I feel exhausted and my sleep has been off', { intent: 'coaching' })
+  assert.match(out, /sleep avg 6\.5h/)
+})
+test('enriched signals stay inside the USER_DATA fence', () => {
+  const out = selectCoachContext(SNAP, 'am I making progress this month', { intent: 'coaching' })
+  const start = out.indexOf('<<<USER_DATA')
+  const end = out.indexOf('USER_DATA>>>')
+  const prIdx = out.indexOf('est-1RM 100kg')
+  assert.ok(prIdx > start && prIdx < end, 'enriched PR signal must be confined to the fence')
 })
 
 /* -------- Sensitive memory withheld unless invoked -------- */

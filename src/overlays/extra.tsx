@@ -27,13 +27,19 @@ import { ActivityIcon } from '../components/ActivityIcon'
 import { exerciseView, imageForMuscle, buildCustomSession } from '../store/programSession'
 import { ACTIVE_EXERCISES, type Exercise } from '../backend/data'
 import { nextSetRecommendation } from '../store/training'
-import { coachThreadView } from '../store/coach'
+import { coachThreadView, recentPR } from '../store/coach'
 import { coachReply } from '../lib/coachChat'
 import { askCoachServer } from '../lib/coachServer'
 import { newCoachRequestKey } from '../lib/coachRequestKey'
 import { fetchCoachWorkspace, readCachedCoachWorkspace, respondToCoachProposal } from '../lib/coachWorkspace'
+import { useAuth } from '../auth/AuthProvider'
+import { writeBackendUser } from '../backend/repo/userRepo'
+import { writeActiveProgram } from '../backend/repo/programRepo'
+import { resolveCoachAction, applyCoachSwapChoice, type SwapOption, type CoachActionOutcome } from '../backend/runtime/coachActionResolver'
+import { deriveLocalProfile } from '../backend/mapping/projection'
+import { newPeriodDraft, periodModeForAbsence, plannedPeriods } from '../store/periods'
 import { CoachMemoryView } from '../components/CoachMemoryView'
-import { coachContext, coachOperational, COACH_PREVIEW, coachPrecheckAsync, newSafetySession } from '../lib/coachSafety'
+import { coachContext, coachOperational, COACH_PREVIEW, COACH_ACTIONING, coachPrecheckAsync, newSafetySession } from '../lib/coachSafety'
 import { SafetyContactButtons } from '../components/SafetyContactButtons'
 import { CoachSafetyStrip } from '../components/CoachSafetyStrip'
 import { CoachComingSoon } from '../components/CoachComingSoon'
@@ -44,7 +50,7 @@ import { brand, useColors, accentFor, type AccentKey } from '../theme'
 import { AppModal, IS_WEB, WEB_SCREEN } from '../components/WebFrame'
 import { thud } from '../lib/haptics'
 import type { ReactNode } from 'react'
-import type { CoachKind, TemplateExercise, ChatMessage } from '../store/types'
+import type { CoachKind, TemplateExercise, ChatMessage, ProgramSnapshot, PlannedPeriod, CommunityScope } from '../store/types'
 import type { CoachActionProposal } from '../backend/coach/contracts'
 
 type Props = { open: boolean; onClose: () => void; params?: Record<string, unknown> }
@@ -476,12 +482,22 @@ function TypingDots() {
  *   • drag RIGHT → reply to this message (a reply glyph fades in; past the
  *     threshold it arms the reply banner). Vertical scroll still passes through.
  */
-function CoachMessageRow({ m, revealX, colors, onReply, onProposalConfirmed }: {
+function CoachMessageRow({ m, revealX, colors, onReply, onProposalConfirmed, undoActive, onUndo, swapOptions, onChooseSwap, shareText, onPublishShare, onCancelShare }: {
   m: ChatMessage
   revealX: Animated.Value
   colors: ReturnType<typeof useColors>
   onReply: (m: ChatMessage) => void
   onProposalConfirmed: (proposal: CoachActionProposal) => void
+  /** Coach Capability Plan: true while this action's undo window is open. */
+  undoActive?: boolean
+  onUndo?: () => void
+  /** Coach Capability Plan: alternatives to choose from for a multi-option swap. */
+  swapOptions?: SwapOption[]
+  onChooseSwap?: (option: SwapOption) => void
+  /** Coach Capability Plan: a drafted PR post awaiting the second (publish) confirm. */
+  shareText?: string
+  onPublishShare?: () => void
+  onCancelShare?: () => void
 }) {
   const user = m.role === 'user'
   const [proposalStatus, setProposalStatus] = useState(m.proposal?.status ?? null)
@@ -612,6 +628,42 @@ function CoachMessageRow({ m, revealX, colors, onReply, onProposalConfirmed }: {
                   <Text style={{ fontSize: 12, fontWeight: '700', color: withAlpha(colors.fg, 0.7) }}>Not now</Text>
                 </Pressable>
               </View>
+            ) : proposalStatus === 'confirmed' && shareText && onPublishShare ? (
+              // Coach Capability Plan: outward PR post — show the draft and require a second,
+              // explicit publish tap before anything leaves the app.
+              <View style={{ marginTop: 9, gap: 8 }}>
+                <View style={{ borderRadius: 12, backgroundColor: withAlpha(colors.fg, 0.05), padding: 10 }}>
+                  <Text style={{ fontSize: 12, lineHeight: 17, color: colors.fg }}>{shareText}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <Pressable onPress={onPublishShare} style={({ pressed }) => ({ minHeight: 44, flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: colors.brand400, opacity: pressed ? 0.75 : 1 })}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#0a0a0b' }}>Publish to feed</Text>
+                  </Pressable>
+                  <Pressable onPress={onCancelShare} style={({ pressed }) => ({ minHeight: 44, flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: withAlpha(colors.fg, 0.07), opacity: pressed ? 0.65 : 1 })}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: withAlpha(colors.fg, 0.7) }}>Not now</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : proposalStatus === 'confirmed' && swapOptions && onChooseSwap ? (
+              // Coach Capability Plan: a swap with ≥2 alternatives — the user picks one.
+              <View style={{ marginTop: 9, gap: 8 }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: withAlpha(colors.fg, 0.45) }}>Pick a replacement</Text>
+                {swapOptions.map((option) => (
+                  <Pressable key={option.id} onPress={() => onChooseSwap(option)} style={({ pressed }) => ({ minHeight: 44, borderRadius: 12, borderWidth: 1, borderColor: withAlpha(colors.brand400, 0.35), paddingVertical: 9, paddingHorizontal: 12, backgroundColor: withAlpha(colors.brand400, pressed ? 0.16 : 0.08) })}>
+                    <Text style={{ fontSize: 12.5, fontWeight: '700', color: colors.fg }}>{option.name}</Text>
+                    {!!option.muscleGroup && <Text style={{ marginTop: 1, fontSize: 11, color: withAlpha(colors.fg, 0.5) }}>{option.muscleGroup}</Text>}
+                  </Pressable>
+                ))}
+              </View>
+            ) : proposalStatus === 'confirmed' && undoActive && onUndo ? (
+              // Coach Capability Plan: the change is applied — offer a one-tap revert while
+              // the undo window is open.
+              <View style={{ marginTop: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 11.5, fontWeight: '700', color: colors.brand400 }}>Applied</Text>
+                <Pressable onPress={onUndo} hitSlop={8} style={({ pressed }) => ({ minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 12, backgroundColor: withAlpha(colors.fg, 0.07), opacity: pressed ? 0.65 : 1 })}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: withAlpha(colors.fg, 0.7) }}>Undo</Text>
+                </Pressable>
+              </View>
             ) : (
               <Text style={{ marginTop: 8, fontSize: 11.5, fontWeight: '700', color: proposalStatus === 'confirmed' ? colors.brand400 : withAlpha(colors.fg, 0.4) }}>
                 {proposalStatus === 'confirmed' ? 'Confirmed' : proposalStatus === 'rejected' ? 'Not now' : 'Proposal expired'}
@@ -632,7 +684,16 @@ function CoachMessageRow({ m, revealX, colors, onReply, onProposalConfirmed }: {
 export function CoachChatSheet({ open, onClose }: Props) {
   const { state, dispatch } = useStore()
   const nav = useNav()
+  const { user } = useAuth()
+  const toast = useToast()
   const colors = useColors()
+  // Coach Capability Plan: the most recent coach-actioned change, kept so the user can UNDO
+  // it from its proposal card. One-level (last action) undo; cleared when the sheet closes.
+  const [undoTarget, setUndoTarget] = useState<{ proposalId: string; snapshot: ProgramSnapshot } | null>(null)
+  // A pending swap that offered ≥2 alternatives — the user picks one on the proposal card.
+  const [swapChoice, setSwapChoice] = useState<{ proposalId: string; fromExerciseId: string; reason: string; options: SwapOption[] } | null>(null)
+  // A drafted PR post awaiting the SECOND explicit confirm before it is published (outward).
+  const [shareDraft, setShareDraft] = useState<{ proposalId: string; text: string; pr: { lift: string; weight: string }; scope: CommunityScope } | null>(null)
   const insets = useSafeAreaInsets()
   const listRef = useRef<FlatList<ChatMessage>>(null)
   const [text, setText] = useState('')
@@ -655,6 +716,9 @@ export function CoachChatSheet({ open, onClose }: Props) {
   const hasHistory = messages.some((m) => m.role === 'user')
   const showGrid = !hasHistory && !focused
   const hasText = text.trim().length > 0
+
+  // The undo / swap-choice / share-draft affordances are session-scoped — drop on close.
+  useEffect(() => { if (!open) { setUndoTarget(null); setSwapChoice(null); setShareDraft(null) } }, [open])
 
   // Mark coach messages read whenever the thread is open and grows.
   useEffect(() => {
@@ -719,7 +783,7 @@ export function CoachChatSheet({ open, onClose }: Props) {
       // TRUSTED BACKEND coach: the server re-runs the precheck (authoritative), the
       // model call, and the validator, so a modified client can't bypass safety
       // (§4.4). It may BLOCK even though the client's fast precheck allowed the turn.
-      const res = await askCoachServer({ message: msg, requestKey })
+      const res = await askCoachServer({ message: msg, requestKey, allowActions: COACH_ACTIONING })
       if (seq !== sendSeqRef.current) return // cancelled / superseded — drop stale reply
       // Server already ran guardOutgoing; blocked replies carry crisis buttons.
       dispatch({
@@ -767,17 +831,174 @@ export function CoachChatSheet({ open, onClose }: Props) {
     if (msg) setRetryMsg(msg)
   }
 
+  // Apply a program-mutating outcome (a swap patch or a full regen): snapshot the current
+  // state for undo, dispatch, persist to Firestore (no-op in demo), and arm the undo card.
+  const commitProgramOutcome = useCallback((outcome: Extract<CoachActionOutcome, { apply: 'patch' | 'regen' }>, proposalId: string) => {
+    const backendUser = state.backendUser
+    if (!backendUser) return
+    const snapshot: ProgramSnapshot = {
+      backendUser,
+      generatedProgram: state.generatedProgram ?? null,
+      programStatus: state.programStatus ?? null,
+      programDoc: state.programDoc ?? null,
+      workoutInstances: state.workoutInstances,
+      plannedPeriods: state.plannedPeriods,
+    }
+    const uid = user?.uid
+    if (outcome.apply === 'patch') {
+      dispatch({ type: 'APPLY_COACH_SWAP', backendUser: outcome.nextUser, generatedProgram: outcome.program, workoutInstances: outcome.instances })
+      if (uid && uid !== 'local') {
+        void writeBackendUser(uid, outcome.nextUser).catch(() => {})
+        // A swap leaves the split/schedule (programDoc) unchanged; persist the updated
+        // instances against the existing programDoc when we have it.
+        if (state.programDoc) void writeActiveProgram(uid, state.programDoc, outcome.instances).catch(() => {})
+      }
+    } else {
+      // 'regen' — goal / days / session length / deload produced a whole new program.
+      dispatch({
+        type: 'APPLY_TRAINING_PROFILE',
+        profilePatch: deriveLocalProfile(outcome.nextUser),
+        backendUser: outcome.nextUser,
+        generatedProgram: outcome.program,
+        programStatus: outcome.status,
+        programDoc: outcome.programDoc,
+        workoutInstances: outcome.instances,
+      })
+      if (uid && uid !== 'local') {
+        void writeBackendUser(uid, outcome.nextUser).catch(() => {})
+        void writeActiveProgram(uid, outcome.programDoc, outcome.instances).catch(() => {})
+      }
+    }
+    thud()
+    setSwapChoice(null)
+    setUndoTarget({ proposalId, snapshot })
+    toast(outcome.message)
+  }, [state, dispatch, user, toast])
+
   const handleProposalConfirmed = useCallback((proposal: CoachActionProposal) => {
-    if (proposal.kind !== 'navigation') return
-    const overlay = proposal.payload.overlay
-    const allowed = ['activeWorkout', 'workout', 'nutrition', 'progress', 'logHabit', 'logWeight', 'logActivity', 'budgetEats', 'beginner']
-    if (typeof overlay !== 'string' || !allowed.includes(overlay)) return
-    if (overlay === 'workout' || overlay === 'nutrition' || overlay === 'progress') nav.goTab(overlay)
-    else nav.open(overlay as 'activeWorkout' | 'logHabit' | 'logWeight' | 'logActivity' | 'budgetEats' | 'beginner')
-  }, [nav])
+    if (proposal.kind === 'navigation') {
+      const overlay = proposal.payload.overlay
+      const allowed = ['activeWorkout', 'workout', 'nutrition', 'progress', 'logHabit', 'logWeight', 'logActivity', 'budgetEats', 'beginner']
+      if (typeof overlay !== 'string' || !allowed.includes(overlay)) return
+      if (overlay === 'workout' || overlay === 'nutrition' || overlay === 'progress') nav.goTab(overlay)
+      else nav.open(overlay as 'activeWorkout' | 'logHabit' | 'logWeight' | 'logActivity' | 'budgetEats' | 'beginner')
+      return
+    }
+
+    // Coach Capability Plan: a confirmed workout_action runs the deterministic engine
+    // (which re-clamps against the Safety Rules) and applies the result to the store,
+    // then persists and offers an undo. Gated by COACH_ACTIONING — a no-op when off.
+    if (proposal.kind === 'workout_action') {
+      if (!COACH_ACTIONING) return
+      const backendUser = state.backendUser
+      if (!backendUser) { toast("You don't have a program set up yet."); return }
+
+      const outcome = resolveCoachAction(
+        { backendUser, program: state.generatedProgram ?? null, instances: state.workoutInstances ?? [], programDoc: state.programDoc ?? null },
+        proposal.payload,
+      )
+      if (!outcome.ok) { toast(outcome.message); return }
+
+      // Navigation / nudge outcomes change no program state — just route + inform.
+      if (outcome.apply === 'navigate') {
+        if (outcome.target === 'quickWorkout') nav.open('quick')
+        else nav.open(outcome.target)
+        toast(outcome.message)
+        return
+      }
+      if (outcome.apply === 'nudge') {
+        nav.open(outcome.kind === 'weight' ? 'logWeight' : 'logHabit')
+        toast(outcome.message)
+        return
+      }
+      // A swap with ≥2 alternatives — let the user pick one on the card.
+      if (outcome.apply === 'choose_swap') {
+        setUndoTarget(null)
+        setSwapChoice({ proposalId: proposal.id, fromExerciseId: outcome.fromExerciseId, reason: outcome.reason, options: outcome.options })
+        toast(outcome.message)
+        return
+      }
+      // Declare a busy period / exam mode via the existing periods store.
+      if (outcome.apply === 'period') {
+        const snapshot: ProgramSnapshot = {
+          backendUser,
+          generatedProgram: state.generatedProgram ?? null,
+          programStatus: state.programStatus ?? null,
+          programDoc: state.programDoc ?? null,
+          workoutInstances: state.workoutInstances,
+          // Effective list (handles legacy exam dates) so undo restores exactly, even from none.
+          plannedPeriods: plannedPeriods(state),
+        }
+        const period: PlannedPeriod = {
+          ...newPeriodDraft(),
+          id: `coach_${Date.now()}`,
+          start: outcome.startDate,
+          end: outcome.endDate,
+          mode: periodModeForAbsence(outcome.mode),
+          note: outcome.label,
+        }
+        dispatch({ type: 'SAVE_PERIOD', period })
+        thud()
+        setSwapChoice(null)
+        setUndoTarget({ proposalId: proposal.id, snapshot })
+        toast(outcome.message)
+        return
+      }
+      // OUTWARD: draft a PR post grounded in a REAL logged PR; require a second explicit confirm.
+      if (outcome.apply === 'share_pr') {
+        const pr = recentPR(state)
+        if (!pr) { toast("I don't see a fresh PR to celebrate yet — log a session and I'll spot it."); return }
+        const weight = fmtWeight(pr.weightKg, state.settings.units)
+        const text = `New ${pr.name} best — ${weight} for ${pr.reps} reps. Proof that showing up works. 💪`
+        setUndoTarget(null); setSwapChoice(null)
+        setShareDraft({ proposalId: proposal.id, text, pr: { lift: pr.name, weight }, scope: 'campus' })
+        toast('Draft ready — publish it when you’re happy.')
+        return
+      }
+      // patch / regen — apply, persist and arm undo.
+      commitProgramOutcome(outcome, proposal.id)
+    }
+  }, [nav, state, dispatch, toast, commitProgramOutcome])
+
+  // The SECOND confirm for an outward PR post: publish it (community is a local preview feed today).
+  const handlePublishShare = useCallback((draft: { text: string; pr: { lift: string; weight: string }; scope: CommunityScope }) => {
+    dispatch({ type: 'ADD_POST', text: draft.text, pr: draft.pr, scope: draft.scope })
+    setShareDraft(null)
+    thud()
+    toast("Posted to your preview feed — community isn't live yet, so only you can see it for now.")
+  }, [dispatch, toast])
+
+  // The user picked one of the offered swap alternatives — apply that specific option.
+  const handleChooseSwap = useCallback((choice: { proposalId: string; fromExerciseId: string; reason: string }, option: SwapOption) => {
+    if (!COACH_ACTIONING) return
+    const backendUser = state.backendUser
+    if (!backendUser) { toast("You don't have a program set up yet."); return }
+    const outcome = applyCoachSwapChoice(
+      { backendUser, program: state.generatedProgram ?? null, instances: state.workoutInstances ?? [], programDoc: state.programDoc ?? null },
+      choice.fromExerciseId, choice.reason, option.id,
+    )
+    if (!outcome.ok) { toast(outcome.message); return }
+    if (outcome.apply === 'patch') commitProgramOutcome(outcome, choice.proposalId)
+  }, [state, toast, commitProgramOutcome])
+
+  // Undo the last coach-actioned change: restore the snapshot and re-persist the prior docs.
+  const handleUndo = useCallback((snapshot: ProgramSnapshot) => {
+    dispatch({ type: 'RESTORE_PROGRAM_SNAPSHOT', snapshot })
+    const uid = user?.uid
+    if (uid && uid !== 'local') {
+      void writeBackendUser(uid, snapshot.backendUser).catch(() => {})
+      if (snapshot.programDoc) void writeActiveProgram(uid, snapshot.programDoc, snapshot.workoutInstances ?? []).catch(() => {})
+    }
+    setUndoTarget(null)
+    thud()
+    toast('Reverted — your plan is back to how it was.')
+  }, [dispatch, user, toast])
 
   const renderMessage = useCallback(({ item, index }: { item: ChatMessage; index: number }) => {
     const showDay = index === 0 || messages[index - 1]?.dateKey !== item.dateKey
+    const rowUndo = undoTarget && item.proposal && undoTarget.proposalId === item.proposal.id ? undoTarget : null
+    const rowChoice = swapChoice && item.proposal && swapChoice.proposalId === item.proposal.id ? swapChoice : null
+    const rowShare = shareDraft && item.proposal && shareDraft.proposalId === item.proposal.id ? shareDraft : null
     return (
       <View style={{ gap: 12 }}>
         {showDay && (
@@ -793,10 +1014,17 @@ export function CoachChatSheet({ open, onClose }: Props) {
           colors={colors}
           onReply={(message) => setReplyingTo({ role: message.role, text: message.text })}
           onProposalConfirmed={handleProposalConfirmed}
+          undoActive={!!rowUndo}
+          onUndo={rowUndo ? () => handleUndo(rowUndo.snapshot) : undefined}
+          swapOptions={rowChoice ? rowChoice.options : undefined}
+          onChooseSwap={rowChoice ? (option) => handleChooseSwap(rowChoice, option) : undefined}
+          shareText={rowShare ? rowShare.text : undefined}
+          onPublishShare={rowShare ? () => handlePublishShare(rowShare) : undefined}
+          onCancelShare={rowShare ? () => { setShareDraft(null); toast('No worries — nothing was posted.') } : undefined}
         />
       </View>
     )
-  }, [colors, handleProposalConfirmed, messages, revealX])
+  }, [colors, handleProposalConfirmed, handleUndo, handleChooseSwap, handlePublishShare, toast, messages, revealX, undoTarget, swapChoice, shareDraft])
 
   if (!coachOperational() && !COACH_PREVIEW) {
     return (

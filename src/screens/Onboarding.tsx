@@ -945,6 +945,7 @@ export default function Onboarding() {
       backendUser: userDoc,
       generatedProgram: activation.program,
       programStatus: activation.status,
+      programDoc: activation.programDoc,
       workoutInstances: activation.instances,
     })
     // Persist the canonical docs to Firestore immediately (no-op in demo mode, where the

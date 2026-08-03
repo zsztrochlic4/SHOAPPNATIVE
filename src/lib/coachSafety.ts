@@ -58,6 +58,18 @@ export function coachOperational(): boolean {
 export const COACH_PREVIEW = process.env.EXPO_PUBLIC_COACH_PREVIEW === '1' && !coachOperational()
 
 /**
+ * DEV-ONLY COACH ACTIONING FLAG (Coach Capability Plan). When on, the coach may PROPOSE
+ * engine-resolvable workout/program changes (swap, goal change, deload, …) and the client
+ * PERFORMS a confirmed proposal through the deterministic engine (which re-clamps against
+ * the Safety Rules). Opt-in via `EXPO_PUBLIC_COACH_ACTIONING=1`, off by default and absent
+ * from production, so real users never receive an actionable proposal until the owner rolls
+ * actioning out as a separate decision. Unlike COACH_PREVIEW this layers on the LIVE coach,
+ * so it requires the coach to actually be operational (honours the kill switch too). The
+ * safety envelope is unaffected either way — the engine re-clamps every change regardless.
+ */
+export const COACH_ACTIONING = process.env.EXPO_PUBLIC_COACH_ACTIONING === '1' && coachOperational()
+
+/**
  * Retained in-memory safety session for non-component coach callers (the reducer `SEND_CHAT` path),
  * so multi-turn persistence + retraction are enforced IDENTICALLY to the 1:1 chat and food coach,
  * which hold their own retained session (spec §2/§7). In-memory ONLY — never persisted or cloud-

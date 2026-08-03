@@ -33,7 +33,9 @@ import type {
   WorkoutSession,
 } from './types'
 
-export const SCHEMA_VERSION = 11
+// v12: + AppState.programDoc (Coach Capability Plan — canonical ProgramDoc held for
+// coach-actioned changes + undo). Optional field; the generic migrate merge defaults it.
+export const SCHEMA_VERSION = 12
 const DAYS = 40 // 0..38 completed history, 39 = today (in progress)
 
 /* round to nearest 2.5 (plate increments) */

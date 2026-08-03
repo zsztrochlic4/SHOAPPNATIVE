@@ -60,6 +60,12 @@ export function newPeriodDraft(): Omit<PlannedPeriod, 'id'> {
   return { start: '', end: '', mode: null, maintDays: ['Mon', 'Wed'], fewerCount: 1, fewerDays: ['Wed'], movingType: 'walking', note: '' }
 }
 
+/** Map a backend `AbsenceMode` (from the coach action resolver) to the UI `PeriodMode`.
+ *  Falls back to 'maintenance' for an unrecognised value. */
+export function periodModeForAbsence(absenceMode: string): PeriodMode {
+  return PERIOD_MODES.find((m) => m.absenceMode === absenceMode)?.id ?? 'maintenance'
+}
+
 /* ------------------------------ dates ------------------------------ */
 
 export function daysBetweenKeys(aKey: string, bKey: string): number {

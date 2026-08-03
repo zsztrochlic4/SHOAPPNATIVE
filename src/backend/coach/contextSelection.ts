@@ -56,6 +56,12 @@ export interface CoachContextSnapshot {
   nutrition: string
   nutritionCheckins: string
   memories: SnapshotMemory[]
+  /** Coach Capability Plan — enriched context gaps. Optional: absent when not computable
+   *  server-side (e.g. no program yet, too little history). Rendered inside the USER_DATA fence. */
+  programDay?: string
+  recentPRs?: string
+  plateaus?: string
+  recovery7d?: string
 }
 
 /** The conflict precedence the model must follow (plan Phase 2). Higher wins. */
@@ -125,17 +131,18 @@ function sectionsForTopic(s: CoachContextSnapshot, topic: ContextTopic): [string
     case 'conversational':
       return []
     case 'training':
-      return [pair('Program', s.program), pair('Recent training', s.recentTraining),
-        pair('Recent training summaries', s.trainingSummaries), pair('Recent readiness', s.readiness),
-        pair('Recent self-chosen activity', s.activity)]
+      return [pair('Today in your program', s.programDay ?? ''), pair('Program', s.program),
+        pair('Recent training', s.recentTraining), pair('Recent training summaries', s.trainingSummaries),
+        pair('Recent readiness', s.readiness), pair('Recent self-chosen activity', s.activity)]
     case 'progress':
-      return [pair('Recent weight entries', s.weights), pair('Recent training summaries', s.trainingSummaries),
+      return [pair('Recent PRs', s.recentPRs ?? ''), pair('Plateau flags', s.plateaus ?? ''),
+        pair('Recent weight entries', s.weights), pair('Recent training summaries', s.trainingSummaries),
         pair('Recent training', s.recentTraining), pair('Program', s.program)]
     case 'nutrition':
       return [pair('Recent nutrition entries', s.nutrition), pair('Recent nutrition check-ins', s.nutritionCheckins)]
     case 'recovery':
-      return [pair('Recent readiness', s.readiness), pair('Recent training', s.recentTraining),
-        pair('Recent training summaries', s.trainingSummaries)]
+      return [pair('Sleep & hydration (7-day)', s.recovery7d ?? ''), pair('Recent readiness', s.readiness),
+        pair('Recent training', s.recentTraining), pair('Recent training summaries', s.trainingSummaries)]
     case 'general':
     default:
       return [pair('Profile', s.profile), pair('Canonical training profile', s.canonicalProfile)]
