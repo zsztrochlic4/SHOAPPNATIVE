@@ -88,7 +88,8 @@ export const reportClientError = onCall(
  * crash rate is VISIBLE without anyone watching dashboards. Runs every 15 min.
  */
 export const monitorSlo = onSchedule(
-  { schedule: 'every 15 minutes', region: 'australia-southeast2', timeoutSeconds: 60 },
+  // Cloud Scheduler has no australia-southeast2 region; scheduled fns must run in southeast1.
+  { schedule: 'every 15 minutes', region: 'australia-southeast1', timeoutSeconds: 60 },
   async () => {
     const day = dayBucket(Date.now())
     let count = 0

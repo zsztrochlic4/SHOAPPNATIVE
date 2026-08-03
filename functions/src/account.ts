@@ -191,7 +191,8 @@ export async function finishDeletion(uid: string, phase: DeletionPhase): Promise
  * Idempotent and bounded; runs every 30 minutes.
  */
 export const resumeAccountDeletions = onSchedule(
-  { schedule: 'every 30 minutes', region: 'australia-southeast2', timeoutSeconds: 540, memory: '512MiB' },
+  // Cloud Scheduler has no australia-southeast2 region; scheduled fns must run in southeast1.
+  { schedule: 'every 30 minutes', region: 'australia-southeast1', timeoutSeconds: 540, memory: '512MiB' },
   async () => {
     const db = getFirestore()
     // Grace window so an in-flight callable is never fought over by the sweep.
