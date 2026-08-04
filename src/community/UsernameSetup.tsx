@@ -17,6 +17,7 @@ import {
   USERNAME_MAX,
   type UsernameAvailability,
 } from './service'
+import { COMMUNITY_BACKEND } from './backendConfig'
 
 type FieldState =
   | { kind: 'idle' }
@@ -142,12 +143,29 @@ export function UsernameSheet({ open, onClose }: { open: boolean; onClose: () =>
   const toast = useToast()
   const current = state.community.username
   const isFirst = !current
+  const [busy, setBusy] = useState(false)
   const { value, field, onChange } = useUsernameField(current ?? '', current)
   // Save only a valid, available name that differs from the current one.
-  const canSave = field.kind === 'available' && field.canonical !== current
+  const canSave = field.kind === 'available' && field.canonical !== current && !busy
 
-  const save = () => {
-    if (field.kind !== 'available' || field.canonical === current) return
+  const save = async () => {
+    if (field.kind !== 'available' || field.canonical === current || busy) return
+    // Live backend: claim the name transactionally first, so a race that lost the
+    // name is caught before we commit it locally (firebase loaded on demand).
+    if (COMMUNITY_BACKEND) {
+      const backend = await import('./backend')
+      if (backend.isCommunityBackendOn()) {
+        setBusy(true)
+        try {
+          await backend.claimUsernameRemote(field.canonical)
+        } catch {
+          setBusy(false)
+          toast('That username was just taken — try another')
+          return
+        }
+        setBusy(false)
+      }
+    }
     dispatch({ type: 'SET_USERNAME', username: field.canonical })
     toast(isFirst ? `Welcome, @${field.canonical}` : 'Username updated')
     onClose()
@@ -178,7 +196,7 @@ export function UsernameSheet({ open, onClose }: { open: boolean; onClose: () =>
         accessibilityState={{ disabled: !canSave }}
         className={`mt-3 items-center rounded-2xl py-4 ${canSave ? 'bg-brand-400 active:opacity-90' : 'bg-white/10'}`}
       >
-        <Text className={`text-[15px] font-bold ${canSave ? 'text-black' : 'text-white/40'}`}>{isFirst ? 'Continue' : 'Save'}</Text>
+        <Text className={`text-[15px] font-bold ${canSave ? 'text-black' : 'text-white/40'}`}>{busy ? 'Saving…' : isFirst ? 'Continue' : 'Save'}</Text>
       </Pressable>
     </Sheet>
   )

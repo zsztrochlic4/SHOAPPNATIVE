@@ -65,9 +65,11 @@ function seedFrom(key: string): number {
   return h >>> 0
 }
 
-function zoneFor(rank: number, tier: Tier): Zone {
+/** Which zone a given rank falls in for a tier. Exported so the live backend
+ *  path can label server-returned standings the same way the simulation does. */
+export function zoneFor(rank: number, tier: Tier, cohortSize = tier.cohort): Zone {
   if (rank <= tier.promote) return 'promote'
-  if (tier.demote > 0 && rank > tier.cohort - tier.demote) return 'demote'
+  if (tier.demote > 0 && rank > cohortSize - tier.demote) return 'demote'
   return 'safe'
 }
 

@@ -15,27 +15,79 @@ import { todayKey } from '../lib/date'
 import { useColors, brand } from '../theme'
 import { Avatar } from '../components/Avatar'
 import { Sheet } from '../components/Sheet'
+import { Skeleton } from '../components/Skeleton'
 import { useToast } from '../components/Toast'
 import { RankBadge, StreakFlame } from './ui'
 import { GlobalLeaderboard } from './GlobalLeaderboard'
-import { TIERS, tierOf, weekKey, daysLeftInWeek, simulateLeague, type LeagueRow, type Zone } from './league'
+import { TIERS, tierOf, weekKey, daysLeftInWeek, simulateLeague, zoneFor, type Tier, type LeagueRow, type Zone } from './league'
+import { COMMUNITY_BACKEND } from './backendConfig'
+
+type LeagueStatus = 'loading' | 'ready' | 'error'
+interface LeagueData { rows: LeagueRow[]; youRank: number; zone: Zone; tier: Tier; status: LeagueStatus; reload: () => void }
+
+/**
+ * League standings source. With the backend off (default) this is the local
+ * simulation, computed synchronously — identical to before. With the backend on
+ * it pushes the user's honest weekly points, then reads the real cohort standings
+ * for their tier, with loading/error states.
+ */
+function useLeagueData(me: ReturnType<typeof myLeaderStats>, storedTier: number, freezeTokens: number, enabled: boolean): LeagueData {
+  const local = useMemo<LeagueData>(() => {
+    const t = tierOf(storedTier)
+    const r = simulateLeague(me, t, weekKey())
+    return { rows: r.rows, youRank: r.youRank, zone: r.zone, tier: t, status: 'ready', reload: () => {} }
+  }, [me, storedTier])
+
+  const [remote, setRemote] = useState<LeagueData | null>(null)
+  const [nonce, setNonce] = useState(0)
+
+  useEffect(() => {
+    if (!COMMUNITY_BACKEND || !enabled) { setRemote(null); return }
+    let cancelled = false
+    const reload = () => setNonce((n) => n + 1)
+    setRemote((prev) => ({ ...(prev ?? local), status: 'loading', reload }))
+    ;(async () => {
+      try {
+        // Firebase adapter loaded on demand, only when the flag is on.
+        const backend = await import('./backend')
+        if (!backend.isCommunityBackendOn()) { if (!cancelled) setRemote(null); return }
+        const sync = await backend.syncStatsRemote({ points: me.odometer, streakCurrent: me.streakCurrent, streakBest: me.streakBest, freezeTokens })
+        const raw = await backend.loadLeagueStandingsRemote(sync.weekKey, sync.tier)
+        if (cancelled) return
+        const tier = tierOf(sync.tier)
+        const rows: LeagueRow[] = raw.map((r, i) => ({ rank: i + 1, username: r.username, points: r.points, isYou: r.isYou, zone: zoneFor(i + 1, tier, raw.length) }))
+        const you = rows.find((r) => r.isYou)
+        setRemote({ rows, youRank: you?.rank ?? 0, zone: you?.zone ?? 'safe', tier, status: 'ready', reload })
+      } catch {
+        if (!cancelled) setRemote((prev) => ({ ...(prev ?? local), status: 'error', reload }))
+      }
+    })()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, nonce, me.odometer, me.streakCurrent, me.streakBest, freezeTokens, storedTier])
+
+  // Flag off → always the local simulation; on → remote once ready, local until then.
+  return COMMUNITY_BACKEND && remote ? remote : local
+}
 
 export function LeagueScreen({ onClaimUsername }: { onClaimUsername: () => void }) {
   const { state, dispatch } = useStore()
   const me = useMemo(() => myLeaderStats(state), [state])
   const [view, setView] = useState<'league' | 'global'>('league')
   const [howOpen, setHowOpen] = useState(false)
+  const freezeTokens = state.community.freezeTokens ?? 0
+  const storedTier = state.community.league?.tier ?? 0
 
   // Weekly freeze grant — idempotent, only fires when a new week has started.
   useEffect(() => {
     dispatch({ type: 'GRANT_WEEKLY_FREEZE', weekKey: weekKey() })
   }, [dispatch])
 
+  // Hooks must run before any early return.
+  const data = useLeagueData(me, storedTier, freezeTokens, !!me.username)
+
   // No username yet: browse the global streak board and claim when ready.
   if (!me.username) return <GlobalLeaderboard onClaimUsername={onClaimUsername} />
-
-  const tier = tierOf(state.community.league?.tier ?? 0)
-  const { rows, youRank, zone } = simulateLeague(me, tier, weekKey())
 
   return (
     <View>
@@ -60,15 +112,52 @@ export function LeagueScreen({ onClaimUsername }: { onClaimUsername: () => void 
 
       {view === 'global' ? (
         <GlobalLeaderboard onClaimUsername={onClaimUsername} />
+      ) : data.status === 'loading' ? (
+        <LeagueLoading />
+      ) : data.status === 'error' ? (
+        <LeagueError onRetry={data.reload} />
       ) : (
         <>
-          <LeagueHero tier={tier} rank={youRank} points={me.odometer} cohort={rows.length} zone={zone} onHow={() => setHowOpen(true)} />
+          <LeagueHero tier={data.tier} rank={data.youRank} points={me.odometer} cohort={data.rows.length} zone={data.zone} onHow={() => setHowOpen(true)} />
           <StreakCard />
-          <LeagueStandings rows={rows} tier={tier} />
+          <LeagueStandings rows={data.rows} tier={data.tier} />
         </>
       )}
 
       <HowLeaguesSheet open={howOpen} onClose={() => setHowOpen(false)} />
+    </View>
+  )
+}
+
+/* ----------------------------- loading / error ----------------------------- */
+
+function LeagueLoading() {
+  return (
+    <View>
+      <Skeleton width="100%" height={92} radius={16} />
+      <View className="mt-3"><Skeleton width="100%" height={78} radius={16} /></View>
+      <View className="mt-4 gap-1.5">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <View key={i} className="flex-row items-center gap-3 rounded-2xl border border-white/5 bg-white/[0.02] p-3">
+            <Skeleton width={28} height={28} radius={14} />
+            <Skeleton width={36} height={36} radius={18} />
+            <View className="flex-1"><Skeleton width="45%" height={13} radius={5} /></View>
+            <Skeleton width={30} height={16} radius={5} />
+          </View>
+        ))}
+      </View>
+    </View>
+  )
+}
+
+function LeagueError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <View className="mt-6 items-center rounded-2xl border border-dashed border-white/15 px-6 py-12">
+      <Text className="font-bold text-white">Couldn't load your league</Text>
+      <Text className="mt-1 max-w-[240px] text-center text-[13px] text-white/45">Check your connection and try again.</Text>
+      <Pressable onPress={onRetry} accessibilityRole="button" accessibilityLabel="Retry loading league" className="btn-primary mt-4 px-5 py-2.5 active:opacity-90">
+        <Text className="text-sm font-semibold text-black">Try again</Text>
+      </Pressable>
     </View>
   )
 }

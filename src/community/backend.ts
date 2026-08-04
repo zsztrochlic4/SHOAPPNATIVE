@@ -13,10 +13,7 @@
 import { httpsCallable } from 'firebase/functions'
 import { collection, doc, getDoc, getDocs, orderBy, query } from 'firebase/firestore'
 import { auth, db, firebaseEnabled, functions } from '../lib/firebase'
-
-/** Master switch. Keep false until the backend is deployed + emulator-tested.
- *  Typed as boolean (not the `false` literal) so callers don't dead-code away. */
-export const COMMUNITY_BACKEND: boolean = false
+import { COMMUNITY_BACKEND } from './backendConfig'
 
 /** True only when the flag is on AND Firebase is actually configured. */
 export function isCommunityBackendOn(): boolean {
@@ -26,6 +23,18 @@ export function isCommunityBackendOn(): boolean {
 function call<I, O>(name: string) {
   if (!firebaseEnabled || !functions) throw new Error('Community backend is not configured')
   return httpsCallable<I, O>(functions, name, { timeout: 20_000 })
+}
+
+/* -------------------------------- reads: name ------------------------------ */
+
+/** Is this (canonical, lowercased) username already owned by SOMEONE ELSE?
+ *  Reads the `usernames/{name}` uniqueness map. A doc owned by the current user
+ *  is not "taken" (lets them re-save their own name). */
+export async function isUsernameTakenRemote(canonical: string): Promise<boolean> {
+  if (!db) return false
+  const snap = await getDoc(doc(db, 'usernames', canonical))
+  if (!snap.exists()) return false
+  return snap.get('uid') !== auth?.currentUser?.uid
 }
 
 /* --------------------------------- writes ---------------------------------- */
@@ -51,14 +60,21 @@ export async function syncStatsRemote(stats: {
 
 /* ---------------------------------- reads ---------------------------------- */
 
-export interface RemoteStanding { uid: string; username: string; points: number }
+export interface RemoteStanding { uid: string; username: string; points: number; isYou: boolean }
 
-/** This week's standings for a tier, ranked by points (server-written, read-only). */
+/** This week's standings for a tier, ranked by points (server-written, read-only).
+ *  Each row is tagged `isYou` against the signed-in uid so the UI can highlight it. */
 export async function loadLeagueStandingsRemote(weekKey: string, tier: number): Promise<RemoteStanding[]> {
   if (!db) return []
+  const myUid = auth?.currentUser?.uid
   const q = query(collection(db, `leagueStandings/${weekKey}/tiers/${tier}/members`), orderBy('points', 'desc'))
   const snap = await getDocs(q)
-  return snap.docs.map((d) => ({ uid: d.id, username: String(d.get('username') ?? ''), points: Number(d.get('points') ?? 0) }))
+  return snap.docs.map((d) => ({
+    uid: d.id,
+    username: String(d.get('username') ?? ''),
+    points: Number(d.get('points') ?? 0),
+    isYou: d.id === myUid,
+  }))
 }
 
 export interface RemoteCommunityProfile {

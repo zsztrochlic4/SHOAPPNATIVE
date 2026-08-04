@@ -21,6 +21,7 @@ import {
   type DiscoverableGroup,
   type LeaderRow,
 } from './simulate'
+import { COMMUNITY_BACKEND } from './backendConfig'
 
 /** Simulated network latency so skeletons/spinners are exercised. Kept short. */
 const LATENCY = { username: 420, board: 520, search: 320, mutate: 460 } as const
@@ -59,6 +60,17 @@ export async function checkUsernameAvailable(raw: string, ownHandle?: string | n
   const v = validateUsername(raw)
   if (!v.ok) return { status: 'invalid', message: v.message }
   try {
+    if (COMMUNITY_BACKEND) {
+      // Live: read the server-side uniqueness map (firebase loaded on demand).
+      const backend = await import('./backend')
+      if (backend.isCommunityBackendOn()) {
+        const taken = await backend.isUsernameTakenRemote(v.canonical)
+        return taken
+          ? { status: 'taken', message: 'That username is taken' }
+          : { status: 'available', canonical: v.canonical }
+      }
+    }
+    // Local simulation.
     await wait(LATENCY.username)
     if (isHandleTaken(v.canonical, ownHandle)) {
       return { status: 'taken', message: 'That username is taken' }
