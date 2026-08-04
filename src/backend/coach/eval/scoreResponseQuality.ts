@@ -43,8 +43,24 @@ export interface EvalManifest {
 }
 
 const HEX40 = /^[0-9a-f]{40}$/i
-const HASHLIKE = /^[0-9a-f]{8,}$/i
+// A real content hash: SHA-256 is 64 hex chars. (Legacy SHA-1 digests were 40; the release runner
+// now emits SHA-256, so require the wider form for a genuine, non-truncated binding.)
+const HASHLIKE = /^[0-9a-f]{64}$/i
 const PLACEHOLDER = /^(FILL_ME|)$/i
+
+/**
+ * Canonical serialisation of the corpus that `corpusHash` is computed over (R5-004). Exported so the
+ * release runner hashes EXACTLY this — the single source of truth for what the manifest binds, with
+ * no drift between what is emitted and what is re-verified.
+ */
+export function canonicalCorpusPayload(): string {
+  return JSON.stringify(RESPONSE_EVAL_CASES.map((c) => ({ id: c.id, prompt: c.prompt, scenario: c.scenario ?? '' })))
+}
+
+/** Canonical serialisation of the model replies that `repliesHash` is computed over (R5-004). */
+export function canonicalRepliesPayload(replies: Record<string, string>): string {
+  return JSON.stringify(RESPONSE_EVAL_CASES.map((c) => replies[c.id] ?? ''))
+}
 
 export interface EvalResult {
   pass: boolean
@@ -130,20 +146,35 @@ export function interRaterAgreement(sheets: ReviewerSheet[]): number | null {
 }
 
 export interface EvalOptions {
-  /** Release gate: a bound, complete manifest is MANDATORY (missing ⇒ fail). */
+  /** Release gate: a bound, complete manifest is MANDATORY (missing ⇒ fail). In a release run the
+   *  expected SHA/model below also become MANDATORY, not optional (R5-004). */
   requireManifest?: boolean
-  /** When supplied, the manifest must match these exactly (the release job provides them). */
+  /** When supplied, the manifest must match these exactly (the release job derives them from HEAD /
+   *  the configured model). Under `requireManifest` they are required, not merely checked-if-present. */
   expectedReleaseSha?: string
   expectedModel?: string
+  /**
+   * Hashes RE-COMPUTED by the release runner from the canonical corpus / model replies / system
+   * prompt (R5-004). When present, each manifest hash must EQUAL its recomputed counterpart — this is
+   * what actually binds the manifest to the real evidence (a shape check alone let a forged hash pass).
+   */
+  recomputedHashes?: { corpusHash?: string; repliesHash?: string; promptHash?: string }
+  /** Release gate: recomputed provenance is MANDATORY — a run without it fails (R5-004). */
+  requireRecomputedProvenance?: boolean
 }
 
-/** Strict manifest provenance validation (R4-002). Returns precise problems (empty ⇒ bound). */
+/** Strict manifest provenance validation (R4-002 / R5-004). Returns precise problems (empty ⇒ bound). */
 export function validateManifest(manifest: EvalManifest | undefined, opts: EvalOptions = {}): string[] {
   const p: string[] = []
   if (!manifest) {
     if (opts.requireManifest) p.push('a bound evaluation manifest is required but none was supplied/readable')
     return p
   }
+  // R5-004: in a release run the expected release SHA and model are MANDATORY inputs (the release job
+  // derives them from HEAD and the configured model) — not optional self-asserted manifest fields.
+  if (opts.requireManifest && !opts.expectedReleaseSha) p.push('release run requires an expected release SHA (derive it from HEAD) to bind the manifest')
+  if (opts.requireManifest && !opts.expectedModel) p.push('release run requires an expected model id to bind the manifest')
+
   const sha = String(manifest.releaseSha ?? '')
   if (!HEX40.test(sha) || PLACEHOLDER.test(sha)) p.push('manifest releaseSha must be a 40-char commit SHA bound to the release')
   if (opts.expectedReleaseSha && sha.toLowerCase() !== opts.expectedReleaseSha.toLowerCase()) p.push(`manifest releaseSha ${sha} does not match the expected release ${opts.expectedReleaseSha}`)
@@ -152,10 +183,29 @@ export function validateManifest(manifest: EvalManifest | undefined, opts: EvalO
   if (opts.expectedModel && model !== opts.expectedModel) p.push(`manifest model ${model} does not match the expected model ${opts.expectedModel}`)
   for (const [k, v] of [['promptHash', manifest.promptHash], ['corpusHash', manifest.corpusHash], ['repliesHash', manifest.repliesHash]] as const) {
     const val = String(v ?? '')
-    if (!HASHLIKE.test(val) || PLACEHOLDER.test(val)) p.push(`manifest ${k} must be a real hash (all 60 replies + corpus + prompt bound)`)
+    if (!HASHLIKE.test(val) || PLACEHOLDER.test(val)) p.push(`manifest ${k} must be a real SHA-256 hash (all 60 replies + corpus + prompt bound)`)
   }
   if (manifest.includesModelReplies !== true) p.push('manifest indicates no model replies were scored')
   if (manifest.replyCount !== REQUIRED_CASE_COUNT) p.push(`manifest replyCount must be exactly ${REQUIRED_CASE_COUNT} non-empty replies (got ${manifest.replyCount ?? 0})`)
+
+  // R5-004: bind the manifest to hashes RE-COMPUTED from the real evidence. A shape-valid but forged,
+  // stale or mismatched hash is caught here because it can't match a fresh recompute of the source.
+  const rc = opts.recomputedHashes
+  if (opts.requireRecomputedProvenance && !rc) {
+    p.push('release run requires recomputed provenance hashes (corpus/replies/prompt) but none were supplied')
+  }
+  if (rc) {
+    for (const [k, recomputed] of [['corpusHash', rc.corpusHash], ['repliesHash', rc.repliesHash], ['promptHash', rc.promptHash]] as const) {
+      if (recomputed == null) {
+        if (opts.requireRecomputedProvenance) p.push(`release run requires a recomputed ${k}`)
+        continue
+      }
+      const claimed = String(manifest[k] ?? '')
+      if (claimed.toLowerCase() !== String(recomputed).toLowerCase()) {
+        p.push(`manifest ${k} does not match the hash recomputed from the actual ${k === 'corpusHash' ? 'corpus' : k === 'repliesHash' ? 'replies' : 'prompt'}`)
+      }
+    }
+  }
   return p
 }
 

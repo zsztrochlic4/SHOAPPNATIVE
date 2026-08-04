@@ -5,6 +5,7 @@ import { getFirestore } from 'firebase-admin/firestore'
 import { requireVerifiedUser, APP_CHECK_ENFORCED } from './lib/guards'
 import { enforceDailyLimit, enforceBurstLimit, enforceGlobalDailyLimit } from './lib/rateLimit'
 import { coachKillSwitch, coachActionsSwitch } from './killSwitchRemote'
+import { callWithResilience } from './lib/providerResilience'
 import { FieldValue, Timestamp } from 'firebase-admin/firestore'
 import {
   isValidRequestKey,
@@ -93,6 +94,12 @@ export interface CoachMessageInput {
    * omits the action allowlist and any workout_action the model emits is downgraded here.
    */
   allowActions?: boolean
+  /**
+   * Validated IANA timezone captured on the device for THIS turn (audit R5-010). Preferred over
+   * the stored settings timezone (which lags a travel/zone change until the debounced cloud save
+   * lands) so the coach's very first reply after a change still names the correct local day.
+   */
+  timezone?: string
 }
 
 export interface CoachTurnResult {
@@ -127,7 +134,7 @@ export interface CoachTurnDeps {
   /** Today's key for the soft daily-limit check. */
   todayKey: string
   /** Production uses server-trusted context; tests may omit this and use readDob. */
-  loadTurnData?: (uid: string) => Promise<CoachTurnData>
+  loadTurnData?: (uid: string, opts?: { requestTimezone?: string }) => Promise<CoachTurnData>
   saveTurn?: typeof saveCoachTurn
   persistSafety?: typeof saveSafetySession
   saveMemory?: typeof saveMemoryCandidate
@@ -179,7 +186,7 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
   if (!message.trim()) throw new HttpsError('invalid-argument', 'Empty message.')
 
   const turnData = deps.loadTurnData
-    ? await deps.loadTurnData(uid)
+    ? await deps.loadTurnData(uid, { requestTimezone: input.timezone })
     : {
         context: {
           dateOfBirth: await deps.readDob(uid),
@@ -355,29 +362,51 @@ export const coachMessage = onCall<CoachMessageInput>(
       }
     }
 
+    // R5-015: every Gemini call runs under an explicit deadline (well under the 60 s function
+    // timeout), bounded jittered retry on transient failures, and a per-instance circuit breaker.
+    // The classifier is short and cheap (small deadline); the reply is longer. Deadlines are sized
+    // so even the worst case (classify retry + reply retry + backoff) stays inside the 60 s budget.
+    const CLASSIFY_DEADLINE_MS = 8_000
+    const REPLY_DEADLINE_MS = 18_000
     const classify: ClassifierTransport = async (prompt) => {
       const m = geminiModel()
-      const r = await m.generateContent({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0, responseMimeType: 'application/json', maxOutputTokens: 200 },
-      })
-      return r.response.text() ?? ''
+      return callWithResilience(
+        async (signal) => {
+          const r = await m.generateContent(
+            {
+              contents: [{ role: 'user', parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0, responseMimeType: 'application/json', maxOutputTokens: 200 },
+            },
+            { timeout: CLASSIFY_DEADLINE_MS, signal },
+          )
+          return r.response.text() ?? ''
+        },
+        { label: 'coach_classify', deadlineMs: CLASSIFY_DEADLINE_MS, maxAttempts: 2, baseBackoffMs: 300 },
+      )
     }
     const result = await runCoachTurn(uid, req.data ?? { message: '' }, {
       readDob: readDobFromFirestore,
       classify,
       generateReply: async (systemPrompt, userText) => {
         const m = geminiModel(systemPrompt)
-        const r = await m.generateContent({
-          contents: [{ role: 'user', parts: [{ text: userText }] }],
-          generationConfig: {
-            temperature: 0.5,
-            maxOutputTokens: 800,
-            responseMimeType: 'application/json',
-            responseSchema: STRUCTURED_COACH_RESPONSE_SCHEMA as any,
+        return callWithResilience(
+          async (signal) => {
+            const r = await m.generateContent(
+              {
+                contents: [{ role: 'user', parts: [{ text: userText }] }],
+                generationConfig: {
+                  temperature: 0.5,
+                  maxOutputTokens: 800,
+                  responseMimeType: 'application/json',
+                  responseSchema: STRUCTURED_COACH_RESPONSE_SCHEMA as any,
+                },
+              },
+              { timeout: REPLY_DEADLINE_MS, signal },
+            )
+            return (r.response.text() ?? '').trim()
           },
-        })
-        return (r.response.text() ?? '').trim()
+          { label: 'coach_reply', deadlineMs: REPLY_DEADLINE_MS, maxAttempts: 2, baseBackoffMs: 500 },
+        )
       },
       // Layered cost controls (audit SA-011), all enforced before the model call:
       //  1. per-user burst (spike within a minute), 2. global daily budget across

@@ -25,6 +25,7 @@ export {
   recordCoachActionOutcome,
 } from './coachProfile'
 export { deleteAccount, resumeAccountDeletions } from './account'
+export { reconcileCoachActions } from './coachReconciler'
 export { reportClientError, monitorSlo } from './observability'
 export { sendNotification, dedupePushToken } from './notifications'
 export { createCheckoutSession, createBillingPortalSession, stripeWebhook } from './billing'

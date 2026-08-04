@@ -7,7 +7,13 @@ import assert from 'node:assert/strict'
 import {
   RESPONSE_EVAL_CASES, GROUP_MINIMUMS, EVAL_DIMENSIONS, REQUIRED_CASE_COUNT,
 } from '../../.sweep-out/backend/coach/eval/responseQualityCorpus.js'
-import { evaluateResponseQuality, interRaterAgreement, validateCompleteness } from '../../.sweep-out/backend/coach/eval/scoreResponseQuality.js'
+import {
+  evaluateResponseQuality, interRaterAgreement, validateCompleteness,
+  canonicalCorpusPayload, canonicalRepliesPayload,
+} from '../../.sweep-out/backend/coach/eval/scoreResponseQuality.js'
+import { createHash } from 'node:crypto'
+
+const sha256 = (s) => createHash('sha256').update(s).digest('hex')
 
 const dims = EVAL_DIMENSIONS.map((d) => d.key)
 
@@ -132,9 +138,10 @@ test('low inter-rater agreement fails', () => {
 const BOUND_MANIFEST = {
   releaseSha: 'a'.repeat(40),
   model: 'gemini-2.5-flash-lite',
-  promptHash: 'deadbeefcafe',
-  corpusHash: 'deadbeefcafe',
-  repliesHash: 'deadbeefcafe',
+  // R5-004: hashes are now SHA-256 (64 hex) — a shorter/truncated digest is rejected.
+  promptHash: 'd'.repeat(64),
+  corpusHash: 'c'.repeat(64),
+  repliesHash: 'e'.repeat(64),
   includesModelReplies: true,
   replyCount: 60,
 }
@@ -174,4 +181,61 @@ test('a fully bound manifest with all 60 replies passes', () => {
 
 test('validateCompleteness returns empty for a complete pair', () => {
   assert.deepEqual(validateCompleteness([fullSheet('jack', 5), fullSheet('sam', 5)]), [])
+})
+
+/* ---------------- R5-004: recomputed-hash provenance binding ---------------- */
+
+test('R5-004: a release run requires expected SHA and model (not optional)', () => {
+  const sheets = [fullSheet('jack', 5), fullSheet('sam', 5)]
+  const r = evaluateResponseQuality(sheets, BOUND_MANIFEST, { requireManifest: true })
+  assert.equal(r.pass, false)
+  assert.ok(r.reasons.some((x) => /requires an expected release SHA/.test(x)))
+  assert.ok(r.reasons.some((x) => /requires an expected model/.test(x)))
+})
+
+test('R5-004: a manifest hash that does not match the recomputed source hash fails', () => {
+  const sheets = [fullSheet('jack', 5), fullSheet('sam', 5)]
+  const realCorpusHash = sha256(canonicalCorpusPayload())
+  // Manifest claims the right corpus hash but a WRONG replies hash → binding catches it.
+  const manifest = { ...BOUND_MANIFEST, corpusHash: realCorpusHash, repliesHash: 'f'.repeat(64) }
+  const r = evaluateResponseQuality(sheets, manifest, {
+    requireManifest: true,
+    expectedReleaseSha: 'a'.repeat(40),
+    expectedModel: 'gemini-2.5-flash-lite',
+    recomputedHashes: { corpusHash: realCorpusHash, repliesHash: sha256(canonicalRepliesPayload({})) + '' },
+  })
+  assert.equal(r.pass, false)
+  assert.ok(r.reasons.some((x) => /repliesHash does not match the hash recomputed/.test(x)))
+})
+
+test('R5-004: missing recomputed provenance fails when required', () => {
+  const sheets = [fullSheet('jack', 5), fullSheet('sam', 5)]
+  const r = evaluateResponseQuality(sheets, BOUND_MANIFEST, {
+    requireManifest: true,
+    requireRecomputedProvenance: true,
+    expectedReleaseSha: 'a'.repeat(40),
+    expectedModel: 'gemini-2.5-flash-lite',
+  })
+  assert.equal(r.pass, false)
+  assert.ok(r.reasons.some((x) => /requires recomputed provenance hashes/.test(x)))
+})
+
+test('R5-004: a manifest fully bound to recomputed source hashes passes', () => {
+  const replies = Object.fromEntries(RESPONSE_EVAL_CASES.map((c) => [c.id, `reply for ${c.id}`]))
+  const corpusHash = sha256(canonicalCorpusPayload())
+  const repliesHash = sha256(canonicalRepliesPayload(replies))
+  const promptHash = sha256('SYSTEM PROMPT vX')
+  const manifest = {
+    releaseSha: 'a'.repeat(40), model: 'gemini-2.5-flash-lite',
+    corpusHash, repliesHash, promptHash, includesModelReplies: true, replyCount: 60,
+  }
+  const sheets = [fullSheet('jack', 5), fullSheet('sam', 5)]
+  const r = evaluateResponseQuality(sheets, manifest, {
+    requireManifest: true,
+    requireRecomputedProvenance: true,
+    expectedReleaseSha: 'a'.repeat(40),
+    expectedModel: 'gemini-2.5-flash-lite',
+    recomputedHashes: { corpusHash, repliesHash, promptHash },
+  })
+  assert.equal(r.pass, true, r.reasons.join('; '))
 })

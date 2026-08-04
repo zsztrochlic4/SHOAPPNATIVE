@@ -72,6 +72,9 @@ export type Action =
   | { type: 'APPLY_COACH_SWAP'; backendUser: UserDoc; generatedProgram: StoredProgram; workoutInstances: WorkoutInstanceDoc[] }
   // Coach Capability Plan: undo — restore the pre-action program snapshot.
   | { type: 'RESTORE_PROGRAM_SNAPSHOT'; snapshot: ProgramSnapshot }
+  // Coach Capability Plan (R5-006): sync the local programDoc.version to the value the cloud
+  // transaction authoritatively stamped, so the next apply/undo guards against the right revision.
+  | { type: 'SET_PROGRAM_VERSION'; version: number }
   | { type: 'START_PROGRAM_DAY'; dateKey: string }
   | { type: 'LOG_WEIGHT'; kg: number }
   | { type: 'ADJUST_WATER'; deltaL: number }
@@ -278,6 +281,13 @@ function reducer(state: AppState, action: Action): AppState {
         ? withPeriods(restored, action.snapshot.plannedPeriods)
         : restored
     }
+
+    // R5-006: mirror the cloud-authoritative program revision locally. No-op if there is no
+    // program doc (the version lives on the canonical program record).
+    case 'SET_PROGRAM_VERSION':
+      return state.programDoc
+        ? { ...state, programDoc: { ...state.programDoc, version: action.version } }
+        : state
 
     case 'START_PROGRAM_DAY': {
       // Materialise a loggable session for the given day from the generated program's

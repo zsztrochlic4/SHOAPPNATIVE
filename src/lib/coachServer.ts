@@ -30,6 +30,9 @@ export interface CoachServerInput {
   /** Coach Capability Plan: opt into engine-resolvable workout_action proposals
    *  (mirrors the client `COACH_ACTIONING` flag, LIVE). Server gates the allowlist on it. */
   allowActions?: boolean
+  /** Validated device IANA timezone for THIS turn (audit R5-010) — lets the server name the
+   *  correct local day immediately, before the debounced settings cloud-save catches up. */
+  timezone?: string
 }
 
 export interface CoachServerResult {

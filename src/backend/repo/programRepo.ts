@@ -16,18 +16,14 @@
 import { collection, doc, getDocs, query, runTransaction, where, writeBatch } from 'firebase/firestore'
 import { db } from '../../lib/firebase'
 import type { ProgramDoc, UserDoc, WorkoutInstanceDoc } from '../schema'
+import { CoachActionConflictError, resolveNextProgramVersion } from './programVersion'
+
+// Re-export so existing importers (extra.tsx) keep a single source for the conflict type.
+export { CoachActionConflictError, resolveNextProgramVersion }
 
 /** Strip `undefined` (Firestore rejects it) via a plain-data round-trip. */
 function clean<T>(value: T): T {
   return JSON.parse(JSON.stringify(value))
-}
-
-/** Thrown when a coach action commits against a program another device already moved past (R4-005). */
-export class CoachActionConflictError extends Error {
-  constructor(public storedVersion: number, public expectedVersion: number) {
-    super(`coach_action_version_conflict: stored ${storedVersion} != expected ${expectedVersion}`)
-    this.name = 'CoachActionConflictError'
-  }
 }
 
 /**
@@ -83,8 +79,8 @@ export async function commitCoachAction(
   program: ProgramDoc,
   instances: WorkoutInstanceDoc[],
   expectedVersion?: number,
-): Promise<void> {
-  if (!db || !uid || uid === 'local') return
+): Promise<number | undefined> {
+  if (!db || !uid || uid === 'local') return undefined
   const database = db
   const instancesCol = collection(database, 'users', uid, 'workout_instances')
   const keep = new Set(instances.map((i) => i.instance_id))
@@ -94,20 +90,23 @@ export async function commitCoachAction(
   const stale = existing.docs.map((d) => d.id).filter((id) => !keep.has(id))
   const programRef = doc(database, 'users', uid, 'programs', program.program_id)
 
-  // R4-005: run in a transaction so we can enforce an OPTIMISTIC version precondition — if the stored
-  // program moved on since this action was resolved (another device committed first), abort with a
-  // conflict rather than silently overwriting it. The write set is still all-or-nothing.
-  await runTransaction(database, async (tx) => {
-    if (expectedVersion != null) {
-      const snap = await tx.get(programRef)
-      const storedVersion = snap.exists() ? (snap.data() as { version?: number }).version : undefined
-      if (snap.exists() && typeof storedVersion === 'number' && storedVersion !== expectedVersion) {
-        throw new CoachActionConflictError(storedVersion, expectedVersion)
-      }
-    }
+  // R4-005 / R5-006: run in a transaction so the version is BOTH checked and advanced authoritatively.
+  //   • Precondition — when the caller supplies expectedVersion, the stored program must be exactly at
+  //     that version; if it moved on (another device committed) OR an existing doc carries no numeric
+  //     version we cannot verify, abort with a conflict rather than silently overwriting (fail closed).
+  //   • Monotonic advance — EVERY commit stamps version = observedVersion + 1, so a subsequent apply or
+  //     undo that did not observe this write is detected as a conflict. This closes the prior gaps where
+  //     patch swaps reused the same version and legacy (missing-version) docs skipped the check entirely.
+  // The returned value is the new stored version so the caller can update its local mirror and guard a
+  // later undo against exactly this revision.
+  return runTransaction(database, async (tx) => {
+    const snap = await tx.get(programRef)
+    const storedVersion = snap.exists() ? (snap.data() as { version?: number }).version : undefined
+    const nextVersion = resolveNextProgramVersion({ exists: snap.exists(), storedVersion, expectedVersion })
     tx.set(doc(database, 'users', uid), { backendUser: clean(backendUser) }, { merge: true })
-    tx.set(programRef, clean(program), { merge: true })
+    tx.set(programRef, { ...clean(program), version: nextVersion }, { merge: true })
     for (const inst of instances) tx.set(doc(instancesCol, inst.instance_id), clean(inst), { merge: false })
     for (const id of stale) tx.delete(doc(instancesCol, id))
+    return nextVersion
   })
 }

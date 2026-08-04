@@ -30,7 +30,7 @@ import { DELOAD } from '../generator/deload'
 import { changeGoal } from '../generator/goalChange'
 import { EXERCISE_BY_ID } from '../data/index'
 import { validateWorkoutActionPayload, SWAP_REASONS, type NudgeKindLit } from '../coach/workoutActions'
-import { validateProgramForUser, summarizeViolations } from './programInvariants'
+import { validateProgramForUser, summarizeViolations, fitProgramToDuration, DURATION_TARGET_TOLERANCE } from './programInvariants'
 
 /** The slice of app state the resolver reads. */
 export interface CoachActionState {
@@ -88,10 +88,13 @@ function guardProgram(user: UserDoc, program: StoredProgram, ok: CoachActionOutc
       message: "I couldn't make that change without breaking one of your safety limits, so I've left your plan as it is.",
     }
   }
-  // U-014: if any day runs over the promised session budget, append an honest caveat rather than
-  // letting the outcome's message imply a clean fit.
-  if (check.daysOverBudget.length > 0 && ok.ok === true && (ok.apply === 'patch' || ok.apply === 'regen')) {
-    const worst = Math.max(...Object.values(check.estimatedMinutesByDay))
+  // U-014 / R5-009: append an honest caveat only when a day runs over the +10% TARGET TOLERANCE.
+  // The duration-fitting path (set_session_length) already trims into tolerance and discloses the
+  // real per-day estimate, so this fires only for other regens (e.g. a goal change) that genuinely
+  // overshoot — it never contradicts an already-fitted message with a redundant "trim" nudge.
+  const worst = Object.values(check.estimatedMinutesByDay).length ? Math.max(...Object.values(check.estimatedMinutesByDay)) : 0
+  const overTolerance = worst > user.session_length_min * DURATION_TARGET_TOLERANCE
+  if (overTolerance && ok.ok === true && (ok.apply === 'patch' || ok.apply === 'regen')) {
     return { ...ok, message: `${ok.message} Heads up: a couple of days come out closer to ${worst} min than your ${user.session_length_min}-min target — trim the last movement if you're tight on time.` }
   }
   return ok
@@ -288,10 +291,39 @@ export function resolveCoachAction(
     }
 
     case 'set_session_length': {
-      // R4-009: don't claim the plan "fits" — the generator can overshoot short sessions, and
-      // guardProgram appends an honest over-budget caveat when it does. A neutral base message keeps
-      // the two from contradicting each other.
-      return regen({ ...state.backendUser, session_length_min: action.sessionLengthMin }, now, `Set your sessions to ${action.sessionLengthMin} minutes and rebuilt your plan around that.`)
+      // R5-009: a session-length request is an explicit HARD time constraint, so we must actually
+      // fit the plan to it — not merely disclose an overshoot. Regenerate, then trim trailing
+      // accessory work from any over-budget day (preserving the main lifts) until each day is within
+      // the +10% target, and mirror every removal into the canonical instances so they stay in sync.
+      const nextUser: UserDoc = { ...state.backendUser, session_length_min: action.sessionLengthMin }
+      const res = activateProgram(nextUser, now)
+      if (!res.status.ok || !res.program || !res.programDoc) {
+        return { ok: false, reason: res.status.reason ?? 'generation_blocked', message: 'That change needs a quick health re-check before I can apply it — open your Training profile to finish it.' }
+      }
+      const genChoices = res.programDoc.generation_audit?.flatMap((a) => a.choices ?? []) ?? []
+      if (genChoices.some((c) => typeof c === 'string' && c.includes('UNFILLED required slot'))) {
+        return { ok: false, reason: 'incomplete_plan', message: "I couldn't build a complete plan from your current equipment and limits without leaving gaps, so I've left your plan as it is — try widening your available equipment." }
+      }
+
+      const fit = fitProgramToDuration(res.program, action.sessionLengthMin)
+      // Mirror the trim into instances: keep only the exercises that survived on each weekday.
+      const keepByWeekday = new Map<string, Set<string>>()
+      for (const day of fit.program.days) keepByWeekday.set(day.weekday, new Set(day.exercises.map((e) => e.exerciseId)))
+      const instances = res.instances.map((inst) => {
+        const weekday = inst.instance_id.split('_').pop() ?? ''
+        const keep = keepByWeekday.get(weekday)
+        return keep ? { ...inst, exercises: inst.exercises.filter((pe) => keep.has(pe.exercise_id)) } : inst
+      })
+
+      const target = action.sessionLengthMin
+      const message = fit.fits
+        ? `Set your sessions to ${target} minutes and trimmed each day to fit — they land around ~${fit.worstMinutes} min.`
+        : `Set your sessions to ${target} minutes. Even trimmed to the essentials your split still needs about ~${fit.worstMinutes} min a day, so I kept the leanest version that preserves your main lifts — drop a training day or nudge the target up if you need it tighter.`
+      return guardProgram(nextUser, fit.program, {
+        ok: true, apply: 'regen', nextUser,
+        program: fit.program, status: res.status, programDoc: res.programDoc, instances,
+        message,
+      })
     }
 
     case 'deload': {

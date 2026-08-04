@@ -11,6 +11,7 @@
 import { EXERCISE_BY_ID, substitutesFor } from '../data'
 import type { Exercise } from '../data/types'
 import { prescribe, injuryStressRegions, injuryExcludeIds, type BuildContext, type PrescribedFields } from './build'
+import { equipmentTagsSatisfied } from '../data/equipmentInventory'
 import type { InjuryRegion } from '../schema'
 
 export type SwapReason = 'dislike' | 'pain' | 'equipment' | 'too_hard' | 'too_easy' | 'specific' | 'variety'
@@ -25,7 +26,7 @@ const SKILL_RANK: Record<string, number> = { Beginner: 0, Intermediate: 1, Advan
 export function eligibleForUser(ex: Exercise, ctx: BuildContext, exclude: Set<string>): boolean {
   return ex.active && !exclude.has(ex.id) &&
     (TIER_RANK[ex.equipmentTier] ?? 9) <= (TIER_RANK[ctx.equipmentTier] ?? 0) &&
-    ex.requiredEquipmentTags.every((t) => t.split('/').some((x) => ctx.equipmentTags.includes(x.trim()))) &&
+    equipmentTagsSatisfied(ex.requiredEquipmentTags, ctx.equipmentTags) &&
     (SKILL_RANK[ex.skillLevel] ?? 9) <= (SKILL_RANK[ctx.experience] ?? 0)
 }
 

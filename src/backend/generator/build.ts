@@ -13,6 +13,7 @@
 import { ACTIVE_EXERCISES, EXERCISE_BY_ID, toSafetyMeta } from '../data'
 import { prescriptionFor } from '../data'
 import { INJURY_MODIFICATIONS } from '../data/injuryModifications'
+import { equipmentTagsSatisfied } from '../data/equipmentInventory'
 import type { Exercise, SessionSlot } from '../data/types'
 import { clampPrescription, type Prescription, type UserSafetyContext } from '../safety/safetyRules'
 import type { BackendGoal, FocalPoint, InjuryRegion } from '../schema'
@@ -53,7 +54,7 @@ export interface BuiltExercise {
 /* ----------------------------- filters ----------------------------- */
 function tierOk(ex: Exercise, tier: string) { return (TIER_RANK[ex.equipmentTier] ?? 9) <= (TIER_RANK[tier] ?? 0) }
 function tagsOk(ex: Exercise, tags: string[]) {
-  return ex.requiredEquipmentTags.every((t) => t.split('/').some((x) => tags.includes(x.trim())))
+  return equipmentTagsSatisfied(ex.requiredEquipmentTags, tags)
 }
 function skillOk(ex: Exercise, exp: string) { return (SKILL_RANK[ex.skillLevel] ?? 9) <= (SKILL_RANK[exp] ?? 0) }
 
