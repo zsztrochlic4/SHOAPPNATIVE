@@ -128,7 +128,10 @@
     "an unexplained material contradiction of earlier context"
   ],
   "includesModelReplies": false,
-  "releaseSha": "171bb5944b29d575b9dbdcc14de505ac60395eec",
+  "replyCount": 0,
+  "corpusHash": "de336f9bc605820a77fad0e121076ac205af0ef2",
+  "repliesHash": "FILL_ME",
+  "releaseSha": "fc6bb0714592ff97dd2782d3e107cc8a5dfe4f7c",
   "model": "gemini-2.5-flash-lite",
   "promptHash": "FILL_ME"
 }

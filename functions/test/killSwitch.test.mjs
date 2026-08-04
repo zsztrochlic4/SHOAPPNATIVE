@@ -36,6 +36,34 @@ test('fail-safe: a read error keeps the last known value (never engages on its o
   assert.equal(ks.engaged(), true) // read error must NOT change it — last value held
 })
 
+test('R4-001: a STALE value whose refresh fails is fail-CLOSED for actions (no stale-false fail-open)', async () => {
+  let clock = 1_000_000
+  let mode = 'ok-false' // first read succeeds with false (actions enabled)
+  const ks = makeRemoteKillSwitch(async () => {
+    if (mode === 'throw') throw new Error('firestore outage')
+    return mode === 'ok-true'
+  }, 30_000, () => clock)
+  await ks.refresh()
+  assert.equal(await ks.engagedFresh(true), false) // fresh + false → actions allowed
+  // Time passes beyond the TTL and the refresh now fails (outage).
+  clock += 60_000
+  mode = 'throw'
+  assert.equal(await ks.engagedFresh(true), true, 'stale value + failed refresh must fail closed for actions')
+  // Advisory (failClosed=false) still fails SAFE — never engages on its own.
+  assert.equal(await ks.engagedFresh(false), false)
+})
+
+test('R4-001: once a fresh read succeeds again, actions follow the real value', async () => {
+  let clock = 1_000_000
+  let mode = 'ok-false'
+  const ks = makeRemoteKillSwitch(async () => (mode === 'throw' ? (() => { throw new Error('x') })() : mode === 'ok-true'), 30_000, () => clock)
+  await ks.refresh()
+  clock += 60_000; mode = 'throw'
+  assert.equal(await ks.engagedFresh(true), true) // stale outage → closed
+  clock += 1_000; mode = 'ok-false'
+  assert.equal(await ks.engagedFresh(true), false) // fresh success → real value
+})
+
 test('the cached value is served within the TTL; an explicit refresh picks up a change', async () => {
   let value = true
   let calls = 0

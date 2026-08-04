@@ -6,6 +6,12 @@
 import { runProfileSweep } from './sweep'
 
 const r = runProfileSweep()
+if (r.warnings.length) {
+  // Non-fatal coverage gaps (e.g. the known Bodyweight equipment-taxonomy defect, R4-004). Surfaced
+  // so they are visible in CI without blocking merges; the coach refuses to apply such plans (U-011).
+  console.warn(`Profile sweep WARNINGS — ${r.warnings.length} known coverage gap(s):`)
+  for (const w of r.warnings.slice(0, 60)) console.warn('  ! ' + w)
+}
 if (r.passed) {
   console.log(`Profile sweep PASSED — ${r.count} profiles, zero safety-floor breaches, zero empty required slots.`)
   process.exit(0)

@@ -176,6 +176,9 @@ export interface Settings {
   reducedMotion?: ReducedMotionSetting
   /** UI language. Defaults to English when absent (older saves). */
   language?: Language
+  /** IANA timezone captured from the device (audit R4-010), e.g. 'Australia/Perth'. Persisted so
+   *  the server coach context names the correct LOCAL day instead of falling back to a default. */
+  timezone?: string
   /** Connected third-party integrations, e.g. { strava: true }. */
   connections?: Record<string, boolean>
   /** Which metric the main Progress chart shows (default 'weight'). */

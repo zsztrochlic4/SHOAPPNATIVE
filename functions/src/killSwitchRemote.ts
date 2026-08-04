@@ -30,8 +30,9 @@ export interface KillSwitchReader {
 
 type Fetcher = () => Promise<boolean>
 
-/** Wrap a boolean fetcher in a background-refreshing, fail-safe cache. Injectable for tests. */
-export function makeRemoteKillSwitch(fetchEngaged: Fetcher, ttlMs = 30_000): KillSwitchReader {
+/** Wrap a boolean fetcher in a background-refreshing, fail-safe cache. Injectable for tests
+ *  (`now` lets a test drive the clock deterministically to reproduce a stale-cache outage). */
+export function makeRemoteKillSwitch(fetchEngaged: Fetcher, ttlMs = 30_000, now: () => number = () => Date.now()): KillSwitchReader {
   let engaged = false
   let lastOk = 0
   let inflight: Promise<void> | null = null
@@ -40,7 +41,7 @@ export function makeRemoteKillSwitch(fetchEngaged: Fetcher, ttlMs = 30_000): Kil
     inflight = (async () => {
       try {
         engaged = await fetchEngaged()
-        lastOk = Date.now()
+        lastOk = now()
       } catch {
         // fail-safe: keep the last known value; a read error never engages the switch on its own.
       } finally {
@@ -49,15 +50,19 @@ export function makeRemoteKillSwitch(fetchEngaged: Fetcher, ttlMs = 30_000): Kil
     })()
     return inflight
   }
+  const isFresh = (): boolean => lastOk !== 0 && now() - lastOk <= ttlMs
   return {
     engaged() {
-      if (Date.now() - lastOk > ttlMs) void refresh() // non-blocking; serves the cached value now
+      if (now() - lastOk > ttlMs) void refresh() // non-blocking; serves the cached value now
       return engaged
     },
     async engagedFresh(failClosed = false) {
-      if (lastOk === 0 || Date.now() - lastOk > ttlMs) await refresh()
-      // Never confirmed (first read failed): fail closed for actions, fail safe otherwise.
-      if (lastOk === 0) return failClosed ? true : engaged
+      if (!isFresh()) await refresh()
+      // audit R4-001: the cache is trustworthy ONLY if it is fresh AFTER the awaited refresh. A
+      // never-populated cache OR a stale value whose refresh failed (a Firestore outage) both leave
+      // us unable to confirm the switch state — so for plan-mutating actions we fail CLOSED
+      // (return true / disabled) rather than serve a stale `false`. Advisory reads fail safe.
+      if (!isFresh()) return failClosed ? true : engaged
       return engaged
     },
     refresh,
