@@ -214,10 +214,11 @@ function assertLoggingPath(user: UserDoc, fails: string[]) {
   }
 }
 
-export interface SweepResult { passed: boolean; count: number; failures: string[] }
+export interface SweepResult { passed: boolean; count: number; failures: string[]; warnings: string[] }
 
 export function runProfileSweep(): SweepResult {
   const failures: string[] = []
+  const warnings: string[] = []
   let count = 0
   // The platform sign-off gate is a deployment gate, not per-program safety — sign off for
   // the test only, and restore it so the sweep never enables the coach as a side effect.
@@ -237,6 +238,28 @@ export function runProfileSweep(): SweepResult {
       const r = generateProgram(user); count++
       if (!r.ok) { failures.push(`${goal}/${exp}/${d}d: generation failed (${r.reason})`); continue }
       assertProgram(`${goal}/${exp}/${d}d`, user, r.program, failures)
+    }
+
+    // Broader EQUIPMENT-TIER × SESSION-DURATION coverage (audit R4-004): the base matrix above is
+    // Full Gym / 60 min. Basic Gym is a HARD gate (it can fill every required slot). Bodyweight is
+    // REPORTED-only: its equipment taxonomy over-grants and genuinely leaves required slots unfilled
+    // — a known workbook-data defect (R4-004) that must NOT block merges, but IS surfaced here so the
+    // gap is visible and can't silently regress further. The coach already refuses to APPLY such a
+    // sparse plan (U-011); this makes the generation gap observable in CI.
+    const durations = [30, 45, 90]
+    for (const goal of goals) for (const dur of durations) {
+      const user = makeUser(goal, 'Intermediate', 4, { equipment_tier: 'Basic Gym', session_length_min: dur })
+      const r = generateProgram(user); count++
+      if (!r.ok) { failures.push(`${goal}/Basic Gym/${dur}min: generation failed (${r.reason})`); continue }
+      assertProgram(`${goal}/Basic Gym/${dur}min`, user, r.program, failures)
+    }
+    for (const goal of goals) for (const dur of durations) {
+      const user = makeUser(goal, 'Intermediate', 4, { equipment_tier: 'Bodyweight', session_length_min: dur })
+      const r = generateProgram(user); count++
+      if (!r.ok) { warnings.push(`${goal}/Bodyweight/${dur}min: generation failed (${r.reason}) [known taxonomy gap R4-004]`); continue }
+      if (r.program.audit.some((a) => a.includes('UNFILLED'))) {
+        warnings.push(`${goal}/Bodyweight/${dur}min: unfilled required slot [known taxonomy gap R4-004]`)
+      }
     }
 
     // Runtime paths (swaps, progression, goal change) for a representative profile per goal.
@@ -320,5 +343,5 @@ export function runProfileSweep(): SweepResult {
     PROFESSIONAL_SIGNOFF.reviewer = prevReviewer
     PROFESSIONAL_SIGNOFF.accreditation = prevAccreditation
   }
-  return { passed: failures.length === 0, count, failures }
+  return { passed: failures.length === 0, count, failures, warnings }
 }

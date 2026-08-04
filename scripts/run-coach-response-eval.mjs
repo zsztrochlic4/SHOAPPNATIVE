@@ -16,6 +16,9 @@
  */
 import { writeFileSync, readFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
+import { createHash } from 'node:crypto'
+
+const sha1 = (s) => createHash('sha1').update(s).digest('hex')
 import {
   RESPONSE_EVAL_CASES, EVAL_DIMENSIONS, GROUP_MINIMUMS, AUTO_FAILURE_RULES,
   MEAN_THRESHOLD, CRITICAL_MIN, IRR_MIN, MAX_AUTO_FAILS,
@@ -35,6 +38,10 @@ function emitSheet() {
     try { replies = JSON.parse(readFileSync(process.env.REPLIES, 'utf8')) } catch { replies = {} }
   }
   const hasReplies = Object.keys(replies).length > 0
+  // R4-002: only mark the run as containing replies when EVERY case has a non-empty reply — one
+  // reply must never satisfy the binding flag.
+  const nonEmptyReplies = RESPONSE_EVAL_CASES.filter((c) => String(replies[c.id] ?? '').trim().length > 0)
+  const hasAllReplies = nonEmptyReplies.length === RESPONSE_EVAL_CASES.length
 
   const dimCols = EVAL_DIMENSIONS.map((d) => `${d.label} (1-5)${d.critical ? ' *critical' : ''}`)
   const header = [
@@ -71,7 +78,10 @@ function emitSheet() {
     dimensions: EVAL_DIMENSIONS,
     thresholds: { MEAN_THRESHOLD, CRITICAL_MIN, IRR_MIN, MAX_AUTO_FAILS },
     autoFailureRules: AUTO_FAILURE_RULES,
-    includesModelReplies: hasReplies,
+    includesModelReplies: hasAllReplies,
+    replyCount: nonEmptyReplies.length,
+    corpusHash: sha1(JSON.stringify(RESPONSE_EVAL_CASES.map((c) => ({ id: c.id, prompt: c.prompt, scenario: c.scenario ?? '' })))),
+    repliesHash: hasAllReplies ? sha1(JSON.stringify(RESPONSE_EVAL_CASES.map((c) => replies[c.id]))) : 'FILL_ME',
     releaseSha: process.env.RELEASE_SHA || 'FILL_ME',
     model: process.env.MODEL || 'FILL_ME',
     promptHash: process.env.PROMPT_HASH || 'FILL_ME',
@@ -93,11 +103,17 @@ function scoreFilled() {
   // The gate itself enforces "exactly two distinct reviewers"; pass through whatever is given so a
   // wrong count fails with a precise reason rather than being silently rejected here.
   const sheets = files.map((f) => JSON.parse(readFileSync(f, 'utf8')))
-  // Bind the manifest when supplied so an unbound (placeholder) manifest fails the gate (U-006).
+  // R4-002: the manifest is MANDATORY in a release run — a missing/unreadable manifest fails rather
+  // than silently skipping provenance validation. Optional EXPECTED_SHA/EXPECTED_MODEL (supplied by
+  // the release job) must match exactly when set.
   let manifest
   const manifestPath = process.env.MANIFEST || 'docs/coach-eval/response-eval-manifest.json'
   try { manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) } catch { manifest = undefined }
-  const result = evaluateResponseQuality(sheets, manifest)
+  const result = evaluateResponseQuality(sheets, manifest, {
+    requireManifest: true,
+    expectedReleaseSha: process.env.EXPECTED_SHA,
+    expectedModel: process.env.EXPECTED_MODEL,
+  })
   console.log(JSON.stringify(result, null, 2))
   process.exit(result.pass ? 0 : 1)
 }

@@ -35,7 +35,7 @@ import { fetchCoachWorkspace, readCachedCoachWorkspace, respondToCoachProposal, 
 import { useReducedMotion, motionDuration } from '../lib/a11y'
 import { useAuth } from '../auth/AuthProvider'
 import { writeBackendUser } from '../backend/repo/userRepo'
-import { commitCoachAction } from '../backend/repo/programRepo'
+import { commitCoachAction, CoachActionConflictError } from '../backend/repo/programRepo'
 import { resolveCoachAction, applyCoachSwapChoice, type SwapOption, type CoachActionOutcome } from '../backend/runtime/coachActionResolver'
 import { deriveLocalProfile } from '../backend/mapping/projection'
 import { newPeriodDraft, periodModeForAbsence, plannedPeriods } from '../store/periods'
@@ -940,17 +940,23 @@ export function CoachChatSheet({ open, onClose }: Props) {
       const programDocToWrite = outcome.apply === 'patch' ? state.programDoc : outcome.programDoc
       if (programDocToWrite) {
         // U-001: user + program + instances (+ stale cleanup) commit ATOMICALLY — no partial state.
-        await commitCoachAction(uid, outcome.nextUser, programDocToWrite, outcome.instances)
+        // R4-005: guard against a concurrent change from another device via the program version.
+        await commitCoachAction(uid, outcome.nextUser, programDocToWrite, outcome.instances, state.programDoc?.version)
       } else {
         await writeBackendUser(uid, outcome.nextUser)
       }
       applyToStore()
       succeed()
-    } catch {
-      // The plan was NOT changed in the store (we persist first), so nothing to roll back locally;
-      // be honest and offer a retry that re-runs the exact same commit.
+    } catch (e: unknown) {
+      // The plan was NOT changed in the store (we persist first), so nothing to roll back locally.
       setApplyingProposalId(null)
       setSwapChoice(null)
+      // R4-005: a version conflict means another device changed the plan first — say so honestly.
+      if (e instanceof CoachActionConflictError) {
+        toast('Your plan was changed on another device, so I didn’t apply this — reopen the coach and try again.')
+        if (actionId) void recordCoachActionOutcome(actionId, 'failed', 'version_conflict')
+        return
+      }
       setFailedApply({ proposalId, retry: () => { void commitProgramOutcome(outcome, proposalId, actionId) } })
       toast("That didn't save, so I've left your plan unchanged — tap retry to try again.")
       if (actionId) void recordCoachActionOutcome(actionId, 'failed', 'persist_failed')

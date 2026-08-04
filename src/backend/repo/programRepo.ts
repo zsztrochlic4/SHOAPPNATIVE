@@ -13,13 +13,21 @@
  * store's AsyncStorage persistence covers the render projection.
  */
 
-import { collection, doc, getDocs, query, where, writeBatch } from 'firebase/firestore'
+import { collection, doc, getDocs, query, runTransaction, where, writeBatch } from 'firebase/firestore'
 import { db } from '../../lib/firebase'
 import type { ProgramDoc, UserDoc, WorkoutInstanceDoc } from '../schema'
 
 /** Strip `undefined` (Firestore rejects it) via a plain-data round-trip. */
 function clean<T>(value: T): T {
   return JSON.parse(JSON.stringify(value))
+}
+
+/** Thrown when a coach action commits against a program another device already moved past (R4-005). */
+export class CoachActionConflictError extends Error {
+  constructor(public storedVersion: number, public expectedVersion: number) {
+    super(`coach_action_version_conflict: stored ${storedVersion} != expected ${expectedVersion}`)
+    this.name = 'CoachActionConflictError'
+  }
 }
 
 /**
@@ -42,16 +50,12 @@ export async function writeActiveProgram(
   if (!db || !uid || uid === 'local') return
   const instancesCol = collection(db, 'users', uid, 'workout_instances')
 
-  // Find instances currently stored for this program so we can drop the ones the new schedule
-  // no longer includes. Best-effort: if the query fails we still write the new set below.
+  // Find instances currently stored for this program so we can drop the ones the new schedule no
+  // longer includes. FAIL CLOSED (R4-011): a discovery-query failure ABORTS the write rather than
+  // committing a new schedule that could leave stale weekday instances behind.
   const keep = new Set(instances.map((i) => i.instance_id))
-  let stale: string[] = []
-  try {
-    const existing = await getDocs(query(instancesCol, where('program_id', '==', program.program_id)))
-    stale = existing.docs.map((d) => d.id).filter((id) => !keep.has(id))
-  } catch {
-    stale = []
-  }
+  const existing = await getDocs(query(instancesCol, where('program_id', '==', program.program_id)))
+  const stale = existing.docs.map((d) => d.id).filter((id) => !keep.has(id))
 
   const batch = writeBatch(db)
   batch.set(doc(db, 'users', uid, 'programs', program.program_id), clean(program), { merge: true })
@@ -78,18 +82,32 @@ export async function commitCoachAction(
   backendUser: UserDoc,
   program: ProgramDoc,
   instances: WorkoutInstanceDoc[],
+  expectedVersion?: number,
 ): Promise<void> {
   if (!db || !uid || uid === 'local') return
-  const instancesCol = collection(db, 'users', uid, 'workout_instances')
+  const database = db
+  const instancesCol = collection(database, 'users', uid, 'workout_instances')
   const keep = new Set(instances.map((i) => i.instance_id))
   // Discover obsolete instances; a failure here ABORTS the commit (fail closed) — no try/catch.
+  // (Queries aren't allowed inside a client transaction, so this read happens first.)
   const existing = await getDocs(query(instancesCol, where('program_id', '==', program.program_id)))
   const stale = existing.docs.map((d) => d.id).filter((id) => !keep.has(id))
+  const programRef = doc(database, 'users', uid, 'programs', program.program_id)
 
-  const batch = writeBatch(db)
-  batch.set(doc(db, 'users', uid), { backendUser: clean(backendUser) }, { merge: true })
-  batch.set(doc(db, 'users', uid, 'programs', program.program_id), clean(program), { merge: true })
-  for (const inst of instances) batch.set(doc(instancesCol, inst.instance_id), clean(inst), { merge: false })
-  for (const id of stale) batch.delete(doc(instancesCol, id))
-  await batch.commit()
+  // R4-005: run in a transaction so we can enforce an OPTIMISTIC version precondition — if the stored
+  // program moved on since this action was resolved (another device committed first), abort with a
+  // conflict rather than silently overwriting it. The write set is still all-or-nothing.
+  await runTransaction(database, async (tx) => {
+    if (expectedVersion != null) {
+      const snap = await tx.get(programRef)
+      const storedVersion = snap.exists() ? (snap.data() as { version?: number }).version : undefined
+      if (snap.exists() && typeof storedVersion === 'number' && storedVersion !== expectedVersion) {
+        throw new CoachActionConflictError(storedVersion, expectedVersion)
+      }
+    }
+    tx.set(doc(database, 'users', uid), { backendUser: clean(backendUser) }, { merge: true })
+    tx.set(programRef, clean(program), { merge: true })
+    for (const inst of instances) tx.set(doc(instancesCol, inst.instance_id), clean(inst), { merge: false })
+    for (const id of stale) tx.delete(doc(instancesCol, id))
+  })
 }

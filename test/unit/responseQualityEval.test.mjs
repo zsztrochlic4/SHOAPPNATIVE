@@ -129,12 +129,46 @@ test('low inter-rater agreement fails', () => {
 
 /* ---------------- manifest binding (U-006) ---------------- */
 
-test('an unbound manifest fails; a bound manifest with replies passes', () => {
+const BOUND_MANIFEST = {
+  releaseSha: 'a'.repeat(40),
+  model: 'gemini-2.5-flash-lite',
+  promptHash: 'deadbeefcafe',
+  corpusHash: 'deadbeefcafe',
+  repliesHash: 'deadbeefcafe',
+  includesModelReplies: true,
+  replyCount: 60,
+}
+
+test('R4-002: a MISSING manifest fails in a release run (requireManifest)', () => {
   const sheets = [fullSheet('jack', 5), fullSheet('sam', 5)]
-  const unbound = evaluateResponseQuality(sheets, { releaseSha: 'FILL_ME', model: 'FILL_ME', promptHash: 'FILL_ME', includesModelReplies: false })
-  assert.equal(unbound.pass, false)
-  assert.ok(unbound.reasons.some((x) => /manifest/.test(x)))
-  const bound = evaluateResponseQuality(sheets, { releaseSha: 'abc123', model: 'gemini-2.5-flash-lite', promptHash: 'deadbeef', includesModelReplies: true })
+  const r = evaluateResponseQuality(sheets, undefined, { requireManifest: true })
+  assert.equal(r.pass, false)
+  assert.ok(r.reasons.some((x) => /bound evaluation manifest is required/.test(x)))
+})
+
+test('R4-002: placeholder / self-asserted provenance fails', () => {
+  const sheets = [fullSheet('jack', 5), fullSheet('sam', 5)]
+  const placeholder = evaluateResponseQuality(sheets, { releaseSha: 'FILL_ME', model: 'FILL_ME', promptHash: 'FILL_ME', includesModelReplies: false, replyCount: 0 })
+  assert.equal(placeholder.pass, false)
+  // one reply must NOT satisfy the binding
+  const oneReply = evaluateResponseQuality(sheets, { ...BOUND_MANIFEST, replyCount: 1 })
+  assert.equal(oneReply.pass, false)
+  assert.ok(oneReply.reasons.some((x) => /replyCount must be exactly 60/.test(x)))
+  // short / non-hex SHA fails
+  const badSha = evaluateResponseQuality(sheets, { ...BOUND_MANIFEST, releaseSha: 'abc123' })
+  assert.equal(badSha.pass, false)
+})
+
+test('R4-002: expected SHA/model mismatch fails', () => {
+  const sheets = [fullSheet('jack', 5), fullSheet('sam', 5)]
+  const r = evaluateResponseQuality(sheets, BOUND_MANIFEST, { expectedReleaseSha: 'b'.repeat(40) })
+  assert.equal(r.pass, false)
+  assert.ok(r.reasons.some((x) => /does not match the expected release/.test(x)))
+})
+
+test('a fully bound manifest with all 60 replies passes', () => {
+  const sheets = [fullSheet('jack', 5), fullSheet('sam', 5)]
+  const bound = evaluateResponseQuality(sheets, BOUND_MANIFEST, { requireManifest: true, expectedReleaseSha: 'a'.repeat(40), expectedModel: 'gemini-2.5-flash-lite' })
   assert.equal(bound.pass, true, bound.reasons.join('; '))
 })
 

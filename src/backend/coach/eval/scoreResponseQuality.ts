@@ -27,13 +27,24 @@ export interface ReviewerSheet {
   cases: CaseScore[]
 }
 
-/** Optional manifest binding checked when supplied (U-006). */
+/** Manifest binding checked in a scored run (U-006 / R4-002). All fields are validated, never
+ *  merely present. `replyCount` must equal the full corpus and every reply must be non-empty. */
 export interface EvalManifest {
   releaseSha?: string
   model?: string
   promptHash?: string
+  corpusHash?: string
+  repliesHash?: string
   includesModelReplies?: boolean
+  replyCount?: number
+  /** Optional expected values a release job supplies; when present they must match exactly. */
+  expectedReleaseSha?: string
+  expectedModel?: string
 }
+
+const HEX40 = /^[0-9a-f]{40}$/i
+const HASHLIKE = /^[0-9a-f]{8,}$/i
+const PLACEHOLDER = /^(FILL_ME|)$/i
 
 export interface EvalResult {
   pass: boolean
@@ -118,7 +129,37 @@ export function interRaterAgreement(sheets: ReviewerSheet[]): number | null {
   return total ? agree / total : null
 }
 
-export function evaluateResponseQuality(sheets: ReviewerSheet[], manifest?: EvalManifest): EvalResult {
+export interface EvalOptions {
+  /** Release gate: a bound, complete manifest is MANDATORY (missing ⇒ fail). */
+  requireManifest?: boolean
+  /** When supplied, the manifest must match these exactly (the release job provides them). */
+  expectedReleaseSha?: string
+  expectedModel?: string
+}
+
+/** Strict manifest provenance validation (R4-002). Returns precise problems (empty ⇒ bound). */
+export function validateManifest(manifest: EvalManifest | undefined, opts: EvalOptions = {}): string[] {
+  const p: string[] = []
+  if (!manifest) {
+    if (opts.requireManifest) p.push('a bound evaluation manifest is required but none was supplied/readable')
+    return p
+  }
+  const sha = String(manifest.releaseSha ?? '')
+  if (!HEX40.test(sha) || PLACEHOLDER.test(sha)) p.push('manifest releaseSha must be a 40-char commit SHA bound to the release')
+  if (opts.expectedReleaseSha && sha.toLowerCase() !== opts.expectedReleaseSha.toLowerCase()) p.push(`manifest releaseSha ${sha} does not match the expected release ${opts.expectedReleaseSha}`)
+  const model = String(manifest.model ?? '')
+  if (!model || PLACEHOLDER.test(model)) p.push('manifest model is not set')
+  if (opts.expectedModel && model !== opts.expectedModel) p.push(`manifest model ${model} does not match the expected model ${opts.expectedModel}`)
+  for (const [k, v] of [['promptHash', manifest.promptHash], ['corpusHash', manifest.corpusHash], ['repliesHash', manifest.repliesHash]] as const) {
+    const val = String(v ?? '')
+    if (!HASHLIKE.test(val) || PLACEHOLDER.test(val)) p.push(`manifest ${k} must be a real hash (all 60 replies + corpus + prompt bound)`)
+  }
+  if (manifest.includesModelReplies !== true) p.push('manifest indicates no model replies were scored')
+  if (manifest.replyCount !== REQUIRED_CASE_COUNT) p.push(`manifest replyCount must be exactly ${REQUIRED_CASE_COUNT} non-empty replies (got ${manifest.replyCount ?? 0})`)
+  return p
+}
+
+export function evaluateResponseQuality(sheets: ReviewerSheet[], manifest?: EvalManifest, opts: EvalOptions = {}): EvalResult {
   const reasons: string[] = []
   const completenessProblems = validateCompleteness(sheets)
   const complete = completenessProblems.length === 0
@@ -141,13 +182,9 @@ export function evaluateResponseQuality(sheets: ReviewerSheet[], manifest?: Eval
   const irr = interRaterAgreement(sheets)
   const casesScored = new Set(sheets.flatMap((s) => s.cases.map((c) => c.caseId))).size
 
-  // Manifest binding (U-006): if provided, it must bind to a real release/model/prompt with replies.
-  if (manifest) {
-    if (!manifest.releaseSha || manifest.releaseSha === 'FILL_ME') reasons.push('manifest releaseSha is not bound to a release')
-    if (!manifest.model || manifest.model === 'FILL_ME') reasons.push('manifest model is not set')
-    if (!manifest.promptHash || manifest.promptHash === 'FILL_ME') reasons.push('manifest promptHash is not set')
-    if (manifest.includesModelReplies !== true) reasons.push('manifest indicates no model replies were scored')
-  }
+  // Manifest binding (U-006 / R4-002): strict, and MANDATORY in a release run — a missing manifest
+  // no longer silently skips provenance; self-asserted / placeholder values are rejected.
+  reasons.push(...validateManifest(manifest, opts))
 
   // Thresholds — only meaningful on complete evidence, but always reported.
   if (!flat.length) reasons.push('no valid scores provided')

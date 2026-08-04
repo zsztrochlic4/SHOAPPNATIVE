@@ -288,7 +288,10 @@ export function resolveCoachAction(
     }
 
     case 'set_session_length': {
-      return regen({ ...state.backendUser, session_length_min: action.sessionLengthMin }, now, `Set your sessions to ${action.sessionLengthMin} minutes and rebuilt your plan to fit.`)
+      // R4-009: don't claim the plan "fits" — the generator can overshoot short sessions, and
+      // guardProgram appends an honest over-budget caveat when it does. A neutral base message keeps
+      // the two from contradicting each other.
+      return regen({ ...state.backendUser, session_length_min: action.sessionLengthMin }, now, `Set your sessions to ${action.sessionLengthMin} minutes and rebuilt your plan around that.`)
     }
 
     case 'deload': {

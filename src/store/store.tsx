@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { AppState as RNAppState } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { todayKey, setLiveClock, refreshClock } from '../lib/date'
+import { todayKey, setLiveClock, refreshClock, deviceTimezone } from '../lib/date'
 import {
   ANON_IDENTITY,
   LEGACY_STORAGE_KEY,
@@ -881,6 +881,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       cancelled = true
     }
   }, [identity, dispatch])
+
+  // R4-010: once hydrated, capture the device's IANA timezone into settings so it persists to the
+  // server and the coach names the correct LOCAL day (travel/other AU states follow the device).
+  useEffect(() => {
+    if (!hydrated) return
+    const tz = deviceTimezone()
+    if (tz && state.settings.timezone !== tz) dispatch({ type: 'SET_SETTINGS', patch: { timezone: tz } })
+  }, [hydrated, state.settings.timezone, dispatch])
 
   const savingRef = useRef(false)
   const savePendingRef = useRef(false)
