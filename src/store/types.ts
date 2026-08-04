@@ -494,6 +494,92 @@ export interface Group {
   joined: boolean
 }
 
+/* ------------------------------------------------------------------ */
+/*  Community competition hub (leaderboards + friend groups)          */
+/* ------------------------------------------------------------------ */
+
+/** How a group leaderboard is ranked. All three are "higher is better". */
+export type GroupRankMetric = 'odometer' | 'streak' | 'volume'
+
+/** A member of a friend group. The current user's row (`isYou`) carries their
+ *  live stats (see selectors.myLeaderStats); everyone else is simulated locally
+ *  until the Firestore backend lands. */
+export interface GroupMember {
+  /** stable id — the member's username (unique within the app) */
+  id: string
+  username: string
+  isYou?: boolean
+  /** 0..100 dashboard "odometer" (weeklyIndex) score */
+  odometer: number
+  /** current consistency streak, in days */
+  streak: number
+  /** longest streak on record (>= streak). Optional on legacy data. */
+  bestStreak?: number
+  /** total weight lifted in the last 7 days, kg */
+  volume7: number
+  /** total weight lifted in the last 30 days, kg */
+  volume30: number
+  /** sessions logged in the last 7 days — contributes to the team goal. Optional
+   *  on legacy data (treated as 0). */
+  sessionsThisWeek?: number
+}
+
+/** One "cheer" (reaction-only social) tally on a group activity event, keyed by
+ *  the event's stable id. `mine` reflects whether the current user has cheered. */
+export interface CheerTally {
+  count: number
+  mine: boolean
+}
+
+/** A private friend group the user created or joined. `ownerUsername` matches
+ *  the current user's username when they created it (drives owner-only delete). */
+export interface CommunityGroup {
+  id: string
+  name: string
+  /** short, easy-to-share join code (see community/passcode.ts) */
+  passcode: string
+  ownerUsername: string
+  createdAtKey: string
+  members: GroupMember[]
+  /** Icon key (src/components/Icon map) + accent colour chosen at creation.
+   *  Optional on legacy groups; the UI falls back to a default. */
+  icon?: string
+  color?: string
+  /** Shared target: combined member sessions the group aims to log this week.
+   *  Owner-editable. Optional on legacy groups (UI falls back to a default). */
+  weeklyGoal?: number
+  /** Reaction-only "cheers" on activity events, keyed by event id. */
+  cheers?: Record<string, CheerTally>
+}
+
+/** The user's weekly league placement. Tier 0 = Bronze … 4 = Diamond. `weekKey`
+ *  is the Monday date-key of the week this placement belongs to. */
+export interface LeagueState {
+  tier: number
+  weekKey: string
+  /** how many seasons/weeks the user has been promoted (for a small flourish) */
+  seasonWins?: number
+}
+
+/** Persisted community slice. `username` is null until the first-visit setup
+ *  gate is completed; groups are the ones the user belongs to locally. */
+export interface CommunityState {
+  username: string | null
+  usernameSetAtKey?: string
+  groups: CommunityGroup[]
+  /* ---- forgiving streaks (Recommendation 2) ---- */
+  /** unspent streak-freeze tokens (auto-offered when a streak is at risk) */
+  freezeTokens?: number
+  /** planned rest-day keys — these keep a streak alive without a token */
+  restDays?: string[]
+  /** day keys the user spent a freeze on (kept the streak through a miss) */
+  frozenDays?: string[]
+  /** weekKey of the last weekly freeze grant (prevents double-granting) */
+  freezeGrantWeek?: string
+  /* ---- weekly league (Recommendation 1) ---- */
+  league?: LeagueState
+}
+
 /** Difficulty tier shown on a quick workout (drives the beginner→advanced order). */
 export type WorkoutLevel = 'Beginner' | 'Intermediate' | 'Advanced'
 
@@ -681,6 +767,9 @@ export interface AppState {
   notifications: AppNotification[]
   events: CommunityEvent[]
   groups: Group[]
+  /** Community competition hub: persistent username + friend groups. Absent on
+   *  saves written before v13; the migrate merge defaults it (see migrate.ts). */
+  community: CommunityState
   partners: PartnerCandidate[]
   coachThread: CoachMessage[]
   /** user-created recipe meals */

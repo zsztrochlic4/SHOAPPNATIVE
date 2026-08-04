@@ -119,26 +119,31 @@ function dayMeetsGoals(h: HabitDay, s: AppState): boolean {
 
 export function streakStats(s: AppState) {
   const byKey = new Map(s.habits.map((h) => [h.dateKey, h]))
+  // Forgiving streaks (Recommendation 2): a day also "counts" if the user marked
+  // it a rest day or protected it with a freeze token — so a planned off day or a
+  // single covered miss never resets the streak. Empty by default (identical to
+  // the original behaviour), so nothing changes for users who don't use them.
+  const protectedDays = new Set([...(s.community?.restDays ?? []), ...(s.community?.frozenDays ?? [])])
+  const dayOk = (k: string): boolean => {
+    if (protectedDays.has(k)) return true
+    const h = byKey.get(k)
+    return h ? dayMeetsGoals(h, s) : false
+  }
+
   // current: count back from yesterday (today is in-progress), including today if it already qualifies
   let current = 0
-  const todayQualifies = (() => {
-    const t = byKey.get(todayKey)
-    return t ? dayMeetsGoals(t, s) : false
-  })()
-  let start = todayQualifies ? 0 : 1
+  const start = dayOk(todayKey) ? 0 : 1
   for (let n = start; n < 400; n++) {
-    const h = byKey.get(dayKey(n))
-    if (h && dayMeetsGoals(h, s)) current++
+    if (dayOk(dayKey(n))) current++
     else break
   }
-  // best: longest run across all history
-  const keys = [...s.habits].map((h) => h.dateKey).sort()
+  // best: longest run across all history (protected days count too)
+  const keys = [...new Set([...s.habits.map((h) => h.dateKey), ...protectedDays])].sort()
   let best = 0
   let run = 0
   let prev: string | null = null
   for (const k of keys) {
-    const h = byKey.get(k)!
-    const ok = dayMeetsGoals(h, s)
+    const ok = dayOk(k)
     const consecutive = prev ? isNextDay(prev, k) : true
     if (ok && (consecutive || run === 0)) run++
     else run = ok ? 1 : 0
@@ -146,6 +151,17 @@ export function streakStats(s: AppState) {
     prev = k
   }
   return { current, best: Math.max(best, current) }
+}
+
+/** Is yesterday an unprotected miss (so the streak just broke / is about to)?
+ *  Drives the "Protect yesterday with a freeze" prompt. */
+export function streakRisk(s: AppState): { atRisk: boolean; dayKey: string } {
+  const y = dayKey(1)
+  const isProtected = (s.community?.restDays ?? []).includes(y) || (s.community?.frozenDays ?? []).includes(y)
+  if (isProtected) return { atRisk: false, dayKey: y }
+  const h = s.habits.find((x) => x.dateKey === y)
+  const met = h ? dayMeetsGoals(h, s) : false
+  return { atRisk: !met, dayKey: y }
 }
 
 function isNextDay(a: string, b: string) {
@@ -365,6 +381,27 @@ export function weeklyIndex(s: AppState): WeeklyIndex {
   ]
   return { score, band, label, blurb, parts }
 }
+
+/** The current user's live competition stats, sourced from real activity — the
+ *  single source the community leaderboards use for the "you" row so a rank
+ *  always reflects actual training, not a stored snapshot. */
+export function myLeaderStats(s: AppState) {
+  const streak = streakStats(s)
+  const idx = weeklyIndex(s)
+  return {
+    username: s.community.username,
+    odometer: idx.score,
+    streakCurrent: streak.current,
+    streakBest: streak.best,
+    volume7: Math.round(totalVolumeRange(s, 7)),
+    volume30: Math.round(totalVolumeRange(s, 30)),
+    // Sessions logged in the last 7 days (prescribed + self-logged) — the unit the
+    // shared weekly team goal counts.
+    sessionsThisWeek: workoutsInRange(s, 7) + activitiesInRange(s, 7).length,
+  }
+}
+
+export type MyLeaderStats = ReturnType<typeof myLeaderStats>
 
 export function leaderboardSorted(s: AppState) {
   return [...s.leaderboard].sort((a, b) => b.points - a.points)

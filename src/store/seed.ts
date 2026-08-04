@@ -1,5 +1,5 @@
 import { makeRng, rand, randInt, pick, round } from '../lib/rng'
-import { dayKey, todayKey } from '../lib/date'
+import { dayKey, todayKey, currentWeekKeys } from '../lib/date'
 import {
   BASE_WEIGHTS,
   EXERCISES,
@@ -20,6 +20,7 @@ import type {
   Challenge,
   CoachMessage,
   CommunityEvent,
+  CommunityState,
   Group,
   HabitDay,
   LeaderUser,
@@ -35,7 +36,10 @@ import type {
 
 // v12: + AppState.programDoc (Coach Capability Plan — canonical ProgramDoc held for
 // coach-actioned changes + undo). Optional field; the generic migrate merge defaults it.
-export const SCHEMA_VERSION = 12
+// v13: + AppState.community (competition hub — persistent username + friend groups).
+// The current user's leaderboard row is always live (selectors.myLeaderStats); other
+// members are simulated locally until the Firestore backend lands.
+export const SCHEMA_VERSION = 13
 const DAYS = 40 // 0..38 completed history, 39 = today (in progress)
 
 /* round to nearest 2.5 (plate increments) */
@@ -362,6 +366,66 @@ export function buildSeed(): AppState {
     { id: 'g-4', icon: 'leaf', name: 'Campus Runners', members: 53, desc: 'Group runs around campus every week.', unread: 0, color: '#F5A524', joined: false },
   ]
 
+  /* -------- community hub (username + friend groups) --------
+   * The demo "Alex" already has a username so the preview lands on the populated
+   * hub rather than the setup gate. The `alexm` member row is a placeholder — the
+   * live UI overrides it with the user's real streak/odometer/volume at render. */
+  const community: CommunityState = {
+    username: 'alexm',
+    usernameSetAtKey: dayKey(20),
+    // Forgiving streaks: the demo starts with 2 freeze tokens and no rest days.
+    freezeTokens: 2,
+    restDays: [],
+    frozenDays: [],
+    // Weekly league: the demo sits in Silver this week.
+    league: { tier: 1, weekKey: currentWeekKeys()[0], seasonWins: 1 },
+    groups: [
+      {
+        id: 'grp-westhall',
+        name: 'West Hall Crew',
+        passcode: 'W7K2QP',
+        ownerUsername: 'alexm',
+        createdAtKey: dayKey(20),
+        icon: 'dumbbell',
+        color: '#7ED957',
+        weeklyGoal: 24,
+        members: [
+          { id: 'alexm', username: 'alexm', isYou: true, odometer: 62, streak: 14, bestStreak: 21, volume7: 18400, volume30: 71200, sessionsThisWeek: 4 },
+          { id: 'jaydenk', username: 'jaydenk', odometer: 78, streak: 22, bestStreak: 31, volume7: 22600, volume30: 88400, sessionsThisWeek: 5 },
+          { id: 'sophie_l', username: 'sophie_l', odometer: 71, streak: 19, bestStreak: 24, volume7: 15200, volume30: 61800, sessionsThisWeek: 4 },
+          { id: 'miar', username: 'miar', odometer: 55, streak: 16, bestStreak: 18, volume7: 12900, volume30: 54300, sessionsThisWeek: 3 },
+          { id: 'danp', username: 'danp', odometer: 48, streak: 9, bestStreak: 27, volume7: 19800, volume30: 73100, sessionsThisWeek: 3 },
+          { id: 'leo_t', username: 'leo_t', odometer: 40, streak: 12, bestStreak: 12, volume7: 9700, volume30: 41200, sessionsThisWeek: 2 },
+        ],
+        cheers: {
+          'a-streak': { count: 6, mine: false },
+          'a-vol': { count: 4, mine: true },
+          'a-odo': { count: 3, mine: false },
+        },
+      },
+      {
+        id: 'grp-lifters',
+        name: 'Lifting Society',
+        passcode: 'LIFT88',
+        ownerUsername: 'jaydenk',
+        createdAtKey: dayKey(12),
+        icon: 'flame',
+        color: '#F5A524',
+        weeklyGoal: 16,
+        members: [
+          { id: 'alexm', username: 'alexm', isYou: true, odometer: 62, streak: 14, bestStreak: 21, volume7: 18400, volume30: 71200, sessionsThisWeek: 4 },
+          { id: 'jaydenk', username: 'jaydenk', odometer: 78, streak: 22, bestStreak: 31, volume7: 22600, volume30: 88400, sessionsThisWeek: 5 },
+          { id: 'ana_v', username: 'ana_v', odometer: 66, streak: 7, bestStreak: 15, volume7: 8100, volume30: 33400, sessionsThisWeek: 3 },
+          { id: 'samw', username: 'samw', odometer: 52, streak: 5, bestStreak: 20, volume7: 10600, volume30: 44800, sessionsThisWeek: 2 },
+        ],
+        cheers: {
+          'a-streak': { count: 8, mine: true },
+          'a-vol': { count: 2, mine: false },
+        },
+      },
+    ],
+  }
+
   return {
     profile,
     settings: {
@@ -412,6 +476,7 @@ export function buildSeed(): AppState {
     notifications,
     events,
     groups,
+    community,
     partners: PARTNER_CANDIDATES,
     coachThread,
     beginnerProgress: [],
@@ -446,6 +511,9 @@ export function emptyState(): AppState {
     coachThread: [],
     beginnerProgress: [],
     badges: s.badges.map((b) => ({ ...b, earned: false, earnedDateKey: undefined })),
+    // Real new account: no username yet (first Community visit prompts setup) and
+    // no groups joined. One starter freeze token as a friendly early win.
+    community: { username: null, groups: [], freezeTokens: 1, restDays: [], frozenDays: [] },
   }
 }
 

@@ -894,7 +894,6 @@ export function ProfileSheet({ open, onClose }: Props) {
         <LinkRow icon={<Sparkles size={18} color={brand[400]} />} title="Your coach" sub="Daily check ins and milestones" onPress={() => nav.open('coach')} />
         <LinkRow icon={<Bell size={18} color={brand[400]} />} title="Notifications" sub="Reminders, streaks & social" onPress={() => nav.open('notifications')} />
         <LinkRow icon={<Award size={18} color={brand[400]} />} title="Badges" sub={`${earned} earned`} onPress={() => nav.open('badges')} />
-        <LinkRow icon={<Trophy size={18} color={brand[400]} />} title="Campus leaderboard" sub={state.profile.university} onPress={() => nav.open('leaderboard')} />
         <LinkRow icon={<GraduationCap size={18} color={brand[400]} />} title="Plan Around Your Life" sub={planSub} onPress={() => nav.open('examMode')} />
         {state.profile.newToGym && <LinkRow icon={<Leaf size={18} color={brand[400]} />} title="New to the gym" sub="Your first 90 days" onPress={() => nav.open('beginner')} />}
         <LinkRow icon={<User size={18} color="rgba(255,255,255,0.7)" />} title="Settings" sub="Units, theme and data" onPress={() => nav.open('settings')} />
@@ -1201,93 +1200,6 @@ function HabitStepper({ icon, label, value, min, max, step, onChange, display, u
         <Text className="text-[11px] text-white/35">{maxLabel}</Text>
       </View>
     </View>
-  )
-}
-
-/* ============================ Create Post ============================ */
-export function CreatePostSheet({ open, onClose }: Props) {
-  const dispatch = useDispatch()
-  const toast = useToast()
-  const [text, setText] = useState('')
-  const [image, setImage] = useState<string | undefined>()
-
-  async function pickImage() {
-    const res = await ImagePicker.launchImageLibraryAsync({ quality: 0.6 })
-    if (!res.canceled) setImage(res.assets[0].uri)
-  }
-
-  function post() {
-    if (!text.trim()) return
-    dispatch({ type: 'ADD_POST', text: text.trim(), image })
-    // Community is a PREVIEW (audit F-024): nothing is shared with anyone, so
-    // never imply a real publish happened.
-    toast('Saved to your preview feed — community isn’t live yet, only you can see this')
-    setText(''); setImage(undefined)
-    onClose()
-  }
-
-  return (
-    <Sheet open={open} onClose={onClose} title="Create a post">
-      <View className="mb-3 rounded-xl border border-amber-400/20 bg-amber-400/[0.06] px-3 py-2.5">
-        <Text className="text-[12px] leading-4 text-amber-200/90">
-          Preview: community isn’t live yet. Posts stay on your device and aren’t visible to anyone else.
-        </Text>
-      </View>
-      <TextInput
-        autoFocus
-        multiline
-        value={text}
-        onChangeText={setText}
-        placeholder="Share a win, a PR, a meal, or some motivation…"
-        placeholderTextColor="rgba(148,148,148,0.6)"
-        className="w-full rounded-2xl border border-white/8 bg-ink-800 p-4 text-[15px] text-white"
-        style={{ minHeight: 112, textAlignVertical: 'top' }}
-      />
-      {image && <Image source={{ uri: image }} resizeMode="cover" className="mt-3 h-48 w-full rounded-2xl" />}
-      <View className="mt-3 flex-row items-center gap-2">
-        <Pressable onPress={pickImage} className="flex-row items-center gap-2 rounded-full bg-ink-700 px-4 py-2 active:opacity-80">
-          <Camera size={16} color="#fff" />
-          <Text className="text-sm font-semibold text-white">{image ? 'Change photo' : 'Add photo'}</Text>
-        </Pressable>
-      </View>
-      <Pressable onPress={post} disabled={!text.trim()} className={`btn-primary mt-6 w-full active:opacity-90 ${!text.trim() ? 'opacity-40' : ''}`}>
-        <Text className="font-semibold text-black">Post</Text>
-      </Pressable>
-    </Sheet>
-  )
-}
-
-export function LeaderboardSheet({ open, onClose }: Props) {
-  const { state } = useStore()
-  const toast = useToast()
-  const rows = leaderboardSorted(state)
-  return (
-    <Sheet open={open} onClose={onClose} title="Friends leaderboard">
-      <Text className="mb-3 text-[13px] text-white/50">This month · {state.profile.university}</Text>
-      <View className="gap-2">
-        {rows.map((u, i) => (
-          <View key={u.id} className={`flex-row items-center gap-3 rounded-2xl border p-3 ${u.isYou ? 'border-brand-400/40 bg-brand-400/10' : 'border-white/5 bg-ink-800'}`}>
-            <Text className={`w-6 text-center text-sm font-extrabold ${i < 3 ? 'text-brand-400' : 'text-white/40'}`}>{i + 1}</Text>
-            <Avatar name={u.name} size={38} />
-            <View className="flex-1">
-              <Text className="font-bold leading-tight text-white">{u.name}</Text>
-              <Text className="text-[12px] text-white/45">{u.workouts} workouts · {u.streak} day streak</Text>
-            </View>
-            <Text className="font-extrabold text-brand-400">{u.points.toLocaleString()}</Text>
-          </View>
-        ))}
-      </View>
-      <Pressable
-        onPress={async () => {
-          const r = await shareText('Join me on StrengthHub, train together and climb the campus leaderboard.', 'StrengthHub')
-          toast(r === 'copied' ? 'Invite copied to clipboard' : r === 'shared' ? 'Invite shared' : 'Sharing not available')
-        }}
-        className="btn-primary mt-5 w-full flex-row items-center justify-center gap-2 active:opacity-90"
-      >
-        <Plus size={16} color="#000" />
-        <Text className="font-semibold text-black">Invite friends</Text>
-      </Pressable>
-    </Sheet>
   )
 }
 

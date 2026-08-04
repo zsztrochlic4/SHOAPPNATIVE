@@ -1,0 +1,267 @@
+/**
+ * The League tab: the headline competitive surface. Leads with the user's own
+ * weekly standing (tier, rank, points, days left, promotion/demotion status),
+ * a forgiving-streak card (Recommendation 2), then the ranked cohort with clearly
+ * labelled promotion / safe / demotion zones. A "My league / Global" toggle keeps
+ * the full streak board one tap away, and a "How leagues work" sheet keeps it
+ * legible. Browse-first: no username → the browseable global board + claim prompt.
+ */
+import { useEffect, useMemo, useState } from 'react'
+import { View, Text, Pressable } from 'react-native'
+import { Trophy, Snowflake, Moon, Info, ChevronRight, ArrowUp, ArrowDown, ShieldCheck, Clock } from 'lucide-react-native'
+import { useStore } from '../store/store'
+import { myLeaderStats, streakRisk } from '../store/selectors'
+import { todayKey } from '../lib/date'
+import { useColors, brand } from '../theme'
+import { Avatar } from '../components/Avatar'
+import { Sheet } from '../components/Sheet'
+import { useToast } from '../components/Toast'
+import { RankBadge, StreakFlame } from './ui'
+import { GlobalLeaderboard } from './GlobalLeaderboard'
+import { TIERS, tierOf, weekKey, daysLeftInWeek, simulateLeague, type LeagueRow, type Zone } from './league'
+
+export function LeagueScreen({ onClaimUsername }: { onClaimUsername: () => void }) {
+  const { state, dispatch } = useStore()
+  const me = useMemo(() => myLeaderStats(state), [state])
+  const [view, setView] = useState<'league' | 'global'>('league')
+  const [howOpen, setHowOpen] = useState(false)
+
+  // Weekly freeze grant — idempotent, only fires when a new week has started.
+  useEffect(() => {
+    dispatch({ type: 'GRANT_WEEKLY_FREEZE', weekKey: weekKey() })
+  }, [dispatch])
+
+  // No username yet: browse the global streak board and claim when ready.
+  if (!me.username) return <GlobalLeaderboard onClaimUsername={onClaimUsername} />
+
+  const tier = tierOf(state.community.league?.tier ?? 0)
+  const { rows, youRank, zone } = simulateLeague(me, tier, weekKey())
+
+  return (
+    <View>
+      {/* view toggle */}
+      <View className="mb-4 flex-row gap-2 rounded-2xl bg-ink-700 p-1">
+        {(['league', 'global'] as const).map((v) => {
+          const active = view === v
+          return (
+            <Pressable
+              key={v}
+              onPress={() => setView(v)}
+              accessibilityRole="button"
+              accessibilityLabel={v === 'league' ? 'My league' : 'Global streaks'}
+              accessibilityState={{ selected: active }}
+              className={`flex-1 items-center rounded-xl py-2 ${active ? 'bg-brand-400' : ''} active:opacity-80`}
+            >
+              <Text className={`text-[13px] font-bold ${active ? 'text-black' : 'text-white/55'}`}>{v === 'league' ? 'My league' : 'Global streaks'}</Text>
+            </Pressable>
+          )
+        })}
+      </View>
+
+      {view === 'global' ? (
+        <GlobalLeaderboard onClaimUsername={onClaimUsername} />
+      ) : (
+        <>
+          <LeagueHero tier={tier} rank={youRank} points={me.odometer} cohort={rows.length} zone={zone} onHow={() => setHowOpen(true)} />
+          <StreakCard />
+          <LeagueStandings rows={rows} tier={tier} />
+        </>
+      )}
+
+      <HowLeaguesSheet open={howOpen} onClose={() => setHowOpen(false)} />
+    </View>
+  )
+}
+
+/* --------------------------------- hero ------------------------------------ */
+
+function LeagueHero({ tier, rank, points, cohort, zone, onHow }: {
+  tier: ReturnType<typeof tierOf>
+  rank: number
+  points: number
+  cohort: number
+  zone: Zone
+  onHow: () => void
+}) {
+  const days = daysLeftInWeek()
+  const nextTier = TIERS[Math.min(TIERS.length - 1, tier.key + 1)]
+  const status =
+    zone === 'promote' ? { text: `In the promotion zone — hold it to reach ${nextTier.name}!`, color: brand[400] }
+    : zone === 'demote' ? { text: 'In the drop zone — one good session moves you up.', color: '#F5A524' }
+    : { text: `Reach rank ${tier.promote} or better to promote to ${nextTier.name}.`, color: 'rgba(255,255,255,0.6)' }
+
+  return (
+    <View className="overflow-hidden rounded-2xl border p-4" style={{ borderColor: `${tier.color}66`, backgroundColor: `${tier.color}14` }}>
+      <View className="flex-row items-center gap-3">
+        <View className="h-14 w-14 items-center justify-center rounded-2xl" style={{ backgroundColor: `${tier.color}26` }}>
+          <Trophy size={26} color={tier.color} />
+        </View>
+        <View className="flex-1">
+          <Text className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: tier.color }}>{tier.name} League</Text>
+          <View className="flex-row items-end gap-1.5">
+            <Text className="text-[30px] font-black leading-tight text-white">#{rank}</Text>
+            <Text className="mb-1.5 text-[13px] font-semibold text-white/45">of {cohort}</Text>
+          </View>
+        </View>
+        <View className="items-end">
+          <View className="flex-row items-center gap-1">
+            <Clock size={12} color="rgba(255,255,255,0.45)" />
+            <Text className="text-[12px] font-bold text-white/60">{days}d left</Text>
+          </View>
+          <Text className="mt-1 text-[12px] text-white/45">{points} pts</Text>
+        </View>
+      </View>
+      <Text className="mt-3 text-[13px] font-semibold" style={{ color: status.color }}>{status.text}</Text>
+      <Pressable onPress={onHow} accessibilityRole="button" accessibilityLabel="How leagues work" className="mt-2 flex-row items-center gap-1 active:opacity-70">
+        <Info size={13} color="rgba(255,255,255,0.45)" />
+        <Text className="text-[12px] font-semibold text-white/45">How leagues work</Text>
+      </Pressable>
+    </View>
+  )
+}
+
+/* ----------------------------- streak card (Rec 2) ------------------------- */
+
+function StreakCard() {
+  const { state, dispatch } = useStore()
+  const toast = useToast()
+  const me = useMemo(() => myLeaderStats(state), [state])
+  const tokens = state.community.freezeTokens ?? 0
+  const risk = streakRisk(state)
+  const restingToday = (state.community.restDays ?? []).includes(todayKey)
+
+  const protect = () => {
+    dispatch({ type: 'USE_STREAK_FREEZE', dateKey: risk.dayKey })
+    toast('Streak protected — nice save')
+  }
+  const toggleRest = () => {
+    dispatch({ type: 'TOGGLE_REST_DAY', dateKey: todayKey })
+    toast(restingToday ? 'Rest day removed' : 'Rest day banked — recovery is training')
+  }
+
+  return (
+    <View className="mt-3 rounded-2xl border border-white/8 bg-ink-800 p-4">
+      <View className="flex-row items-center gap-3">
+        <StreakFlame days={me.streakCurrent} size={20} />
+        <View className="flex-1">
+          <Text className="text-[13px] font-bold text-white">{me.streakCurrent}-day streak</Text>
+          <Text className="text-[12px] text-white/45">Best {me.streakBest} · rest days &amp; freezes keep it alive</Text>
+        </View>
+        <View className="flex-row items-center gap-1.5 rounded-full bg-white/8 px-2.5 py-1">
+          <Snowflake size={13} color="#6AD1E3" />
+          <Text className="text-[12px] font-bold text-white/70">{tokens}</Text>
+        </View>
+      </View>
+
+      <View className="mt-3 flex-row gap-2">
+        {risk.atRisk && tokens > 0 && (
+          <Pressable onPress={protect} accessibilityRole="button" accessibilityLabel="Use a freeze to protect yesterday" className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl bg-brand-400 py-2.5 active:opacity-90">
+            <Snowflake size={14} color="#000" />
+            <Text className="text-[13px] font-bold text-black">Protect yesterday</Text>
+          </Pressable>
+        )}
+        <Pressable
+          onPress={toggleRest}
+          accessibilityRole="button"
+          accessibilityLabel={restingToday ? 'Remove rest day' : 'Mark today a rest day'}
+          accessibilityState={{ selected: restingToday }}
+          className={`flex-1 flex-row items-center justify-center gap-1.5 rounded-xl py-2.5 active:opacity-90 ${restingToday ? 'bg-brand-400/20' : 'border border-white/10 bg-white/5'}`}
+        >
+          <Moon size={14} color={restingToday ? brand[400] : 'rgba(255,255,255,0.7)'} />
+          <Text className={`text-[13px] font-bold ${restingToday ? 'text-brand-300' : 'text-white/80'}`}>{restingToday ? 'Resting today' : 'Rest day'}</Text>
+        </Pressable>
+      </View>
+    </View>
+  )
+}
+
+/* ------------------------------- standings --------------------------------- */
+
+const ZONE_LABEL: Record<Zone, { label: string; color: string; Icon: typeof ArrowUp }> = {
+  promote: { label: 'Promotion zone', color: '#7ED957', Icon: ArrowUp },
+  safe: { label: 'Holding', color: 'rgba(255,255,255,0.45)', Icon: ShieldCheck },
+  demote: { label: 'Drop zone', color: '#F5A524', Icon: ArrowDown },
+}
+
+function LeagueStandings({ rows, tier }: { rows: LeagueRow[]; tier: ReturnType<typeof tierOf> }) {
+  const items: React.ReactNode[] = []
+  let prevZone: Zone | null = null
+  for (const r of rows) {
+    if (r.zone !== prevZone) {
+      const z = ZONE_LABEL[r.zone]
+      const ZIcon = z.Icon
+      items.push(
+        <View key={`z-${r.zone}`} className="mb-1 mt-3 flex-row items-center gap-1.5">
+          <ZIcon size={12} color={z.color} />
+          <Text className="text-[11px] font-bold uppercase tracking-wide" style={{ color: z.color }}>
+            {z.label}{r.zone === 'safe' ? ` in ${tier.name}` : ''}
+          </Text>
+        </View>,
+      )
+      prevZone = r.zone
+    }
+    items.push(<StandingRow key={r.username} row={r} />)
+  }
+  return (
+    <View className="mt-4">
+      <Text className="mb-1 section-title">This week's standings</Text>
+      {items}
+    </View>
+  )
+}
+
+function StandingRow({ row }: { row: LeagueRow }) {
+  const you = !!row.isYou
+  const accent = row.zone === 'promote' ? '#7ED957' : row.zone === 'demote' ? '#F5A524' : 'rgba(255,255,255,0.5)'
+  return (
+    <View
+      className="mb-1.5 flex-row items-center gap-3 rounded-2xl border p-3"
+      style={you ? { borderColor: `${brand[400]}66`, backgroundColor: `${brand[400]}12` } : { borderColor: 'rgba(255,255,255,0.05)', backgroundColor: 'rgba(255,255,255,0.02)' }}
+    >
+      <RankBadge rank={row.rank} size={28} />
+      <Avatar name={row.username} size={36} />
+      <Text numberOfLines={1} className={`flex-1 font-bold leading-tight ${you ? 'text-brand-300' : 'text-white'}`}>@{row.username}{you ? ' (You)' : ''}</Text>
+      <View className="items-end">
+        <Text className="text-[16px] font-black" style={{ color: you ? brand[400] : accent }}>{row.points}</Text>
+        <Text className="text-[10px] font-semibold text-white/35">pts</Text>
+      </View>
+    </View>
+  )
+}
+
+/* --------------------------- how leagues work ------------------------------ */
+
+function HowLeaguesSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  return (
+    <Sheet open={open} onClose={onClose} title="How leagues work">
+      <View className="gap-3">
+        <HowRow n="1" title="Compete for the week" body="You're placed in a league of ~25 people. Your score this week is your dashboard odometer — how consistently you hit your goals. It's about showing up, not how much you lift." />
+        <HowRow n="2" title="Climb the ladder" body="Every Monday the league resets. Finish near the top and you promote to the next tier — Bronze, Silver, Gold, Platinum, Diamond. The higher you go, the tougher the climb." />
+        <HowRow n="3" title="Mind the drop zone" body="Finish in the bottom few and you slip down a tier. It's easy to climb straight back — a couple of good days does it." />
+        <HowRow n="4" title="Streaks are forgiving" body="A planned rest day or a freeze token keeps your streak alive through an off day. Rest is part of training — no guilt, no all-or-nothing." />
+      </View>
+      <View className="mt-4 flex-row flex-wrap gap-2">
+        {TIERS.map((t) => (
+          <View key={t.key} className="flex-row items-center gap-1.5 rounded-full px-2.5 py-1" style={{ backgroundColor: `${t.color}1f` }}>
+            <View className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: t.color }} />
+            <Text className="text-[11px] font-bold text-white/80">{t.name}</Text>
+          </View>
+        ))}
+      </View>
+    </Sheet>
+  )
+}
+
+function HowRow({ n, title, body }: { n: string; title: string; body: string }) {
+  return (
+    <View className="flex-row gap-3">
+      <View className="h-6 w-6 items-center justify-center rounded-full bg-brand-400/20">
+        <Text className="text-[12px] font-black text-brand-300">{n}</Text>
+      </View>
+      <View className="flex-1">
+        <Text className="font-bold text-white">{title}</Text>
+        <Text className="mt-0.5 text-[13px] leading-snug text-white/55">{body}</Text>
+      </View>
+    </View>
+  )
+}

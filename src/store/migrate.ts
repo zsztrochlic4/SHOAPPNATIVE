@@ -1,5 +1,5 @@
 import { buildSeed, emptyState, SCHEMA_VERSION } from './seed'
-import type { AppState, NotificationConsent, Settings } from './types'
+import type { AppState, CommunityState, NotificationConsent, Settings } from './types'
 
 type UnknownRecord = Record<string, unknown>
 
@@ -89,6 +89,25 @@ export function migrateAppState(value: unknown): MigrationResult {
   }
   if (!isRecord(value.integrations) && value.integrations !== undefined) {
     next.integrations = base.integrations
+  }
+
+  // v13 community slice: default it when absent (pre-v13 saves) or malformed, and
+  // repair the key containers so the hub never crashes on a bad blob. Newer
+  // optional fields (freezeTokens, restDays, frozenDays, league, cheers…) are
+  // carried through from the persisted copy, defaulted from base when absent.
+  if (!isRecord(value.community)) {
+    next.community = base.community
+  } else {
+    const c = value.community
+    next.community = {
+      ...base.community,
+      ...c,
+      username: typeof c.username === 'string' ? c.username : null,
+      usernameSetAtKey: typeof c.usernameSetAtKey === 'string' ? c.usernameSetAtKey : undefined,
+      groups: Array.isArray(c.groups) ? c.groups : [],
+      restDays: Array.isArray(c.restDays) ? c.restDays : [],
+      frozenDays: Array.isArray(c.frozenDays) ? c.frozenDays : [],
+    } as CommunityState
   }
 
   return {

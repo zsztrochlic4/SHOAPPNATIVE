@@ -105,7 +105,6 @@ export function coachDaily(s: AppState): CoachMessage {
       'celebration',
       'That was a personal best',
       `${pr.name} at ${fmtW(pr.weightKg)} for ${pr.reps} is the strongest you've logged. That is real progress, ${name}. Take the win.`,
-      { label: 'Share it', overlay: 'createPost' },
     )
   }
 
