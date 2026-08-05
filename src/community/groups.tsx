@@ -30,6 +30,7 @@ import {
   type DiscoverableGroup,
 } from './service'
 import { youMember } from './simulate'
+import { COMMUNITY_BACKEND } from './backendConfig'
 
 /* ------------------------------ ranking metrics ---------------------------- */
 
@@ -116,10 +117,25 @@ type ActiveSheet =
   | null
 
 export function GroupsTab({ onClaimUsername }: { onClaimUsername: () => void }) {
-  const { state } = useStore()
+  const { state, dispatch } = useStore()
   const me = useMemo(() => myLeaderStats(state), [state])
   const groups = state.community.groups
   const [sheet, setSheet] = useState<ActiveSheet>(null)
+
+  // Backend on: hydrate the local group cache from the server (firebase loaded on
+  // demand). Off: the seeded/local groups are the source of truth (unchanged).
+  useEffect(() => {
+    if (!COMMUNITY_BACKEND || !me.username) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const b = await import('./groupsBackend')
+        const gs = await b.loadMyGroupsRemote()
+        if (!cancelled) dispatch({ type: 'SET_COMMUNITY_GROUPS', groups: gs })
+      } catch { /* keep the cached copy on failure */ }
+    })()
+    return () => { cancelled = true }
+  }, [dispatch, me.username])
 
   // Browse-first: creating or joining needs an identity. Without a username, the
   // action opens the claim sheet instead.
@@ -224,7 +240,27 @@ function CreateGroupSheet({ open, onClose, onCreated }: { open: boolean; onClose
   const submit = async () => {
     setBusy(true)
     setError(null)
-    const res = await createGroup(name, me, todayKey, state.community.groups, GROUP_ICONS[pick])
+    const appearance = GROUP_ICONS[pick]
+    if (COMMUNITY_BACKEND) {
+      try {
+        const b = await import('./groupsBackend')
+        const { groupId, passcode } = await b.createGroupRemote(name.trim(), appearance.icon, appearance.color)
+        const group: CommunityGroup = {
+          id: groupId, name: name.trim(), passcode, ownerUsername: me.username ?? '',
+          createdAtKey: todayKey, members: [youMember(me)], icon: appearance.icon, color: appearance.color, weeklyGoal: 12,
+        }
+        setBusy(false)
+        dispatch({ type: 'CREATE_GROUP', group })
+        toast('Group created — share the code')
+        onClose()
+        onCreated(groupId)
+      } catch {
+        setBusy(false)
+        setError("Couldn't create the group. Try again.")
+      }
+      return
+    }
+    const res = await createGroup(name, me, todayKey, state.community.groups, appearance)
     setBusy(false)
     if (!res.ok) { setError(res.message); return }
     dispatch({ type: 'CREATE_GROUP', group: res.group })
@@ -323,7 +359,16 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
     const token = ++tokenRef.current
     setLoading(true)
     const t = setTimeout(async () => {
-      const res = await searchGroups(query, joinedIds)
+      let res: DiscoverableGroup[]
+      if (COMMUNITY_BACKEND) {
+        const b = await import('./groupsBackend')
+        const joined = new Set(joinedIds)
+        res = (await b.searchGroupsRemote(query))
+          .filter((h) => !joined.has(h.id))
+          .map((h) => ({ id: h.id, name: h.name, passcode: '', memberCount: h.memberCount, icon: h.icon, color: h.color }))
+      } else {
+        res = await searchGroups(query, joinedIds)
+      }
       if (token !== tokenRef.current) return
       setResults(res)
       setLoading(false)
@@ -336,6 +381,21 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
     if (!selected) return
     setBusy(true)
     setError(null)
+    if (COMMUNITY_BACKEND) {
+      try {
+        const b = await import('./groupsBackend')
+        const { groupId, name } = await b.joinGroupRemote(selected.id, code)
+        const full = await b.loadGroupRemote(groupId)
+        setBusy(false)
+        if (full) dispatch({ type: 'JOIN_GROUP_BY_CODE', group: full })
+        toast(`Joined ${name}`)
+        onClose()
+      } catch {
+        setBusy(false)
+        setError("That code doesn't match this group.")
+      }
+      return
+    }
     const res = await joinGroup(selected, code, me, todayKey, state.community.groups.map((g) => g.id))
     setBusy(false)
     if (!res.ok) {
@@ -484,14 +544,16 @@ function GroupDetailSheet({ open, groupId, onClose }: { open: boolean; groupId: 
     if (res === 'copied') toast('Invite copied to clipboard')
     else if (res === 'failed') toast("Couldn't open share")
   }
-  const leave = () => {
+  const leave = async () => {
     if (!group) return
+    if (COMMUNITY_BACKEND) { try { const b = await import('./groupsBackend'); await b.leaveGroupRemote(group.id) } catch { /* optimistic */ } }
     dispatch({ type: 'LEAVE_GROUP', id: group.id })
     toast(`Left ${group.name}`)
     onClose()
   }
-  const remove = () => {
+  const remove = async () => {
     if (!group) return
+    if (COMMUNITY_BACKEND) { try { const b = await import('./groupsBackend'); await b.deleteGroupRemote(group.id) } catch { /* optimistic */ } }
     dispatch({ type: 'DELETE_GROUP', id: group.id })
     toast('Group deleted')
     onClose()
@@ -505,7 +567,11 @@ function GroupDetailSheet({ open, groupId, onClose }: { open: boolean; groupId: 
   const activity = useMemo(() => buildActivity(ranked), [ranked])
   const sessionsDone = ranked.reduce((a, m) => a + (m.sessionsThisWeek ?? 0), 0)
   const goal = group?.weeklyGoal ?? Math.max(4, ranked.length * 4)
-  const setGoal = (next: number) => group && dispatch({ type: 'SET_GROUP_GOAL', id: group.id, goal: next })
+  const setGoal = (next: number) => {
+    if (!group) return
+    if (COMMUNITY_BACKEND) { import('./groupsBackend').then((b) => b.setGroupGoalRemote(group.id, next)).catch(() => {}) }
+    dispatch({ type: 'SET_GROUP_GOAL', id: group.id, goal: next })
+  }
 
   return (
     <Sheet open={open} onClose={onClose} title={group?.name ?? 'Group'}>
@@ -601,7 +667,10 @@ function GroupDetailSheet({ open, groupId, onClose }: { open: boolean; groupId: 
                     key={a.id}
                     item={a}
                     tally={group.cheers?.[a.id]}
-                    onCheer={() => dispatch({ type: 'CHEER_ACTIVITY', groupId: group.id, activityId: a.id })}
+                    onCheer={() => {
+                      if (COMMUNITY_BACKEND) { import('./groupsBackend').then((b) => b.cheerRemote(group.id, a.id)).catch(() => {}) }
+                      dispatch({ type: 'CHEER_ACTIVITY', groupId: group.id, activityId: a.id })
+                    }}
                   />
                 ))}
               </View>

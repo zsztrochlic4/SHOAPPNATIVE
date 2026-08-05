@@ -134,6 +134,8 @@ export type Action =
   | { type: 'TOGGLE_REST_DAY'; dateKey: string }
   | { type: 'GRANT_WEEKLY_FREEZE'; weekKey: string }
   | { type: 'SET_LEAGUE'; tier: number; weekKey: string; seasonWins?: number }
+  // Replace the local group cache with the server's copy (backend hydration).
+  | { type: 'SET_COMMUNITY_GROUPS'; groups: CommunityGroup[] }
   | { type: 'MARK_NOTIF_READ'; id: string }
   | { type: 'MARK_ALL_READ' }
   | { type: 'ADD_NOTIFICATION'; notif: Omit<AppNotification, 'id' | 'dateKey' | 'time' | 'read'> }
@@ -786,6 +788,10 @@ function reducer(state: AppState, action: Action): AppState {
       const tokens = Math.min(FREEZE_CAP, (state.community.freezeTokens ?? 0) + 1)
       return { ...state, community: { ...state.community, freezeTokens: tokens, freezeGrantWeek: action.weekKey } }
     }
+
+    // Backend hydration: replace the local group cache with the server's copy.
+    case 'SET_COMMUNITY_GROUPS':
+      return { ...state, community: { ...state.community, groups: action.groups } }
 
     // Commit the user's league placement (client simulation now; server on rollover later).
     case 'SET_LEAGUE':
