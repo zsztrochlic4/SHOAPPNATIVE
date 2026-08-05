@@ -23,7 +23,7 @@
  * australia-southeast2 (matching the app); scheduled jobs in australia-southeast1
  * (Cloud Scheduler has no southeast2 region).
  */
-import { FieldValue, getFirestore } from 'firebase-admin/firestore'
+import { FieldPath, FieldValue, getFirestore, type Query } from 'firebase-admin/firestore'
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { onSchedule } from 'firebase-functions/v2/scheduler'
 import * as logger from 'firebase-functions/logger'
@@ -42,13 +42,50 @@ const FREEZE_CAP = 2
 
 const clampTier = (t: number): number => Math.max(0, Math.min(TOP_TIER, t))
 
-/** Monday (UTC) date-key for the week containing `d`. NOTE: production should pin
- *  this to the app's timezone (Australia) so resets align with users' local week;
- *  UTC is used here for determinism and is fine for a first cut. */
+/** The app's home timezone. League weeks reset on the *local* Monday, matching
+ *  both the scheduled jobs' `timeZone` and the client's device-local week
+ *  (src/community/league.ts weekKey uses the device clock, ≈ Sydney for our AUS
+ *  user base). Using UTC here would drift the reset ~10–11h off users' Monday. */
+const APP_TZ = 'Australia/Sydney'
+
+// Weekday index (Mon = 0 … Sun = 6) keyed by the `en-CA` short weekday name.
+const WEEKDAY_INDEX: Record<string, number> = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 }
+const APP_TZ_PARTS = new Intl.DateTimeFormat('en-CA', {
+  timeZone: APP_TZ, year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short',
+})
+
+/** Monday date-key (YYYY-MM-DD) for the week containing instant `d`, computed in
+ *  the app's home timezone (Australia/Sydney). We take the civil date + weekday as
+ *  they read in Sydney, then step back to that week's Monday with pure calendar
+ *  arithmetic (Date.UTC handles month/day underflow). DST is irrelevant — a Sydney
+ *  calendar day belongs to exactly one calendar Monday regardless of offset. */
 function mondayKey(d: Date): string {
-  const dow = (d.getUTCDay() + 6) % 7 // Mon = 0 … Sun = 6
-  const monday = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - dow))
+  const parts = APP_TZ_PARTS.formatToParts(d)
+  const get = (t: string): string => parts.find((p) => p.type === t)?.value ?? ''
+  const y = Number(get('year')), m = Number(get('month')), day = Number(get('day'))
+  const dow = WEEKDAY_INDEX[get('weekday')] ?? 0
+  const monday = new Date(Date.UTC(y, m - 1, day - dow))
   return monday.toISOString().slice(0, 10)
+}
+
+/** Stream a query in bounded pages (ordered by document id), invoking `onDoc` for
+ *  each document. Keeps memory flat for cohort-wide scans — a single `.get()` on a
+ *  large collection loads every doc at once. */
+async function forEachPaged(
+  base: Query,
+  pageSize: number,
+  onDoc: (doc: FirebaseFirestore.QueryDocumentSnapshot) => void | Promise<void>,
+): Promise<void> {
+  let cursor: FirebaseFirestore.QueryDocumentSnapshot | null = null
+  for (;;) {
+    let q = base.orderBy(FieldPath.documentId()).limit(pageSize)
+    if (cursor) q = q.startAfter(cursor)
+    const snap = await q.get()
+    if (snap.empty) break
+    for (const doc of snap.docs) await onDoc(doc)
+    if (snap.size < pageSize) break
+    cursor = snap.docs[snap.docs.length - 1]
+  }
 }
 
 const USERNAME_RE = /^[a-z0-9_]{3,20}$/
@@ -163,15 +200,18 @@ export const syncCommunityStats = onCall<SyncInput>(
 
 /* -------------------------------- rolloverLeagues -------------------------- */
 
-/** Weekly promotion/demotion. Runs every Monday: ranks each tier's cohort from
- *  the just-ended week and moves the top up / the bottom down, then resets points.
- *  Scale note: this reads all of last week's standings; for a large user base this
- *  should be sharded per tier/region and paginated. Fine for launch volumes. */
+/** Weekly promotion/demotion. Runs every Monday: for the just-ended week it moves
+ *  each tier's top cohort up and its bottom cohort down, then resets everyone's
+ *  points. The movers are found with two *bounded* queries (top N by points desc,
+ *  bottom M by points asc) rather than loading the whole tier — promotion wins ties
+ *  with demotion in a small cohort (the bottom set is minus the top set), exactly
+ *  reproducing the previous rank-based logic. The points reset streams the cohort
+ *  in pages so memory stays flat as the user base grows. */
 export const rolloverLeagues = onSchedule(
   { schedule: '5 0 * * 1', timeZone: 'Australia/Sydney', region: 'australia-southeast1', timeoutSeconds: 540, memory: '512MiB' },
   async () => {
     const db = getFirestore()
-    // The week that just ended = the Monday 7 days before today.
+    // The week that just ended = the Monday 7 days before today (in the app tz).
     const now = new Date()
     const prevWeek = mondayKey(new Date(now.getTime() - 7 * 86400000))
 
@@ -179,19 +219,26 @@ export const rolloverLeagues = onSchedule(
     let demoted = 0
     for (let tier = 0; tier < TIERS.length; tier++) {
       const cfg = TIERS[tier]
-      const snap = await db
-        .collection(`leagueStandings/${prevWeek}/tiers/${tier}/members`)
-        .orderBy('points', 'desc')
-        .get()
-      const docs = snap.docs
-      const n = docs.length
+      const members = db.collection(`leagueStandings/${prevWeek}/tiers/${tier}/members`)
+
+      // Movers: bounded reads of just the top (promote up) and bottom (demote down).
+      const moves = new Map<string, number>() // uid → new tier
+      if (cfg.promote > 0) {
+        const top = await members.orderBy('points', 'desc').limit(cfg.promote).get()
+        for (const d of top.docs) moves.set(d.id, clampTier(tier + 1))
+      }
+      if (cfg.demote > 0) {
+        const bottom = await members.orderBy('points', 'asc').limit(cfg.demote).get()
+        // Promotion wins in a cohort smaller than promote + demote.
+        for (const d of bottom.docs) if (!moves.has(d.id)) moves.set(d.id, clampTier(tier - 1))
+      }
+
+      // Reset the whole cohort's points (and apply any tier move), paginated.
       let batch = db.batch()
       let ops = 0
-      for (let rank = 1; rank <= n; rank++) {
-        const uid = docs[rank - 1].id
-        let newTier = tier
-        if (cfg.promote > 0 && rank <= cfg.promote) newTier = clampTier(tier + 1)
-        else if (cfg.demote > 0 && rank > n - cfg.demote) newTier = clampTier(tier - 1)
+      await forEachPaged(members, 400, async (doc) => {
+        const uid = doc.id
+        const newTier = moves.get(uid) ?? tier
         if (newTier > tier) promoted++
         else if (newTier < tier) demoted++
         batch.set(
@@ -205,7 +252,7 @@ export const rolloverLeagues = onSchedule(
           { merge: true },
         )
         if (++ops >= 400) { await batch.commit(); batch = db.batch(); ops = 0 }
-      }
+      })
       if (ops > 0) await batch.commit()
     }
     logger.info('community.rolloverLeagues', { prevWeek, promoted, demoted })
@@ -217,22 +264,21 @@ export const rolloverLeagues = onSchedule(
 /** Weekly freeze grant — tops every community member up by one freeze token, to a
  *  cap. A field-transform can't itself clamp, so a min() would need a read; for a
  *  weekly grant we simply set the cap when already at/over it and otherwise
- *  increment. Scale note: paginate for very large user bases. */
+ *  increment. The cohort scan is paginated so memory stays flat as it grows. */
 export const grantStreakFreezes = onSchedule(
   { schedule: '10 0 * * 1', timeZone: 'Australia/Sydney', region: 'australia-southeast1', timeoutSeconds: 540, memory: '512MiB' },
   async () => {
     const db = getFirestore()
-    const snap = await db.collection('communityProfiles').get()
     let granted = 0
     let batch = db.batch()
     let ops = 0
-    for (const doc of snap.docs) {
+    await forEachPaged(db.collection('communityProfiles'), 400, async (doc) => {
       const cur = typeof doc.get('freezeTokens') === 'number' ? doc.get('freezeTokens') : 0
-      if (cur >= FREEZE_CAP) continue
+      if (cur >= FREEZE_CAP) return
       batch.set(doc.ref, { freezeTokens: Math.min(FREEZE_CAP, cur + 1) }, { merge: true })
       granted++
       if (++ops >= 400) { await batch.commit(); batch = db.batch(); ops = 0 }
-    }
+    })
     if (ops > 0) await batch.commit()
     logger.info('community.grantStreakFreezes', { granted })
   },
