@@ -5,8 +5,8 @@
 //   npm run test:unit
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { validateStructuredCoachReply } from '../../.sweep-out/backend/coach/structuredResponse.js'
-import { validateWorkoutActionPayload } from '../../.sweep-out/backend/coach/workoutActions.js'
+import { validateStructuredCoachReply, STRUCTURED_COACH_RESPONSE_SCHEMA } from '../../.sweep-out/backend/coach/structuredResponse.js'
+import { validateWorkoutActionPayload, WORKOUT_ACTION_NAMES } from '../../.sweep-out/backend/coach/workoutActions.js'
 import { buildCoachSystemPrompt, HARD_NEVERS } from '../../.sweep-out/backend/coach/operatingRules.js'
 
 function reply(proposal) {
@@ -23,19 +23,51 @@ test('valid workout_action proposal passes the structured schema', () => {
   assert.equal(r.reply.proposal.payload.action, 'swap')
 })
 
-test('workout_action with an unknown action is rejected to the safe fallback', () => {
+// Graceful degradation (coach action-fallback fix): a MALFORMED proposal must NOT nuke an otherwise
+// valid reply into the generic fallback. The text message is kept, the unactionable proposal is
+// dropped to kind 'none' (so it can never reach the engine), and proposalDropped is flagged.
+test('workout_action with an unknown action DEGRADES: message kept, proposal dropped (never engine-bound)', () => {
   const r = validateStructuredCoachReply(reply({
     kind: 'workout_action', title: 'x', summary: 'y', payload: { action: 'delete_account' },
   }))
-  assert.equal(r.ok, false)
-  assert.match(r.reason, /^bad_workout_action:/)
+  assert.equal(r.ok, true)
+  assert.equal(r.reply.proposal.kind, 'none') // the bad action is DROPPED, not surfaced
+  assert.equal(r.reply.message, 'Here is a change you asked for.') // the model's text survives
+  assert.equal(r.proposalDropped, true)
+  assert.match(r.droppedReason, /^bad_workout_action:/)
 })
 
-test('workout_action with out-of-domain params is rejected', () => {
+test('workout_action with a prose action (the flash-lite failure) DEGRADES to message-only', () => {
+  const r = validateStructuredCoachReply(reply({
+    kind: 'workout_action', title: 'Swap Exercise', summary: 'y',
+    payload: { action: 'Swap bench press for dumbbell bench press.' },
+  }))
+  assert.equal(r.ok, true)
+  assert.equal(r.reply.proposal.kind, 'none')
+  assert.equal(r.proposalDropped, true)
+})
+
+test('workout_action with out-of-domain params DEGRADES (proposal dropped, not applied)', () => {
   const r = validateStructuredCoachReply(reply({
     kind: 'workout_action', title: 'x', summary: 'y', payload: { action: 'change_goal', newGoal: 'Powerlifting' },
   }))
+  assert.equal(r.ok, true)
+  assert.equal(r.reply.proposal.kind, 'none')
+  assert.equal(r.proposalDropped, true)
+})
+
+test('a broken CORE reply (bad message) still hard-fails to the fallback — degrade is proposal-only', () => {
+  const r = validateStructuredCoachReply({
+    mode: 'personalised', message: '   ', citations: [], memory: null,
+    proposal: { kind: 'workout_action', title: 'x', summary: 'y', payload: { action: 'delete_account' } },
+  })
   assert.equal(r.ok, false)
+  assert.equal(r.reason, 'bad_message')
+})
+
+test('the generation schema advertises the bounded action enum (structural steering)', () => {
+  const actionSchema = STRUCTURED_COACH_RESPONSE_SCHEMA.properties.proposal.properties.payload.properties.action
+  assert.deepEqual([...actionSchema.enum], [...WORKOUT_ACTION_NAMES])
 })
 
 // --- validateWorkoutActionPayload directly ---
