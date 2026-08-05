@@ -17,13 +17,18 @@
 import { writeFileSync, readFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { createHash } from 'node:crypto'
+import { execSync } from 'node:child_process'
 
-const sha1 = (s) => createHash('sha1').update(s).digest('hex')
+// R5-004: SHA-256 (not SHA-1) for every provenance hash, over the SAME canonical serialisation the
+// scorer re-verifies — so a bundle can't pass with a forged/stale/mismatched hash.
+const sha256 = (s) => createHash('sha256').update(s).digest('hex')
 import {
   RESPONSE_EVAL_CASES, EVAL_DIMENSIONS, GROUP_MINIMUMS, AUTO_FAILURE_RULES,
   MEAN_THRESHOLD, CRITICAL_MIN, IRR_MIN, MAX_AUTO_FAILS,
 } from '../.sweep-out/backend/coach/eval/responseQualityCorpus.js'
-import { evaluateResponseQuality } from '../.sweep-out/backend/coach/eval/scoreResponseQuality.js'
+import {
+  evaluateResponseQuality, canonicalCorpusPayload, canonicalRepliesPayload,
+} from '../.sweep-out/backend/coach/eval/scoreResponseQuality.js'
 
 const OUT = process.env.OUT || 'eval-out'
 const MODE = (process.env.MODE || 'sheet').toLowerCase()
@@ -80,11 +85,11 @@ function emitSheet() {
     autoFailureRules: AUTO_FAILURE_RULES,
     includesModelReplies: hasAllReplies,
     replyCount: nonEmptyReplies.length,
-    corpusHash: sha1(JSON.stringify(RESPONSE_EVAL_CASES.map((c) => ({ id: c.id, prompt: c.prompt, scenario: c.scenario ?? '' })))),
-    repliesHash: hasAllReplies ? sha1(JSON.stringify(RESPONSE_EVAL_CASES.map((c) => replies[c.id]))) : 'FILL_ME',
+    corpusHash: sha256(canonicalCorpusPayload()),
+    repliesHash: hasAllReplies ? sha256(canonicalRepliesPayload(replies)) : 'FILL_ME',
     releaseSha: process.env.RELEASE_SHA || 'FILL_ME',
     model: process.env.MODEL || 'FILL_ME',
-    promptHash: process.env.PROMPT_HASH || 'FILL_ME',
+    promptHash: process.env.PROMPT_FILE ? sha256(readFileSync(process.env.PROMPT_FILE, 'utf8')) : (process.env.PROMPT_HASH || 'FILL_ME'),
   }
   writeFileSync(join(OUT, 'response-eval-manifest.json'), JSON.stringify(manifest, null, 2), 'utf8')
 
@@ -103,16 +108,38 @@ function scoreFilled() {
   // The gate itself enforces "exactly two distinct reviewers"; pass through whatever is given so a
   // wrong count fails with a precise reason rather than being silently rejected here.
   const sheets = files.map((f) => JSON.parse(readFileSync(f, 'utf8')))
-  // R4-002: the manifest is MANDATORY in a release run — a missing/unreadable manifest fails rather
-  // than silently skipping provenance validation. Optional EXPECTED_SHA/EXPECTED_MODEL (supplied by
-  // the release job) must match exactly when set.
+  // R4-002 / R5-004: the manifest is MANDATORY, and it is now BOUND to hashes RE-COMPUTED here from
+  // the canonical corpus, the actual model replies and the system prompt — so a forged/stale/mismatched
+  // bundle can never pass a shape check. The expected release SHA (derived from HEAD when not supplied)
+  // and the expected model are MANDATORY inputs, not optional.
   let manifest
   const manifestPath = process.env.MANIFEST || 'docs/coach-eval/response-eval-manifest.json'
   try { manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) } catch { manifest = undefined }
+
+  // Recompute the source hashes the gate binds against.
+  let replies = {}
+  if (process.env.REPLIES) {
+    try { replies = JSON.parse(readFileSync(process.env.REPLIES, 'utf8')) } catch { replies = {} }
+  }
+  const hasAllReplies = RESPONSE_EVAL_CASES.every((c) => String(replies[c.id] ?? '').trim().length > 0)
+  const recomputedHashes = {
+    corpusHash: sha256(canonicalCorpusPayload()),
+    repliesHash: hasAllReplies ? sha256(canonicalRepliesPayload(replies)) : undefined,
+    promptHash: process.env.PROMPT_FILE ? sha256(readFileSync(process.env.PROMPT_FILE, 'utf8')) : undefined,
+  }
+
+  // Derive the release SHA from HEAD when the release job didn't pass one explicitly.
+  let expectedReleaseSha = process.env.EXPECTED_SHA
+  if (!expectedReleaseSha) {
+    try { expectedReleaseSha = execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim() } catch { expectedReleaseSha = undefined }
+  }
+
   const result = evaluateResponseQuality(sheets, manifest, {
     requireManifest: true,
-    expectedReleaseSha: process.env.EXPECTED_SHA,
+    requireRecomputedProvenance: true,
+    expectedReleaseSha,
     expectedModel: process.env.EXPECTED_MODEL,
+    recomputedHashes,
   })
   console.log(JSON.stringify(result, null, 2))
   process.exit(result.pass ? 0 : 1)

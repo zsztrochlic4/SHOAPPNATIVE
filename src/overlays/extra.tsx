@@ -31,7 +31,7 @@ import { coachThreadView, recentPR } from '../store/coach'
 import { coachReply } from '../lib/coachChat'
 import { askCoachServer } from '../lib/coachServer'
 import { newCoachRequestKey } from '../lib/coachRequestKey'
-import { fetchCoachWorkspace, readCachedCoachWorkspace, respondToCoachProposal, recordCoachActionOutcome } from '../lib/coachWorkspace'
+import { fetchCoachWorkspace, readCachedCoachWorkspace, respondToCoachProposal, recordCoachActionOutcome, flushCoachActionOutcomeOutbox } from '../lib/coachWorkspace'
 import { useReducedMotion, motionDuration } from '../lib/a11y'
 import { useAuth } from '../auth/AuthProvider'
 import { writeBackendUser } from '../backend/repo/userRepo'
@@ -45,7 +45,7 @@ import { SafetyContactButtons } from '../components/SafetyContactButtons'
 import { CoachSafetyStrip } from '../components/CoachSafetyStrip'
 import { CoachComingSoon } from '../components/CoachComingSoon'
 import { todaySession, leaderboardSorted, youRank } from '../store/selectors'
-import { relativeLabel, todayKey } from '../lib/date'
+import { relativeLabel, todayKey, deviceTimezone } from '../lib/date'
 import { CHART_METRICS, MAX_DASHBOARD_STATS, STAT_METRICS, STAT_TIMEFRAMES, dashboardStatIds, dashboardTimeframe, progressMetricId } from '../lib/metrics'
 import { brand, useColors, accentFor, type AccentKey } from '../theme'
 import { AppModal, IS_WEB, WEB_SCREEN } from '../components/WebFrame'
@@ -734,7 +734,7 @@ export function CoachChatSheet({ open, onClose }: Props) {
   const colors = useColors()
   // Coach Capability Plan: the most recent coach-actioned change, kept so the user can UNDO
   // it from its proposal card. One-level (last action) undo; cleared when the sheet closes.
-  const [undoTarget, setUndoTarget] = useState<{ proposalId: string; snapshot: ProgramSnapshot; actionId?: string } | null>(null)
+  const [undoTarget, setUndoTarget] = useState<{ proposalId: string; snapshot: ProgramSnapshot; actionId?: string; appliedVersion?: number } | null>(null)
   // C-003: the confirmed action currently being persisted (show "Applying…", not "Applied").
   const [applyingProposalId, setApplyingProposalId] = useState<string | null>(null)
   // C-003: a confirmed action whose persist FAILED and was rolled back — retry closure attached.
@@ -794,6 +794,9 @@ export function CoachChatSheet({ open, onClose }: Props) {
       } catch {
         if (active && !cached) setCoachConsented(false)
       }
+      // R5-007: reconcile any action outcome stranded by a prior crash/offline window so a journal
+      // entry can't sit at pending_apply indefinitely. Best-effort; never blocks the UI.
+      void flushCoachActionOutcomeOutbox()
     })()
     return () => { active = false }
   }, [open])
@@ -840,7 +843,7 @@ export function CoachChatSheet({ open, onClose }: Props) {
       // TRUSTED BACKEND coach: the server re-runs the precheck (authoritative), the
       // model call, and the validator, so a modified client can't bypass safety
       // (§4.4). It may BLOCK even though the client's fast precheck allowed the turn.
-      const res = await askCoachServer({ message: msg, requestKey, allowActions: COACH_ACTIONING })
+      const res = await askCoachServer({ message: msg, requestKey, allowActions: COACH_ACTIONING, timezone: deviceTimezone() ?? undefined })
       if (seq !== sendSeqRef.current) return // cancelled / superseded — drop stale reply
       // Server already ran guardOutgoing; blocked replies carry crisis buttons.
       dispatch({
@@ -921,10 +924,11 @@ export function CoachChatSheet({ open, onClose }: Props) {
         })
       }
     }
-    const succeed = () => {
+    const succeed = (appliedVersion?: number) => {
       thud()
       setSwapChoice(null); setFailedApply(null)
-      setUndoTarget({ proposalId, snapshot, actionId })
+      // R5-006: remember the exact revision this apply produced so an undo can guard against it.
+      setUndoTarget({ proposalId, snapshot, actionId, appliedVersion })
       toast(outcome.message)
       if (actionId) void recordCoachActionOutcome(actionId, 'applied')
     }
@@ -940,13 +944,17 @@ export function CoachChatSheet({ open, onClose }: Props) {
       const programDocToWrite = outcome.apply === 'patch' ? state.programDoc : outcome.programDoc
       if (programDocToWrite) {
         // U-001: user + program + instances (+ stale cleanup) commit ATOMICALLY — no partial state.
-        // R4-005: guard against a concurrent change from another device via the program version.
-        await commitCoachAction(uid, outcome.nextUser, programDocToWrite, outcome.instances, state.programDoc?.version)
+        // R4-005/R5-006: guard against a concurrent change from another device via the program version,
+        // and mirror the new authoritative revision locally so the next apply/undo is guarded too.
+        const newVersion = await commitCoachAction(uid, outcome.nextUser, programDocToWrite, outcome.instances, state.programDoc?.version)
+        applyToStore()
+        if (newVersion != null) dispatch({ type: 'SET_PROGRAM_VERSION', version: newVersion })
+        succeed(newVersion)
       } else {
         await writeBackendUser(uid, outcome.nextUser)
+        applyToStore()
+        succeed()
       }
-      applyToStore()
-      succeed()
     } catch (e: unknown) {
       // The plan was NOT changed in the store (we persist first), so nothing to roll back locally.
       setApplyingProposalId(null)
@@ -1081,22 +1089,51 @@ export function CoachChatSheet({ open, onClose }: Props) {
 
   // Undo the last coach-actioned change: restore the snapshot and re-persist the prior docs (C-003:
   // await the restore writes so a failed rollback is not silently lost). Records rolled_back (C-018).
-  const handleUndo = useCallback((snapshot: ProgramSnapshot, actionId?: string) => {
+  const handleUndo = useCallback((snapshot: ProgramSnapshot, actionId?: string, appliedVersion?: number) => {
+    // Capture the currently-applied program state so a cloud conflict can restore it (the undo did NOT
+    // take effect on the cloud, so the local view must not stay reverted).
+    const appliedState: ProgramSnapshot | null = state.backendUser
+      ? {
+          backendUser: state.backendUser,
+          generatedProgram: state.generatedProgram ?? null,
+          programStatus: state.programStatus ?? null,
+          programDoc: state.programDoc ?? null,
+          workoutInstances: state.workoutInstances,
+          plannedPeriods: state.plannedPeriods,
+        }
+      : null
     dispatch({ type: 'RESTORE_PROGRAM_SNAPSHOT', snapshot })
     const uid = user?.uid
     const persist = async () => {
       if (!uid || uid === 'local') return
       // U-001: the rollback is atomic too — restore user + program + instances in one batch.
-      if (snapshot.programDoc) await commitCoachAction(uid, snapshot.backendUser, snapshot.programDoc, snapshot.workoutInstances ?? [])
-      else await writeBackendUser(uid, snapshot.backendUser)
+      // R5-006: the undo carries a version precondition (the revision the original apply produced), so
+      // if another device changed the plan since we applied, the revert ABORTS rather than clobbering
+      // that newer change. Mirror the new revision locally on success.
+      if (snapshot.programDoc) {
+        const newVersion = await commitCoachAction(uid, snapshot.backendUser, snapshot.programDoc, snapshot.workoutInstances ?? [], appliedVersion)
+        if (newVersion != null) dispatch({ type: 'SET_PROGRAM_VERSION', version: newVersion })
+      } else {
+        await writeBackendUser(uid, snapshot.backendUser)
+      }
     }
     void persist()
       .then(() => { if (actionId) void recordCoachActionOutcome(actionId, 'rolled_back') })
-      .catch(() => { toast("Your plan is reverted here, but that didn't sync — it'll retry when you're back online.") })
+      .catch((e: unknown) => {
+        if (e instanceof CoachActionConflictError && appliedState) {
+          // The undo didn't land on the cloud — restore the applied state locally and tell the truth,
+          // rather than leaving the two out of sync (R5-006).
+          dispatch({ type: 'RESTORE_PROGRAM_SNAPSHOT', snapshot: appliedState })
+          toast('Your plan was changed on another device, so I couldn’t undo this here — reopen the coach and try again.')
+          if (actionId) void recordCoachActionOutcome(actionId, 'failed', 'version_conflict')
+          return
+        }
+        toast("Your plan is reverted here, but that didn't sync — it'll retry when you're back online.")
+      })
     setUndoTarget(null)
     thud()
     toast('Reverted — your plan is back to how it was.')
-  }, [dispatch, user, toast])
+  }, [dispatch, user, toast, state])
 
   const renderMessage = useCallback(({ item, index }: { item: ChatMessage; index: number }) => {
     const showDay = index === 0 || messages[index - 1]?.dateKey !== item.dateKey
@@ -1121,7 +1158,7 @@ export function CoachChatSheet({ open, onClose }: Props) {
           onReply={(message) => setReplyingTo({ role: message.role, text: message.text })}
           onProposalConfirmed={handleProposalConfirmed}
           undoActive={!!rowUndo}
-          onUndo={rowUndo ? () => handleUndo(rowUndo.snapshot, rowUndo.actionId) : undefined}
+          onUndo={rowUndo ? () => handleUndo(rowUndo.snapshot, rowUndo.actionId, rowUndo.appliedVersion) : undefined}
           applying={rowApplying}
           applyFailed={!!rowFailed}
           onRetryApply={rowFailed ? rowFailed.retry : undefined}

@@ -10,6 +10,7 @@ import { SESSION_TEMPLATES } from '../data/sessionTemplates'
 import { ACTIVE_EXERCISES } from '../data'
 import { prescriptionFor } from '../data'
 import { canGenerate } from '../mapping/onboardingContract'
+import { equipmentTagsSatisfied } from '../data/equipmentInventory'
 import type { UserDoc } from '../schema'
 import { selectSplit } from './select'
 import { buildSchedule, type Placement } from './schedule'
@@ -132,7 +133,7 @@ export function generateProgram(user: UserDoc, opts: GenerateOptions = {}): GenR
     !excl.has(ex.id) && !usedIds.has(ex.id) &&
     (ex.equipmentTier === 'Bodyweight' || (ex.equipmentTier === 'Basic Gym' && ctx.equipmentTier !== 'Bodyweight') || ctx.equipmentTier === 'Full Gym') &&
     (SKILL[ex.skillLevel] ?? 9) <= (SKILL[ctx.experience] ?? 0) && // S01: never add an Advanced lift for a non-Advanced user
-    ex.requiredEquipmentTags.every((t) => t.split('/').some((x) => ctx.equipmentTags.includes(x.trim())))
+    equipmentTagsSatisfied(ex.requiredEquipmentTags, ctx.equipmentTags)
   const daySizeCap = budget + 2 // reconciliation may push a day slightly past its base budget
 
   // Rule 2 — add one slot (isolation preferred) for an under-target muscle, on a day that

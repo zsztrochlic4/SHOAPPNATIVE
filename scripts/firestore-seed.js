@@ -155,9 +155,14 @@ function validateUserDoc(u) {
 }
 
 /* --------------------------- connection --------------------------- */
+// firebase-admin v13+ no longer ships the `admin.credential.*` / `admin.firestore()`
+// namespace on the default export (`require('firebase-admin').credential` is undefined),
+// so we load the modular entry points explicitly. Returns null if the package is absent.
 function loadAdmin() {
   try {
-    return require('firebase-admin')
+    const app = require('firebase-admin/app')
+    const firestore = require('firebase-admin/firestore')
+    return { app, firestore }
   } catch (_) {
     return null
   }
@@ -181,20 +186,23 @@ function connectionConfig() {
 }
 
 async function tryConnect(admin, cfg, seedDoc) {
+  const { initializeApp, cert, applicationDefault } = admin.app
+  const { getFirestore } = admin.firestore
+  let app
   if (cfg.kind === 'emulator') {
-    admin.initializeApp({ projectId: cfg.projectId })
+    app = initializeApp({ projectId: cfg.projectId })
   } else if (cfg.kind === 'application-default') {
-    admin.initializeApp({ credential: admin.credential.applicationDefault() })
+    app = initializeApp({ credential: applicationDefault() })
   } else {
-    admin.initializeApp({
-      credential: admin.credential.cert({
+    app = initializeApp({
+      credential: cert({
         projectId: cfg.projectId,
         clientEmail: cfg.clientEmail,
         privateKey: cfg.privateKey,
       }),
     })
   }
-  const db = admin.firestore()
+  const db = getFirestore(app)
   const probe = db.collection('_validation').doc('connectivity')
   const stamp = {
     last_run_at: new Date().toISOString(),

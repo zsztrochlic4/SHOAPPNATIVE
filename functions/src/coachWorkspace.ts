@@ -76,6 +76,21 @@ function localWeekdayName(tz: string, now: Date = new Date()): string {
   }
 }
 
+/**
+ * Whether a string is a usable IANA timezone (R5-010). Used to gate the client-supplied per-turn
+ * timezone before it is allowed to override stored settings, so a garbage value can never make the
+ * coach name a wrong day.
+ */
+export function isValidTimezone(tz: unknown): tz is string {
+  if (typeof tz !== 'string' || !tz || tz.length > 60) return false
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: tz })
+    return true
+  } catch {
+    return false
+  }
+}
+
 /** "Today (Wednesday) is a Push day: Bench Press, …" from the stored program's schedule. */
 function programDayText(program: any, today: string): string {
   const days = program && Array.isArray(program.days) ? program.days : null
@@ -200,7 +215,10 @@ function restoreSafety(data: Record<string, unknown> | undefined): SafetySession
   return session
 }
 
-export async function loadCoachTurnData(uid: string): Promise<CoachTurnData> {
+export async function loadCoachTurnData(
+  uid: string,
+  opts: { requestTimezone?: string } = {},
+): Promise<CoachTurnData> {
   const db = getFirestore()
   // C-015: record which context reads FAILED (vs were genuinely empty) so we can disclose gaps.
   const gaps: string[] = []
@@ -249,8 +267,12 @@ export async function loadCoachTurnData(uid: string): Promise<CoachTurnData> {
     : []
   // C-007: the unit preference lives in the app's settings (settings.units), NOT profile.units.
   const units = ordinary(settings.units || profile.units || 'metric', 20)
-  // C-008: name the day in the user's local timezone (stored IANA tz, else the AU market default).
-  const timezone = ordinary(settings.timezone || backend.timezone, 60) || DEFAULT_TIMEZONE
+  // C-008 / R5-010: name the day in the user's local timezone. Prefer the VALIDATED timezone the
+  // client sent with THIS turn (fresh on the device) over stored settings, which lag behind a
+  // travel/timezone change until the ~800 ms debounced cloud save lands — so the first turn after a
+  // change still names the right day. Falls back to stored settings, then the AU market default.
+  const requestTz = isValidTimezone(opts.requestTimezone) ? opts.requestTimezone : undefined
+  const timezone = requestTz || ordinary(settings.timezone || backend.timezone, 60) || DEFAULT_TIMEZONE
   const todayName = localWeekdayName(timezone)
 
   const context: CoachContext = {

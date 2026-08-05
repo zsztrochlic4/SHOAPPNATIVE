@@ -27,6 +27,7 @@
 import { EXERCISE_BY_ID } from '../data/index'
 import type { Exercise } from '../data/types'
 import { injuryExcludeIds } from '../generator/build'
+import { equipmentTagsSatisfied } from '../data/equipmentInventory'
 import type { StoredProgram, StoredDay, StoredExercise } from './activate'
 import type { InjuryRegion, UserDoc } from '../schema'
 
@@ -65,7 +66,7 @@ export const MIN_EXERCISES_PER_TRAINING_DAY = 2
 
 function equipmentOk(ex: Exercise, user: UserDoc): boolean {
   if ((TIER_RANK[ex.equipmentTier] ?? 9) > (TIER_RANK[user.equipment_tier] ?? 0)) return false
-  return ex.requiredEquipmentTags.every((t) => t.split('/').some((x) => user.equipment_tags.includes(x.trim())))
+  return equipmentTagsSatisfied(ex.requiredEquipmentTags, user.equipment_tags)
 }
 
 function skillOk(ex: Exercise, user: UserDoc): boolean {
@@ -170,4 +171,69 @@ export function summarizeViolations(violations: InvariantViolation[]): string {
   const counts: Record<string, number> = {}
   for (const v of violations) counts[v.code] = (counts[v.code] ?? 0) + 1
   return Object.entries(counts).map(([code, n]) => `${code}:${n}`).join(',')
+}
+
+export interface DurationFitResult {
+  /** The program with over-budget days trimmed of trailing accessory work. */
+  program: StoredProgram
+  /** Every exercise removed to fit, so callers can mirror the change into workout instances. */
+  removed: { weekday: string; exerciseId: string }[]
+  /** Worst single-day estimate after trimming. */
+  worstMinutes: number
+  /** True when every day now sits within `targetMin * tolerance`. */
+  fits: boolean
+}
+
+/**
+ * Fit a program to a session-time target (audit R5-009). When a user asks for a specific session
+ * length we must respect it, not just disclose the overshoot. This removes the lowest-priority
+ * ACCESSORY work (an isolation / non-Load exercise, else the last exercise) from the worst
+ * over-budget day, re-estimating after each removal, until every day is within
+ * `targetMin * tolerance` or no day can be trimmed further without dropping below the minimum
+ * viable exercise count. Compound (Load) movements are preserved wherever possible so the plan
+ * keeps its primary stimulus. Pure — never mutates the input program.
+ */
+export function fitProgramToDuration(
+  program: StoredProgram,
+  targetMin: number,
+  tolerance: number = DURATION_TARGET_TOLERANCE,
+): DurationFitResult {
+  const cap = targetMin * tolerance
+  const days: StoredDay[] = program.days.map((d) => ({ ...d, exercises: [...d.exercises] }))
+  const removed: { weekday: string; exerciseId: string }[] = []
+
+  // Bounded loop: at most one removal per iteration, capped well above any real exercise count.
+  for (let guard = 0; guard < 500; guard++) {
+    let worst: StoredDay | null = null
+    let worstMin = 0
+    for (const d of days) {
+      const m = estimateDayMinutes(d)
+      if (m > worstMin) { worstMin = m; worst = d }
+    }
+    if (!worst || worstMin <= cap) break
+    if (worst.exercises.length <= MIN_EXERCISES_PER_TRAINING_DAY) break // can't trim this day further
+    // Prefer the last non-Load (accessory/isolation) exercise; fall back to the last exercise.
+    let idx = -1
+    for (let i = worst.exercises.length - 1; i >= 0; i--) {
+      if (worst.exercises[i].prescriptionClass !== 'Load') { idx = i; break }
+    }
+    if (idx === -1) idx = worst.exercises.length - 1
+    const [gone] = worst.exercises.splice(idx, 1)
+    removed.push({ weekday: worst.weekday, exerciseId: gone.exerciseId })
+  }
+
+  const weeklySetsByMuscle: Record<string, number> = {}
+  for (const m of Object.keys(program.weeklySetsByMuscle)) {
+    weeklySetsByMuscle[m] = days.reduce(
+      (n, d) => n + d.exercises.filter((e) => e.muscleGroup === m).reduce((a, e) => a + e.sets, 0),
+      0,
+    )
+  }
+  const worstMinutes = days.reduce((mx, d) => Math.max(mx, estimateDayMinutes(d)), 0)
+  return {
+    program: { ...program, days, weeklySetsByMuscle },
+    removed,
+    worstMinutes,
+    fits: worstMinutes <= cap,
+  }
 }
