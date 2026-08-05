@@ -145,10 +145,12 @@ test('leaveGroup: owner is blocked, member leaves and the count decrements (F-00
   await C.call('joinGroupByPasscode', { groupId: g.groupId, passcode: g.passcode })
   // Owner cannot leave without transferring/deleting.
   await rejectsCode(B.call('leaveGroup', { groupId: g.groupId }), 'failed-precondition')
-  // A joined member can leave; membership + count reflect it.
+  // A joined member can leave; membership + count reflect it. Read the (now
+  // removed) member doc as the OWNER — once C has left, the rules correctly deny C
+  // reading the members subcollection, so verify via B who is still a member.
   const left = await C.call('leaveGroup', { groupId: g.groupId })
   assert.equal(left.ok, true)
-  const member = await getDoc(doc(C.db, `groups/${g.groupId}/members/${C.uid}`))
+  const member = await getDoc(doc(B.db, `groups/${g.groupId}/members/${C.uid}`))
   assert.equal(member.exists(), false, 'member doc removed on leave')
   const group = await getDoc(doc(B.db, `groups/${g.groupId}`))
   assert.equal(group.get('memberCount'), 1, 'count back to owner-only after member leaves')
