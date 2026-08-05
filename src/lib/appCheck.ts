@@ -21,8 +21,16 @@ import { initializeAppCheck, ReCaptchaEnterpriseProvider, type AppCheck } from '
  *  - App Check does NOT gate the coach on. `COACH_ENABLED` remains the master switch (and is false);
  *    App Check sits alongside it as endpoint-abuse protection, not an availability gate.
  *  - reCAPTCHA is a WEB provider. Native (iOS/Android) attestation (App Attest / Play Integrity)
- *    needs the native App Check path in a dev build — a separate follow-up (see the runbook §9).
+ *    needs the native App Check path in a dev build. That bridge is DRAFTED in ./appCheckNative
+ *    (App Attest / Play Integrity → JS-SDK CustomProvider); it stays dormant until the owner
+ *    installs @react-native-firebase/* and uncomments the two marked lines below. See
+ *    docs/APP_CHECK.md §Native and src/lib/appCheckNative.ts for the full activation checklist.
  */
+
+// NATIVE ACTIVATION (owner) — after `npx expo install @react-native-firebase/app
+// @react-native-firebase/app-check`, uncomment the next line and the native branch in
+// initAppCheck(). Kept commented so the JS-SDK-only build never tries to resolve the native module.
+// import { initNativeAppCheck } from './appCheckNative'
 
 const RECAPTCHA_SITE_KEY =
   process.env.EXPO_PUBLIC_APPCHECK_RECAPTCHA_ENTERPRISE_KEY ||
@@ -40,7 +48,13 @@ let appCheck: AppCheck | null = null
  */
 export function initAppCheck(app: FirebaseApp): AppCheck | null {
   if (appCheck) return appCheck
-  if (Platform.OS !== 'web') return null   // reCAPTCHA is web-only; native attestation is a dev-build step
+  if (Platform.OS !== 'web') {
+    // NATIVE ACTIVATION (owner): uncomment to bridge App Attest / Play Integrity into the JS SDK.
+    // Requires @react-native-firebase/* installed + a dev/EAS build (see ./appCheckNative header).
+    //   appCheck = initNativeAppCheck(app)
+    //   return appCheck
+    return null   // until activated: reCAPTCHA is web-only, native attestation is a dev-build step
+  }
   if (!RECAPTCHA_SITE_KEY) return null       // no key yet → stay a no-op until the console + key are set
   try {
     if (DEBUG_TOKEN && typeof globalThis !== 'undefined') {
