@@ -1,0 +1,12 @@
+appId: com.zaggy887.strengthhub
+tags:
+  - smoke
+  - core
+---
+# JOURNEY: happy-path boot. The shell renders and all five bottom-nav tabs are present.
+- runFlow: ../subflows/boot.yaml
+- assertVisible: "Dashboard"
+- assertVisible: "Workout"
+- assertVisible: "Nutrition"
+- assertVisible: "Progress"
+- assertVisible: "Community"

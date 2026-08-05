@@ -1,0 +1,11 @@
+appId: com.zaggy887.strengthhub
+---
+# Reusable boot: cold-launch a CLEAN session and wait for the dashboard shell.
+# Assumes a DEMO-MODE dev build (EXPO_PUBLIC_DEMO_MODE=1) so the seeded, onboarded,
+# auto-entitled user lands straight on the tabs — mirrors the Playwright web e2e.
+# For a non-demo build, replace this with a sign-in subflow (see README "Auth").
+- launchApp:
+    clearState: true
+- assertVisible:
+    text: "Dashboard"
+    timeout: 40000

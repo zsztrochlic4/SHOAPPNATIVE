@@ -1,0 +1,24 @@
+appId: com.zaggy887.strengthhub
+tags:
+  - smoke
+  - core
+---
+# JOURNEY: navigation. Switching tabs shows a control unique to each screen
+# (mirrors e2e/smoke.spec.ts). Tabs stay mounted (React <Activity>), so we assert
+# VISIBILITY of a per-tab control, not mere presence.
+- runFlow: ../subflows/boot.yaml
+
+- tapOn: "Nutrition"
+- assertVisible: "Snap your meal"
+
+- tapOn: "Workout"
+- assertVisible: "History"        # Workout's inner segmented tab
+
+- tapOn: "Community"
+- assertVisible: "League"         # Community's inner segmented tab
+
+- tapOn: "Nutrition"
+- assertVisible: "Snap your meal"
+
+- tapOn: "Dashboard"
+- assertVisible: "Dashboard"

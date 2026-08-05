@@ -1,0 +1,17 @@
+appId: com.zaggy887.strengthhub
+tags:
+  - community
+---
+# JOURNEY: community hub. Reach Community, switch its inner segments, open settings.
+- runFlow: ../subflows/boot.yaml
+
+- tapOn: "Community"
+- assertVisible: "League"          # inner segmented tab
+
+# Open Community settings (accessibilityLabel from src/screens/Community.tsx).
+- tapOn:
+    text: "Community settings"
+# TODO (on device): assert a settings-sheet control, then dismiss it. Label TBC on build.
+- back
+
+- assertVisible: "League"
