@@ -23,6 +23,7 @@ import type {
   AppNotification,
   AppState,
   ChatMessage,
+  CommunityGroup,
   CommunityScope,
   IntegrationState,
   LoggedActivity,
@@ -121,6 +122,23 @@ export type Action =
   | { type: 'JOIN_CHALLENGE'; id: string }
   | { type: 'RSVP_EVENT'; id: string }
   | { type: 'JOIN_GROUP'; id: string }
+  // Community competition hub (v13). The service layer (src/community) builds the
+  // fully-formed CommunityGroup — passcode + simulated members — so these reducer
+  // cases only guard invariants (dup name/membership, owner-only delete) and commit.
+  | { type: 'SET_USERNAME'; username: string }
+  | { type: 'CREATE_GROUP'; group: CommunityGroup }
+  | { type: 'JOIN_GROUP_BY_CODE'; group: CommunityGroup }
+  | { type: 'LEAVE_GROUP'; id: string }
+  | { type: 'DELETE_GROUP'; id: string }
+  | { type: 'SET_GROUP_GOAL'; id: string; goal: number }
+  // Cheers (reaction-only), forgiving streaks, and weekly leagues.
+  | { type: 'CHEER_ACTIVITY'; groupId: string; activityId: string }
+  | { type: 'USE_STREAK_FREEZE'; dateKey: string }
+  | { type: 'TOGGLE_REST_DAY'; dateKey: string }
+  | { type: 'GRANT_WEEKLY_FREEZE'; weekKey: string }
+  | { type: 'SET_LEAGUE'; tier: number; weekKey: string; seasonWins?: number }
+  // Replace the local group cache with the server's copy (backend hydration).
+  | { type: 'SET_COMMUNITY_GROUPS'; groups: CommunityGroup[] }
   | { type: 'MARK_NOTIF_READ'; id: string }
   | { type: 'MARK_ALL_READ' }
   | { type: 'ADD_NOTIFICATION'; notif: Omit<AppNotification, 'id' | 'dateKey' | 'time' | 'read'> }
@@ -670,6 +688,130 @@ function reducer(state: AppState, action: Action): AppState {
       )
       return { ...state, groups }
     }
+
+    // --- Community competition hub (v13) ---
+    case 'SET_USERNAME': {
+      const username = action.username.trim()
+      if (!username) return state
+      return {
+        ...state,
+        community: { ...state.community, username, usernameSetAtKey: todayKey },
+      }
+    }
+
+    case 'CREATE_GROUP': {
+      const existing = state.community.groups
+      // Guard: never create a second group with the same id, or a name that
+      // collides case-insensitively with one you're already in.
+      const name = action.group.name.trim().toLowerCase()
+      if (existing.some((g) => g.id === action.group.id || g.name.trim().toLowerCase() === name)) {
+        return state
+      }
+      return {
+        ...state,
+        community: { ...state.community, groups: [action.group, ...existing] },
+      }
+    }
+
+    case 'JOIN_GROUP_BY_CODE': {
+      const existing = state.community.groups
+      // Prevent duplicate membership: joining a group you're already in is a no-op.
+      if (existing.some((g) => g.id === action.group.id)) return state
+      return {
+        ...state,
+        community: { ...state.community, groups: [action.group, ...existing] },
+      }
+    }
+
+    case 'LEAVE_GROUP':
+      return {
+        ...state,
+        community: {
+          ...state.community,
+          groups: state.community.groups.filter((g) => g.id !== action.id),
+        },
+      }
+
+    case 'DELETE_GROUP': {
+      // Owner-only: a member can only delete a group they created. The UI already
+      // gates + confirms this; the reducer enforces it structurally so a stray
+      // dispatch can never remove someone else's group.
+      const target = state.community.groups.find((g) => g.id === action.id)
+      if (!target || target.ownerUsername !== state.community.username) return state
+      return {
+        ...state,
+        community: {
+          ...state.community,
+          groups: state.community.groups.filter((g) => g.id !== action.id),
+        },
+      }
+    }
+
+    case 'SET_GROUP_GOAL': {
+      // Owner-only: only the group's creator can change the shared weekly target.
+      const target = state.community.groups.find((g) => g.id === action.id)
+      if (!target || target.ownerUsername !== state.community.username) return state
+      const goal = Math.max(1, Math.min(200, Math.round(action.goal)))
+      return {
+        ...state,
+        community: {
+          ...state.community,
+          groups: state.community.groups.map((g) => (g.id === action.id ? { ...g, weeklyGoal: goal } : g)),
+        },
+      }
+    }
+
+    // Cheer / un-cheer a group activity event (reaction-only, positive-only).
+    case 'CHEER_ACTIVITY': {
+      const groups = state.community.groups.map((g) => {
+        if (g.id !== action.groupId) return g
+        const cheers = { ...(g.cheers ?? {}) }
+        const cur = cheers[action.activityId] ?? { count: 0, mine: false }
+        cheers[action.activityId] = { count: Math.max(0, cur.count + (cur.mine ? -1 : 1)), mine: !cur.mine }
+        return { ...g, cheers }
+      })
+      return { ...state, community: { ...state.community, groups } }
+    }
+
+    // Spend a freeze token to protect a specific day's streak (idempotent per day).
+    case 'USE_STREAK_FREEZE': {
+      const tokens = state.community.freezeTokens ?? 0
+      const frozen = state.community.frozenDays ?? []
+      if (tokens <= 0 || frozen.includes(action.dateKey)) return state
+      return {
+        ...state,
+        community: { ...state.community, freezeTokens: tokens - 1, frozenDays: [...frozen, action.dateKey] },
+      }
+    }
+
+    // Mark / unmark a planned rest day (keeps the streak without spending a token).
+    case 'TOGGLE_REST_DAY': {
+      const rest = state.community.restDays ?? []
+      const next = rest.includes(action.dateKey) ? rest.filter((d) => d !== action.dateKey) : [...rest, action.dateKey]
+      return { ...state, community: { ...state.community, restDays: next } }
+    }
+
+    // Weekly freeze grant — idempotent per week, capped so tokens can't stockpile.
+    case 'GRANT_WEEKLY_FREEZE': {
+      if (state.community.freezeGrantWeek === action.weekKey) return state
+      const FREEZE_CAP = 2
+      const tokens = Math.min(FREEZE_CAP, (state.community.freezeTokens ?? 0) + 1)
+      return { ...state, community: { ...state.community, freezeTokens: tokens, freezeGrantWeek: action.weekKey } }
+    }
+
+    // Backend hydration: replace the local group cache with the server's copy.
+    case 'SET_COMMUNITY_GROUPS':
+      return { ...state, community: { ...state.community, groups: action.groups } }
+
+    // Commit the user's league placement (client simulation now; server on rollover later).
+    case 'SET_LEAGUE':
+      return {
+        ...state,
+        community: {
+          ...state.community,
+          league: { tier: action.tier, weekKey: action.weekKey, seasonWins: action.seasonWins ?? state.community.league?.seasonWins },
+        },
+      }
 
     case 'MARK_NOTIF_READ':
       return { ...state, notifications: state.notifications.map((n) => (n.id === action.id ? { ...n, read: true } : n)) }

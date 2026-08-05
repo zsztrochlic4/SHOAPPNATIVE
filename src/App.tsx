@@ -47,8 +47,6 @@ import {
   MenuDrawer,
   LogWeightSheet,
   LogHabitSheet,
-  CreatePostSheet,
-  LeaderboardSheet,
   QuickWorkoutsSheet,
   BadgesSheet,
   CoachSheet,
@@ -56,11 +54,8 @@ import {
   BeginnerSheet,
   BudgetEatsSheet,
   ExerciseDetailSheet,
-  PartnerMatchSheet,
   PRCelebrationSheet,
   LogActivitySheet,
-  PostDetailSheet,
-  ChallengeDetailSheet,
   CustomizeSheet,
   CreateSessionSheet,
 } from './overlays'
@@ -242,8 +237,6 @@ function Shell() {
       case 'trainingProfile': return <TrainingProfileSheet open onClose={nav.close} />
       case 'logWeight': return <LogWeightSheet open onClose={nav.close} />
       case 'logHabit': return <LogHabitSheet open onClose={nav.close} params={params} />
-      case 'createPost': return <CreatePostSheet open onClose={nav.close} />
-      case 'leaderboard': return <LeaderboardSheet open onClose={nav.close} />
       case 'quick': return <QuickWorkoutsSheet open onClose={nav.close} />
       case 'badges': return <BadgesSheet open onClose={nav.close} />
       case 'examMode': return <PlanAroundLifeSheet open onClose={nav.close} />
@@ -252,11 +245,8 @@ function Shell() {
       case 'beginner': return <BeginnerSheet open onClose={nav.close} />
       case 'budgetEats': return <BudgetEatsSheet open onClose={nav.close} />
       case 'exerciseDetail': return <ExerciseDetailSheet open onClose={nav.close} params={params} />
-      case 'partnerMatch': return <PartnerMatchSheet open onClose={nav.close} />
       case 'prCelebration': return <PRCelebrationSheet open onClose={nav.close} params={params} />
       case 'logActivity': return <LogActivitySheet open onClose={nav.close} />
-      case 'postDetail': return <PostDetailSheet open onClose={nav.close} params={params} />
-      case 'challengeDetail': return <ChallengeDetailSheet open onClose={nav.close} params={params} />
       case 'customize': return <CustomizeSheet open onClose={nav.close} params={params} />
       case 'createSession': return <CreateSessionSheet open onClose={nav.close} params={params} />
       default: return null

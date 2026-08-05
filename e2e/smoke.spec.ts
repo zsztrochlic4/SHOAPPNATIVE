@@ -45,7 +45,7 @@ test('bottom-nav tabs switch the active screen', async ({ page }) => {
   await expect(page.getByRole('tab', { name: 'History' })).toBeVisible() // Workout's inner segmented tab
 
   await page.getByRole('tab', { name: 'Community' }).click()
-  await expect(page.getByText(/social features aren.t live/i)).toBeVisible() // Preview banner
+  await expect(page.getByRole('tab', { name: 'League' })).toBeVisible() // Community's inner segmented tab
 
   await page.getByRole('tab', { name: 'Nutrition' }).click()
   await expect(page.getByText('Snap your meal')).toBeVisible()

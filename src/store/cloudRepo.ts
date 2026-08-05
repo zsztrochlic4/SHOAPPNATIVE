@@ -105,7 +105,14 @@ const WINDOWED_KEYS = SUB_KEYS.filter((k) => LOAD_POLICY[k] === 'window')
 // Stripe webhook) and mirrored into the store by BillingSync — persisting it to
 // the root would both duplicate the source of truth and be rejected by the
 // rules' `hasOnly(rootAllowedKeys())` guard.
-const LOCAL_ONLY: (keyof AppState)[] = ['subscription']
+//
+// `community` (competition hub) is likewise NOT stored in the user root: its
+// authoritative multi-user data (username uniqueness, league standings, cheers)
+// lives in dedicated top-level collections written by Cloud Functions
+// (functions/src/community.ts). The local slice is a per-device cache/simulation
+// hydrated from that backend; syncing it to the root would clobber server truth
+// and be rejected by the rules' root allowlist.
+const LOCAL_ONLY: (keyof AppState)[] = ['subscription', 'community']
 
 /** Firestore allows 500 writes per batch; stay safely under it. */
 const BATCH_LIMIT = 400

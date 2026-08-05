@@ -1,376 +1,66 @@
-import { memo, useCallback, useRef, useState, type ReactNode } from 'react'
-import { View, Text, Pressable, Image, ScrollView, FlatList, Animated, Easing, type ListRenderItemInfo } from 'react-native'
-import {
-  Users, Heart, MessageCircle, Bookmark, ChevronRight, MoreHorizontal, CalendarClock,
-  HeartHandshake, Award, UserPlus, Swords, TrendingUp,
-} from 'lucide-react-native'
-import { Icon } from '../components/Icon'
-import { Avatar, AvatarStack } from '../components/Avatar'
-import { ProgressRing, ProgressBar, SegmentedTabs, ScreenHeader, SectionHeader, Chip } from '../components/ui'
-import { Hero } from '../components/Hero'
-import { useDispatch, useStore } from '../store/store'
-import { useNav } from '../nav'
-import { img } from '../data/catalog'
-import { youRank } from '../store/selectors'
-import { brand, useColors } from '../theme'
-import type { Challenge, CommunityScope, Post } from '../store/types'
+import { useState } from 'react'
+import { View, Text, Pressable } from 'react-native'
+import { Settings2, AtSign } from 'lucide-react-native'
+import { ScreenHeader, SegmentedTabs } from '../components/ui'
+import { useStoreSelector } from '../store/store'
+import { useColors, brand } from '../theme'
+import type { AppState } from '../store/types'
+import { LeagueScreen } from '../community/LeagueScreen'
+import { GroupsTab } from '../community/groups'
+import { UsernameSheet } from '../community/UsernameSetup'
 
-const TABS = ['Feed', 'Groups', 'Challenges', 'Events']
+const TABS = ['League', 'Groups']
 
+const selectUsername = (s: AppState) => s.community.username
+
+/**
+ * Community competition hub — a global consistency-streak leaderboard and a
+ * Groups tab for private friend competitions. Browse-first: anyone can look
+ * around, and a username is prompted only when they act (compete on the board,
+ * create or join a group). All social interaction is competing — no posts or
+ * comments — which keeps it safe and low-moderation.
+ */
 export default function Community() {
-  const [tab, setTab] = useState('Feed')
-  const nav = useNav()
+  const username = useStoreSelector(selectUsername)
+  const [tab, setTab] = useState('League')
+  const [usernameOpen, setUsernameOpen] = useState(false)
   const colors = useColors()
+
   return (
     <View className="px-5 pt-2">
       <ScreenHeader
         title="Community"
         trailing={
-          <Pressable onPress={() => nav.open('leaderboard')} accessibilityRole="button" accessibilityLabel="Campus leaderboard" className="relative h-10 w-10 items-center justify-center rounded-xl active:opacity-70">
-            <Users size={22} color={colors.fg} />
-            <View className="absolute right-2 top-2 h-2 w-2 rounded-full bg-brand-400" style={{ borderWidth: 2, borderColor: colors.ink900 }} />
-          </Pressable>
+          username ? (
+            <Pressable
+              onPress={() => setUsernameOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Community settings"
+              className="h-10 flex-row items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 active:opacity-80"
+            >
+              <Text className="text-[13px] font-bold text-white/80">@{username}</Text>
+              <Settings2 size={15} color={colors.fg} />
+            </Pressable>
+          ) : (
+            <Pressable
+              onPress={() => setUsernameOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Set a username"
+              className="h-10 flex-row items-center gap-1.5 rounded-full bg-brand-400 px-3.5 active:opacity-90"
+            >
+              <AtSign size={15} color="#000" />
+              <Text className="text-[13px] font-bold text-black">Set username</Text>
+            </Pressable>
+          )
         }
       />
       <SegmentedTabs tabs={TABS} active={tab} onChange={setTab} />
-      <View className="mt-3 flex-row items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
-        <CalendarClock size={14} color={brand[400]} />
-        <Text className="flex-1 text-[12px] leading-snug text-white/55">Preview — social features aren’t live yet, so the posts and people shown here are examples.</Text>
-      </View>
       <View className="mt-5">
-        {tab === 'Feed' && <FeedTab />}
-        {tab === 'Groups' && <GroupList />}
-        {tab === 'Challenges' && <ChallengesTab />}
-        {tab === 'Events' && <EventsTab />}
-      </View>
-    </View>
-  )
-}
-
-const SCOPES: { id: CommunityScope; label: (p: { university: string; dorm: string; society: string }) => string }[] = [
-  { id: 'campus', label: (p) => p.university },
-  { id: 'dorm', label: (p) => p.dorm },
-  { id: 'society', label: (p) => p.society },
-]
-const feedPostKey = (post: Post) => post.id
-const feedContentStyle = { gap: 12, paddingHorizontal: 20, paddingBottom: 4 }
-
-function FeedTab() {
-  const { state, dispatch } = useStore()
-  const nav = useNav()
-  const [scope, setScope] = useState<CommunityScope>('campus')
-  const featured =
-    scope === 'dorm'
-      ? state.challenges.find((c) => c.scope === 'dorm')
-      : scope === 'society'
-        ? state.challenges.find((c) => c.scope === 'society')
-        : state.challenges.find((c) => c.joined && c.scope === 'campus')
-  const renderPost = useCallback(
-    ({ item }: ListRenderItemInfo<Post>) => <FeedCard post={item} />,
-    [],
-  )
-
-  return (
-    <>
-      <Hero image={img.community} rounded={16}>
-        <Users size={26} color={brand[400]} />
-        <Text className="mt-2 text-xl font-extrabold leading-tight tracking-tight text-white">Your campus,{'\n'}<Text className="text-brand-400">your people.</Text></Text>
-        <Text className="mt-2 max-w-[230px] text-[13px] leading-snug text-white/65">Train alongside students in your halls and societies, not strangers across the world.</Text>
-        <View className="mt-4 flex-row gap-2">
-          <Pressable onPress={() => nav.open('createPost')} accessibilityRole="button" accessibilityLabel="Create a post" className="btn-primary px-4 py-2.5 active:opacity-90">
-            <Text className="text-sm font-semibold text-black">Share something</Text>
-          </Pressable>
-          <Pressable onPress={() => nav.open('partnerMatch')} accessibilityRole="button" accessibilityLabel="Find a training partner" className="flex-row items-center gap-1.5 rounded-full bg-white/10 px-4 py-2.5 active:opacity-90">
-            <UserPlus size={15} color="#fff" />
-            <Text className="text-sm font-semibold text-white">Find a partner</Text>
-          </Pressable>
-        </View>
-      </Hero>
-
-      {/* scope selector */}
-      <View className="mt-4 flex-row gap-2">
-        {SCOPES.map((s) => {
-          const active = scope === s.id
-          return (
-            <Pressable key={s.id} onPress={() => setScope(s.id)} accessibilityRole="button" accessibilityLabel={s.label(state.profile)} accessibilityState={{ selected: active }} className={`flex-1 items-center rounded-full py-2 active:opacity-80 ${active ? 'bg-brand-400' : 'bg-ink-700'}`}>
-              <Text numberOfLines={1} className={`text-[13px] font-semibold ${active ? 'text-black' : 'text-white/60'}`}>{s.label(state.profile)}</Text>
-            </Pressable>
-          )
-        })}
+        {tab === 'League' && <LeagueScreen onClaimUsername={() => setUsernameOpen(true)} />}
+        {tab === 'Groups' && <GroupsTab onClaimUsername={() => setUsernameOpen(true)} />}
       </View>
 
-      <SectionHeader title="What's happening" />
-      <FlatList
-        horizontal
-        data={state.posts}
-        renderItem={renderPost}
-        keyExtractor={feedPostKey}
-        className="-mx-5"
-        contentContainerStyle={feedContentStyle}
-        showsHorizontalScrollIndicator={false}
-        initialNumToRender={3}
-        maxToRenderPerBatch={3}
-        windowSize={5}
-      />
-
-      {featured && (
-        <>
-          <SectionHeader title={scope === 'campus' ? 'Active challenge' : 'Belonging challenge'} />
-          <ChallengeCard c={featured} onJoin={() => dispatch({ type: 'JOIN_CHALLENGE', id: featured.id })} />
-        </>
-      )}
-
-      <Pressable onPress={() => nav.open('leaderboard')} accessibilityRole="button" accessibilityLabel="Open campus leaderboard" className="mt-4 w-full flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-4 active:opacity-90">
-        <Award size={24} color={brand[400]} />
-        <View className="flex-1">
-          <Text className="font-bold text-white">Campus leaderboard</Text>
-          <Text className="text-[13px] text-white/50">You're #{youRank(state)} at {state.profile.university}</Text>
-        </View>
-        <ChevronRight size={18} color="rgba(255,255,255,0.3)" />
-      </Pressable>
-
-      <SectionHeader title="Your societies" />
-      <GroupList />
-      <View className="h-2" />
-    </>
-  )
-}
-
-const FeedCard = memo(function FeedCard({ post: p }: { post: Post }) {
-  const dispatch = useDispatch()
-  const nav = useNav()
-  const onLike = useCallback(() => dispatch({ type: 'TOGGLE_LIKE', postId: p.id }), [dispatch, p.id])
-  const onKudos = useCallback(() => dispatch({ type: 'GIVE_KUDOS', postId: p.id }), [dispatch, p.id])
-  const onBookmark = useCallback(() => dispatch({ type: 'TOGGLE_BOOKMARK', postId: p.id }), [dispatch, p.id])
-  const onComment = useCallback(() => nav.open('postDetail', { postId: p.id }), [nav, p.id])
-  return (
-    <View className="w-[268px] shrink-0 overflow-hidden rounded-2xl border border-white/5 bg-ink-800">
-      <View className="flex-row items-center gap-2.5 p-3">
-        <Avatar name={p.author} size={36} />
-        <View className="flex-1">
-          <Text className="text-sm font-bold leading-tight text-white">{p.author}</Text>
-          <Text className="text-[12px] text-white/45">{p.time}</Text>
-        </View>
-        <MoreHorizontal size={18} color="rgba(255,255,255,0.4)" />
-      </View>
-      {p.pr && (
-        <View className="mx-3 mb-2 flex-row items-center gap-1.5 self-start rounded-full bg-brand-400/15 px-2.5 py-1">
-          <Award size={13} color={brand[300]} />
-          <Text className="text-[11px] font-bold text-brand-300">Personal best · {p.pr.lift} {p.pr.weight}</Text>
-        </View>
-      )}
-      <Text className="px-3 pb-3 text-[14px] leading-snug text-white">{p.text}</Text>
-      {p.image && <Image source={{ uri: p.image }} resizeMode="cover" className="h-36 w-full" />}
-      {p.ring && (
-        <View className="mx-3 mb-3 items-center rounded-xl bg-ink-700 py-5">
-          <ProgressRing value={p.ring} size={92} stroke={8}><Text className="text-xl font-extrabold text-white">{p.ring}%</Text></ProgressRing>
-          <Text className="mt-2 text-[10px] font-semibold tracking-wider text-white/45">{p.ringLabel}</Text>
-        </View>
-      )}
-      <View className="flex-row items-center gap-3 p-3">
-        <ReactionButton
-          active={p.liked}
-          count={p.likes}
-          onPress={onLike}
-          renderIcon={(active) => <Heart size={17} color={active ? brand[400] : 'rgba(255,255,255,0.55)'} fill={active ? brand[400] : 'none'} />}
-        />
-        <ReactionButton
-          active={!!p.gaveKudos}
-          count={p.kudos ?? 0}
-          onPress={onKudos}
-          renderIcon={(active) => <HeartHandshake size={17} color={active ? brand[400] : 'rgba(255,255,255,0.55)'} fill={active ? brand[400] : 'none'} />}
-        />
-        <Pressable onPress={onComment} accessibilityRole="button" accessibilityLabel={`Comments (${p.comments})`} className="flex-row items-center gap-1.5 active:opacity-70">
-          <MessageCircle size={17} color="rgba(255,255,255,0.55)" />
-          <Text className="text-sm text-white/55">{p.comments}</Text>
-        </Pressable>
-        <Pressable onPress={onBookmark} accessibilityRole="button" accessibilityLabel={p.bookmarked ? "Remove bookmark" : "Bookmark post"} accessibilityState={{ selected: !!p.bookmarked }} className="ml-auto active:opacity-70">
-          <Bookmark size={17} color={p.bookmarked ? brand[400] : 'rgba(255,255,255,0.45)'} fill={p.bookmarked ? brand[400] : 'none'} />
-        </Pressable>
-      </View>
-    </View>
-  )
-})
-
-/* A like/kudos button with an optimistic heart-burst. The tap registers
- * instantly (the reducer already toggled state) and a little pop of particles
- * confirms it — the Instagram/Strava touch that signals quality. */
-function ReactionButton({ active, count, onPress, renderIcon }: {
-  active: boolean
-  count: number
-  onPress: () => void
-  renderIcon: (active: boolean) => ReactNode
-}) {
-  const pop = useRef(new Animated.Value(1)).current
-  const burst = useRef(new Animated.Value(0)).current
-  const PARTICLES = 6
-
-  function press() {
-    const activating = !active
-    onPress()
-    pop.stopAnimation()
-    pop.setValue(activating ? 0.5 : 0.82)
-    Animated.spring(pop, { toValue: 1, useNativeDriver: true, speed: 14, bounciness: activating ? 18 : 6 }).start()
-    if (activating) {
-      burst.setValue(0)
-      Animated.timing(burst, { toValue: 1, duration: 520, easing: Easing.out(Easing.quad), useNativeDriver: true }).start()
-    }
-  }
-
-  return (
-    <Pressable onPress={press} hitSlop={10} accessibilityRole="button" accessibilityLabel={`Kudos (${count})`} accessibilityState={{ selected: active }} className="flex-row items-center gap-1.5 active:opacity-70">
-      <View style={{ width: 17, height: 17, alignItems: 'center', justifyContent: 'center' }}>
-        {Array.from({ length: PARTICLES }).map((_, i) => {
-          const angle = (i / PARTICLES) * Math.PI * 2
-          return (
-            <Animated.View
-              key={i}
-              pointerEvents="none"
-              style={{
-                position: 'absolute', width: 4, height: 4, borderRadius: 2, backgroundColor: brand[400],
-                opacity: burst.interpolate({ inputRange: [0, 0.7, 1], outputRange: [0.9, 0.9, 0] }),
-                transform: [
-                  { translateX: burst.interpolate({ inputRange: [0, 1], outputRange: [0, Math.cos(angle) * 15] }) },
-                  { translateY: burst.interpolate({ inputRange: [0, 1], outputRange: [0, Math.sin(angle) * 15] }) },
-                  { scale: burst.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 1, 0] }) },
-                ],
-              }}
-            />
-          )
-        })}
-        <Animated.View style={{ transform: [{ scale: pop }] }}>{renderIcon(active)}</Animated.View>
-      </View>
-      <Text className={`text-sm ${active ? 'text-brand-400' : 'text-white/55'}`}>{count}</Text>
-    </Pressable>
-  )
-}
-
-function ChallengeCard({ c, onJoin }: { c: Challenge; onJoin: () => void }) {
-  const nav = useNav()
-  return (
-    <View className="rounded-2xl border border-white/5 bg-ink-800 p-4">
-      <View className="flex-row items-center gap-4">
-        <ProgressRing value={c.progressPct || 1} size={62} stroke={5}>
-          <Text className="text-lg font-extrabold leading-none text-white">{c.weeks}</Text>
-          <Text className="text-[8px] font-semibold tracking-wide text-white/50">WEEKS</Text>
-        </ProgressRing>
-        <View className="flex-1">
-          <Text className="font-bold leading-tight text-white">{c.title}</Text>
-          <View className="mt-1.5 flex-row items-center gap-2">
-            <AvatarStack names={['Alex M', 'Sophie L', 'Jayden K', 'Mia R', 'Dan P']} size={24} />
-            <Text className="text-[12px] font-semibold text-white/55">+{c.participants}</Text>
-          </View>
-        </View>
-        {c.rank != null && (
-          <View className="items-end">
-            <Text className="text-[11px] text-white/45">Your rank</Text>
-            <Text className="text-lg font-extrabold text-brand-400">#{c.rank}</Text>
-            {c.rankDelta != null && c.rankDelta !== 0 && (
-              <View className="mt-0.5 flex-row items-center gap-0.5">
-                <TrendingUp size={11} color={c.rankDelta > 0 ? brand[400] : 'rgba(255,255,255,0.4)'} style={c.rankDelta > 0 ? undefined : { transform: [{ scaleY: -1 }] }} />
-                <Text className="text-[11px] font-bold" style={{ color: c.rankDelta > 0 ? brand[400] : 'rgba(255,255,255,0.4)' }}>
-                  {c.rankDelta > 0 ? `+${c.rankDelta}` : c.rankDelta} this week
-                </Text>
-              </View>
-            )}
-          </View>
-        )}
-      </View>
-
-      {c.vsLabel && c.yourSide ? (
-        <View className="mt-4">
-          <View className="mb-1 flex-row items-center justify-between">
-            <View className="flex-row items-center gap-1">
-              <Swords size={13} color={brand[400]} />
-              <Text className="text-[12px] font-semibold text-brand-400">{c.yourSide}</Text>
-            </View>
-            <Text className="text-[12px] font-semibold text-white/45">{c.rivalSide}</Text>
-          </View>
-          <View className="h-3 flex-row overflow-hidden rounded-full bg-ink-700">
-            <View className="h-full rounded-l-full bg-brand-400" style={{ width: `${c.yourSidePct ?? 50}%` }} />
-          </View>
-          <View className="mt-1 flex-row items-center justify-between">
-            <Text className="text-[12px] text-white/50">{c.yourSidePct}%</Text>
-            <Text className="text-[12px] text-white/50">{c.rivalSidePct}%</Text>
-          </View>
-        </View>
-      ) : (
-        <>
-          <ProgressBar value={c.progressPct} className="mt-4" />
-          <View className="mt-2 flex-row items-center justify-between">
-            <Text className="text-[12px] text-white/50">Week {c.currentWeek} of {c.totalWeeks}</Text>
-            <Text className="text-[12px] text-white/50">{c.progressPct}% complete</Text>
-          </View>
-        </>
-      )}
-
-      <View className="mt-4 flex-row gap-2">
-        <Pressable onPress={() => nav.open('challengeDetail', { id: c.id })} accessibilityRole="button" accessibilityLabel="View challenge details" className="flex-1 items-center rounded-full border border-white/10 bg-white/5 py-2.5 active:opacity-80">
-          <Text className="text-sm font-semibold text-white/80">View standings</Text>
-        </Pressable>
-        {!c.joined && (
-          <Pressable onPress={onJoin} accessibilityRole="button" accessibilityLabel="Join challenge" className="btn-primary flex-1 py-2.5 active:opacity-90">
-            <Text className="text-sm font-semibold text-black">Join</Text>
-          </Pressable>
-        )}
-      </View>
-    </View>
-  )
-}
-
-function GroupList() {
-  const { state, dispatch } = useStore()
-  return (
-    <View className="gap-2.5">
-      {state.groups.map((g) => (
-        <View key={g.id} className="w-full flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-3">
-          <View className="h-12 w-12 shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: `${g.color}22` }}><Icon name={g.icon} size={22} color={g.color} /></View>
-          <View className="min-w-0 flex-1">
-            <Text className="font-bold leading-tight text-white">{g.name}</Text>
-            <Text className="text-[12px] text-white/45">{g.members} members · {g.desc}</Text>
-          </View>
-          {g.unread > 0 && g.joined && <Chip color="green">{g.unread} new</Chip>}
-          <Pressable onPress={() => dispatch({ type: 'JOIN_GROUP', id: g.id })} accessibilityRole="button" accessibilityLabel={g.joined ? 'Leave group' : 'Join group'} accessibilityState={{ selected: g.joined }} className={`rounded-full px-3.5 py-1.5 active:opacity-80 ${g.joined ? 'bg-ink-700' : 'bg-brand-400'}`}>
-            <Text className={`text-sm font-bold ${g.joined ? 'text-white/70' : 'text-black'}`}>{g.joined ? 'Joined' : 'Join'}</Text>
-          </Pressable>
-        </View>
-      ))}
-    </View>
-  )
-}
-
-function ChallengesTab() {
-  const { state, dispatch } = useStore()
-  const scopeLabel: Record<string, string> = { campus: 'Campus', dorm: 'Hall vs hall', society: 'Society vs society', global: 'Open to all' }
-  return (
-    <View className="gap-3">
-      {state.challenges.map((c) => (
-        <View key={c.id}>
-          {c.scope && <Text className="mb-1 ml-1 text-[11px] font-semibold uppercase tracking-wide text-white/35">{scopeLabel[c.scope]}</Text>}
-          <ChallengeCard c={c} onJoin={() => dispatch({ type: 'JOIN_CHALLENGE', id: c.id })} />
-        </View>
-      ))}
-    </View>
-  )
-}
-
-function EventsTab() {
-  const { state, dispatch } = useStore()
-  return (
-    <View className="gap-3">
-      {state.events.map((e) => (
-        <View key={e.id} className="flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-4">
-          <View className="h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-400/15"><CalendarClock size={22} color={brand[400]} /></View>
-          <View className="flex-1">
-            <Text className="font-bold leading-tight text-white">{e.title}</Text>
-            <Text className="text-[12px] text-white/50">{e.when}</Text>
-            <Text className="text-[12px] text-white/40">Hosted by {e.host}</Text>
-          </View>
-          <Pressable onPress={() => dispatch({ type: 'RSVP_EVENT', id: e.id })} accessibilityRole="button" accessibilityLabel={e.rsvp ? 'Cancel RSVP' : 'RSVP to event'} accessibilityState={{ selected: e.rsvp }} className={`rounded-full px-3.5 py-1.5 active:opacity-80 ${e.rsvp ? 'bg-brand-400' : 'bg-ink-700'}`}>
-            <Text className={`text-sm font-bold ${e.rsvp ? 'text-black' : 'text-white/70'}`}>{e.rsvp ? 'Going' : 'RSVP'}</Text>
-          </Pressable>
-        </View>
-      ))}
+      <UsernameSheet open={usernameOpen} onClose={() => setUsernameOpen(false)} />
     </View>
   )
 }

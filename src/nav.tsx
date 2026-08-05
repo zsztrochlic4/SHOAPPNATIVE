@@ -12,8 +12,6 @@ export type Overlay =
   | 'logWeight'
   | 'logHabit'
   | 'logActivity'
-  | 'createPost'
-  | 'leaderboard'
   | 'quick'
   | 'badges'
   | 'examMode'
@@ -22,10 +20,7 @@ export type Overlay =
   | 'beginner'
   | 'budgetEats'
   | 'exerciseDetail'
-  | 'partnerMatch'
   | 'prCelebration'
-  | 'postDetail'
-  | 'challengeDetail'
 
 export type NavCtx = {
   open: (o: Overlay, params?: Record<string, unknown>) => void

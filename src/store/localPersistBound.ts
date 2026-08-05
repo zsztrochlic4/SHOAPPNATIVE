@@ -86,7 +86,7 @@ const SUBCOLLECTION_KEYS = [
   'chat', 'coachThread', 'notifications', 'workoutSummaries',
 ] as const
 /** Device-only fields never written to the root (mirror of cloudRepo LOCAL_ONLY). */
-const LOCAL_ONLY_KEYS = ['subscription'] as const
+const LOCAL_ONLY_KEYS = ['subscription', 'community'] as const
 
 /** The exact set of fields cloudRepo writes to the root doc. */
 export function rootDocFields(state: AppState): Record<string, unknown> {
