@@ -546,14 +546,22 @@ function GroupDetailSheet({ open, groupId, onClose }: { open: boolean; groupId: 
   }
   const leave = async () => {
     if (!group) return
-    if (COMMUNITY_BACKEND) { try { const b = await import('./groupsBackend'); await b.leaveGroupRemote(group.id) } catch { /* optimistic */ } }
+    // Don't diverge from the server: when the backend is on, only remove locally
+    // if the server confirmed it (audit F-016). Offline/sim path stays local.
+    if (COMMUNITY_BACKEND) {
+      try { const b = await import('./groupsBackend'); await b.leaveGroupRemote(group.id) }
+      catch { toast("Couldn't leave the group — check your connection and try again"); return }
+    }
     dispatch({ type: 'LEAVE_GROUP', id: group.id })
     toast(`Left ${group.name}`)
     onClose()
   }
   const remove = async () => {
     if (!group) return
-    if (COMMUNITY_BACKEND) { try { const b = await import('./groupsBackend'); await b.deleteGroupRemote(group.id) } catch { /* optimistic */ } }
+    if (COMMUNITY_BACKEND) {
+      try { const b = await import('./groupsBackend'); await b.deleteGroupRemote(group.id) }
+      catch { toast("Couldn't delete the group — check your connection and try again"); return }
+    }
     dispatch({ type: 'DELETE_GROUP', id: group.id })
     toast('Group deleted')
     onClose()
@@ -668,8 +676,17 @@ function GroupDetailSheet({ open, groupId, onClose }: { open: boolean; groupId: 
                     item={a}
                     tally={group.cheers?.[a.id]}
                     onCheer={() => {
-                      if (COMMUNITY_BACKEND) { import('./groupsBackend').then((b) => b.cheerRemote(group.id, a.id)).catch(() => {}) }
+                      // Optimistic toggle, but roll back if the server rejects it so
+                      // the count can't diverge silently (audit F-016).
                       dispatch({ type: 'CHEER_ACTIVITY', groupId: group.id, activityId: a.id })
+                      if (COMMUNITY_BACKEND) {
+                        import('./groupsBackend')
+                          .then((b) => b.cheerRemote(group.id, a.id))
+                          .catch(() => {
+                            dispatch({ type: 'CHEER_ACTIVITY', groupId: group.id, activityId: a.id })
+                            toast("Couldn't send your cheer")
+                          })
+                      }
                     }}
                   />
                 ))}

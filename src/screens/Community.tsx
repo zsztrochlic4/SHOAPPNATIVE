@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { View, Text, Pressable } from 'react-native'
-import { Settings2, AtSign } from 'lucide-react-native'
+import { Settings2, AtSign, Info } from 'lucide-react-native'
 import { ScreenHeader, SegmentedTabs } from '../components/ui'
 import { useStoreSelector } from '../store/store'
 import { useColors, brand } from '../theme'
@@ -8,6 +8,7 @@ import type { AppState } from '../store/types'
 import { LeagueScreen } from '../community/LeagueScreen'
 import { GroupsTab } from '../community/groups'
 import { UsernameSheet } from '../community/UsernameSetup'
+import { COMMUNITY_BACKEND } from '../community/backendConfig'
 
 const TABS = ['League', 'Groups']
 
@@ -55,6 +56,17 @@ export default function Community() {
         }
       />
       <SegmentedTabs tabs={TABS} active={tab} onChange={setTab} />
+      {/* Truthfulness: while the backend is off the whole hub runs on illustrative
+          local data — say so plainly rather than passing invented people off as
+          real competition (audit F-001). Disappears once COMMUNITY_BACKEND is on. */}
+      {!COMMUNITY_BACKEND && (
+        <View className="mt-3 flex-row items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+          <Info size={14} color={colors.fgTertiary} />
+          <Text className="flex-1 text-[12px] leading-snug text-secondary">
+            Preview · example data. Competitors, groups and standings are illustrative until Community goes live.
+          </Text>
+        </View>
+      )}
       <View className="mt-5">
         {tab === 'League' && <LeagueScreen onClaimUsername={() => setUsernameOpen(true)} />}
         {tab === 'Groups' && <GroupsTab onClaimUsername={() => setUsernameOpen(true)} />}

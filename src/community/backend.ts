@@ -53,6 +53,12 @@ export async function syncStatsRemote(stats: {
   streakCurrent: number
   streakBest: number
   freezeTokens: number
+  // Group leaderboards + the shared team goal denormalise these onto member docs;
+  // omitting them made the server fan out zeros and collapse volume/session
+  // rankings after a normal sync (audit F-011). Always send the full set.
+  volume7: number
+  volume30: number
+  sessionsThisWeek: number
 }): Promise<{ ok: true; tier: number; weekKey: string }> {
   const res = await call<typeof stats, { ok: true; tier: number; weekKey: string }>('syncCommunityStats')(stats)
   return res.data
