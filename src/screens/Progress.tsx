@@ -105,7 +105,7 @@ export default function Progress() {
       <View className="mb-3.5 flex-row items-center justify-between">
         <View className="min-w-0 flex-1">
           <Text className="text-[28px] font-extrabold tracking-tight text-white">My Progress</Text>
-          <Text className="mt-0.5 text-[12.5px] text-white/45">Goal: {GOAL_LABEL[p.goal]}</Text>
+          <Text className="mt-0.5 text-[12.5px] text-secondary">Goal: {GOAL_LABEL[p.goal]}</Text>
         </View>
         <Pressable
           onPress={() => setCustomizeOpen(true)}
@@ -120,16 +120,16 @@ export default function Progress() {
       <View className="rounded-3xl border border-white/5 bg-ink-800 p-4">
         <View className="flex-row items-start justify-between gap-2.5">
           <View className="min-w-0 flex-1">
-            <Text className="text-[13px] font-semibold text-white/60">{feat.title}</Text>
+            <Text className="text-[13px] font-semibold text-secondary">{feat.title}</Text>
             <View className="mt-1 flex-row flex-wrap items-baseline gap-2">
               <View className="flex-row items-baseline">
                 <Text className="text-[32px] font-extrabold leading-none text-white">{feat.value}</Text>
-                <Text className="ml-1 text-[13px] font-semibold text-white/45">{feat.unit}</Text>
+                <Text className="ml-1 text-[13px] font-semibold text-secondary">{feat.unit}</Text>
               </View>
               <Text className="text-[12px] font-bold" style={{ color: deltaColor }}>{feat.deltaText}</Text>
               <VerdictChip verdict={feat.verdict} colors={colors} />
             </View>
-            <Text className="mt-1 text-[11px] text-white/40">{feat.deltaNote}</Text>
+            <Text className="mt-1 text-[11px] text-tertiary">{feat.deltaNote}</Text>
           </View>
           <Pressable
             onPress={cycleTf}
@@ -158,7 +158,7 @@ export default function Progress() {
         <View className="mt-4 flex-row justify-between border-t border-white/[0.06] pt-3.5">
           {feat.stats.map((st, i) => (
             <View key={i} style={{ alignItems: st.align === 'left' ? 'flex-start' : st.align === 'right' ? 'flex-end' : 'center' }}>
-              <Text className="text-[11px] text-white/40">{st.label}</Text>
+              <Text className="text-[11px] text-tertiary">{st.label}</Text>
               <Text className="mt-0.5 text-[16px] font-extrabold" style={{ color: st.accent ? colors.brand400 : colors.fg }}>{st.value}</Text>
             </View>
           ))}
@@ -167,7 +167,7 @@ export default function Progress() {
         {/* Mini 7-day bars (steps / water / sleep) */}
         {feat.mini7 && (
           <View className="mt-4 border-t border-white/[0.06] pt-3.5">
-            <Text className="mb-2.5 text-[11px] text-white/40">Last 7 days</Text>
+            <Text className="mb-2.5 text-[11px] text-tertiary">Last 7 days</Text>
             <View className="h-16 flex-row items-end gap-[7px]">
               {feat.mini7.map((b, i) => (
                 <View key={i} className="h-full flex-1 flex-col items-center gap-1.5">
@@ -199,10 +199,10 @@ export default function Progress() {
           <View key={q.id} className="flex-1 rounded-3xl border border-white/5 bg-ink-800 px-3 py-3.5">
             <View className="flex-row items-center gap-1.5">
               <Icon name={q.icon} size={15} color={colors.brand400} />
-              <Text numberOfLines={1} className="flex-1 text-[11px] font-medium text-white/60">{q.label}</Text>
+              <Text numberOfLines={1} className="flex-1 text-[11px] font-medium text-secondary">{q.label}</Text>
             </View>
             <Text className="mt-2.5 text-[21px] font-extrabold leading-none text-white">{q.value}</Text>
-            <Text className="mt-1.5 text-[10.5px] text-white/40">{q.cap}</Text>
+            <Text className="mt-1.5 text-[10.5px] text-tertiary">{q.cap}</Text>
           </View>
         ))}
       </View>
@@ -211,19 +211,19 @@ export default function Progress() {
       {lifts.length > 0 && (
         <>
           <SectionHeader title="Training progress" />
-          <Text className="-mt-2 mb-3.5 text-[12.5px] text-white/45">Sorted by gain · Last {RANGE_LABEL[liftPeriod]}</Text>
+          <Text className="-mt-2 mb-3.5 text-[12.5px] text-secondary">Sorted by gain · Last {RANGE_LABEL[liftPeriod]}</Text>
           <View className="rounded-3xl border border-white/5 bg-ink-800 px-[18px] pb-3.5 pt-1">
             {liftsShown.map((l, i) => (
               <View key={l.id} style={{ paddingVertical: 13, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: `${colors.fg}12` }}>
                 <View className="flex-row items-center gap-2.5">
-                  <Text className="w-5 text-[12px] font-extrabold text-white/35">{i + 1}</Text>
+                  <Text className="w-5 text-[12px] font-extrabold text-tertiary">{i + 1}</Text>
                   <Text numberOfLines={1} className="flex-1 text-[14.5px] font-bold text-white">{l.name}</Text>
                   <Text className="text-[14px] font-extrabold text-brand-400">+{l.gainPct}%</Text>
                 </View>
                 <View className="ml-[30px] mt-2.5 h-2.5 overflow-hidden rounded-full bg-white/10">
                   <View className="h-full rounded-full" style={{ width: `${Math.round((l.gainPct / maxGain) * 100)}%`, backgroundColor: colors.brand400 }} />
                 </View>
-                <Text className="ml-[30px] mt-1.5 text-[11.5px] text-white/45">{l.from} {weightUnit(units)} → {l.now} {weightUnit(units)}</Text>
+                <Text className="ml-[30px] mt-1.5 text-[11.5px] text-secondary">{l.from} {weightUnit(units)} → {l.now} {weightUnit(units)}</Text>
               </View>
             ))}
             {hasLiftToggle && (
@@ -253,7 +253,7 @@ export default function Progress() {
             <View className="mt-2.5 flex-row flex-wrap items-baseline gap-[11px]">
               <Text className="text-[40px] font-extrabold leading-none text-white" style={{ letterSpacing: -1 }}>{bmi.bmi.toFixed(1)}</Text>
               <View className="flex-row items-center gap-2">
-                <Text className="text-[14px] text-white/50">Your weight is</Text>
+                <Text className="text-[14px] text-secondary">Your weight is</Text>
                 <View style={{ paddingHorizontal: 11, paddingVertical: 4, borderRadius: 999, backgroundColor: `${progColor(bmi.color, colors)}26` }}>
                   <Text style={{ fontSize: 13, fontWeight: '700', color: progColor(bmi.color, colors) }}>{bmi.label}</Text>
                 </View>
@@ -282,7 +282,7 @@ export default function Progress() {
                     <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: `${b.c}99` }} />
                     <Text className="text-[11.5px] font-semibold text-white/75">{b.label}</Text>
                   </View>
-                  <Text className="ml-3.5 mt-0.5 text-[11px] text-white/40">{b.range}</Text>
+                  <Text className="ml-3.5 mt-0.5 text-[11px] text-tertiary">{b.range}</Text>
                 </View>
               ))}
             </View>

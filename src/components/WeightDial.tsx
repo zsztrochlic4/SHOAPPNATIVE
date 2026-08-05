@@ -133,13 +133,13 @@ export function WeightDial({
         <View style={{ position: 'absolute', left: 0, right: 0, top: cy - 74, alignItems: 'center' }} pointerEvents="none">
           <Text className="text-5xl font-extrabold tracking-tight text-white">
             {step < 1 ? value.toFixed(1).replace(/\.0$/, '') : Math.round(value)}
-            <Text className="text-xl font-bold text-white/40"> {unit}</Text>
+            <Text className="text-xl font-bold text-tertiary"> {unit}</Text>
           </Text>
           <Text className="mt-1 text-[11px] font-semibold uppercase tracking-widest text-brand-400">slide to adjust</Text>
         </View>
       </View>
       <View className="mt-1 w-full flex-row items-center justify-between px-1">
-        <Text className="text-[11px] text-white/30">{min}</Text>
+        <Text className="text-[11px] text-tertiary">{min}</Text>
         <View className="flex-row gap-2">
           <Pressable onPress={() => nudge(-step)} hitSlop={8} className="h-9 w-9 items-center justify-center rounded-full bg-ink-700 active:opacity-80">
             <Minus size={16} color="rgba(255,255,255,0.8)" />
@@ -148,7 +148,7 @@ export function WeightDial({
             <Plus size={16} color={colors.brand400} />
           </Pressable>
         </View>
-        <Text className="text-[11px] text-white/30">{max}</Text>
+        <Text className="text-[11px] text-tertiary">{max}</Text>
       </View>
     </View>
   )

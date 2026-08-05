@@ -8,10 +8,11 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import { View, Text, Pressable } from 'react-native'
-import { Trophy, Snowflake, Moon, Info, ChevronRight, ArrowUp, ArrowDown, ShieldCheck, Clock } from 'lucide-react-native'
+import { Trophy, Snowflake, Moon, Info, ChevronRight, ArrowUp, ArrowDown, ShieldCheck, Clock, UserPlus, Users } from 'lucide-react-native'
 import { useStore } from '../store/store'
 import { myLeaderStats, streakRisk } from '../store/selectors'
 import { todayKey } from '../lib/date'
+import { shareText } from '../lib/share'
 import { useColors, brand } from '../theme'
 import { Avatar } from '../components/Avatar'
 import { Sheet } from '../components/Sheet'
@@ -104,7 +105,7 @@ export function LeagueScreen({ onClaimUsername }: { onClaimUsername: () => void 
               accessibilityState={{ selected: active }}
               className={`flex-1 items-center rounded-xl py-2 ${active ? 'bg-brand-400' : ''} active:opacity-80`}
             >
-              <Text className={`text-[13px] font-bold ${active ? 'text-black' : 'text-white/55'}`}>{v === 'league' ? 'My league' : 'Global streaks'}</Text>
+              <Text className={`text-[13px] font-bold ${active ? 'text-black' : 'text-secondary'}`}>{v === 'league' ? 'My league' : 'Global streaks'}</Text>
             </Pressable>
           )
         })}
@@ -120,6 +121,7 @@ export function LeagueScreen({ onClaimUsername }: { onClaimUsername: () => void 
         <>
           <LeagueHero tier={data.tier} rank={data.youRank} points={me.odometer} cohort={data.rows.length} zone={data.zone} onHow={() => setHowOpen(true)} />
           <StreakCard />
+          {data.rows.length < LOW_POP_COHORT && <LeagueFillingCard count={data.rows.length} />}
           <LeagueStandings rows={data.rows} tier={data.tier} />
         </>
       )}
@@ -154,9 +156,57 @@ function LeagueError({ onRetry }: { onRetry: () => void }) {
   return (
     <View className="mt-6 items-center rounded-2xl border border-dashed border-white/15 px-6 py-12">
       <Text className="font-bold text-white">Couldn't load your league</Text>
-      <Text className="mt-1 max-w-[240px] text-center text-[13px] text-white/45">Check your connection and try again.</Text>
+      <Text className="mt-1 max-w-[240px] text-center text-[13px] text-secondary">Check your connection and try again.</Text>
       <Pressable onPress={onRetry} accessibilityRole="button" accessibilityLabel="Retry loading league" className="btn-primary mt-4 px-5 py-2.5 active:opacity-90">
         <Text className="text-sm font-semibold text-black">Try again</Text>
+      </Pressable>
+    </View>
+  )
+}
+
+/* ------------------------------ low-population ----------------------------- */
+
+// A full cohort is ~25. Below this the tier hasn't filled enough to feel like a
+// real competition (only reachable on the live backend — the local simulation
+// always seeds a full board), so we reassure rather than show a thin, sad list.
+const LOW_POP_COHORT = 6
+
+/** Shown when the live league has only a handful of real members. Reframes the
+ *  sparse board as "filling up" and gives one concrete action (invite friends)
+ *  instead of leaving the standings looking empty next to the demo-seeded feel. */
+function LeagueFillingCard({ count }: { count: number }) {
+  const toast = useToast()
+  const invite = async () => {
+    const res = await shareText(
+      "I'm competing on StrengthHub — join my league and let's climb together.",
+      'StrengthHub',
+    )
+    if (res === 'copied') toast('Invite copied to clipboard')
+    else if (res === 'failed') toast("Couldn't open share")
+  }
+  return (
+    <View className="mt-4 rounded-2xl border border-dashed border-white/15 bg-ink-800 p-4">
+      <View className="flex-row items-center gap-3">
+        <View className="h-10 w-10 items-center justify-center rounded-full" style={{ backgroundColor: `${brand[400]}1a` }}>
+          <Users size={18} color={brand[400]} />
+        </View>
+        <View className="min-w-0 flex-1">
+          <Text className="font-bold text-white">Your league is filling up</Text>
+          <Text className="mt-0.5 text-[13px] leading-snug text-secondary">
+            {count <= 1
+              ? "You're first in — new lifters land here every day. Invite a friend and climb together."
+              : `${count} lifters so far. More join your league as StrengthHub grows.`}
+          </Text>
+        </View>
+      </View>
+      <Pressable
+        onPress={invite}
+        accessibilityRole="button"
+        accessibilityLabel="Invite friends to StrengthHub"
+        className="mt-3 flex-row items-center justify-center gap-2 rounded-xl bg-brand-400 py-2.5 active:opacity-90"
+      >
+        <UserPlus size={16} color="#000" />
+        <Text className="text-[14px] font-bold text-black">Invite friends</Text>
       </Pressable>
     </View>
   )
@@ -189,21 +239,21 @@ function LeagueHero({ tier, rank, points, cohort, zone, onHow }: {
           <Text className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: tier.color }}>{tier.name} League</Text>
           <View className="flex-row items-end gap-1.5">
             <Text className="text-[30px] font-black leading-tight text-white">#{rank}</Text>
-            <Text className="mb-1.5 text-[13px] font-semibold text-white/45">of {cohort}</Text>
+            <Text className="mb-1.5 text-[13px] font-semibold text-secondary">of {cohort}</Text>
           </View>
         </View>
         <View className="items-end">
           <View className="flex-row items-center gap-1">
             <Clock size={12} color="rgba(255,255,255,0.45)" />
-            <Text className="text-[12px] font-bold text-white/60">{days}d left</Text>
+            <Text className="text-[12px] font-bold text-secondary">{days}d left</Text>
           </View>
-          <Text className="mt-1 text-[12px] text-white/45">{points} pts</Text>
+          <Text className="mt-1 text-[12px] text-secondary">{points} pts</Text>
         </View>
       </View>
       <Text className="mt-3 text-[13px] font-semibold" style={{ color: status.color }}>{status.text}</Text>
       <Pressable onPress={onHow} accessibilityRole="button" accessibilityLabel="How leagues work" className="mt-2 flex-row items-center gap-1 active:opacity-70">
         <Info size={13} color="rgba(255,255,255,0.45)" />
-        <Text className="text-[12px] font-semibold text-white/45">How leagues work</Text>
+        <Text className="text-[12px] font-semibold text-secondary">How leagues work</Text>
       </Pressable>
     </View>
   )
@@ -234,7 +284,7 @@ function StreakCard() {
         <StreakFlame days={me.streakCurrent} size={20} />
         <View className="flex-1">
           <Text className="text-[13px] font-bold text-white">{me.streakCurrent}-day streak</Text>
-          <Text className="text-[12px] text-white/45">Best {me.streakBest} · rest days &amp; freezes keep it alive</Text>
+          <Text className="text-[12px] text-secondary">Best {me.streakBest} · rest days &amp; freezes keep it alive</Text>
         </View>
         <View className="flex-row items-center gap-1.5 rounded-full bg-white/8 px-2.5 py-1">
           <Snowflake size={13} color="#6AD1E3" />
@@ -312,7 +362,7 @@ function StandingRow({ row }: { row: LeagueRow }) {
       <Text numberOfLines={1} className={`flex-1 font-bold leading-tight ${you ? 'text-brand-300' : 'text-white'}`}>@{row.username}{you ? ' (You)' : ''}</Text>
       <View className="items-end">
         <Text className="text-[16px] font-black" style={{ color: you ? brand[400] : accent }}>{row.points}</Text>
-        <Text className="text-[10px] font-semibold text-white/35">pts</Text>
+        <Text className="text-[10px] font-semibold text-tertiary">pts</Text>
       </View>
     </View>
   )
@@ -324,7 +374,7 @@ function HowLeaguesSheet({ open, onClose }: { open: boolean; onClose: () => void
   return (
     <Sheet open={open} onClose={onClose} title="How leagues work">
       <View className="gap-3">
-        <HowRow n="1" title="Compete for the week" body="You're placed in a league of ~25 people. Your score this week is your dashboard odometer — how consistently you hit your goals. It's about showing up, not how much you lift." />
+        <HowRow n="1" title="Compete for the week" body="You're placed in a league with others at your level — up to ~25 as it fills. Your score this week is your dashboard odometer — how consistently you hit your goals. It's about showing up, not how much you lift." />
         <HowRow n="2" title="Climb the ladder" body="Every Monday the league resets. Finish near the top and you promote to the next tier — Bronze, Silver, Gold, Platinum, Diamond. The higher you go, the tougher the climb." />
         <HowRow n="3" title="Mind the drop zone" body="Finish in the bottom few and you slip down a tier. It's easy to climb straight back — a couple of good days does it." />
         <HowRow n="4" title="Streaks are forgiving" body="A planned rest day or a freeze token keeps your streak alive through an off day. Rest is part of training — no guilt, no all-or-nothing." />
@@ -349,7 +399,7 @@ function HowRow({ n, title, body }: { n: string; title: string; body: string }) 
       </View>
       <View className="flex-1">
         <Text className="font-bold text-white">{title}</Text>
-        <Text className="mt-0.5 text-[13px] leading-snug text-white/55">{body}</Text>
+        <Text className="mt-0.5 text-[13px] leading-snug text-secondary">{body}</Text>
       </View>
     </View>
   )

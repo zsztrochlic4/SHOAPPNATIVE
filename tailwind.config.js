@@ -16,6 +16,14 @@ module.exports = {
         // light/dark theme toggle (set via `vars()` on the root view) flips
         // every screen automatically — mirrors the original web app.
         white: 'rgb(var(--fg) / <alpha-value>)',
+        // Semantic text tiers — use `text-secondary` / `text-tertiary` for
+        // secondary/de-emphasised copy instead of `text-white/45` etc. These are
+        // solid AA-passing colours (see src/theme.tsx); low-opacity white failed
+        // WCAG AA contrast, badly in the light theme. `text-disabled` is the only
+        // intentionally-dim tier — for disabled controls / placeholders.
+        secondary: 'rgb(var(--fg-secondary) / <alpha-value>)',
+        tertiary: 'rgb(var(--fg-tertiary) / <alpha-value>)',
+        disabled: 'rgb(var(--fg-disabled) / <alpha-value>)',
         ink: {
           DEFAULT: 'rgb(var(--ink-900) / <alpha-value>)',
           900: 'rgb(var(--ink-900) / <alpha-value>)',

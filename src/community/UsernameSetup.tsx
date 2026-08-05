@@ -121,12 +121,12 @@ function UsernameField({
         )}
       </View>
       <View className="mt-2 min-h-[18px] px-1">
-        {field.kind === 'checking' && <Text className="text-[12px] text-white/40">Checking availability…</Text>}
+        {field.kind === 'checking' && <Text className="text-[12px] text-tertiary">Checking availability…</Text>}
         {field.kind === 'available' && <Text className="text-[12px] font-semibold text-brand-300">Available</Text>}
         {(field.kind === 'taken' || field.kind === 'invalid' || field.kind === 'error') && (
           <Text className="text-[12px] font-semibold" style={{ color: colors.danger }}>{field.message}</Text>
         )}
-        {field.kind === 'idle' && <Text className="text-[12px] text-white/35">Letters, numbers and underscores. This is how you appear on leaderboards.</Text>}
+        {field.kind === 'idle' && <Text className="text-[12px] text-tertiary">Letters, numbers and underscores. This is how you appear on leaderboards.</Text>}
       </View>
     </View>
   )
@@ -178,12 +178,12 @@ export function UsernameSheet({ open, onClose }: { open: boolean; onClose: () =>
           <View className="h-14 w-14 items-center justify-center rounded-2xl" style={{ backgroundColor: `${brand[400]}1a` }}>
             <Trophy size={26} color={brand[400]} />
           </View>
-          <Text className="mt-3 max-w-[300px] text-center text-[14px] leading-snug text-white/60">
+          <Text className="mt-3 max-w-[300px] text-center text-[14px] leading-snug text-secondary">
             Pick a unique name to compete on the leaderboard and join groups with friends. You can change it later.
           </Text>
         </View>
       ) : (
-        <Text className="mb-4 text-[13px] leading-snug text-white/50">
+        <Text className="mb-4 text-[13px] leading-snug text-secondary">
           Your username is how friends find you and how you appear on every leaderboard.
         </Text>
       )}
@@ -196,7 +196,7 @@ export function UsernameSheet({ open, onClose }: { open: boolean; onClose: () =>
         accessibilityState={{ disabled: !canSave }}
         className={`mt-3 items-center rounded-2xl py-4 ${canSave ? 'bg-brand-400 active:opacity-90' : 'bg-white/10'}`}
       >
-        <Text className={`text-[15px] font-bold ${canSave ? 'text-black' : 'text-white/40'}`}>{busy ? 'Saving…' : isFirst ? 'Continue' : 'Save'}</Text>
+        <Text className={`text-[15px] font-bold ${canSave ? 'text-black' : 'text-disabled'}`}>{busy ? 'Saving…' : isFirst ? 'Continue' : 'Save'}</Text>
       </Pressable>
     </Sheet>
   )

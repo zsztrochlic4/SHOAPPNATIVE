@@ -84,7 +84,7 @@ export function CoachSheet({ open, onClose }: Props) {
         <View className="h-11 w-11 items-center justify-center rounded-full bg-brand-400"><Sparkles size={20} color="#000" /></View>
         <View>
           <Text className="font-bold leading-tight text-white">Coach</Text>
-          <Text className="text-[12px] text-white/50">Reads your logs. Checks in, not chats.</Text>
+          <Text className="text-[12px] text-secondary">Reads your logs. Checks in, not chats.</Text>
         </View>
       </View>
 
@@ -94,7 +94,7 @@ export function CoachSheet({ open, onClose }: Props) {
             <View className="mb-1 flex-row items-center gap-2">
               <View className="h-6 w-6 items-center justify-center rounded-full bg-white/5">{coachIcon[m.kind]}</View>
               <Text className="font-bold leading-tight text-white">{m.title}</Text>
-              <Text className="ml-auto text-[11px] text-white/35">{i === 0 ? 'Today' : relativeLabel(m.dateKey)}</Text>
+              <Text className="ml-auto text-[11px] text-tertiary">{i === 0 ? 'Today' : relativeLabel(m.dateKey)}</Text>
             </View>
             <Text className="text-[14px] leading-snug text-white/70">{m.body}</Text>
             {m.cta && (
@@ -133,7 +133,7 @@ export function BeginnerSheet({ open, onClose }: Props) {
   return (
     <Sheet open={open} onClose={onClose} full>
       <Text className="text-[25px] font-extrabold tracking-[-0.03em] leading-[1.15] text-white">New to the gym</Text>
-      <Text className="mt-2.5 text-[13.5px] leading-5 text-white/55">A calm, step by step path into your first 90 days. Nothing here assumes you know anything yet.</Text>
+      <Text className="mt-2.5 text-[13.5px] leading-5 text-secondary">A calm, step by step path into your first 90 days. Nothing here assumes you know anything yet.</Text>
 
       <View className="mt-4 rounded-[20px] border border-white/[0.06] bg-ink-800 p-4">
         <View className="flex-row items-center justify-between gap-3">
@@ -141,12 +141,12 @@ export function BeginnerSheet({ open, onClose }: Props) {
           <Text className="text-[12px] font-bold text-brand-400">{done.length}/{total} read</Text>
         </View>
         <View className="mt-[11px]"><ProgressBar value={(done.length / total) * 100} /></View>
-        <Text className="mt-[9px] text-[11.5px] text-white/45">{note}</Text>
+        <Text className="mt-[9px] text-[11.5px] text-secondary">{note}</Text>
       </View>
 
       <View className="mb-3 mt-[22px] flex-row items-center justify-between px-0.5">
-        <Text className="text-[11px] font-bold uppercase tracking-wider text-white/35">The basics</Text>
-        <Text className="text-[11.5px] text-white/30">Read in any order</Text>
+        <Text className="text-[11px] font-bold uppercase tracking-wider text-tertiary">The basics</Text>
+        <Text className="text-[11.5px] text-tertiary">Read in any order</Text>
       </View>
 
       <View className="gap-2.5">
@@ -160,18 +160,18 @@ export function BeginnerSheet({ open, onClose }: Props) {
                 {isDone ? (
                   <View className="h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-brand-400"><Check size={15} strokeWidth={3.4} color="#000" /></View>
                 ) : (
-                  <View className="h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full border-[1.5px] border-white/[0.14]"><Text className="text-[12.5px] font-bold text-white/50">{i + 1}</Text></View>
+                  <View className="h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full border-[1.5px] border-white/[0.14]"><Text className="text-[12.5px] font-bold text-secondary">{i + 1}</Text></View>
                 )}
                 <View className="min-w-0 flex-1">
                   <View className="flex-row items-center gap-1.5">
-                    <Text className={`text-[14.5px] font-bold leading-tight ${isDone ? 'text-white/55' : 'text-white'}`}>{l.title}</Text>
+                    <Text className={`text-[14.5px] font-bold leading-tight ${isDone ? 'text-secondary' : 'text-white'}`}>{l.title}</Text>
                     {isNext && (
                       <View className="rounded-full bg-brand-400/[0.16] px-2 py-0.5">
                         <Text className="text-[9.5px] font-bold uppercase tracking-wide text-brand-300">Start here</Text>
                       </View>
                     )}
                   </View>
-                  <Text numberOfLines={1} className="mt-[3px] text-[12px] leading-tight text-white/50">{l.summary}</Text>
+                  <Text numberOfLines={1} className="mt-[3px] text-[12px] leading-tight text-secondary">{l.summary}</Text>
                 </View>
                 <ChevronDown size={17} color="rgba(255,255,255,0.3)" style={{ transform: [{ rotate: isOpen ? '180deg' : '0deg' }] }} />
               </Pressable>
@@ -199,7 +199,7 @@ export function BeginnerSheet({ open, onClose }: Props) {
         })}
       </View>
 
-      <Text className="mt-5 px-3 text-center text-[12px] leading-[1.55] text-white/35">Nobody is watching you as closely as you think. Take these one at a time.</Text>
+      <Text className="mt-5 px-3 text-center text-[12px] leading-[1.55] text-tertiary">Nobody is watching you as closely as you think. Take these one at a time.</Text>
     </Sheet>
   )
 }
@@ -214,7 +214,7 @@ export function BudgetEatsSheet({ open, onClose }: Props) {
       <View className="rounded-3xl border border-white/8 bg-ink-800 p-5">
         <Salad size={26} color={brand[400]} />
         <Text className="mt-2 text-xl font-extrabold tracking-tight text-white">Tasty, simple, cheap</Text>
-        <Text className="mt-1 text-[14px] leading-snug text-white/60">Easy meals with every step laid out. Pick one and cook along.</Text>
+        <Text className="mt-1 text-[14px] leading-snug text-secondary">Easy meals with every step laid out. Pick one and cook along.</Text>
       </View>
 
       <View className="mt-4 gap-2.5">
@@ -226,7 +226,7 @@ export function BudgetEatsSheet({ open, onClose }: Props) {
                 <Image source={{ uri: m.image }} resizeMode="cover" className="h-14 w-14 rounded-xl" />
                 <View className="min-w-0 flex-1">
                   <Text className="font-bold leading-tight text-white">{m.name}</Text>
-                  <Text className="text-[12px] text-white/50">{m.minutes} min · serves {m.serves}</Text>
+                  <Text className="text-[12px] text-secondary">{m.minutes} min · serves {m.serves}</Text>
                   <View className="mt-1 flex-row flex-wrap gap-1">{m.tags.slice(0, 2).map((t) => <Chip key={t} color="green">{t}</Chip>)}</View>
                 </View>
                 <ChevronDown size={18} color="rgba(255,255,255,0.3)" style={{ flexShrink: 0, transform: [{ rotate: isOpen ? '180deg' : '0deg' }] }} />
@@ -234,7 +234,7 @@ export function BudgetEatsSheet({ open, onClose }: Props) {
               {isOpen && (
                 <View className="gap-3 border-t border-white/5 px-4 py-3">
                   <View>
-                    <Text className="mb-1 text-[12px] font-bold uppercase tracking-wide text-white/40">Ingredients</Text>
+                    <Text className="mb-1 text-[12px] font-bold uppercase tracking-wide text-tertiary">Ingredients</Text>
                     <View className="gap-1">
                       {m.ingredients.map((ing) => (
                         <View key={ing} className="flex-row items-start gap-2">
@@ -245,7 +245,7 @@ export function BudgetEatsSheet({ open, onClose }: Props) {
                     </View>
                   </View>
                   <View>
-                    <Text className="mb-1 text-[12px] font-bold uppercase tracking-wide text-white/40">Method</Text>
+                    <Text className="mb-1 text-[12px] font-bold uppercase tracking-wide text-tertiary">Method</Text>
                     <View className="gap-1 pl-1">{m.steps.map((s, i) => <Text key={i} className="text-[14px] text-white/70">{i + 1}. {s}</Text>)}</View>
                   </View>
                   {m.cookOnce && (
@@ -302,11 +302,11 @@ export function ExerciseDetailSheet({ open, onClose, params }: Props) {
       {!library && (
         <View className="mt-4 flex-row gap-2.5">
           <View className="flex-1 rounded-2xl bg-white/[0.04] px-3.5 py-3">
-            <Text className="text-[10.5px] font-bold uppercase tracking-wider text-white/35">Target</Text>
+            <Text className="text-[10.5px] font-bold uppercase tracking-wider text-tertiary">Target</Text>
             <Text className="mt-1 text-[14.5px] font-bold text-white">{sets} × {reps} reps</Text>
           </View>
           <View className="flex-1 rounded-2xl bg-white/[0.04] px-3.5 py-3">
-            <Text className="text-[10.5px] font-bold uppercase tracking-wider text-white/35">Working weight</Text>
+            <Text className="text-[10.5px] font-bold uppercase tracking-wider text-tertiary">Working weight</Text>
             <Text className="mt-1 text-[14.5px] font-bold text-white">{fmtWeight(fallback, units, units === 'imperial' ? 0 : 1)}</Text>
           </View>
         </View>
@@ -328,7 +328,7 @@ export function ExerciseDetailSheet({ open, onClose, params }: Props) {
       </View>
 
       <View className="mt-2.5 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-3">
-        <Text className="text-[11px] font-bold uppercase tracking-wider text-white/40">If the station is taken</Text>
+        <Text className="text-[11px] font-bold uppercase tracking-wider text-tertiary">If the station is taken</Text>
         <Text className="mt-[5px] text-[13px] leading-[1.5] text-white/70">{detail.ifTaken}</Text>
       </View>
 
@@ -368,7 +368,7 @@ export function PRCelebrationSheet({ open, onClose, params }: Props) {
         <Text className="mt-5 text-[13px] font-semibold uppercase tracking-wide text-brand-400">New personal best</Text>
         <Text className="mt-1 text-3xl font-extrabold tracking-tight text-white">{lift}</Text>
         <Text className="mt-1 text-lg font-bold text-white/80">{weight} for {reps} reps</Text>
-        <Text className="mt-3 max-w-[260px] text-center text-[14px] leading-snug text-white/55">That is the strongest you have logged on this lift. Quietly huge. Your cohort would love to see it.</Text>
+        <Text className="mt-3 max-w-[260px] text-center text-[14px] leading-snug text-secondary">That is the strongest you have logged on this lift. Quietly huge. Your cohort would love to see it.</Text>
       </View>
       <Pressable onPress={share} className="btn-primary w-full flex-row items-center justify-center gap-1.5 active:opacity-90"><Share2 size={16} color="#000" /><Text className="font-semibold text-black">Share with your cohort</Text></Pressable>
       <Pressable onPress={onClose} className="mt-2 w-full items-center rounded-full bg-ink-700 py-3 active:opacity-90"><Text className="text-sm font-semibold text-white/70">Keep it to myself</Text></Pressable>
@@ -1292,7 +1292,7 @@ export function LogActivitySheet({ open, onClose }: Props) {
 
   return (
     <Sheet open={open} onClose={onClose} title="Log an activity">
-      <Text className="mb-1 text-[12.5px] text-white/50">Anything the app didn't prescribe still counts.</Text>
+      <Text className="mb-1 text-[12.5px] text-secondary">Anything the app didn't prescribe still counts.</Text>
 
       <View className="mt-3 flex-row flex-wrap gap-2">
         {ACTIVITY_PRESETS.map((a) => {
@@ -1322,12 +1322,12 @@ export function LogActivitySheet({ open, onClose }: Props) {
         />
       )}
 
-      <Text className="mb-2.5 mt-[22px] text-[11px] font-bold uppercase tracking-wider text-white/35">Duration</Text>
+      <Text className="mb-2.5 mt-[22px] text-[11px] font-bold uppercase tracking-wider text-tertiary">Duration</Text>
       <View className="flex-row items-center gap-2">
         {['15', '30', '45', '60'].map((m) => {
           const on = minutes === m
           return (
-            <Pressable key={m} onPress={() => setMinutes(m)} className={`flex-1 items-center rounded-full border py-2.5 active:opacity-90 ${on ? 'border-brand-400 bg-brand-400' : 'border-white/[0.08] bg-white/[0.04]'}`}><Text className={`text-[13px] font-bold ${on ? 'text-black' : 'text-white/60'}`}>{m}m</Text></Pressable>
+            <Pressable key={m} onPress={() => setMinutes(m)} className={`flex-1 items-center rounded-full border py-2.5 active:opacity-90 ${on ? 'border-brand-400 bg-brand-400' : 'border-white/[0.08] bg-white/[0.04]'}`}><Text className={`text-[13px] font-bold ${on ? 'text-black' : 'text-secondary'}`}>{m}m</Text></Pressable>
           )
         })}
         <View className="flex-row items-center gap-1.5">
@@ -1337,22 +1337,22 @@ export function LogActivitySheet({ open, onClose }: Props) {
             onChangeText={(t) => setMinutes(t.replace(/\D/g, '').slice(0, 3))}
             className="w-[52px] rounded-full border border-white/10 bg-white/[0.03] px-1 py-2.5 text-center text-[13px] font-bold text-white"
           />
-          <Text className="text-[12px] text-white/45">min</Text>
+          <Text className="text-[12px] text-secondary">min</Text>
         </View>
       </View>
 
-      <Text className="mb-2.5 mt-[22px] text-[11px] font-bold uppercase tracking-wider text-white/35">Intensity</Text>
+      <Text className="mb-2.5 mt-[22px] text-[11px] font-bold uppercase tracking-wider text-tertiary">Intensity</Text>
       <View className="flex-row gap-2">
         {(['easy', 'moderate', 'hard'] as const).map((i) => {
           const on = intensity === i
           return (
-            <Pressable key={i} onPress={() => setIntensity(i)} className={`flex-1 items-center rounded-2xl border py-[11px] active:opacity-90 ${on ? 'border-brand-400/45 bg-brand-400/[0.16]' : 'border-white/[0.08] bg-white/[0.04]'}`}><Text className={`text-[13px] font-semibold capitalize ${on ? 'text-brand-300' : 'text-white/60'}`}>{i}</Text></Pressable>
+            <Pressable key={i} onPress={() => setIntensity(i)} className={`flex-1 items-center rounded-2xl border py-[11px] active:opacity-90 ${on ? 'border-brand-400/45 bg-brand-400/[0.16]' : 'border-white/[0.08] bg-white/[0.04]'}`}><Text className={`text-[13px] font-semibold capitalize ${on ? 'text-brand-300' : 'text-secondary'}`}>{i}</Text></Pressable>
           )
         })}
       </View>
 
       <View className="mt-[18px] flex-row items-center justify-between rounded-2xl border border-brand-400/[0.18] bg-brand-400/[0.06] px-4 py-3">
-        <Text className="text-[13px] text-white/60">Estimated burn</Text>
+        <Text className="text-[13px] text-secondary">Estimated burn</Text>
         <Text className="text-[17px] font-extrabold text-brand-400">≈ {kcal} kcal</Text>
       </View>
 
@@ -1360,7 +1360,7 @@ export function LogActivitySheet({ open, onClose }: Props) {
       <View className="mt-2.5 flex-row items-center justify-between rounded-2xl bg-white/[0.04] px-4 py-3">
         <View className="min-w-0 flex-1">
           <Text className="text-[13.5px] font-bold text-white">Repeat weekly</Text>
-          <Text className="mt-0.5 text-[11.5px] text-white/45">Shows up every week automatically</Text>
+          <Text className="mt-0.5 text-[11.5px] text-secondary">Shows up every week automatically</Text>
         </View>
         <Pressable onPress={() => setWeekly((v) => !v)} className={`h-7 w-12 shrink-0 justify-center rounded-full px-[3px] active:opacity-90 ${weekly ? 'bg-brand-400' : 'bg-white/15'}`}>
           <View className="h-[22px] w-[22px] rounded-full bg-white" style={{ transform: [{ translateX: weekly ? 20 : 0 }] }} />
@@ -1697,7 +1697,7 @@ export function CreateSessionSheet({ open, onClose, params }: Props) {
 
   return (
     <Sheet open={open} onClose={onClose} title={editId ? 'Edit workout' : 'New workout'} full>
-      <Text className="mb-2 text-[11px] font-bold uppercase tracking-wider text-white/35">Workout name</Text>
+      <Text className="mb-2 text-[11px] font-bold uppercase tracking-wider text-tertiary">Workout name</Text>
       <TextInput
         value={name}
         onChangeText={setName}
@@ -1706,7 +1706,7 @@ export function CreateSessionSheet({ open, onClose, params }: Props) {
         className="w-full rounded-2xl border border-white/10 bg-white/[0.03] px-3.5 py-3 text-[14px] text-white"
       />
 
-      <Text className="mb-2 mt-[22px] text-[11px] font-bold uppercase tracking-wider text-white/35">Exercises</Text>
+      <Text className="mb-2 mt-[22px] text-[11px] font-bold uppercase tracking-wider text-tertiary">Exercises</Text>
 
       {/* Catalog toggle */}
       <Pressable onPress={() => setCatalogOpen((v) => !v)} className="flex-row items-center gap-3 rounded-2xl border border-brand-400/25 bg-brand-400/[0.06] px-3.5 py-3 active:opacity-90">
@@ -1735,7 +1735,7 @@ export function CreateSessionSheet({ open, onClose, params }: Props) {
                   <Image source={{ uri: imageForMuscle(e.muscleGroup) }} resizeMode="cover" className="h-[38px] w-[38px] rounded-[11px] bg-ink-700" />
                   <View className="min-w-0 flex-1">
                     <Text numberOfLines={1} className="text-[13.5px] font-semibold leading-tight text-white">{e.name}</Text>
-                    <Text numberOfLines={1} className="mt-px text-[11.5px] text-white/45">{e.muscleGroup} · {e.type}</Text>
+                    <Text numberOfLines={1} className="mt-px text-[11.5px] text-secondary">{e.muscleGroup} · {e.type}</Text>
                   </View>
                   <View className={`h-[26px] w-[26px] items-center justify-center rounded-full ${on ? 'bg-brand-400' : 'border-2 border-white/20'}`}>
                     {on ? <Check size={14} strokeWidth={3} color="#000" /> : <Plus size={14} strokeWidth={3} color="rgba(255,255,255,0.5)" />}
@@ -1743,7 +1743,7 @@ export function CreateSessionSheet({ open, onClose, params }: Props) {
                 </Pressable>
               )
             })}
-            {catalog.length === 0 && <Text className="py-5 text-center text-[13px] text-white/40">No exercises found.</Text>}
+            {catalog.length === 0 && <Text className="py-5 text-center text-[13px] text-tertiary">No exercises found.</Text>}
           </View>
         </View>
       )}
@@ -1751,8 +1751,8 @@ export function CreateSessionSheet({ open, onClose, params }: Props) {
       {/* Picks */}
       {items.length === 0 ? (
         <View className="mt-3.5 items-center rounded-[18px] border border-dashed border-white/15 px-6 py-[22px]">
-          <Text className="text-[13.5px] font-semibold text-white/55">No exercises yet</Text>
-          <Text className="mt-[3px] text-center text-[12px] text-white/40">Pick a few from the list above to build your session</Text>
+          <Text className="text-[13.5px] font-semibold text-secondary">No exercises yet</Text>
+          <Text className="mt-[3px] text-center text-[12px] text-tertiary">Pick a few from the list above to build your session</Text>
         </View>
       ) : (
         <View className="mt-3.5 gap-2.5">
@@ -1764,7 +1764,7 @@ export function CreateSessionSheet({ open, onClose, params }: Props) {
                   <View className="h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-400/15"><Text className="text-[11.5px] font-bold text-brand-300">{idx + 1}</Text></View>
                   <View className="min-w-0 flex-1">
                     <Text numberOfLines={1} className="text-[14px] font-bold leading-tight text-white">{it.name}</Text>
-                    <Text numberOfLines={1} className="mt-px text-[11.5px] text-white/45">{muscleFor(it.defId)}</Text>
+                    <Text numberOfLines={1} className="mt-px text-[11.5px] text-secondary">{muscleFor(it.defId)}</Text>
                   </View>
                   <Pressable onPress={() => removeItem(it.defId)} hitSlop={6} className="h-7 w-7 items-center justify-center rounded-full bg-white/5 active:opacity-80">
                     <X size={13} strokeWidth={2.6} color="rgba(255,255,255,0.45)" />
@@ -1774,7 +1774,7 @@ export function CreateSessionSheet({ open, onClose, params }: Props) {
                 <View className="mt-3 flex-row items-start gap-2.5">
                   {/* Sets */}
                   <View className="flex-1">
-                    <Text className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wide text-white/35">Sets</Text>
+                    <Text className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wide text-tertiary">Sets</Text>
                     <View className="flex-row items-center gap-2">
                       <Pressable onPress={() => patchItem(it.defId, { targetSets: Math.max(1, it.targetSets - 1) })} className="h-[34px] w-[34px] items-center justify-center rounded-xl bg-white/[0.06] active:opacity-80"><Minus size={15} color="rgba(255,255,255,0.7)" /></Pressable>
                       <Text className="flex-1 text-center text-[15px] font-bold text-white">{it.targetSets}</Text>
@@ -1783,7 +1783,7 @@ export function CreateSessionSheet({ open, onClose, params }: Props) {
                   </View>
                   {/* Target reps */}
                   <View className="flex-1">
-                    <Text className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wide text-white/35">Target reps</Text>
+                    <Text className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wide text-tertiary">Target reps</Text>
                     <Pressable onPress={() => setRepsOpen(repsMenu ? null : it.defId)} className="h-[34px] flex-row items-center justify-between rounded-xl border border-white/[0.08] bg-ink-700 px-2.5 active:opacity-80">
                       <Text className="text-[13.5px] font-semibold text-white">{it.targetReps} reps</Text>
                       <ChevronDown size={15} color="rgba(255,255,255,0.5)" style={{ transform: [{ rotate: repsMenu ? '180deg' : '0deg' }] }} />
@@ -1809,7 +1809,7 @@ export function CreateSessionSheet({ open, onClose, params }: Props) {
 
           {/* Summary + actions */}
           <View className="mt-1 flex-row items-center justify-between rounded-2xl bg-white/[0.04] px-4 py-3">
-            <Text className="text-[13px] text-white/55">{items.length} exercise{items.length === 1 ? '' : 's'} · {totalSets} sets</Text>
+            <Text className="text-[13px] text-secondary">{items.length} exercise{items.length === 1 ? '' : 's'} · {totalSets} sets</Text>
             <Text className="text-[13px] font-bold text-brand-400">≈ {estMinutes} min</Text>
           </View>
 

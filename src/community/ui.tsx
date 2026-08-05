@@ -56,7 +56,7 @@ export function RankBadge({ rank, size = 30 }: { rank: number; size?: number }) 
   }
   return (
     <View style={{ width: size, height: size }} className="items-center justify-center">
-      <Text className="text-[13px] font-bold text-white/45">{rank}</Text>
+      <Text className="text-[13px] font-bold text-secondary">{rank}</Text>
     </View>
   )
 }

@@ -19,6 +19,12 @@ import type { AccentKey } from './store/periods'
 export const cssVars: Record<'dark' | 'light', Record<string, string>> = {
   dark: {
     '--fg': '255 255 255',
+    // Semantic text tiers — SOLID colours (not white-at-opacity) chosen to pass
+    // WCAG AA (>=4.5:1) for small text across the ink card range. Low-opacity
+    // white washed out below AA, worst in the light theme; see tailwind.config.js.
+    '--fg-secondary': '169 173 181',
+    '--fg-tertiary': '139 143 152',
+    '--fg-disabled': '116 119 127',
     '--ink-900': '10 10 11',
     '--ink-800': '18 18 20',
     '--ink-700': '26 27 30',
@@ -43,6 +49,11 @@ export const cssVars: Record<'dark' | 'light', Record<string, string>> = {
   },
   light: {
     '--fg': '31 38 28',
+    // Solid AA-passing text tiers for the cream/sage light theme (fg-at-opacity
+    // fell to ~2.5:1 here — the worst case that motivated these tokens).
+    '--fg-secondary': '84 92 80',
+    '--fg-tertiary': '95 102 89',
+    '--fg-disabled': '139 145 132',
     '--ink-900': '244 240 229',
     '--ink-800': '252 250 242',
     '--ink-700': '235 230 215',
@@ -82,6 +93,9 @@ export type ThemeName = 'light' | 'dark'
 export const palette = {
   dark: {
     fg: '#ffffff',
+    fgSecondary: '#a9adb5',
+    fgTertiary: '#8b8f98',
+    fgDisabled: '#74777f',
     ink900: '#0a0a0b',
     ink800: '#121214',
     ink700: '#1a1b1e',
@@ -104,6 +118,9 @@ export const palette = {
   },
   light: {
     fg: '#1f261c',
+    fgSecondary: '#545c50',
+    fgTertiary: '#5f6659',
+    fgDisabled: '#8b9184',
     ink900: '#f4f0e5',
     ink800: '#fcfaf2',
     ink700: '#ebe6d7',

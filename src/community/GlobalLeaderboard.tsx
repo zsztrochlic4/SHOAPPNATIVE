@@ -57,7 +57,7 @@ export function GlobalLeaderboard({ onClaimUsername }: { onClaimUsername: () => 
       <View className="mt-8 items-center rounded-2xl border border-dashed border-white/15 px-6 py-12">
         <RefreshCw size={26} color="rgba(255,255,255,0.4)" />
         <Text className="mt-3 font-bold text-white">Couldn't load the leaderboard</Text>
-        <Text className="mt-1 max-w-[240px] text-center text-[13px] text-white/45">Check your connection and try again.</Text>
+        <Text className="mt-1 max-w-[240px] text-center text-[13px] text-secondary">Check your connection and try again.</Text>
         <Pressable onPress={load} accessibilityRole="button" accessibilityLabel="Retry loading leaderboard" className="btn-primary mt-4 px-5 py-2.5 active:opacity-90">
           <Text className="text-sm font-semibold text-black">Try again</Text>
         </Pressable>
@@ -75,7 +75,7 @@ export function GlobalLeaderboard({ onClaimUsername }: { onClaimUsername: () => 
         <Text className="section-title">Streak leaderboard</Text>
         <View className="flex-row items-center gap-1.5">
           <Flame size={13} color={colors.accentOrange} />
-          <Text className="text-[12px] font-semibold text-white/45">By current streak</Text>
+          <Text className="text-[12px] font-semibold text-secondary">By current streak</Text>
         </View>
       </View>
 
@@ -108,15 +108,15 @@ function YourRankCard({ rank, total, me }: { rank: number | null; total: number;
           <Text className="text-[12px] font-semibold uppercase tracking-wide text-brand-300">Your rank</Text>
           <View className="flex-row items-end gap-1.5">
             <Text className="text-[30px] font-black leading-tight text-white">#{rankText}</Text>
-            <Text className="mb-1.5 text-[13px] font-semibold text-white/45">of {total.toLocaleString('en-US')}</Text>
+            <Text className="mb-1.5 text-[13px] font-semibold text-secondary">of {total.toLocaleString('en-US')}</Text>
           </View>
-          <Text className="text-[13px] text-white/55">@{me.username}{top ? ' · top 3!' : ''}</Text>
+          <Text className="text-[13px] text-secondary">@{me.username}{top ? ' · top 3!' : ''}</Text>
         </View>
         <View className="items-end gap-1.5">
           <StreakFlame days={me.streakCurrent} size={18} />
           <View className="flex-row items-center gap-1">
             <TrendingUp size={12} color="rgba(255,255,255,0.4)" />
-            <Text className="text-[12px] font-semibold text-white/45">best {me.streakBest}</Text>
+            <Text className="text-[12px] font-semibold text-secondary">best {me.streakBest}</Text>
           </View>
         </View>
       </View>
@@ -137,7 +137,7 @@ function ClaimBanner({ onPress }: { onPress: () => void }) {
       </View>
       <View className="flex-1">
         <Text className="font-bold text-white">Join the leaderboard</Text>
-        <Text className="text-[12px] text-white/55">Claim a username to appear and compete on your streak.</Text>
+        <Text className="text-[12px] text-secondary">Claim a username to appear and compete on your streak.</Text>
       </View>
       <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel="Claim a username" className="rounded-full bg-brand-400 px-3.5 py-2 active:opacity-90">
         <Text className="text-[13px] font-bold text-black">Claim</Text>
@@ -163,7 +163,7 @@ function LeaderRowView({ row }: { row: LeaderRow }) {
         <Text numberOfLines={1} className={`font-bold leading-tight ${you ? 'text-brand-300' : 'text-white'}`}>
           @{row.username}{you ? ' (You)' : ''}
         </Text>
-        <Text className="text-[12px] text-white/40">Best streak {row.streakBest}</Text>
+        <Text className="text-[12px] text-tertiary">Best streak {row.streakBest}</Text>
       </View>
       <StreakFlame days={row.streakCurrent} size={16} />
     </View>

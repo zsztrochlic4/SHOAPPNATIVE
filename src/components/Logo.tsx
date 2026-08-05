@@ -37,7 +37,7 @@ export function Wordmark({
       </Text>
       {online && (
         <Text
-          className="text-white/40"
+          className="text-tertiary"
           style={{ fontSize: fs * 0.4, fontWeight: '700', letterSpacing: 2, marginLeft: 2, marginTop: 2 }}
         >
           ONLINE

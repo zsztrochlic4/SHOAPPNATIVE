@@ -174,7 +174,7 @@ export default function Dashboard() {
       <View className="flex-row items-start justify-between gap-3">
         <View className="min-w-0 flex-1">
           <Text className="text-[20px] font-extrabold tracking-tight text-white">{greeting}, {state.profile.name}</Text>
-          <Text className="mt-0.5 text-[13px] text-white/45">{longDate(todayKey)}</Text>
+          <Text className="mt-0.5 text-[13px] text-secondary">{longDate(todayKey)}</Text>
         </View>
         {streak.current > 0 && <StreakChip days={streak.current} atRisk={streakAtRisk} onPress={() => nav.open('logHabit')} />}
       </View>
@@ -190,10 +190,10 @@ export default function Dashboard() {
 
       <Pressable onPress={() => setShowWhy((v) => !v)} accessibilityRole="button" accessibilityLabel="Explain your readiness score" className="active:opacity-90">
         <View className="mt-2"><IndexGauge index={idx} /></View>
-        <Text className="mt-2 text-center text-[13px] leading-snug text-white/55">{idx.blurb}</Text>
+        <Text className="mt-2 text-center text-[13px] leading-snug text-secondary">{idx.blurb}</Text>
         <View className="mt-1.5 flex-row items-center justify-center gap-1">
           <Info size={12} color="rgba(148,148,148,0.7)" />
-          <Text className="text-[12px] font-semibold text-white/45">{showWhy ? 'Hide the breakdown' : 'What moves this score?'}</Text>
+          <Text className="text-[12px] font-semibold text-secondary">{showWhy ? 'Hide the breakdown' : 'What moves this score?'}</Text>
           <ChevronDown size={13} color="rgba(148,148,148,0.7)" style={{ transform: [{ rotate: showWhy ? '180deg' : '0deg' }] }} />
         </View>
       </Pressable>
@@ -220,7 +220,7 @@ export default function Dashboard() {
       {showWhy && (
         <Card className="mt-3 p-4">
           <Text className="text-[13px] font-bold text-white">How your readiness works</Text>
-          <Text className="mt-1 text-[12px] leading-snug text-white/55">
+          <Text className="mt-1 text-[12px] leading-snug text-secondary">
             It blends your last 7 days across five habits versus your targets. <Text className="font-semibold text-white/75">50 means on track</Text>. Higher means you're beating your goals. Hit your targets and each bar fills toward 100%.
           </Text>
           <View className="mt-3 gap-2.5">
@@ -261,7 +261,7 @@ export default function Dashboard() {
           const date = parseInt(k.slice(-2))
           return (
             <Pressable key={k} disabled={future} onPress={() => { setSelDate(k); setPastEditorOpen(false) }} className={`w-10 items-center gap-1.5 rounded-xl py-1.5 ${future ? 'opacity-30' : 'active:opacity-70'}`}>
-              <Text className={`text-[10px] font-semibold uppercase tracking-wide ${today ? 'text-brand-400' : 'text-white/35'}`}>{WD[i]}</Text>
+              <Text className={`text-[10px] font-semibold uppercase tracking-wide ${today ? 'text-brand-400' : 'text-tertiary'}`}>{WD[i]}</Text>
               {/* Selected day = a filled disc with a ring around it (a small gap
                *  between). Today keeps a ring even when it isn't the selected day so
                *  it stays marked. */}
@@ -299,7 +299,7 @@ export default function Dashboard() {
               <Text className="mt-1 text-2xl font-extrabold tracking-tight text-white">{selSession.name}</Text>
               <View className="mt-2 flex-row items-center gap-1.5">
                 <Clock size={15} color="rgba(255,255,255,0.6)" />
-                <Text className="text-sm text-white/60">{selSession.exercises.length} exercises · {selSession.durationMin} min · {fmtVolume(selSession.volumeKg, units)}</Text>
+                <Text className="text-sm text-secondary">{selSession.exercises.length} exercises · {selSession.durationMin} min · {fmtVolume(selSession.volumeKg, units)}</Text>
               </View>
             </View>
           </View>
@@ -319,7 +319,7 @@ export default function Dashboard() {
             <Text className="mt-1 text-2xl font-extrabold tracking-tight text-white">Rest day</Text>
             <View className="mt-2 flex-row items-center gap-1.5">
               <Clock size={15} color="rgba(255,255,255,0.6)" />
-              <Text className="text-sm text-white/60">Recovery and mobility</Text>
+              <Text className="text-sm text-secondary">Recovery and mobility</Text>
             </View>
           </View>
         </View>
@@ -335,7 +335,7 @@ export default function Dashboard() {
               <View key={ex.defId} className="flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-3">
                 <Image source={{ uri: ex.image }} resizeMode="cover" className="h-10 w-10 rounded-xl" />
                 <Text numberOfLines={1} className="flex-1 font-semibold text-white">{ex.name}</Text>
-                <Text className="text-[12px] text-white/55">{doneSets.length || ex.sets.length} × {fmtWeightNum(top, units, units === 'imperial' ? 0 : 1)} {weightUnit(units)}</Text>
+                <Text className="text-[12px] text-secondary">{doneSets.length || ex.sets.length} × {fmtWeightNum(top, units, units === 'imperial' ? 0 : 1)} {weightUnit(units)}</Text>
               </View>
             )
           })}
@@ -350,7 +350,7 @@ export default function Dashboard() {
               <View className="h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-400/15"><ActivityIcon name={a.icon} size={18} color={brand[400]} /></View>
               <View className="min-w-0 flex-1">
                 <Text numberOfLines={1} className="font-semibold text-white">{a.name}</Text>
-                <Text className="text-[12px] capitalize text-white/50">{a.minutes} min · {a.intensity}</Text>
+                <Text className="text-[12px] capitalize text-secondary">{a.minutes} min · {a.intensity}</Text>
               </View>
             </View>
           ))}
@@ -358,7 +358,7 @@ export default function Dashboard() {
       )}
 
       {!isToday && !selSession && selActivities.length === 0 && (
-        <Text className="mt-3 rounded-2xl border border-dashed border-white/15 py-4 text-center text-[13px] text-white/40">No workout or activity logged on {shortDate(selDate)}.</Text>
+        <Text className="mt-3 rounded-2xl border border-dashed border-white/15 py-4 text-center text-[13px] text-tertiary">No workout or activity logged on {shortDate(selDate)}.</Text>
       )}
 
       {/* Progress — the merged checklist for today (opens the update sheet), or an
@@ -380,7 +380,7 @@ export default function Dashboard() {
       <View className="mt-7 flex-row items-end justify-between" style={{ marginBottom: 12 }}>
         <View className="min-w-0 flex-1">
           <Text className="text-[19px] font-extrabold text-white" style={{ letterSpacing: -0.19 }}>Progress overview</Text>
-          <Text className="mt-[3px] text-[12px] font-semibold text-white/45">{timeframeLabel(timeframe)}</Text>
+          <Text className="mt-[3px] text-[12px] font-semibold text-secondary">{timeframeLabel(timeframe)}</Text>
         </View>
         <Pressable onPress={() => nav.open('customize')} hitSlop={8} className="ml-3 flex-row items-center gap-[5px] active:opacity-70">
           <SlidersHorizontal size={16} color={colors.brand400} strokeWidth={1.8} />
@@ -405,7 +405,7 @@ export default function Dashboard() {
             <View className="h-10 w-10 items-center justify-center rounded-xl bg-brand-400/15"><Leaf size={20} color={brand[400]} /></View>
             <View className="flex-1">
               <Text className="font-bold text-white">New to the gym</Text>
-              <Text className="text-[12px] text-white/50">Your first 90 days, step by step</Text>
+              <Text className="text-[12px] text-secondary">Your first 90 days, step by step</Text>
             </View>
             <ChevronRight size={18} color={chevron} />
           </Pressable>
@@ -521,8 +521,8 @@ function GoalRow({ goal, index, onPress, colors }: { goal: Goal; index: number; 
       <View className="min-w-0 flex-1">
         {/* textDecorationLine via style — the NativeWind `line-through` class
             doesn't make it through to RN's Text on every platform. */}
-        <Text numberOfLines={1} className={`text-[15px] font-bold ${goal.done ? 'text-white/40' : 'text-white'}`} style={{ textDecorationLine: goal.done ? 'line-through' : 'none' }}>{goal.label}</Text>
-        <Text numberOfLines={1} className={`mt-0.5 text-[12.5px] ${goal.done ? 'text-white/35' : 'text-white/45'}`}>{goalSub(goal)}</Text>
+        <Text numberOfLines={1} className={`text-[15px] font-bold ${goal.done ? 'text-tertiary' : 'text-white'}`} style={{ textDecorationLine: goal.done ? 'line-through' : 'none' }}>{goal.label}</Text>
+        <Text numberOfLines={1} className={`mt-0.5 text-[12.5px] ${goal.done ? 'text-tertiary' : 'text-secondary'}`}>{goalSub(goal)}</Text>
       </View>
       {!goal.done && onPress && <ChevronRight size={18} color="rgba(148,148,148,0.45)" />}
     </>
@@ -568,13 +568,13 @@ function DayProgressCard({ goals, doneCount, total, onUpdate, stamp, tags, onTag
         <Animated.View style={{ transform: [{ scale: bump }] }}>
           <Text className="text-[16px] font-extrabold" style={{ color: colors.brand400 }}>{doneCount}</Text>
         </Animated.View>
-        <Text className="text-[13px] font-semibold text-white/55">of {total} done</Text>
+        <Text className="text-[13px] font-semibold text-secondary">of {total} done</Text>
         {onUpdate ? (
           <Pressable onPress={onUpdate} hitSlop={8} className="ml-auto active:opacity-60">
             <Text className="text-[12.5px] font-bold" style={{ color: colors.brand400 }}>Update →</Text>
           </Pressable>
         ) : (
-          <Text className="ml-auto text-[12.5px] text-white/30">{stamp}</Text>
+          <Text className="ml-auto text-[12.5px] text-tertiary">{stamp}</Text>
         )}
       </View>
       <View className="mx-0.5 mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
@@ -596,8 +596,8 @@ function FoodCheckIn({ tags, colors, onTag }: { tags: string[]; colors: ThemeCol
     <View>
       <View className="mb-3 flex-row items-center gap-2">
         <Leaf size={14} color={colors.brand400} />
-        <Text className="text-[12px] font-bold uppercase tracking-wide text-white/40">Food check-in</Text>
-        <Text className="ml-auto text-[11px] text-white/30">from your nutrition log</Text>
+        <Text className="text-[12px] font-bold uppercase tracking-wide text-tertiary">Food check-in</Text>
+        <Text className="ml-auto text-[11px] text-tertiary">from your nutrition log</Text>
       </View>
       {tags.length > 0 ? (
         <View className="flex-row flex-wrap gap-2">
@@ -618,7 +618,7 @@ function FoodCheckIn({ tags, colors, onTag }: { tags: string[]; colors: ThemeCol
           <Text className="text-[13px] font-semibold" style={{ color: colors.brand400 }}>Tag how your eating went →</Text>
         </Pressable>
       ) : (
-        <Text className="text-[13px] text-white/35">No food tags for this day</Text>
+        <Text className="text-[13px] text-tertiary">No food tags for this day</Text>
       )}
     </View>
   )
@@ -1140,10 +1140,10 @@ function OverviewCard({ accent, result, colors, single = false }: { accent: stri
         <View style={{ width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: `${accent}26` }}>
           <Icon name={result.icon} size={20} color={accent} />
         </View>
-        <Text numberOfLines={1} className="mt-3 text-[12.5px] font-semibold text-white/50" style={{ textAlign: 'center' }}>{result.label}</Text>
+        <Text numberOfLines={1} className="mt-3 text-[12.5px] font-semibold text-secondary" style={{ textAlign: 'center' }}>{result.label}</Text>
         <View className="mt-1.5 flex-row items-baseline justify-center" style={{ gap: 3 }}>
           <Text className="font-extrabold text-white" style={{ fontSize: 34, letterSpacing: -1 }}>{result.value}</Text>
-          {!!result.unit && <Text className="text-[14px] text-white/45">{result.unit}</Text>}
+          {!!result.unit && <Text className="text-[14px] text-secondary">{result.unit}</Text>}
         </View>
         <View className="mt-2.5">{pill}</View>
       </LinearGradient>
@@ -1161,10 +1161,10 @@ function OverviewCard({ accent, result, colors, single = false }: { accent: stri
       <View style={{ width: 28, height: 28, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: `${accent}26` }}>
         <Icon name={result.icon} size={15} color={accent} />
       </View>
-      <Text numberOfLines={1} className="mt-2.5 text-[11.5px] font-semibold text-white/50">{result.label}</Text>
+      <Text numberOfLines={1} className="mt-2.5 text-[11.5px] font-semibold text-secondary">{result.label}</Text>
       <View className="mt-[5px] flex-row items-baseline" style={{ gap: 2 }}>
         <Text className="text-[24px] font-extrabold text-white" style={{ letterSpacing: -0.7 }}>{result.value}</Text>
-        {!!result.unit && <Text className="text-[12px] text-white/45">{result.unit}</Text>}
+        {!!result.unit && <Text className="text-[12px] text-secondary">{result.unit}</Text>}
       </View>
       <View className="mt-[9px] flex-row">{pill}</View>
     </LinearGradient>
@@ -1243,7 +1243,7 @@ function BusyPeriodCard({ colors, onPress }: { colors: ThemeColors; onPress: () 
                   <Text style={{ fontSize: 12, fontWeight: '700', color: neutralChip ? `${colors.fg}b3` : chipCol }}>{chipLabel}</Text>
                 </View>
               </View>
-              <Text className="mt-[3px] text-[13px] text-white/60">{subtitle}</Text>
+              <Text className="mt-[3px] text-[13px] text-secondary">{subtitle}</Text>
             </View>
             <ChevronRight size={20} color={`${colors.fg}66`} />
           </View>

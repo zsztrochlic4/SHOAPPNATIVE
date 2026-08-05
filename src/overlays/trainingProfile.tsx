@@ -86,7 +86,7 @@ export function TrainingProfileSheet({ open, onClose }: Props) {
   if (!backendUser) {
     return (
       <Sheet open={open} onClose={onClose} title="Training profile">
-        <Text className="text-[14px] leading-6 text-white/60">
+        <Text className="text-[14px] leading-6 text-secondary">
           Your training profile becomes editable once onboarding is complete on a real account.
         </Text>
       </Sheet>
@@ -151,15 +151,15 @@ export function TrainingProfileSheet({ open, onClose }: Props) {
 
   const seg = (selected: boolean) =>
     `items-center justify-center rounded-xl border px-3 py-2.5 active:opacity-85 ${selected ? 'border-brand-400 bg-brand-400/10' : 'border-white/8 bg-ink-800'}`
-  const segText = (selected: boolean) => `text-[12.5px] font-bold ${selected ? 'text-brand-400' : 'text-white/60'}`
+  const segText = (selected: boolean) => `text-[12.5px] font-bold ${selected ? 'text-brand-400' : 'text-secondary'}`
 
   return (
     <Sheet open={open} onClose={onClose} title="Training profile">
-      <Text className="text-[12.5px] leading-5 text-white/50">
+      <Text className="text-[12.5px] leading-5 text-secondary">
         Changes only take effect after you preview and apply the regenerated plan. Your workout history and logged sets are never changed.
       </Text>
 
-      <Text className="mb-2 mt-5 text-[11px] font-bold uppercase tracking-wide text-white/40">Primary goal</Text>
+      <Text className="mb-2 mt-5 text-[11px] font-bold uppercase tracking-wide text-tertiary">Primary goal</Text>
       <View className="flex-row flex-wrap gap-2">
         {GOALS.map((g) => (
           <Pressable key={g.v} onPress={() => { tick(); setPreview(null); setGoal(g.v) }} accessibilityRole="radio" accessibilityLabel={g.label} accessibilityState={{ selected: goal === g.v, checked: goal === g.v }} className={seg(goal === g.v)} style={{ width: '48%' }}>
@@ -168,7 +168,7 @@ export function TrainingProfileSheet({ open, onClose }: Props) {
         ))}
       </View>
 
-      <Text className="mb-2 mt-5 text-[11px] font-bold uppercase tracking-wide text-white/40">Experience</Text>
+      <Text className="mb-2 mt-5 text-[11px] font-bold uppercase tracking-wide text-tertiary">Experience</Text>
       <View className="flex-row gap-2">
         {EXPERIENCE.map((e) => (
           <Pressable key={e} onPress={() => { tick(); setPreview(null); setExperience(e) }} accessibilityRole="radio" accessibilityLabel={e} accessibilityState={{ selected: experience === e, checked: experience === e }} className={`flex-1 ${seg(experience === e)}`}>
@@ -177,7 +177,7 @@ export function TrainingProfileSheet({ open, onClose }: Props) {
         ))}
       </View>
 
-      <Text className="mb-2 mt-5 text-[11px] font-bold uppercase tracking-wide text-white/40">Training days ({days.length} selected)</Text>
+      <Text className="mb-2 mt-5 text-[11px] font-bold uppercase tracking-wide text-tertiary">Training days ({days.length} selected)</Text>
       <View className="flex-row flex-wrap gap-2">
         {WEEKDAYS.map((d) => {
           const on = days.includes(d)
@@ -190,7 +190,7 @@ export function TrainingProfileSheet({ open, onClose }: Props) {
       </View>
       {!daysValid && <Text className="mt-1.5 text-[11.5px] text-amber-300/90">Choose between 2 and 6 days.</Text>}
 
-      <Text className="mb-2 mt-5 text-[11px] font-bold uppercase tracking-wide text-white/40">Session length</Text>
+      <Text className="mb-2 mt-5 text-[11px] font-bold uppercase tracking-wide text-tertiary">Session length</Text>
       <View className="flex-row gap-2">
         {SESSION_LENGTHS.map((m) => (
           <Pressable key={m} onPress={() => { tick(); setPreview(null); setSessionLen(m) }} accessibilityRole="radio" accessibilityLabel={`${m} minutes`} accessibilityState={{ selected: sessionLen === m, checked: sessionLen === m }} className={`flex-1 ${seg(sessionLen === m)}`}>
@@ -199,7 +199,7 @@ export function TrainingProfileSheet({ open, onClose }: Props) {
         ))}
       </View>
 
-      <Text className="mb-2 mt-5 text-[11px] font-bold uppercase tracking-wide text-white/40">Equipment</Text>
+      <Text className="mb-2 mt-5 text-[11px] font-bold uppercase tracking-wide text-tertiary">Equipment</Text>
       <View className="flex-row gap-2">
         {TIERS.map((t) => (
           <Pressable key={t.v} onPress={() => { tick(); setPreview(null); setTier(t.v) }} accessibilityRole="radio" accessibilityLabel={t.label} accessibilityState={{ selected: tier === t.v, checked: tier === t.v }} className={`flex-1 ${seg(tier === t.v)}`}>
@@ -217,8 +217,8 @@ export function TrainingProfileSheet({ open, onClose }: Props) {
                 <ShieldCheck size={16} color={brand[400]} />
                 <Text className="text-[13.5px] font-bold text-white">Proposed: {preview.program.splitName} · {preview.program.days.length}-day</Text>
               </View>
-              <Text className="mt-1.5 text-[12px] leading-5 text-white/55">{preview.program.recommendationNote}</Text>
-              <Text className="mt-1.5 text-[11px] leading-4 text-white/35">All safety rules re-applied. Your history and current weights carry forward.</Text>
+              <Text className="mt-1.5 text-[12px] leading-5 text-secondary">{preview.program.recommendationNote}</Text>
+              <Text className="mt-1.5 text-[11px] leading-4 text-tertiary">All safety rules re-applied. Your history and current weights carry forward.</Text>
             </>
           ) : (
             <>
@@ -226,7 +226,7 @@ export function TrainingProfileSheet({ open, onClose }: Props) {
                 <AlertTriangle size={16} color="#fbbf24" />
                 <Text className="text-[13.5px] font-bold text-amber-200">No program can generate with these settings yet</Text>
               </View>
-              <Text className="mt-1.5 text-[12px] leading-5 text-white/55">
+              <Text className="mt-1.5 text-[12px] leading-5 text-secondary">
                 You can still save the profile — the plan stays on hold until the block clears ({preview.status.reason ?? 'unknown'}).
               </Text>
             </>
@@ -247,13 +247,13 @@ export function TrainingProfileSheet({ open, onClose }: Props) {
       </Pressable>
       {preview && (
         <Pressable onPress={() => setPreview(null)} accessibilityRole="button" accessibilityLabel="Back to editing" className="mt-2 w-full items-center py-2 active:opacity-70">
-          <Text className="text-[12.5px] font-bold text-white/45">Keep editing instead</Text>
+          <Text className="text-[12.5px] font-bold text-secondary">Keep editing instead</Text>
         </Pressable>
       )}
 
-      <Text className="mt-4 text-[11px] leading-4 text-white/35">
+      <Text className="mt-4 text-[11px] leading-4 text-tertiary">
         Date of birth, injuries and health-screening answers gate your safety rules, so they can’t be edited here. Email{' '}
-        <Text className="text-white/55" onPress={() => void Linking.openURL('mailto:info@strengthhubonline.com')}>info@strengthhubonline.com</Text>
+        <Text className="text-secondary" onPress={() => void Linking.openURL('mailto:info@strengthhubonline.com')}>info@strengthhubonline.com</Text>
         {' '}and we’ll update them with the required checks.
       </Text>
     </Sheet>
