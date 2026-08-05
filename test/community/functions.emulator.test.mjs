@@ -132,3 +132,43 @@ test('deleteGroup: owner-only', async () => {
   const dir = await getDoc(doc(B.db, 'groupDirectory', g.groupId))
   assert.equal(dir.exists(), false, 'directory entry removed')
 })
+
+/* ---- audit remediation invariants (F-002/006/007/009/019) ------------------ */
+
+test('claimUsername: reserved handles are rejected (F-009)', async () => {
+  await rejectsCode(C.call('claimUsername', { username: 'admin' }), 'invalid-argument')
+  await rejectsCode(C.call('claimUsername', { username: 'StrengthHub' }), 'invalid-argument')
+})
+
+test('leaveGroup: owner is blocked, member leaves and the count decrements (F-006/F-007)', async () => {
+  const g = await B.call('createGroup', { name: 'Leave Crew', icon: 'flame', color: '#F5A524' })
+  await C.call('joinGroupByPasscode', { groupId: g.groupId, passcode: g.passcode })
+  // Owner cannot leave without transferring/deleting.
+  await rejectsCode(B.call('leaveGroup', { groupId: g.groupId }), 'failed-precondition')
+  // A joined member can leave; membership + count reflect it.
+  const left = await C.call('leaveGroup', { groupId: g.groupId })
+  assert.equal(left.ok, true)
+  const member = await getDoc(doc(C.db, `groups/${g.groupId}/members/${C.uid}`))
+  assert.equal(member.exists(), false, 'member doc removed on leave')
+  const group = await getDoc(doc(B.db, `groups/${g.groupId}`))
+  assert.equal(group.get('memberCount'), 1, 'count back to owner-only after member leaves')
+})
+
+test('joinGroupByPasscode: re-joining is idempotent, not a double count (F-006)', async () => {
+  const g = await B.call('createGroup', { name: 'Idempotent Crew', icon: 'target', color: '#3B82F6' })
+  const first = await C.call('joinGroupByPasscode', { groupId: g.groupId, passcode: g.passcode })
+  assert.equal(first.ok, true)
+  const again = await C.call('joinGroupByPasscode', { groupId: g.groupId, passcode: g.passcode })
+  assert.equal(again.already, true, 'second join is a no-op')
+  const group = await getDoc(doc(B.db, `groups/${g.groupId}`))
+  assert.equal(group.get('memberCount'), 2, 'count is 2 (owner + member), not double-incremented')
+})
+
+test('cheerGroupActivity: malformed activity ids are rejected (F-019)', async () => {
+  const g = await B.call('createGroup', { name: 'Cheer Guard', icon: 'brain', color: '#8B5CF6' })
+  await rejectsCode(B.call('cheerGroupActivity', { groupId: g.groupId, activityId: 'x'.repeat(65) }), 'invalid-argument')
+  await rejectsCode(B.call('cheerGroupActivity', { groupId: g.groupId, activityId: 'bad id!' }), 'invalid-argument')
+  // A well-formed id still works.
+  const ok = await B.call('cheerGroupActivity', { groupId: g.groupId, activityId: 'a-streak' })
+  assert.equal(ok.ok, true)
+})

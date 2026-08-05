@@ -203,6 +203,15 @@ export async function collectUserExport(
     const snap = await getDocs(collection(db!, 'coachUsers', uid, name))
     if (snap.size) collections[`coach_${name}`] = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
   }))
+  // Community profile — the user's own handle, league tier/points, streak and
+  // group membership list (audit F-004). Others' group data isn't this user's to
+  // export; the profile is the personal record.
+  try {
+    const communitySnap = await getDoc(doc(db, 'communityProfiles', uid))
+    if (communitySnap.exists()) profile.communityProfile = communitySnap.data()
+  } catch {
+    /* rules may deny in some configs — the export manifest documents scope */
+  }
   return { profile, collections }
 }
 

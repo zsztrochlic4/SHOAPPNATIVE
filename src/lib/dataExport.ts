@@ -26,6 +26,7 @@ export const EXPORT_SCOPE = {
     'Chat and coach-thread transcripts, notifications, push token records',
     'Coach workspace: consent/preferences, memories, conversation summaries, insights, proposals, actions, turns',
     'Subscription entitlement record (status, period end — no payment details)',
+    'Community profile: username, league tier/points, streak and group memberships',
   ],
   excluded: [
     'Operational coach safety state (restricted; not client-readable by design)',

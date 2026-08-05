@@ -27,7 +27,21 @@ import { FieldPath, FieldValue, getFirestore, type Query } from 'firebase-admin/
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { onSchedule } from 'firebase-functions/v2/scheduler'
 import * as logger from 'firebase-functions/logger'
-import { requireAuth } from './lib/guards'
+import { requireAuth, auditAppCheck, APP_CHECK_ENFORCED } from './lib/guards'
+import { enforceDailyLimit } from './lib/rateLimit'
+
+const REGION = 'australia-southeast2'
+const MAX_INSTANCES = 10 // cost bound for the callables (audit F-024)
+const CALL_OPTS = { region: REGION, enforceAppCheck: APP_CHECK_ENFORCED, maxInstances: MAX_INSTANCES }
+
+// Handles that must not be claimable — impersonation / official-looking names
+// (audit F-009). Case-insensitive; extend as policy evolves. This is a minimum
+// reserved-name guard, not a full profanity/moderation suite.
+const RESERVED_USERNAMES = new Set([
+  'admin', 'administrator', 'strengthhub', 'sho', 'support', 'help', 'official',
+  'staff', 'team', 'moderator', 'mod', 'root', 'system', 'coach', 'null', 'undefined',
+  'me', 'you', 'everyone', 'anonymous', 'owner',
+])
 
 /** Promotion/demotion counts per tier — mirror of src/community/league.ts TIERS. */
 const TIERS = [
@@ -97,13 +111,19 @@ interface ClaimInput { username?: string }
 /** Atomically claim a unique username (case-insensitive). Releases any previous
  *  handle the user held. Throws `already-exists` if another user owns it. */
 export const claimUsername = onCall<ClaimInput>(
-  { region: 'australia-southeast2' },
+  CALL_OPTS,
   async (req) => {
     const uid = requireAuth(req)
+    auditAppCheck(req, 'claimUsername')
+    // Bounds name-reservation / squatting attempts (audit F-008).
+    await enforceDailyLimit('community.claimUsername', uid, 20)
     const raw = (req.data?.username ?? '').trim()
     const lower = raw.toLowerCase()
     if (!USERNAME_RE.test(lower)) {
       throw new HttpsError('invalid-argument', 'Usernames are 3–20 characters: letters, numbers, underscores.')
+    }
+    if (RESERVED_USERNAMES.has(lower)) {
+      throw new HttpsError('invalid-argument', 'That username is reserved.')
     }
 
     const db = getFirestore()
@@ -155,9 +175,12 @@ const intIn = (v: unknown, min: number, max: number): number => {
 /** Push the user's honest weekly consistency (odometer points) + streak to the
  *  server, which mirrors it into this week's league standings for their tier. */
 export const syncCommunityStats = onCall<SyncInput>(
-  { region: 'australia-southeast2' },
+  CALL_OPTS,
   async (req) => {
     const uid = requireAuth(req)
+    auditAppCheck(req, 'syncCommunityStats')
+    // Called on League open; generous cap just bounds a scripted abuser.
+    await enforceDailyLimit('community.syncStats', uid, 200)
     const points = intIn(req.data?.points, 0, 100)
     const streakCurrent = intIn(req.data?.streakCurrent, 0, 10000)
     const streakBest = intIn(req.data?.streakBest, 0, 10000)
