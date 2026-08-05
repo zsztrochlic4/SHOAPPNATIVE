@@ -18,6 +18,7 @@
  */
 
 import type { CoachContext, DetectorHit, SafetyCategory } from './types'
+import { CLASSIFIER_EXEMPLARS } from './classifierExemplars'
 import { isKnownFalsePositive } from './rules'
 
 /** Sends a fully-formed prompt to a model and resolves the raw text reply. null ⇒ no model wired. */
@@ -43,6 +44,25 @@ const MODEL_CATEGORIES: SafetyCategory[] = [
   'supplement_dosing', 'prescribed_medication', 'unsafe_training', 'ai_relationship', 'off_topic',
 ]
 const CATEGORY_SET = new Set<string>([...MODEL_CATEGORIES, 'none'])
+
+/**
+ * Few-shot calibration block (audit R5-002). Renders the shared CLASSIFIER_EXEMPLARS in the SAME
+ * format the measurement harness uses (scripts/lib/classifier-prompt.mjs), so the shipped prompt and
+ * the holdout measurement stay aligned. Recall-neutral by construction: it also shows genuine
+ * first-person risk being flagged, so it only sharpens the benign/at-risk boundary.
+ */
+function exemplarBlock(): string[] {
+  const lines = CLASSIFIER_EXEMPLARS.map(
+    (e) => `  message: "${e.text}"  ->  {"categories": ${JSON.stringify(e.categories)}}`,
+  )
+  return [
+    'WORKED EXAMPLES (for calibration only — apply the SAME judgement to the LATEST message below; do',
+    'not echo these). Note how third-party attributes, academic/research framing, historical/resolved',
+    'states and gym hyperbole are ["none"], while genuine first-person risk is flagged:',
+    ...lines,
+    '',
+  ]
+}
 
 /**
  * The classification instruction. Deliberately CONSERVATIVE / recall-biased: for a detect-and-refer
@@ -97,6 +117,7 @@ function buildPrompt(text: string, ctx: CoachContext, recent: string[]): string 
     '- PRECEDENCE: an overdose/poisoning WITH any immediate-danger sign, and a third party in IMMEDIATE danger, are emergencies — return medical_emergency (alongside the specific category) so they route to emergency services, not a lesser line.',
     '- Consider misspellings, slang, letter-spacing/obfuscation, euphemism, and other languages.',
     '',
+    ...exemplarBlock(),
     `Recent turns (oldest first), for context only:\n${context}`,
     '',
     `LATEST message to classify:\n  "${text}"`,

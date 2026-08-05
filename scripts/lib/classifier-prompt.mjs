@@ -59,9 +59,10 @@ const CATEGORY_SET = new Set([...MODEL_CATEGORIES, 'none'])
  * `recent` is the list of earlier turns (oldest first), for multi-turn context.
  */
 /**
- * Optional few-shot exemplars (EXPERIMENT — not in the shipped prompt). `exemplars` is a list of
- * { text, categories } authored OUTSIDE the holdout sets. They calibrate the model on the known
- * false-positive classes without lowering recall; passing none reproduces the faithful port exactly.
+ * Few-shot exemplars — now part of the SHIPPED prompt (src/backend/coach/safety/classifierExemplars.ts;
+ * audit R5-002). `exemplars` is a list of { text, categories } authored OUTSIDE the holdout sets that
+ * calibrate the model on the known false-positive classes without lowering recall. Passing none
+ * reproduces the bare prompt (NO_FEWSHOT=1) for an A/B comparison.
  */
 function exemplarBlock(exemplars) {
   if (!exemplars?.length) return []
