@@ -84,7 +84,7 @@ export function ProgramHolding({ status }: { status: ProgramStatus }) {
         <IconCmp size={30} color={st.color} />
       </View>
       <Text className="mt-5 text-center text-xl font-extrabold text-white">{title}</Text>
-      <Text className="mt-2.5 max-w-[320px] text-center text-[14px] leading-6 text-white/60">{body}</Text>
+      <Text className="mt-2.5 max-w-[320px] text-center text-[14px] leading-6 text-secondary">{body}</Text>
       {quick && (
         <Pressable
           onPress={() => nav.open('quick')}
@@ -132,7 +132,7 @@ export function GeneratedProgramView({ program }: { program: StoredProgram }) {
     <View className="gap-2.5">
       <View className="rounded-[20px] border border-brand-400/20 bg-brand-400/[0.06] p-4">
         <Text className="text-[14px] font-bold text-white">{program.splitName} · {training}-day program</Text>
-        <Text className="mt-1.5 text-[12.5px] leading-5 text-white/55">{program.recommendationNote}</Text>
+        <Text className="mt-1.5 text-[12.5px] leading-5 text-secondary">{program.recommendationNote}</Text>
       </View>
 
       {program.days.map((d) => {
@@ -140,10 +140,10 @@ export function GeneratedProgramView({ program }: { program: StoredProgram }) {
         return (
           <View key={d.weekday} className="overflow-hidden rounded-[20px] border border-white/5 bg-ink-800">
             <Pressable onPress={() => setOpenDay(open ? null : d.weekday)} className="flex-row items-center gap-3 p-4 active:opacity-90">
-              <View className="w-[34px] shrink-0"><Text className="text-[11px] font-bold uppercase tracking-wider text-white/40">{d.weekday.slice(0, 3)}</Text></View>
+              <View className="w-[34px] shrink-0"><Text className="text-[11px] font-bold uppercase tracking-wider text-tertiary">{d.weekday.slice(0, 3)}</Text></View>
               <View className="min-w-0 flex-1">
                 <Text className="text-[14.5px] font-bold text-white">{d.dayType}</Text>
-                <Text numberOfLines={1} className="mt-0.5 text-[12px] text-white/50">{d.exercises.map((e) => e.muscleGroup).filter((m, i, a) => a.indexOf(m) === i).slice(0, 3).join(' · ')}</Text>
+                <Text numberOfLines={1} className="mt-0.5 text-[12px] text-secondary">{d.exercises.map((e) => e.muscleGroup).filter((m, i, a) => a.indexOf(m) === i).slice(0, 3).join(' · ')}</Text>
               </View>
               <Chip color="green">{d.exercises.length} ex</Chip>
               <ChevronDown size={17} color="rgba(255,255,255,0.3)" style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
@@ -156,12 +156,12 @@ export function GeneratedProgramView({ program }: { program: StoredProgram }) {
                     <View key={`${e.exerciseId}-${i}`} className="flex-row items-start justify-between gap-3">
                       <View className="min-w-0 flex-1">
                         <Text className="text-[13.5px] font-semibold text-white">{e.name}</Text>
-                        <Text className="mt-px text-[11.5px] text-white/45">{e.muscleGroup}</Text>
+                        <Text className="mt-px text-[11.5px] text-secondary">{e.muscleGroup}</Text>
                       </View>
                       <View className="items-end">
                         <Text className="text-[13px] font-semibold text-white/85">{e.sets} × {repRange(e)}</Text>
                         <View className="mt-0.5 flex-row items-center gap-1">
-                          <Text className="text-[12px] text-white/45">RIR {e.rirMin}</Text>
+                          <Text className="text-[12px] text-secondary">RIR {e.rirMin}</Text>
                           {e.injuryAdjusted && (
                             <View className="rounded-md bg-amber-400/15 px-1.5 py-0.5">
                               <Text className="text-[10px] font-semibold text-amber-300">injury-adjusted</Text>
@@ -186,9 +186,9 @@ export function GeneratedProgramView({ program }: { program: StoredProgram }) {
             const t = program.volumeTargets[m]
             return (
               <View key={m} className="flex-row items-center gap-1.5 rounded-full bg-white/5 px-2.5 py-1.5">
-                <Text className="text-[12px] text-white/60">{m}</Text>
+                <Text className="text-[12px] text-secondary">{m}</Text>
                 <Text className="text-[12px] font-bold text-white/90">{n}</Text>
-                {t ? <Text className="text-[11px] text-white/35">({t.min}–{t.max})</Text> : null}
+                {t ? <Text className="text-[11px] text-tertiary">({t.min}–{t.max})</Text> : null}
               </View>
             )
           })}
@@ -198,7 +198,7 @@ export function GeneratedProgramView({ program }: { program: StoredProgram }) {
       {program.coverageNotes.length > 0 && (
         <View className="rounded-2xl border border-white/5 bg-ink-800 p-4">
           {program.coverageNotes.map((c, i) => (
-            <Text key={i} className="text-[12px] leading-5 text-white/50">{c}</Text>
+            <Text key={i} className="text-[12px] leading-5 text-secondary">{c}</Text>
           ))}
         </View>
       )}
@@ -207,7 +207,7 @@ export function GeneratedProgramView({ program }: { program: StoredProgram }) {
        *  program and feeds the progression engine. */}
       <View className="flex-row items-center gap-2 rounded-2xl border border-white/5 bg-white/[0.02] px-4 py-3">
         <Clock3 size={15} color="rgba(255,255,255,0.4)" />
-        <Text className="flex-1 text-[12px] leading-5 text-white/45">
+        <Text className="flex-1 text-[12px] leading-5 text-secondary">
           {program.startingLoadNote} Head to the Today tab to log each session set by set — your
           weights adapt automatically as you progress.
         </Text>

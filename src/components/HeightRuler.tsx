@@ -64,7 +64,7 @@ export function HeightRuler({
       <View className="items-end">
         <Text className="text-5xl font-extrabold tracking-tight text-white">
           {value}
-          <Text className="text-xl font-bold text-white/40"> {unit}</Text>
+          <Text className="text-xl font-bold text-tertiary"> {unit}</Text>
         </Text>
         <Text className="mt-1 text-[11px] font-semibold uppercase tracking-widest text-brand-400">drag the ruler</Text>
       </View>
@@ -77,7 +77,7 @@ export function HeightRuler({
       >
         {marks.map(({ v, y, major }) => (
           <View key={v} style={{ position: 'absolute', top: y, right: 0, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            {major && <Text className="text-[11px] font-semibold text-white/40">{v}</Text>}
+            {major && <Text className="text-[11px] font-semibold text-tertiary">{v}</Text>}
             <View
               style={{
                 width: major ? 30 : 16,

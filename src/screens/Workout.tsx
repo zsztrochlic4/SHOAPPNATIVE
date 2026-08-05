@@ -148,7 +148,7 @@ function TodayTab() {
           <View className="mt-6">
             <Text className="section-title mb-2">Today's Progress</Text>
             <View className="mb-[7px] flex-row items-center justify-between">
-              <Text className="text-[12.5px] text-white/55">{prog.done}/{prog.total} exercises completed</Text>
+              <Text className="text-[12.5px] text-secondary">{prog.done}/{prog.total} exercises completed</Text>
               <Text className="text-[12.5px] font-semibold text-white">{prog.pct}%</Text>
             </View>
             <ProgressBar value={prog.pct} />
@@ -177,7 +177,7 @@ function TodayTab() {
                     <RowThumb uri={e.image} />
                     <View className="min-w-0 flex-1">
                       <Text numberOfLines={1} className="text-[14px] font-bold leading-tight text-white">{e.name}</Text>
-                      <Text numberOfLines={1} className="mt-[1px] text-[11.5px] text-white/50">{e.targetSets} sets · {e.targetReps} reps</Text>
+                      <Text numberOfLines={1} className="mt-[1px] text-[11.5px] text-secondary">{e.targetSets} sets · {e.targetReps} reps</Text>
                     </View>
                     <View className={`shrink-0 rounded-full px-2 py-0.5 ${done ? 'bg-brand-400/15' : 'bg-white/10'}`}>
                       <Text className={`text-[11px] font-medium ${done ? 'text-brand-300' : 'text-white/70'}`}>{fmtWeight(topWeight, units, units === 'imperial' ? 0 : 1)}</Text>
@@ -193,7 +193,7 @@ function TodayTab() {
         <View className="items-center rounded-[20px] border border-white/5 bg-ink-800 p-8">
           <Text className="text-2xl">😌</Text>
           <Text className="mt-2 font-bold text-white">Rest Day</Text>
-          <Text className="mt-1 text-center text-[13px] text-white/50">Recovery is where you grow. Try a mobility flow, a walk, or log whatever you got up to below.</Text>
+          <Text className="mt-1 text-center text-[13px] text-secondary">Recovery is where you grow. Try a mobility flow, a walk, or log whatever you got up to below.</Text>
           <Pressable onPress={() => nav.open('quick')} className="btn-primary mt-4 active:opacity-90">
             <Text className="font-semibold text-black">Quick mobility</Text>
           </Pressable>
@@ -209,7 +209,7 @@ function TodayTab() {
         <View className="h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-accent-blue/[0.18]"><Clock size={20} color="#3B82F6" /></View>
         <View className="min-w-0 flex-1">
           <Text className="text-[14.5px] font-bold leading-tight text-white">12-Minute Bodyweight Exercises</Text>
-          <Text className="mt-0.5 text-[12px] text-white/50">Quick, no-equipment workouts when you're short on time</Text>
+          <Text className="mt-0.5 text-[12px] text-secondary">Quick, no-equipment workouts when you're short on time</Text>
         </View>
         <ChevronRight size={17} color="rgba(59,130,246,0.55)" />
       </Pressable>
@@ -228,7 +228,7 @@ function OtherActivities() {
       <View className="mb-3 flex-row items-start justify-between">
         <View>
           <Text className="section-title">Other activities</Text>
-          <Text className="mt-0.5 text-[12px] text-white/45">Log anything else you did today</Text>
+          <Text className="mt-0.5 text-[12px] text-secondary">Log anything else you did today</Text>
         </View>
         <Pressable onPress={() => nav.open('logActivity')} className="flex-row items-center gap-1 px-1 active:opacity-70">
           <Text className="see-all">Log</Text>
@@ -241,7 +241,7 @@ function OtherActivities() {
           <View className="h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-brand-400/15"><Activity size={20} color={brand[400]} /></View>
           <View className="min-w-0 flex-1">
             <Text className="text-[14.5px] font-bold leading-tight text-white">Log a workout, sport or activity</Text>
-            <Text className="mt-0.5 text-[12px] text-white/50">Swim, run, football, pickleball, anything counts</Text>
+            <Text className="mt-0.5 text-[12px] text-secondary">Swim, run, football, pickleball, anything counts</Text>
           </View>
           <ChevronRight size={17} color="rgba(255,255,255,0.3)" />
         </Pressable>
@@ -260,15 +260,15 @@ function OtherActivities() {
                     </View>
                   )}
                 </View>
-                <Text className="mt-0.5 text-[12px] capitalize text-white/50">{a.minutes} min · {a.intensity}</Text>
-                {a.note && <Text numberOfLines={1} className="text-[12px] text-white/40">{a.note}</Text>}
+                <Text className="mt-0.5 text-[12px] capitalize text-secondary">{a.minutes} min · {a.intensity}</Text>
+                {a.note && <Text numberOfLines={1} className="text-[12px] text-tertiary">{a.note}</Text>}
               </View>
               <Pressable onPress={() => dispatch({ type: 'TOGGLE_ACTIVITY_WEEKLY', id: a.id })} className={`h-8 w-8 shrink-0 items-center justify-center rounded-full active:opacity-80 ${a.weekly ? 'bg-brand-400/20' : 'bg-white/5'}`}><Repeat size={15} color={a.weekly ? brand[400] : 'rgba(255,255,255,0.4)'} /></Pressable>
               <Pressable onPress={() => dispatch({ type: 'REMOVE_ACTIVITY', id: a.id })} className="h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/5 active:opacity-80"><Trash2 size={15} color="rgba(255,255,255,0.4)" /></Pressable>
             </View>
           ))}
           <Pressable onPress={() => nav.open('logActivity')} className="w-full items-center rounded-[20px] border border-dashed border-white/15 py-3 active:opacity-80">
-            <Text className="text-[13.5px] font-semibold text-white/55">+ Log another activity</Text>
+            <Text className="text-[13.5px] font-semibold text-secondary">+ Log another activity</Text>
           </Pressable>
         </View>
       )}
@@ -295,14 +295,14 @@ function MyWorkouts() {
     <View className="mt-7">
       <View className="mb-3">
         <Text className="section-title">Your workouts</Text>
-        <Text className="mt-0.5 text-[12px] text-white/45">Build your own session, your exercises, your way</Text>
+        <Text className="mt-0.5 text-[12px] text-secondary">Build your own session, your exercises, your way</Text>
       </View>
 
       <Pressable onPress={() => nav.open('createSession')} className="w-full flex-row items-center gap-3 rounded-[20px] border border-brand-400/25 bg-brand-400/[0.06] p-3.5 active:opacity-90">
         <View className="h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-brand-400/15"><Plus size={20} color={brand[400]} strokeWidth={2.4} /></View>
         <View className="min-w-0 flex-1">
           <Text className="text-[14.5px] font-bold leading-tight text-white">New workout</Text>
-          <Text className="mt-0.5 text-[12px] text-white/50">Pick exercises, set sets & reps, then start</Text>
+          <Text className="mt-0.5 text-[12px] text-secondary">Pick exercises, set sets & reps, then start</Text>
         </View>
         <ChevronRight size={17} color="rgba(255,255,255,0.3)" />
       </Pressable>
@@ -320,7 +320,7 @@ function MyWorkouts() {
                       <Text numberOfLines={1} className="text-[14px] font-bold leading-tight text-white">{t.name}</Text>
                       <Pencil size={12} color="rgba(255,255,255,0.35)" />
                     </View>
-                    <Text numberOfLines={1} className="mt-0.5 text-[11.5px] text-white/50">{t.exercises.length} exercise{t.exercises.length === 1 ? '' : 's'} · {sets} sets</Text>
+                    <Text numberOfLines={1} className="mt-0.5 text-[11.5px] text-secondary">{t.exercises.length} exercise{t.exercises.length === 1 ? '' : 's'} · {sets} sets</Text>
                   </View>
                 </Pressable>
                 <Pressable onPress={() => startTemplate(t.id)} className="flex-row items-center gap-1 rounded-full bg-brand-400 px-3.5 py-1.5 active:opacity-90">
@@ -359,17 +359,17 @@ function LegacyProgram() {
     <View className="gap-2.5">
       <View className="rounded-[20px] border border-brand-400/20 bg-brand-400/[0.06] p-4">
         <Text className="text-[14px] font-bold text-white">Your weekly split · {state.profile.daysPerWeek}-day program</Text>
-        <Text className="mt-1.5 text-[12.5px] leading-5 text-white/55">Built around your week. Weights adapt as you log each session.</Text>
+        <Text className="mt-1.5 text-[12.5px] leading-5 text-secondary">Built around your week. Weights adapt as you log each session.</Text>
       </View>
       {state.program.map((d) => {
         const open = openDay === d.day && !d.rest && d.exerciseIds.length > 0
         return (
           <View key={d.id} className="overflow-hidden rounded-[20px] border border-white/5 bg-ink-800">
             <Pressable onPress={() => setOpenDay(open ? null : d.day)} className="flex-row items-center gap-3 p-4 active:opacity-90">
-              <View className="w-[34px] shrink-0"><Text className="text-[11px] font-bold uppercase tracking-wider text-white/40">{d.day}</Text></View>
+              <View className="w-[34px] shrink-0"><Text className="text-[11px] font-bold uppercase tracking-wider text-tertiary">{d.day}</Text></View>
               <View className="min-w-0 flex-1">
                 <Text className="text-[14.5px] font-bold text-white">{d.name}</Text>
-                <Text className="mt-0.5 text-[12px] text-white/50">{d.focus}</Text>
+                <Text className="mt-0.5 text-[12px] text-secondary">{d.focus}</Text>
               </View>
               {d.rest ? <Chip color="gray">Rest</Chip> : <Chip color="green">{d.exerciseIds.length} ex</Chip>}
               {!d.rest && d.exerciseIds.length > 0 && (
@@ -386,7 +386,7 @@ function LegacyProgram() {
                       <View key={id} className="flex-row items-center justify-between gap-3">
                         <View className="min-w-0 flex-1">
                           <Text className="text-[13.5px] font-semibold text-white">{v?.name ?? id}</Text>
-                          <Text className="mt-px text-[11.5px] text-white/45">{v?.muscle ?? ''}</Text>
+                          <Text className="mt-px text-[11.5px] text-secondary">{v?.muscle ?? ''}</Text>
                         </View>
                       </View>
                     )
@@ -464,8 +464,8 @@ function ExercisesTab({ bottomInset }: { bottomInset: number }) {
       {beginnerDone ? (
         <Pressable onPress={() => nav.open('beginner')} className="mb-3.5 flex-row items-center gap-2.5 rounded-[14px] bg-white/[0.03] px-3 py-2.5 active:opacity-90">
           <Check size={13} strokeWidth={3} color="rgba(126,217,87,0.8)" />
-          <Text className="flex-1 text-[12.5px] font-semibold text-white/50">Beginner guide finished</Text>
-          <Text className="text-[12px] font-semibold text-white/35">Revisit</Text>
+          <Text className="flex-1 text-[12.5px] font-semibold text-secondary">Beginner guide finished</Text>
+          <Text className="text-[12px] font-semibold text-tertiary">Revisit</Text>
           <ChevronRight size={14} color="rgba(255,255,255,0.25)" />
         </Pressable>
       ) : (
@@ -473,7 +473,7 @@ function ExercisesTab({ bottomInset }: { bottomInset: number }) {
           <View className="h-[38px] w-[38px] items-center justify-center rounded-[14px] bg-brand-400/15"><Leaf size={18} color={brand[400]} /></View>
           <View className="min-w-0 flex-1">
             <Text className="text-[14px] font-bold leading-tight text-white">New here?</Text>
-            <Text className="mt-0.5 text-[12px] text-white/50">Start the beginner guide, no experience needed</Text>
+            <Text className="mt-0.5 text-[12px] text-secondary">Start the beginner guide, no experience needed</Text>
           </View>
           <ChevronRight size={16} color="rgba(255,255,255,0.3)" />
         </Pressable>
@@ -515,8 +515,8 @@ function ExercisesTab({ bottomInset }: { bottomInset: number }) {
 
       {/* Filter title + result count */}
       <View className="mb-3 flex-row items-center justify-between px-0.5">
-        <Text className="text-[12px] font-bold uppercase tracking-wider text-white/35">{muscle ?? 'All exercises'}</Text>
-        <Text className="text-[12px] text-white/35">{filtered.length} of {all.length}</Text>
+        <Text className="text-[12px] font-bold uppercase tracking-wider text-tertiary">{muscle ?? 'All exercises'}</Text>
+        <Text className="text-[12px] text-tertiary">{filtered.length} of {all.length}</Text>
       </View>
 
     </View>
@@ -536,7 +536,7 @@ function ExercisesTab({ bottomInset }: { bottomInset: number }) {
         <View className="items-center px-5 py-9">
           <Search size={24} color="rgba(255,255,255,0.35)" />
           <Text className="mt-3 text-center text-[14px] font-semibold text-white">No matching exercises</Text>
-          <Text className="mt-1 text-center text-[13px] leading-5 text-white/45">Try another muscle group or clear your search.</Text>
+          <Text className="mt-1 text-center text-[13px] leading-5 text-secondary">Try another muscle group or clear your search.</Text>
           <Pressable onPress={clearFilters} className="mt-4 min-h-11 items-center justify-center rounded-full bg-brand-400 px-5 active:opacity-90">
             <Text className="text-[13px] font-bold text-black">Clear filters</Text>
           </Pressable>
@@ -571,7 +571,7 @@ const ExerciseLibraryCard = memo(function ExerciseLibraryCard({
       <ExerciseThumb uri={exercise.image} />
       <View className="p-3">
         <Text numberOfLines={1} className="text-[13px] font-bold text-white">{exercise.name}</Text>
-        <Text className="mt-0.5 text-[11.5px] text-white/45">{exercise.muscle}</Text>
+        <Text className="mt-0.5 text-[11.5px] text-secondary">{exercise.muscle}</Text>
       </View>
     </Pressable>
   )
@@ -694,7 +694,7 @@ function HistoryTab({ bottomInset }: { bottomInset: number }) {
         <View className="items-center px-5 py-10">
           <Dumbbell size={28} color="rgba(126,217,87,0.55)" />
           <Text className="mt-3 text-center text-[15px] font-bold text-white">No workouts logged yet</Text>
-          <Text className="mt-1 max-w-[260px] text-center text-[13px] leading-5 text-white/45">Your first one is the hardest. Start with a session or add an activity you have already completed.</Text>
+          <Text className="mt-1 max-w-[260px] text-center text-[13px] leading-5 text-secondary">Your first one is the hardest. Start with a session or add an activity you have already completed.</Text>
           <Pressable onPress={() => nav.open('logActivity')} className="mt-4 min-h-11 items-center justify-center rounded-full bg-brand-400 px-5 active:opacity-90">
             <Text className="text-[13px] font-bold text-black">Log an activity</Text>
           </Pressable>
@@ -717,7 +717,7 @@ function HistoryTab({ bottomInset }: { bottomInset: number }) {
                     </View>
                   )}
                 </View>
-                <Text className="mt-0.5 text-[12px] text-white/45">{relativeLabel(h.dateKey)}{h.kind === 'activity' ? ' · activity' : ''}</Text>
+                <Text className="mt-0.5 text-[12px] text-secondary">{relativeLabel(h.dateKey)}{h.kind === 'activity' ? ' · activity' : ''}</Text>
               </View>
               {h.kind === 'session' && volSeries.length >= 2 && (
                 <View className="mr-1 shrink-0"><Sparkline values={volSeries} activeIndex={volIndex.get(h.id) ?? -1} color={brand[400]} /></View>
@@ -726,12 +726,12 @@ function HistoryTab({ bottomInset }: { bottomInset: number }) {
                 {h.kind === 'session' ? (
                   <>
                     <Text className="text-[13.5px] font-bold text-white">{fmtVolume(h.volumeKg, units)}</Text>
-                    <Text className="mt-px text-[12px] text-white/45">{h.durationMin} min</Text>
+                    <Text className="mt-px text-[12px] text-secondary">{h.durationMin} min</Text>
                   </>
                 ) : (
                   <>
                     <Text className="text-[13.5px] font-bold text-white">{h.minutes} min</Text>
-                    <Text className="mt-px text-[12px] capitalize text-white/45">activity</Text>
+                    <Text className="mt-px text-[12px] capitalize text-secondary">activity</Text>
                   </>
                 )}
               </View>
@@ -742,8 +742,8 @@ function HistoryTab({ bottomInset }: { bottomInset: number }) {
               <View className="px-3.5 pb-3.5">
                 <View className="mb-3 h-px bg-white/5" />
                 <View className="mb-2 flex-row items-center justify-between">
-                  <Text className="text-[10.5px] font-bold uppercase tracking-wider text-white/35">{h.kind === 'session' ? 'What you lifted' : 'Effort'}</Text>
-                  <Text className="text-[11.5px] text-white/40">
+                  <Text className="text-[10.5px] font-bold uppercase tracking-wider text-tertiary">{h.kind === 'session' ? 'What you lifted' : 'Effort'}</Text>
+                  <Text className="text-[11.5px] text-tertiary">
                     {h.kind === 'session' ? `${h.exercises.length} exercises · ${h.durationMin} min` : `${h.intensity} · ${h.minutes} min`}
                   </Text>
                 </View>
@@ -757,11 +757,11 @@ function HistoryTab({ bottomInset }: { bottomInset: number }) {
                         <View key={x.defId} className="flex-row items-center justify-between gap-3">
                           <View className="min-w-0 flex-1">
                             <Text numberOfLines={1} className="text-[13px] font-semibold text-white">{x.name}</Text>
-                            <Text className="mt-px text-[11.5px] text-white/45">{x.sets.length} sets × {x.targetReps} reps</Text>
+                            <Text className="mt-px text-[11.5px] text-secondary">{x.sets.length} sets × {x.targetReps} reps</Text>
                           </View>
                           <View className="items-end">
                             <Text className="text-[13px] font-bold text-brand-300">{fmtWeight(top, units, units === 'imperial' ? 0 : 1)}</Text>
-                            <Text className="mt-px text-[11px] text-white/35">{fmtVolume(vol, units)}</Text>
+                            <Text className="mt-px text-[11px] text-tertiary">{fmtVolume(vol, units)}</Text>
                           </View>
                         </View>
                       )
@@ -770,7 +770,7 @@ function HistoryTab({ bottomInset }: { bottomInset: number }) {
                     <View className="flex-row items-center justify-between gap-3">
                       <View className="min-w-0 flex-1">
                         <Text className="text-[13px] font-semibold text-white">Estimated burn</Text>
-                        <Text className="mt-px text-[11.5px] capitalize text-white/45">{h.minutes} min at {h.intensity} effort</Text>
+                        <Text className="mt-px text-[11.5px] capitalize text-secondary">{h.minutes} min at {h.intensity} effort</Text>
                       </View>
                       <Text className="text-[13px] font-bold text-brand-300">{h.calories} kcal</Text>
                     </View>

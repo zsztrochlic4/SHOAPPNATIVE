@@ -98,7 +98,7 @@ export function WelcomeScreen({ onSignUp, onLogIn }: { onSignUp: () => void; onL
             <Text className="text-[16px] font-bold text-black">Get started</Text>
           </PressableScale>
           <PressableScale onPress={onLogIn} haptic={false} scaleTo={0.97} className="mt-4 items-center py-2">
-            <Text className="text-[14px] text-white/60">
+            <Text className="text-[14px] text-secondary">
               Already have an account? <Text className="font-bold text-brand-400">Log in</Text>
             </Text>
           </PressableScale>

@@ -186,7 +186,7 @@ function Dropdown({ value, placeholder, options, onSelect }: { value: string; pl
   return (
     <View>
       <Pressable onPress={openMenu} className="flex-row items-center justify-between rounded-[13px] bg-ink-700 px-3.5 py-3 active:opacity-80">
-        <Text numberOfLines={1} className={`flex-1 text-[14px] font-semibold ${current ? 'text-white' : 'text-white/45'}`}>{current?.label ?? placeholder}</Text>
+        <Text numberOfLines={1} className={`flex-1 text-[14px] font-semibold ${current ? 'text-white' : 'text-secondary'}`}>{current?.label ?? placeholder}</Text>
         <ChevronDown size={18} color={alpha(c.fg, 0.5)} style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
       </Pressable>
       <AppModal visible={open} transparent animationType="none" onRequestClose={() => setOpen(false)}>
@@ -194,7 +194,7 @@ function Dropdown({ value, placeholder, options, onSelect }: { value: string; pl
           <Pressable onPress={() => {}} className="rounded-t-[24px] border-t border-white/10 bg-ink-800 px-4 pb-8 pt-3" style={{ maxHeight: '70%' }}>
             <View className="mb-2.5 h-1 w-10 self-center rounded-full bg-white/20" />
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-              {options.length === 0 && <Text className="px-2 py-6 text-center text-[14px] text-white/45">Nothing to choose from yet.</Text>}
+              {options.length === 0 && <Text className="px-2 py-6 text-center text-[14px] text-secondary">Nothing to choose from yet.</Text>}
               {options.map((o, i) => {
                 const on = o.value === value
                 return (
@@ -235,7 +235,7 @@ export default function Nutrition() {
           const active = tab === t
           return (
             <Pressable key={t} onPress={() => setTab(t)} className="relative pb-3">
-              <Text className={`text-[15px] font-semibold ${active ? 'text-brand-400' : 'text-white/50'}`}>{t}</Text>
+              <Text className={`text-[15px] font-semibold ${active ? 'text-brand-400' : 'text-secondary'}`}>{t}</Text>
               {active && <View className="absolute -bottom-px left-[-2px] right-[-2px] h-[2.5px] rounded-full bg-brand-400" />}
             </Pressable>
           )
@@ -421,7 +421,7 @@ function OverviewTab() {
           </View>
           <View className="min-w-0 flex-1">
             <Text className="text-[18px] font-extrabold leading-tight text-white">Snap your meal</Text>
-            <Text className="mt-0.5 text-[14px] text-white/60">How healthy is your meal really?</Text>
+            <Text className="mt-0.5 text-[14px] text-secondary">How healthy is your meal really?</Text>
           </View>
         </View>
 
@@ -450,7 +450,7 @@ function OverviewTab() {
           <View className="mt-3 items-center gap-2 rounded-[15px] border border-white/[0.06] bg-white/[0.03] px-4 py-6">
             <View className="h-11 w-11 items-center justify-center rounded-full" style={{ backgroundColor: alpha(c.danger, 0.14) }}><X size={22} color={c.danger} strokeWidth={2.6} /></View>
             <Text className="text-[14px] font-extrabold text-white">That doesn’t look like food</Text>
-            <Text className="max-w-[240px] text-center text-[12px] leading-[1.5] text-white/50">Point the camera at a meal or drink and try again.</Text>
+            <Text className="max-w-[240px] text-center text-[12px] leading-[1.5] text-secondary">Point the camera at a meal or drink and try again.</Text>
             <Pressable onPress={retake} className="mt-1 rounded-xl bg-white/[0.06] px-5 py-2.5 active:opacity-80"><Text className="text-[13px] font-bold text-white">Try again</Text></Pressable>
           </View>
         )}
@@ -458,7 +458,7 @@ function OverviewTab() {
         {scan === 'result' && scanError && (
           <View className="mt-3 items-center gap-2 rounded-[15px] border border-white/[0.06] bg-white/[0.03] px-4 py-6">
             <Text className="text-[13.5px] font-extrabold text-white">Scan unavailable</Text>
-            <Text className="max-w-[250px] text-center text-[12px] leading-[1.5] text-white/50">{scanError}</Text>
+            <Text className="max-w-[250px] text-center text-[12px] leading-[1.5] text-secondary">{scanError}</Text>
             {/* Recovery must be real, not just promised (audit F-009): manual
                 logging is one tap away, right from the failed-scan state. */}
             <View className="mt-1 flex-row gap-2">
@@ -487,14 +487,14 @@ function OverviewTab() {
                 </View>
               </View>
             </View>
-            <Text className="mt-1.5 text-[10px] leading-[1.4] text-white/35">{result.sample ? 'A demo example, not a real scan. Tap the name to edit it.' : 'An AI estimate from your photo, not a nutrition label. Numbers are approximate. Tap the name to edit.'}</Text>
+            <Text className="mt-1.5 text-[10px] leading-[1.4] text-tertiary">{result.sample ? 'A demo example, not a real scan. Tap the name to edit it.' : 'An AI estimate from your photo, not a nutrition label. Numbers are approximate. Tap the name to edit.'}</Text>
 
             <View className="mt-3 flex-row items-end justify-between gap-3">
               <View>
-                <Text className="text-[10px] font-extrabold uppercase tracking-wider text-white/40">Est. calories</Text>
+                <Text className="text-[10px] font-extrabold uppercase tracking-wider text-tertiary">Est. calories</Text>
                 <View className="flex-row items-baseline gap-1.5">
                   <Text className="text-[28px] font-black leading-none text-brand-400">{kcalLabel}</Text>
-                  <Text className="text-[13px] font-bold text-white/50">kcal</Text>
+                  <Text className="text-[13px] font-bold text-secondary">kcal</Text>
                 </View>
               </View>
               <View className="flex-row items-center overflow-hidden rounded-full border border-white/10 bg-white/[0.04]">
@@ -524,7 +524,7 @@ function OverviewTab() {
 
             {pickMode ? (
               <View className="mt-3 rounded-[13px] border p-3" style={{ borderColor: alpha(c.brand400, 0.28), backgroundColor: alpha(c.brand400, 0.06) }}>
-                <Text className="mb-2 text-[11px] font-extrabold uppercase tracking-wide text-white/60">
+                <Text className="mb-2 text-[11px] font-extrabold uppercase tracking-wide text-secondary">
                   {pickMode === 'log' ? "Log to today. Which meal?" : `Plan for ${todayShort()}. Which meal?`}
                 </Text>
                 <View className="flex-row gap-1.5">
@@ -540,7 +540,7 @@ function OverviewTab() {
                     </Pressable>
                   ))}
                 </View>
-                <Pressable onPress={() => setPickMode(null)} accessibilityRole="button" accessibilityLabel="Cancel" className="mt-2 items-center active:opacity-70"><Text className="text-[11.5px] font-bold text-white/45">Cancel</Text></Pressable>
+                <Pressable onPress={() => setPickMode(null)} accessibilityRole="button" accessibilityLabel="Cancel" className="mt-2 items-center active:opacity-70"><Text className="text-[11.5px] font-bold text-secondary">Cancel</Text></Pressable>
               </View>
             ) : (
               <>
@@ -566,7 +566,7 @@ function OverviewTab() {
           <View className="items-center gap-2.5 px-3 pb-3.5 pt-5">
             <View className="h-14 w-14 items-center justify-center rounded-full" style={{ backgroundColor: alpha(c.brand400, 0.16) }}><Check size={30} color={c.brand400} strokeWidth={3} /></View>
             <Text className="text-[14.5px] font-extrabold text-white">{loggedMsg.title}</Text>
-            <Text className="text-[12px] text-white/50">{loggedMsg.sub}</Text>
+            <Text className="text-[12px] text-secondary">{loggedMsg.sub}</Text>
           </View>
         )}
       </View>
@@ -602,7 +602,7 @@ function OverviewTab() {
         </View>
         <View className="mt-3.5 flex-row items-center justify-center gap-1.5">
           <LayoutGrid size={13} color={alpha(c.fg, 0.38)} />
-          <Text className="text-[11.5px] text-white/40">These show on the Dashboard.</Text>
+          <Text className="text-[11.5px] text-tertiary">These show on the Dashboard.</Text>
         </View>
       </View>
     </ScrollView>
@@ -623,7 +623,7 @@ function TodayLogCard({ onAddFood }: { onAddFood: () => void }) {
         <View>
           <Text className="text-[18px] font-extrabold tracking-tight text-white">Today’s food log</Text>
           {/* Descriptive only — we don't set a calorie goal to hit (app-wide rule). */}
-          <Text className="mt-0.5 text-[12px] text-white/45">
+          <Text className="mt-0.5 text-[12px] text-secondary">
             {`${Math.round(day.kcal)} kcal logged`}
           </Text>
         </View>
@@ -645,12 +645,12 @@ function TodayLogCard({ onAddFood }: { onAddFood: () => void }) {
         ].map((m) => (
           <View key={m.label} className="flex-row items-center gap-1.5">
             <View className="h-2 w-2 rounded-full" style={{ backgroundColor: m.color }} />
-            <Text className="text-[12px] font-semibold text-white/60">{m.label} <Text className="font-extrabold text-white">{m.v}g</Text></Text>
+            <Text className="text-[12px] font-semibold text-secondary">{m.label} <Text className="font-extrabold text-white">{m.v}g</Text></Text>
           </View>
         ))}
       </View>
       {day.meals.length === 0 ? (
-        <Text className="mt-3.5 text-[12.5px] leading-5 text-white/40">
+        <Text className="mt-3.5 text-[12.5px] leading-5 text-tertiary">
           Nothing logged yet today. Scan a meal above or add food manually — totals update instantly.
         </Text>
       ) : (
@@ -659,7 +659,7 @@ function TodayLogCard({ onAddFood }: { onAddFood: () => void }) {
             <View key={m.id} className="flex-row items-center gap-2.5 rounded-[14px] border border-white/[0.06] bg-white/[0.03] px-3 py-2.5">
               <View className="min-w-0 flex-1">
                 <Text numberOfLines={1} className="text-[13.5px] font-bold text-white">{m.name}</Text>
-                <Text className="mt-px text-[11.5px] text-white/45">
+                <Text className="mt-px text-[11.5px] text-secondary">
                   {m.meal}{m.qty !== 1 ? ` · ${m.qty} servings` : ''} · ~{Math.round(m.kcal * m.qty)} kcal
                 </Text>
               </View>
@@ -676,7 +676,7 @@ function TodayLogCard({ onAddFood }: { onAddFood: () => void }) {
           ))}
         </View>
       )}
-      <Text className="mt-3 text-[10.5px] leading-4 text-white/30">
+      <Text className="mt-3 text-[10.5px] leading-4 text-tertiary">
         Scanned entries are AI estimates, not measurements. Targets are general guidance, not medical advice.
       </Text>
     </View>
@@ -737,7 +737,7 @@ function RecipesTab({ onOpenRecipe, onAddMeal }: { onOpenRecipe: (m: BudgetMeal 
 
       {/* My meals */}
       <View className="mb-2.5 flex-row items-center justify-between">
-        <Text className="text-[12px] font-extrabold uppercase tracking-[1.4px] text-white/40">My meals</Text>
+        <Text className="text-[12px] font-extrabold uppercase tracking-[1.4px] text-tertiary">My meals</Text>
         <Pressable onPress={onAddMeal} className="flex-row items-center gap-1.5 rounded-full px-3 py-1.5 active:opacity-80" style={{ backgroundColor: alpha(c.brand400, 0.14) }}>
           <Plus size={13} color={c.brand400} strokeWidth={2.6} />
           <Text className="text-[12px] font-bold text-brand-400">Add a meal</Text>
@@ -745,7 +745,7 @@ function RecipesTab({ onOpenRecipe, onAddMeal }: { onOpenRecipe: (m: BudgetMeal 
       </View>
       {myMeals.length === 0 ? (
         <Pressable onPress={onAddMeal} className="mb-1 items-center rounded-2xl border border-dashed border-white/[0.12] px-5 py-6 active:opacity-80">
-          <Text className="text-center text-[13px] text-white/45">Save meals you cook often for quick planning.</Text>
+          <Text className="text-center text-[13px] text-secondary">Save meals you cook often for quick planning.</Text>
         </Pressable>
       ) : (
         <View className="gap-2.5">
@@ -753,7 +753,7 @@ function RecipesTab({ onOpenRecipe, onAddMeal }: { onOpenRecipe: (m: BudgetMeal 
             <Pressable key={m.id} onPress={() => onOpenRecipe(m)} className="flex-row items-center gap-3 rounded-2xl border border-white/[0.06] bg-ink-800 px-3.5 py-3 active:opacity-80">
               <View className="min-w-0 flex-1">
                 <Text numberOfLines={1} className="text-[14px] font-bold text-white">{m.name}</Text>
-                <Text numberOfLines={1} className="mt-0.5 text-[11.5px] text-white/50">{m.ingredients.slice(0, 4).join(', ') || m.notes || 'My recipe'}</Text>
+                <Text numberOfLines={1} className="mt-0.5 text-[11.5px] text-secondary">{m.ingredients.slice(0, 4).join(', ') || m.notes || 'My recipe'}</Text>
               </View>
               <Text className="text-[11px] font-bold text-brand-400">{m.kcal} kcal · {m.p}g protein</Text>
             </Pressable>
@@ -785,7 +785,7 @@ function RecipesTab({ onOpenRecipe, onAddMeal }: { onOpenRecipe: (m: BudgetMeal 
         <TextInput value={query} onChangeText={setQuery} placeholder="Search recipes…" placeholderTextColor={alpha(c.fg, 0.3)} className="flex-1 py-2.5 text-[14px] text-white" />
       </View>
 
-      <Text className="mb-2.5 mt-4 text-[12px] font-extrabold uppercase tracking-[1.6px] text-white/35">{countLabel}</Text>
+      <Text className="mb-2.5 mt-4 text-[12px] font-extrabold uppercase tracking-[1.6px] text-tertiary">{countLabel}</Text>
     </View>
   )
 
@@ -801,7 +801,7 @@ function RecipesTab({ onOpenRecipe, onAddMeal }: { onOpenRecipe: (m: BudgetMeal 
         <View className="items-center rounded-[18px] border border-dashed border-white/15 px-6 py-9">
           <Text className="text-[26px]">🍽️</Text>
           <Text className="mt-2 text-[14px] font-bold text-white/65">No recipes match that</Text>
-          <Text className="mt-1 text-[12px] text-white/40">Try another category or clear your search.</Text>
+          <Text className="mt-1 text-[12px] text-tertiary">Try another category or clear your search.</Text>
         </View>
       )}
       ItemSeparatorComponent={RecipeListGap}
@@ -839,7 +839,7 @@ const BudgetRecipeRow = memo(function BudgetRecipeRow({
       <Image source={{ uri: meal.image }} resizeMode="cover" className="h-16 w-16 rounded-[13px] bg-ink-700" />
       <View className="min-w-0 flex-1">
         <Text numberOfLines={1} className="text-[14.5px] font-bold leading-tight text-white">{meal.name}</Text>
-        {!!meal.flavour && <Text numberOfLines={2} className="mt-0.5 text-[12px] leading-[1.35] text-white/55">{meal.flavour}</Text>}
+        {!!meal.flavour && <Text numberOfLines={2} className="mt-0.5 text-[12px] leading-[1.35] text-secondary">{meal.flavour}</Text>}
         <View className="mt-1.5 flex-row items-center gap-1.5">
           <Clock size={12} color={accentColor} />
           <Text className="text-[12px] font-bold text-brand-400">{meal.timeDisplay ?? `${meal.minutes} min`}</Text>
@@ -938,10 +938,10 @@ function MealPlanTab() {
           <Text className="text-[18px] font-extrabold tracking-tight text-white">Plan your week</Text>
           <View className="flex-row items-center gap-2.5">
             <Text className="text-[11px] font-bold text-brand-400">{plannedCount} planned</Text>
-            {plannedCount > 0 && <Pressable onPress={clearWeek} className="active:opacity-70"><Text className="text-[11px] font-bold text-white/45">Clear</Text></Pressable>}
+            {plannedCount > 0 && <Pressable onPress={clearWeek} className="active:opacity-70"><Text className="text-[11px] font-bold text-secondary">Clear</Text></Pressable>}
           </View>
         </View>
-        <Text className="mt-1.5 text-[13px] leading-[1.5] text-white/60">Pick a meal once and repeat it across the days you want. Same lunch every day is a single tap.</Text>
+        <Text className="mt-1.5 text-[13px] leading-[1.5] text-secondary">Pick a meal once and repeat it across the days you want. Same lunch every day is a single tap.</Text>
 
         <PlanLabel>My meals</PlanLabel>
         <Dropdown
@@ -1000,7 +1000,7 @@ function MealPlanTab() {
 
         <View className="mt-3 flex-row items-start gap-1.5">
           <CalendarCheck size={14} color={c.brand400} style={{ marginTop: 1 }} />
-          <Text className="flex-1 text-[11.5px] leading-[1.45] text-white/50">{whenHint}</Text>
+          <Text className="flex-1 text-[11.5px] leading-[1.45] text-secondary">{whenHint}</Text>
         </View>
 
         <Pressable onPress={addToPlan} className="mt-4 flex-row items-center justify-center gap-2 rounded-[14px] bg-brand-400 py-3.5 active:opacity-90">
@@ -1014,7 +1014,7 @@ function MealPlanTab() {
         <Pressable onPress={() => setWeekOffset((w) => Math.max(-12, w - 1))} className="h-[42px] w-[42px] items-center justify-center rounded-full border border-white/[0.08] bg-ink-800 active:opacity-70" style={{ opacity: weekOffset <= -12 ? 0.3 : 1 }}><ChevronLeft size={20} color={c.brand400} strokeWidth={2.6} /></Pressable>
         <View className="min-w-0 flex-1 items-center">
           <Text className="text-[16px] font-extrabold tracking-tight text-white">{weekLabel}</Text>
-          <Text className="mt-px text-[11.5px] font-semibold text-white/45">{fmt(mon)} to {fmt(sun)} · {plannedCount} planned</Text>
+          <Text className="mt-px text-[11.5px] font-semibold text-secondary">{fmt(mon)} to {fmt(sun)} · {plannedCount} planned</Text>
         </View>
         <Pressable onPress={() => setWeekOffset((w) => Math.min(6, w + 1))} className="h-[42px] w-[42px] items-center justify-center rounded-full border border-white/[0.08] bg-ink-800 active:opacity-70" style={{ opacity: weekOffset >= 6 ? 0.3 : 1 }}><ChevronRight size={20} color={c.brand400} strokeWidth={2.6} /></Pressable>
       </View>
@@ -1033,10 +1033,10 @@ function MealPlanTab() {
                   <Text className="text-[15px] font-extrabold text-white">{d}</Text>
                   {isToday && <Text className="text-[10px] font-extrabold uppercase tracking-wide text-brand-400">Today</Text>}
                 </View>
-                <Text className="text-[11px] font-semibold text-white/35">{items.length ? `${items.length} planned` : logged.length ? '' : 'None'}</Text>
+                <Text className="text-[11px] font-semibold text-tertiary">{items.length ? `${items.length} planned` : logged.length ? '' : 'None'}</Text>
               </View>
               {empty ? (
-                <Text className="text-[12.5px] text-white/30">Nothing planned</Text>
+                <Text className="text-[12.5px] text-tertiary">Nothing planned</Text>
               ) : (
                 <View className="gap-2.5">
                   {items.map((it) => (
@@ -1050,13 +1050,13 @@ function MealPlanTab() {
                     <>
                       <View className="mt-0.5 flex-row items-center gap-1.5">
                         <Check size={11} color={c.brand400} strokeWidth={3.2} />
-                        <Text className="text-[10px] font-extrabold uppercase tracking-wide text-white/40">Logged today</Text>
+                        <Text className="text-[10px] font-extrabold uppercase tracking-wide text-tertiary">Logged today</Text>
                       </View>
                       {logged.map((m) => (
                         <View key={m.id} className="flex-row items-center gap-3">
-                          <Text className="w-[66px] text-[10.5px] font-extrabold uppercase tracking-wide text-white/45">{m.meal}</Text>
+                          <Text className="w-[66px] text-[10.5px] font-extrabold uppercase tracking-wide text-secondary">{m.meal}</Text>
                           <Text numberOfLines={1} className="min-w-0 flex-1 text-[13px] text-white/80">{m.name}</Text>
-                          <Text className="text-[11px] font-semibold text-white/40">~{Math.round(m.kcal * m.qty)} kcal</Text>
+                          <Text className="text-[11px] font-semibold text-tertiary">~{Math.round(m.kcal * m.qty)} kcal</Text>
                         </View>
                       ))}
                     </>
@@ -1078,7 +1078,7 @@ function MealPlanTab() {
 }
 
 function PlanLabel({ children, tight }: { children: ReactNode; tight?: boolean }) {
-  return <Text className={`text-[11px] font-extrabold uppercase tracking-wide text-white/40 ${tight ? 'mb-1.5' : 'mb-1.5 mt-3.5'}`}>{children}</Text>
+  return <Text className={`text-[11px] font-extrabold uppercase tracking-wide text-tertiary ${tight ? 'mb-1.5' : 'mb-1.5 mt-3.5'}`}>{children}</Text>
 }
 
 /* ============================ Guide ============================ */
@@ -1140,13 +1140,13 @@ function GuideTab() {
       <View className="mt-6">
       {/* Balanced plate */}
       <View className="mb-1 flex-row items-center gap-2.5"><Text className="text-[19px]">🍽️</Text><Text className="text-[19px] font-extrabold tracking-tight text-white">The balanced plate</Text></View>
-      <Text className="mb-4 text-[13px] leading-[1.5] text-white/55">Tap a section of the plate to see what goes where.</Text>
+      <Text className="mb-4 text-[13px] leading-[1.5] text-secondary">Tap a section of the plate to see what goes where.</Text>
 
       <BalancedPlate selected={active.slice} onSelect={(i) => { setPlate(i); setPlateEx(false) }} />
 
       <View className="mt-3.5 flex-row items-center justify-center gap-2.5">
         <Text className="text-[20px]">🥑</Text>
-        <Text className="text-[13px] font-semibold text-white/60">Add a small amount of <Text onPress={() => { setPlate(3); setPlateEx(false) }} className="font-bold" style={{ color: c.accentPurple }}>healthy fat</Text> on the side</Text>
+        <Text className="text-[13px] font-semibold text-secondary">Add a small amount of <Text onPress={() => { setPlate(3); setPlateEx(false) }} className="font-bold" style={{ color: c.accentPurple }}>healthy fat</Text> on the side</Text>
       </View>
 
       <View className="mt-6 flex-row flex-wrap" style={{ gap: 9 }}>
@@ -1183,13 +1183,13 @@ function GuideTab() {
 
       {/* Portions by hand */}
       <View className="mb-1 mt-8 flex-row items-center gap-2.5"><Text className="text-[19px]">🖐️</Text><Text className="text-[19px] font-extrabold tracking-tight text-white">Portion sizes, by hand</Text></View>
-      <Text className="mb-4 text-[13px] leading-[1.5] text-white/55">No scales needed. Your own hand scales with you.</Text>
+      <Text className="mb-4 text-[13px] leading-[1.5] text-secondary">No scales needed. Your own hand scales with you.</Text>
       <View className="flex-row flex-wrap gap-2.5">
         {PORTIONS.map((p) => (
           <View key={p.hand} style={{ width: '47.5%' }} className="rounded-2xl border border-white/[0.06] bg-ink-800 p-3.5">
             <View className="h-11 w-11 items-center justify-center rounded-full" style={{ backgroundColor: alpha(tint(p.color, c), 0.16) }}><Text className="text-[24px]">{p.emoji}</Text></View>
             <View className="mt-2.5 flex-row items-center gap-1.5"><Text className="text-[14.5px] font-extrabold text-white">{p.hand}</Text><Text className="text-[12px] font-bold" style={{ color: tint(p.color, c) }}>· {p.title}</Text></View>
-            <Text className="mt-1 text-[12.5px] leading-[1.4] text-white/55">{p.desc}</Text>
+            <Text className="mt-1 text-[12.5px] leading-[1.4] text-secondary">{p.desc}</Text>
           </View>
         ))}
       </View>
@@ -1200,7 +1200,7 @@ function GuideTab() {
         {TIERS.map((t) => (
           <View key={t.title} className="rounded-2xl bg-ink-800 px-4 py-3.5" style={{ borderLeftWidth: 3, borderLeftColor: tint(t.color, c) }}>
             <Text className="text-[15px] font-extrabold" style={{ color: tint(t.color, c) }}>{t.title}</Text>
-            <Text className="mt-1 text-[12.5px] leading-[1.5] text-white/60">{t.desc}</Text>
+            <Text className="mt-1 text-[12.5px] leading-[1.5] text-secondary">{t.desc}</Text>
             <View className="mt-2.5 flex-row flex-wrap gap-1.5">{t.items.map((it) => <View key={it} className="rounded-full bg-white/5 px-3 py-1.5"><Text className="text-[11px] text-white/70">{it}</Text></View>)}</View>
           </View>
         ))}
@@ -1208,11 +1208,11 @@ function GuideTab() {
 
       {/* Everyday wins */}
       <View className="mt-8 flex-row items-center gap-2.5"><Text className="text-[19px]">✨</Text><Text className="text-[19px] font-extrabold tracking-tight text-white">Simple everyday wins</Text></View>
-      <Text className="mb-3 mt-1 text-[13px] leading-[1.5] text-white/55">Small habits that make healthy eating easier.</Text>
+      <Text className="mb-3 mt-1 text-[13px] leading-[1.5] text-secondary">Small habits that make healthy eating easier.</Text>
       {PRINCIPLES.map((p) => (
         <View key={p.title} className="flex-row items-start gap-3.5 border-t border-white/[0.06] py-3.5">
           <View className="h-[38px] w-[38px] items-center justify-center rounded-full" style={{ backgroundColor: alpha(c.brand400, 0.12) }}><Text className="text-[18px]">{p.emoji}</Text></View>
-          <View className="min-w-0 flex-1"><Text className="text-[14px] font-extrabold text-white">{p.title}</Text><Text className="mt-0.5 text-[12.5px] leading-[1.5] text-white/60">{p.text}</Text></View>
+          <View className="min-w-0 flex-1"><Text className="text-[14px] font-extrabold text-white">{p.title}</Text><Text className="mt-0.5 text-[12.5px] leading-[1.5] text-secondary">{p.text}</Text></View>
         </View>
       ))}
 
@@ -1225,7 +1225,7 @@ function GuideTab() {
             <View key={l.id} {...({ dataSet: { lessonId: l.id } } as any)} onLayout={(e) => { rowY.current[l.id] = e.nativeEvent.layout.y }} className="overflow-hidden rounded-[14px]" style={{ backgroundColor: open ? alpha(c.brand400, 0.05) : 'transparent', borderLeftWidth: open ? 3 : 0, borderLeftColor: c.brand400 }}>
               <Pressable onPress={() => toggleLesson(l.id)} className="flex-row items-center gap-3 px-3 py-3.5 active:opacity-80">
                 <View className="h-10 w-10 items-center justify-center rounded-full" style={{ backgroundColor: alpha(c.brand400, 0.12) }}><Text className="text-[19px]">{l.emoji}</Text></View>
-                <View className="min-w-0 flex-1"><Text className="text-[14.5px] font-extrabold text-white">{l.title}</Text><Text numberOfLines={1} className="mt-px text-[12px] text-white/60">{l.summary}</Text></View>
+                <View className="min-w-0 flex-1"><Text className="text-[14.5px] font-extrabold text-white">{l.title}</Text><Text numberOfLines={1} className="mt-px text-[12px] text-secondary">{l.summary}</Text></View>
                 <ChevronDown size={18} color={open ? c.brand400 : alpha(c.fg, 0.35)} style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
               </Pressable>
               {open && (
@@ -1326,7 +1326,7 @@ function RecipeModal({ meal, onClose, onEdit }: { meal: BudgetMeal | UserMeal | 
             {budget && (
               <View className="flex-row flex-wrap gap-1.5">
                 {budget.tags.map((t) => <View key={t} className="rounded-full px-3 py-1" style={{ backgroundColor: alpha(c.brand400, 0.15) }}><Text className="text-[11px] font-bold text-brand-300">{t}</Text></View>)}
-                <View className="rounded-full bg-white/[0.06] px-3 py-1"><Text className="text-[11px] font-bold text-white/60">{macros}</Text></View>
+                <View className="rounded-full bg-white/[0.06] px-3 py-1"><Text className="text-[11px] font-bold text-secondary">{macros}</Text></View>
               </View>
             )}
             {meal.ingredients.length > 0 && (
@@ -1365,7 +1365,7 @@ function RecipeModal({ meal, onClose, onEdit }: { meal: BudgetMeal | UserMeal | 
 }
 
 function SectionHead({ children }: { children: ReactNode }) {
-  return <Text className="mb-2 text-[12px] font-extrabold uppercase tracking-wide text-white/40">{children}</Text>
+  return <Text className="mb-2 text-[12px] font-extrabold uppercase tracking-wide text-tertiary">{children}</Text>
 }
 
 /* ============================ Add / edit meal sheet ============================ */
@@ -1419,7 +1419,7 @@ function AddMealSheet({ open, editing, onClose }: { open: boolean; editing: User
           <View className="flex-row items-center justify-between px-[18px] pb-2 pt-[18px]">
             <View>
               <Text className="text-[18px] font-extrabold text-white">{editing ? 'Edit your meal' : 'Add your meal'}</Text>
-              <Text className="mt-px text-[12px] text-white/50">{editing ? 'Update the details below.' : 'Save a recipe you cook often.'}</Text>
+              <Text className="mt-px text-[12px] text-secondary">{editing ? 'Update the details below.' : 'Save a recipe you cook often.'}</Text>
             </View>
             <Pressable onPress={onClose} className="h-8 w-8 items-center justify-center rounded-full bg-white/[0.06] active:opacity-80"><X size={16} color={c.fg} /></Pressable>
           </View>
@@ -1451,7 +1451,7 @@ function AddMealSheet({ open, editing, onClose }: { open: boolean; editing: User
 function Field({ label, optional, children }: { label: string; optional?: boolean; children: ReactNode }) {
   return (
     <View>
-      <Text className="mb-1.5 text-[11px] font-extrabold uppercase tracking-wide text-white/40">{label}{optional && <Text className="font-semibold normal-case tracking-normal text-white/35"> · optional</Text>}</Text>
+      <Text className="mb-1.5 text-[11px] font-extrabold uppercase tracking-wide text-tertiary">{label}{optional && <Text className="font-semibold normal-case tracking-normal text-tertiary"> · optional</Text>}</Text>
       {children}
     </View>
   )

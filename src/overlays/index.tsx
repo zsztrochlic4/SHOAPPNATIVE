@@ -89,8 +89,8 @@ export function NotificationsSheet({ open, onClose }: Props) {
                 <Text className="font-bold leading-tight text-white">{n.title}</Text>
                 {!n.read && <View className="ml-2 h-2 w-2 shrink-0 rounded-full bg-brand-400" />}
               </View>
-              <Text className="text-[13px] text-white/55">{n.body}</Text>
-              <Text className="mt-1 text-[11px] text-white/35">{n.time}</Text>
+              <Text className="text-[13px] text-secondary">{n.body}</Text>
+              <Text className="mt-1 text-[11px] text-tertiary">{n.time}</Text>
             </View>
           </Pressable>
         ))}
@@ -179,7 +179,7 @@ function GoalRow({ label, unit, children }: { label: string; unit: string; child
     <View className="flex-row items-center justify-between">
       <View className="flex-1">
         <Text className="text-[14px] font-semibold text-white">{label}</Text>
-        <Text className="text-[11px] text-white/40">{unit}</Text>
+        <Text className="text-[11px] text-tertiary">{unit}</Text>
       </View>
       {children}
     </View>
@@ -363,7 +363,7 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
           <Dumbbell size={18} color={brand[400]} />
           <View className="flex-1">
             <Text className="font-bold text-white">Training profile</Text>
-            <Text className="text-[12px] text-white/50">Goal, experience, days, session length, equipment — preview a new program before applying</Text>
+            <Text className="text-[12px] text-secondary">Goal, experience, days, session length, equipment — preview a new program before applying</Text>
           </View>
           <ChevronRight size={16} color="rgba(255,255,255,0.35)" />
         </Pressable>
@@ -378,7 +378,7 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
         >
           <View className="min-w-0 flex-1">
             <Text numberOfLines={1} className="font-bold leading-tight text-white" style={currentLang.rtl ? { writingDirection: 'rtl' } : undefined}>{currentLang.native}</Text>
-            <Text className="text-[12px] text-white/45">{currentLang.english}</Text>
+            <Text className="text-[12px] text-secondary">{currentLang.english}</Text>
           </View>
           <ChevronRight size={18} color="rgba(255,255,255,0.4)" style={{ transform: [{ rotate: langOpen ? '90deg' : '0deg' }] }} />
         </Pressable>
@@ -399,7 +399,7 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
                   >
                     <View className="min-w-0 flex-1">
                       <Text numberOfLines={1} className="font-bold leading-tight text-white" style={l.rtl ? { writingDirection: 'rtl' } : undefined}>{l.native}</Text>
-                      <Text className="text-[11px] text-white/45">{l.english}{l.code !== 'en' ? ' · partial' : ''}</Text>
+                      <Text className="text-[11px] text-secondary">{l.english}{l.code !== 'en' ? ' · partial' : ''}</Text>
                     </View>
                     {active && <Check size={16} strokeWidth={3} color={brand[400]} />}
                   </Pressable>
@@ -408,7 +408,7 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
             </View>
             {/* Honesty over implication (audit F-030): today's translations
                 cover Settings only — say so instead of promising a translated app. */}
-            <Text className="mt-2 px-1 text-[11px] leading-4 text-white/35">
+            <Text className="mt-2 px-1 text-[11px] leading-4 text-tertiary">
               Translations are a preview and currently cover Settings only — the rest of the app remains in English for now.
             </Text>
           </>
@@ -435,7 +435,7 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
           >
             <View className="flex-1">
               <Text className="font-bold text-amber-200">Notifications are blocked by your device</Text>
-              <Text className="mt-0.5 text-[12px] leading-4 text-white/50">Allow them in device Settings, then turn the switch on here.</Text>
+              <Text className="mt-0.5 text-[12px] leading-4 text-secondary">Allow them in device Settings, then turn the switch on here.</Text>
             </View>
             <Text className="text-[12.5px] font-extrabold text-amber-300">Open Settings</Text>
           </Pressable>
@@ -454,7 +454,7 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
       <Group label="Accessibility">
         <View className="rounded-2xl border border-white/5 bg-ink-800 p-4">
           <Text className="mb-1 font-bold text-white">Motion</Text>
-          <Text className="mb-3 text-[12px] leading-4 text-white/50">
+          <Text className="mb-3 text-[12px] leading-4 text-secondary">
             Reduce animations and celebratory effects. "Auto" follows your device's Reduce Motion setting.
           </Text>
           <Segmented<'system' | 'reduce' | 'full'>
@@ -475,7 +475,7 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
             <View className="flex-row items-center justify-between">
               <View className="min-w-0 flex-1">
                 <Text className="font-bold text-white">StrengthHub membership</Text>
-                <Text className="mt-0.5 text-[12px] text-white/50">
+                <Text className="mt-0.5 text-[12px] text-secondary">
                   {subStatusLabel}
                   {sub?.status === 'trialing' && sub.trialEnd ? ` · trial ends ${new Date(sub.trialEnd * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : ''}
                   {sub?.status === 'active' && periodEndLabel ? ` · renews ${periodEndLabel}` : ''}
@@ -495,7 +495,7 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
             >
               <Text className="text-sm font-semibold text-black">{portalBusy ? 'Opening…' : 'Manage or cancel subscription'}</Text>
             </Pressable>
-            <Text className="mt-2 text-[11px] leading-4 text-white/35">
+            <Text className="mt-2 text-[11px] leading-4 text-tertiary">
               Opens Stripe's secure portal: change payment method, view invoices, or cancel any time. Cancelling keeps access until the period ends.
             </Text>
           </View>
@@ -514,7 +514,7 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
             <RotateCcw size={18} color={brand[400]} />
             <View className="flex-1">
               <Text className="font-bold text-white">{t('settings.resetDemo')}</Text>
-              <Text className="text-[12px] text-white/50">{t('settings.resetDemoSub')}</Text>
+              <Text className="text-[12px] text-secondary">{t('settings.resetDemoSub')}</Text>
             </View>
           </Pressable>
         )}
@@ -532,7 +532,7 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
           <Trash2 size={18} color="#f87171" />
           <View className="flex-1">
             <Text className="font-bold text-red-300">{confirmingClear ? 'Tap again to wipe everything' : t('settings.clear')}</Text>
-            <Text className="text-[12px] text-white/50">{confirmingClear ? 'Erases your data and restarts onboarding' : t('settings.clearSub')}</Text>
+            <Text className="text-[12px] text-secondary">{confirmingClear ? 'Erases your data and restarts onboarding' : t('settings.clearSub')}</Text>
           </View>
         </Pressable>
         <Pressable
@@ -545,7 +545,7 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
           <Download size={18} color="rgba(255,255,255,0.7)" />
           <View className="flex-1">
             <Text className="font-bold text-white/85">{exporting ? 'Preparing…' : 'Download my data'}</Text>
-            <Text className="text-[12px] text-white/50">Export your profile and logs as a JSON file</Text>
+            <Text className="text-[12px] text-secondary">Export your profile and logs as a JSON file</Text>
           </View>
         </Pressable>
         {authEnabled && (
@@ -557,7 +557,7 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
             <Trash2 size={18} color="#f87171" />
             <View className="flex-1">
               <Text className="font-bold text-red-300">{deleting ? 'Deleting…' : confirmingDelete ? 'Tap again to permanently delete' : 'Delete account'}</Text>
-              <Text className="text-[12px] text-white/50">{confirmingDelete ? 'Erases your account and all data — this cannot be undone' : 'Permanently delete your account and data'}</Text>
+              <Text className="text-[12px] text-secondary">{confirmingDelete ? 'Erases your account and all data — this cannot be undone' : 'Permanently delete your account and data'}</Text>
             </View>
           </Pressable>
         )}
@@ -588,7 +588,7 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
         >
           <View className="flex-1">
             <Text className="font-bold text-white">Contact support</Text>
-            <Text className="text-[12px] text-white/45">info@strengthhubonline.com — billing, data, safety or anything else</Text>
+            <Text className="text-[12px] text-secondary">info@strengthhubonline.com — billing, data, safety or anything else</Text>
           </View>
           <ChevronRight size={16} color="rgba(255,255,255,0.35)" />
         </Pressable>
@@ -597,7 +597,7 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
       <View className="mt-7 items-center gap-2">
         <LogoMark size={34} />
         {/* Real runtime version/build (audit F-033) — what support needs to identify a build. */}
-        <Text className="text-[12px] text-white/30">
+        <Text className="text-[12px] text-tertiary">
           StrengthHub Online · v{Constants.expoConfig?.version ?? '1.0.0'}
           {(() => {
             const build = Platform.OS === 'ios'
@@ -639,7 +639,7 @@ function SyncStatusRow() {
     <View className={`w-full flex-row items-center gap-3 rounded-2xl border p-4 ${status.error ? 'border-amber-400/25 bg-amber-400/[0.06]' : 'border-white/5 bg-ink-800'}`}>
       <View className="flex-1">
         <Text className={`font-bold ${tone}`}>Cloud backup</Text>
-        <Text className="mt-0.5 text-[12px] text-white/50">{label}</Text>
+        <Text className="mt-0.5 text-[12px] text-secondary">{label}</Text>
       </View>
       <Pressable
         onPress={async () => {
@@ -779,10 +779,10 @@ export function MenuDrawer({ open, onClose }: { open: boolean; onClose: () => vo
             <Avatar name={p.name} size={64} />
             <View className="min-w-0 flex-1">
               <Text numberOfLines={1} className="text-xl font-extrabold text-white">{p.name}</Text>
-              <Text numberOfLines={1} className="mt-0.5 text-[13px] text-white/50">{p.university} · Age {p.age}</Text>
+              <Text numberOfLines={1} className="mt-0.5 text-[13px] text-secondary">{p.university} · Age {p.age}</Text>
               <View className="mt-2 flex-row flex-wrap items-center gap-2">
                 <View className="rounded-full bg-brand-400/15 px-2.5 py-1"><Text className="text-[11px] font-bold text-brand-400">{goalLabel[p.goal]}</Text></View>
-                <Text className="text-[12px] text-white/40">Member since {joined}</Text>
+                <Text className="text-[12px] text-tertiary">Member since {joined}</Text>
               </View>
             </View>
           </Pressable>
@@ -833,7 +833,7 @@ export function MenuDrawer({ open, onClose }: { open: boolean; onClose: () => vo
 function MenuSection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <View className="mt-5">
-      <Text className="mb-2 px-1 text-[12px] font-bold uppercase tracking-wide text-white/40">{title}</Text>
+      <Text className="mb-2 px-1 text-[12px] font-bold uppercase tracking-wide text-tertiary">{title}</Text>
       <View className="overflow-hidden rounded-2xl border border-white/5 bg-ink-800">{children}</View>
     </View>
   )
@@ -845,7 +845,7 @@ function MenuRow({ icon, title, sub, onPress, badge, first }: { icon: ReactNode;
       <View className="h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-400/10">{icon}</View>
       <View className="min-w-0 flex-1">
         <Text className="font-semibold text-white">{title}</Text>
-        {sub && <Text numberOfLines={1} className="mt-0.5 text-[12px] text-white/45">{sub}</Text>}
+        {sub && <Text numberOfLines={1} className="mt-0.5 text-[12px] text-secondary">{sub}</Text>}
       </View>
       {badge}
       <ChevronRight size={18} color="rgba(255,255,255,0.25)" />
@@ -875,14 +875,14 @@ export function ProfileSheet({ open, onClose }: Props) {
         <Avatar name={state.profile.name} size={64} />
         <View>
           <Text className="text-xl font-extrabold text-white">{state.profile.name}</Text>
-          <Text className="text-[13px] text-white/50">{state.profile.age} · {state.profile.university}</Text>
+          <Text className="text-[13px] text-secondary">{state.profile.age} · {state.profile.university}</Text>
           <View className="mt-1 flex-row">
             <Chip color="green">{goalLabel[state.profile.goal]}</Chip>
           </View>
         </View>
       </View>
 
-      <Text className="mt-3 text-[13px] text-white/45">{state.profile.dorm} · {state.profile.cohort}</Text>
+      <Text className="mt-3 text-[13px] text-secondary">{state.profile.dorm} · {state.profile.cohort}</Text>
 
       <View className="mt-4 flex-row gap-3">
         <Stat label="Workouts" value={String(totalWorkouts)} />
@@ -947,7 +947,7 @@ export function AddFoodSheet({ open, onClose, params }: Props) {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-1 mb-3" contentContainerStyle={{ gap: 8, paddingHorizontal: 4 }}>
         {(['Breakfast', 'Lunch', 'Snack', 'Dinner'] as MealName[]).map((m) => (
           <Pressable key={m} onPress={() => setMeal(m)} accessibilityRole="button" accessibilityLabel={m} accessibilityState={{ selected: meal === m }} className={`shrink-0 rounded-full px-4 py-1.5 active:opacity-90 ${meal === m ? 'bg-brand-400' : 'bg-ink-700'}`}>
-            <Text className={`text-sm font-semibold ${meal === m ? 'text-black' : 'text-white/60'}`}>{m}</Text>
+            <Text className={`text-sm font-semibold ${meal === m ? 'text-black' : 'text-secondary'}`}>{m}</Text>
           </Pressable>
         ))}
       </ScrollView>
@@ -971,7 +971,7 @@ export function AddFoodSheet({ open, onClose, params }: Props) {
       <View className="mb-3 flex-row">
         <Pressable onPress={() => setBudgetOnly((b) => !b)} accessibilityRole="button" accessibilityLabel="Budget meals filter" accessibilityState={{ selected: budgetOnly }} className={`flex-row items-center gap-1.5 rounded-full px-3 py-1.5 active:opacity-90 ${budgetOnly ? 'bg-brand-400/20' : 'bg-ink-700'}`}>
           <Wallet size={13} color={budgetOnly ? brand[400] : 'rgba(255,255,255,0.55)'} />
-          <Text className={`text-xs font-semibold ${budgetOnly ? 'text-brand-400' : 'text-white/55'}`}>Budget meals {budgetOnly ? 'on' : 'off'}</Text>
+          <Text className={`text-xs font-semibold ${budgetOnly ? 'text-brand-400' : 'text-secondary'}`}>Budget meals {budgetOnly ? 'on' : 'off'}</Text>
         </Pressable>
       </View>
 
@@ -984,7 +984,7 @@ export function AddFoodSheet({ open, onClose, params }: Props) {
 
       {myResults.length > 0 && (
         <View className="mb-4">
-          <Text className="mb-2 text-[12px] font-extrabold uppercase tracking-wide text-white/40">My meals</Text>
+          <Text className="mb-2 text-[12px] font-extrabold uppercase tracking-wide text-tertiary">My meals</Text>
           <View className="gap-2">
             {myResults.map((m) => (
               <MyMealRow key={m.id} m={m} onAdd={addUserMeal} />
@@ -995,12 +995,12 @@ export function AddFoodSheet({ open, onClose, params }: Props) {
 
       <View className="gap-2">
         {myResults.length > 0 && results.length > 0 && (
-          <Text className="mb-1 text-[12px] font-extrabold uppercase tracking-wide text-white/40">Foods</Text>
+          <Text className="mb-1 text-[12px] font-extrabold uppercase tracking-wide text-tertiary">Foods</Text>
         )}
         {results.map((f) => (
           <FoodRow key={f.id} id={f.id} onAdd={add} />
         ))}
-        {results.length === 0 && myResults.length === 0 && <Text className="py-6 text-center text-sm text-white/40">No foods found.</Text>}
+        {results.length === 0 && myResults.length === 0 && <Text className="py-6 text-center text-sm text-tertiary">No foods found.</Text>}
       </View>
     </Sheet>
   )
@@ -1014,7 +1014,7 @@ function MyMealRow({ m, onAdd }: { m: UserMeal; onAdd: (m: UserMeal) => void }) 
       </View>
       <View className="min-w-0 flex-1">
         <Text numberOfLines={1} className="font-bold leading-tight text-white">{m.name}</Text>
-        <Text className="text-[12px] text-white/45">Saved meal · {m.kcal} kcal · {m.p}P {m.c}C {m.f}F</Text>
+        <Text className="text-[12px] text-secondary">Saved meal · {m.kcal} kcal · {m.p}P {m.c}C {m.f}F</Text>
       </View>
       <View className="h-7 w-7 items-center justify-center rounded-full bg-brand-400"><Plus size={16} strokeWidth={3} color="#000" /></View>
     </Pressable>
@@ -1027,7 +1027,7 @@ function FoodRow({ id, onAdd }: { id: string; onAdd: (id: string) => void }) {
     <Pressable onPress={() => onAdd(id)} accessibilityRole="button" accessibilityLabel={`Add ${f.name}`} className="w-full flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-3 active:opacity-90">
       <View className="min-w-0 flex-1">
         <Text numberOfLines={1} className="font-bold leading-tight text-white">{f.name}</Text>
-        <Text className="text-[12px] text-white/45">{f.serving} · {f.kcal} kcal · {f.p}P {f.c}C {f.f}F</Text>
+        <Text className="text-[12px] text-secondary">{f.serving} · {f.kcal} kcal · {f.p}P {f.c}C {f.f}F</Text>
       </View>
       {f.budget && <Wallet size={14} color={brand[400]} />}
       <View className="h-7 w-7 items-center justify-center rounded-full bg-brand-400"><Plus size={16} strokeWidth={3} color="#000" /></View>
@@ -1053,7 +1053,7 @@ export function LogWeightSheet({ open, onClose }: Props) {
   const num = weightVal(current, units)
   return (
     <Sheet open={open} onClose={onClose} title="Log weight">
-      <Text className="text-[13px] text-white/50">Today · {relativeLabel(todayKey)}</Text>
+      <Text className="text-[13px] text-secondary">Today · {relativeLabel(todayKey)}</Text>
       <View className="mt-6 flex-row items-end justify-center gap-2">
         <TextInput
           autoFocus
@@ -1062,7 +1062,7 @@ export function LogWeightSheet({ open, onClose }: Props) {
           onChangeText={(v) => setVal(v.replace(/[^\d.]/g, ''))}
           className="w-40 border-b-2 border-brand-400 bg-transparent pb-2 text-center text-5xl font-extrabold text-white"
         />
-        <Text className="pb-3 text-xl font-bold text-white/50">{weightUnit(units)}</Text>
+        <Text className="pb-3 text-xl font-bold text-secondary">{weightUnit(units)}</Text>
       </View>
       <View className="mt-4 flex-row justify-center gap-2">
         {[-0.5, -0.1, 0.1, 0.5].map((d) => (
@@ -1103,7 +1103,7 @@ export function LogHabitSheet({ open, onClose }: Props) {
   const waterStep = units === 'imperial' ? 8 / 33.814 : 0.25
   return (
     <Sheet open={open} onClose={onClose} title="Log habits">
-      <Text className="mb-3 text-[13px] text-white/50">Adjust and log. Done in seconds.</Text>
+      <Text className="mb-3 text-[13px] text-secondary">Adjust and log. Done in seconds.</Text>
 
       <View className="gap-3.5">
         {/* Water: fast tap logger */}
@@ -1121,7 +1121,7 @@ export function LogHabitSheet({ open, onClose }: Props) {
               <Text className="font-bold text-brand-400">+ {units === 'imperial' ? '8 oz' : '250 ml'}</Text>
             </Pressable>
           </View>
-          <Text className="mt-2 text-center text-[12px] text-white/40">Goal {fmtFluid(state.profile.waterTargetL, units)}</Text>
+          <Text className="mt-2 text-center text-[12px] text-tertiary">Goal {fmtFluid(state.profile.waterTargetL, units)}</Text>
         </View>
 
         {/* Steps: stepper */}
@@ -1145,12 +1145,12 @@ export function LogHabitSheet({ open, onClose }: Props) {
           <View className="flex-row items-center gap-2">
             <Leaf size={18} color={brand[400]} />
             <Text className="flex-1 font-bold text-white">Mindset</Text>
-            <Text className="text-2xl font-extrabold text-brand-400">{mindset}<Text className="text-[13px] font-semibold text-white/40"> min</Text></Text>
+            <Text className="text-2xl font-extrabold text-brand-400">{mindset}<Text className="text-[13px] font-semibold text-tertiary"> min</Text></Text>
           </View>
           <View className="mt-3 flex-row flex-wrap gap-2">
             {[0, 5, 10, 15, 20, 30, 45].map((m) => (
               <Pressable key={m} onPress={() => setMindset(m)} className={`items-center rounded-xl px-3 py-2 active:opacity-90 ${mindset === m ? 'bg-brand-400' : 'bg-ink-700'}`} style={{ minWidth: 44 }}>
-                <Text className={`text-sm font-bold ${mindset === m ? 'text-black' : 'text-white/60'}`}>{m === 0 ? 'None' : m}</Text>
+                <Text className={`text-sm font-bold ${mindset === m ? 'text-black' : 'text-secondary'}`}>{m === 0 ? 'None' : m}</Text>
               </Pressable>
             ))}
           </View>
@@ -1178,14 +1178,14 @@ function HabitStepper({ icon, label, value, min, max, step, onChange, display, u
       <View className="flex-row items-center gap-2">
         {icon}
         <Text className="flex-1 font-bold text-white">{label}</Text>
-        <Text className="text-2xl font-extrabold text-brand-400">{display}{unit && <Text className="text-[13px] font-semibold text-white/40"> {unit}</Text>}</Text>
+        <Text className="text-2xl font-extrabold text-brand-400">{display}{unit && <Text className="text-[13px] font-semibold text-tertiary"> {unit}</Text>}</Text>
       </View>
       <View className="mt-3 flex-row items-center gap-2">
         <Pressable onPress={() => dec(step)} className="h-11 w-11 items-center justify-center rounded-xl bg-ink-700 active:opacity-80">
           <Minus size={18} color="#fff" />
         </Pressable>
         <Pressable onPress={() => dec(step * 4)} className="flex-1 items-center rounded-xl bg-ink-700 py-3 active:opacity-80">
-          <Text className="text-sm font-bold text-white/60">− {step * 4 >= 1000 ? `${step * 4 / 1000}k` : step * 4}</Text>
+          <Text className="text-sm font-bold text-secondary">− {step * 4 >= 1000 ? `${step * 4 / 1000}k` : step * 4}</Text>
         </Pressable>
         <Pressable onPress={() => inc(step * 4)} className="flex-1 items-center rounded-xl bg-brand-400/20 py-3 active:opacity-80">
           <Text className="text-sm font-bold text-brand-400">+ {step * 4 >= 1000 ? `${step * 4 / 1000}k` : step * 4}</Text>
@@ -1195,9 +1195,9 @@ function HabitStepper({ icon, label, value, min, max, step, onChange, display, u
         </Pressable>
       </View>
       <View className="mt-1.5 flex-row items-center justify-between">
-        <Text className="text-[11px] text-white/35">{minLabel}</Text>
+        <Text className="text-[11px] text-tertiary">{minLabel}</Text>
         {goalLabel && <Text className="text-[11px] font-semibold text-brand-400/80">Goal {goalLabel}</Text>}
-        <Text className="text-[11px] text-white/35">{maxLabel}</Text>
+        <Text className="text-[11px] text-tertiary">{maxLabel}</Text>
       </View>
     </View>
   )
@@ -1254,7 +1254,7 @@ export function QuickWorkoutsSheet({ open, onClose }: Props) {
   return (
     <Sheet open={open} onClose={onClose} full>
       <Text className="text-[25px] font-extrabold tracking-[-0.03em] leading-[1.15] text-white">12-Minute Bodyweight Exercises</Text>
-      <Text className="mt-2.5 text-[13.5px] leading-5 text-white/55">Quick, no-equipment workouts when you're short on time. Ordered easiest first.</Text>
+      <Text className="mt-2.5 text-[13.5px] leading-5 text-secondary">Quick, no-equipment workouts when you're short on time. Ordered easiest first.</Text>
       <View className="mt-4 gap-2.5">
         {quickWorkouts.map((q) => {
           const stations = q.rounds[0]?.stations ?? []
@@ -1267,19 +1267,19 @@ export function QuickWorkoutsSheet({ open, onClose }: Props) {
                     <Text className={`text-[9.5px] font-bold uppercase tracking-wider ${lvl.text}`}>{q.level}</Text>
                   </View>
                   <Text className="text-[15px] font-bold leading-tight text-white">{q.name}</Text>
-                  <Text className="mt-0.5 text-[12px] text-white/50">{q.focus}</Text>
-                  <Text className="mt-1 text-[11px] text-white/40">{q.rounds.length} rounds · {stations.length} exercises</Text>
+                  <Text className="mt-0.5 text-[12px] text-secondary">{q.focus}</Text>
+                  <Text className="mt-1 text-[11px] text-tertiary">{q.rounds.length} rounds · {stations.length} exercises</Text>
                 </View>
                 <View className="shrink-0 items-end">
                   <Text className="text-[22px] font-extrabold leading-none text-accent-blue">{q.minutes}</Text>
-                  <Text className="mt-[3px] text-[9.5px] font-bold uppercase tracking-wider text-white/35">minutes</Text>
+                  <Text className="mt-[3px] text-[9.5px] font-bold uppercase tracking-wider text-tertiary">minutes</Text>
                 </View>
               </View>
               <View className="mt-3 flex-row flex-wrap gap-1.5">
                 {stations.map((s) => (
                   <View key={s.exerciseId} className="flex-row items-center gap-1 rounded-full bg-white/[0.06] px-2.5 py-1">
                     <Text className="text-[11.5px] text-white/65">{s.name}</Text>
-                    <Text className="text-[11.5px] font-semibold text-white/40">· {s.workSec}s</Text>
+                    <Text className="text-[11.5px] font-semibold text-tertiary">· {s.workSec}s</Text>
                   </View>
                 ))}
               </View>
@@ -1308,7 +1308,7 @@ export function BadgesSheet({ open, onClose }: Props) {
               <Icon name={b.icon} size={22} color={b.earned ? '#7ED957' : '#888'} />
             </View>
             <Text className="mt-2 text-center text-[12px] font-bold leading-tight text-white">{b.name}</Text>
-            <Text className="mt-0.5 text-center text-[10px] text-white/45">{b.desc}</Text>
+            <Text className="mt-0.5 text-center text-[10px] text-secondary">{b.desc}</Text>
             {b.earned && b.earnedDateKey && <Text className="mt-1 text-[9px] font-semibold text-brand-400">{shortDate(b.earnedDateKey)}</Text>}
           </View>
         ))}
@@ -1321,7 +1321,7 @@ export function BadgesSheet({ open, onClose }: Props) {
 function Group({ label, children }: { label: string; children: ReactNode }) {
   return (
     <View className="mb-5">
-      <Text className="mb-2 text-[12px] font-bold uppercase tracking-wide text-white/40">{label}</Text>
+      <Text className="mb-2 text-[12px] font-bold uppercase tracking-wide text-tertiary">{label}</Text>
       <View className="gap-2.5">{children}</View>
     </View>
   )
@@ -1333,7 +1333,7 @@ function Row({ icon, title, sub, children }: { icon: ReactNode; title: string; s
       <View className="h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/5">{icon}</View>
       <View className="flex-1">
         <Text className="font-bold leading-tight text-white">{title}</Text>
-        <Text className="text-[12px] text-white/50">{sub}</Text>
+        <Text className="text-[12px] text-secondary">{sub}</Text>
       </View>
       {children}
     </View>
@@ -1346,7 +1346,7 @@ function LinkRow({ icon, title, sub, onPress }: { icon: ReactNode; title: string
       <View className="h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/5">{icon}</View>
       <View className="flex-1">
         <Text className="font-bold leading-tight text-white">{title}</Text>
-        <Text className="text-[12px] text-white/50">{sub}</Text>
+        <Text className="text-[12px] text-secondary">{sub}</Text>
       </View>
       <ChevronRight size={18} color="rgba(255,255,255,0.3)" />
     </Pressable>
@@ -1386,7 +1386,7 @@ function NotificationPrefsPanel({ t }: { t: (k: string) => string }) {
 
   return (
     <View className="gap-2.5 rounded-2xl border border-white/5 bg-ink-800/60 p-3.5">
-      <Text className="text-[11px] font-bold uppercase tracking-wide text-white/40">{t('notif.deliver')}</Text>
+      <Text className="text-[11px] font-bold uppercase tracking-wide text-tertiary">{t('notif.deliver')}</Text>
       <Row icon={<Dumbbell size={18} color={brand[400]} />} title={t('notif.workout')} sub={t('notif.workoutSub')}>
         <Toggle on={prefs.workoutReminder} onPress={() => set({ workoutReminder: !prefs.workoutReminder })} label="Workout reminder" />
       </Row>
@@ -1394,13 +1394,13 @@ function NotificationPrefsPanel({ t }: { t: (k: string) => string }) {
         <Toggle on={prefs.streakReminder} onPress={() => set({ streakReminder: !prefs.streakReminder })} label="Streak reminder" />
       </Row>
 
-      <Text className="mt-1 text-[11px] font-bold uppercase tracking-wide text-white/40">{t('notif.time')}</Text>
+      <Text className="mt-1 text-[11px] font-bold uppercase tracking-wide text-tertiary">{t('notif.time')}</Text>
       <View className="flex-row gap-2">
         {TIME_PRESETS.map((h) => {
           const on = prefs.reminderHour === h
           return (
             <Pressable key={h} onPress={() => set({ reminderHour: h })} className={`flex-1 items-center rounded-xl py-2.5 active:opacity-90 ${on ? 'bg-brand-400' : 'bg-ink-700'}`}>
-              <Text className={`text-[13px] font-bold ${on ? 'text-black' : 'text-white/60'}`}>{fmtHour(h)}</Text>
+              <Text className={`text-[13px] font-bold ${on ? 'text-black' : 'text-secondary'}`}>{fmtHour(h)}</Text>
             </Pressable>
           )
         })}
@@ -1424,7 +1424,7 @@ function NotificationPrefsPanel({ t }: { t: (k: string) => string }) {
 function HourStepper({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
   return (
     <View className="flex-1 rounded-xl border border-white/8 bg-ink-900 p-2.5">
-      <Text className="mb-1.5 text-[11px] font-semibold text-white/45">{label}</Text>
+      <Text className="mb-1.5 text-[11px] font-semibold text-secondary">{label}</Text>
       <View className="flex-row items-center justify-between">
         <Pressable onPress={() => onChange((value + 23) % 24)} className="h-8 w-8 items-center justify-center rounded-lg bg-ink-700 active:opacity-80"><Minus size={15} color="#fff" /></Pressable>
         <Text className="text-[14px] font-extrabold text-white">{fmtHour(value)}</Text>
@@ -1470,7 +1470,7 @@ function Segmented<T extends string>({ value, options, onChange }: { value: T; o
           className="flex-1 flex-row items-center justify-center gap-1.5 rounded-lg py-2.5 active:opacity-90"
         >
           {o.icon}
-          <Text className={`text-sm font-semibold ${value === o.v ? 'text-black' : 'text-white/60'}`}>{o.l}</Text>
+          <Text className={`text-sm font-semibold ${value === o.v ? 'text-black' : 'text-secondary'}`}>{o.l}</Text>
         </Pressable>
       ))}
     </View>
@@ -1481,7 +1481,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <View className="flex-1 rounded-2xl border border-white/5 bg-ink-800 p-3">
       <Text className="text-lg font-extrabold text-white">{value}</Text>
-      <Text className="text-[11px] text-white/45">{label}</Text>
+      <Text className="text-[11px] text-secondary">{label}</Text>
     </View>
   )
 }

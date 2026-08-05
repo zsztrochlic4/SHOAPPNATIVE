@@ -75,7 +75,7 @@ export function IntegrationsSection() {
             <View className="h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/5">{ICONS[p.id]}</View>
             <View className="flex-1">
               <Text className="font-bold leading-tight text-white">{p.name}</Text>
-              <Text className="text-[12px] text-white/50">{on && sync ? sync : p.sub}</Text>
+              <Text className="text-[12px] text-secondary">{on && sync ? sync : p.sub}</Text>
             </View>
             <Pressable
               onPress={() => onPress(p)}
@@ -97,7 +97,7 @@ export function IntegrationsSection() {
           <Text className="text-sm font-semibold text-brand-400">{syncing ? 'Syncing…' : 'Sync now'}</Text>
         </Pressable>
       )}
-      <Text className="mt-0.5 px-1 text-[11px] leading-snug text-white/35">
+      <Text className="mt-0.5 px-1 text-[11px] leading-snug text-tertiary">
         Apple Health and Health Connect sync automatically once the native app ships — your workouts, steps and sleep land in Workout history and feed your habit tracking.
       </Text>
     </View>

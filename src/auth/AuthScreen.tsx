@@ -83,7 +83,7 @@ export function AuthScreen({ initialMode = 'signin', onBack }: { initialMode?: '
         <View className="mb-8 items-center">
           <LogoMark size={52} />
           <Text className="mt-4 text-2xl font-extrabold tracking-tight text-white">StrengthHub Online</Text>
-          <Text className="mt-1 text-[14px] text-white/50">{isSignup ? 'Create your account' : 'Welcome back'}</Text>
+          <Text className="mt-1 text-[14px] text-secondary">{isSignup ? 'Create your account' : 'Welcome back'}</Text>
         </View>
 
         {isSignup && (
@@ -130,7 +130,7 @@ export function AuthScreen({ initialMode = 'signin', onBack }: { initialMode?: '
           <>
             <View className="my-5 flex-row items-center gap-3">
               <View className="h-px flex-1 bg-white/10" />
-              <Text className="text-[12px] text-white/35">or</Text>
+              <Text className="text-[12px] text-tertiary">or</Text>
               <View className="h-px flex-1 bg-white/10" />
             </View>
 
@@ -147,7 +147,7 @@ export function AuthScreen({ initialMode = 'signin', onBack }: { initialMode?: '
         )}
 
         <Pressable onPress={() => { setMode(isSignup ? 'signin' : 'signup'); setError(null); setNotice(null) }} className="mt-6 active:opacity-70">
-          <Text className="text-center text-[14px] text-white/55">
+          <Text className="text-center text-[14px] text-secondary">
             {isSignup ? 'Already have an account? ' : 'New here? '}
             <Text className="font-bold" style={{ color: brand[400] }}>{isSignup ? 'Sign in' : 'Create one'}</Text>
           </Text>
@@ -160,7 +160,7 @@ export function AuthScreen({ initialMode = 'signin', onBack }: { initialMode?: '
 function Field({ label, ...props }: { label: string } & React.ComponentProps<typeof TextInput>) {
   return (
     <View className="mt-3">
-      <Text className="mb-1.5 text-[12px] font-semibold text-white/50">{label}</Text>
+      <Text className="mb-1.5 text-[12px] font-semibold text-secondary">{label}</Text>
       <TextInput
         {...props}
         placeholderTextColor="rgba(148,148,148,0.6)"

@@ -165,7 +165,7 @@ export function SegmentedTabs({
               {t === 'Coach' ? (
                 <Sun size={18} color={isActive ? brand[400] : 'rgba(148,148,148,0.75)'} />
               ) : (
-                <Text className={`text-[15px] font-semibold ${isActive ? 'text-brand-400' : 'text-white/45'}`}>{t}</Text>
+                <Text className={`text-[15px] font-semibold ${isActive ? 'text-brand-400' : 'text-secondary'}`}>{t}</Text>
               )}
               {isActive && <View className="absolute -bottom-px left-0 right-0 h-0.5 rounded-full bg-brand-400" />}
             </Pressable>

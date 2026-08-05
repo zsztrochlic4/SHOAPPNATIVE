@@ -40,7 +40,7 @@ const MemoryRow = memo(function MemoryRow({ item, onDelete }: { item: CoachMemor
         <View className="flex-1">
           <Text className="text-[11px] font-bold uppercase tracking-wide text-brand-400">{item.category.replace(/_/g, ' ')}</Text>
           <Text className="mt-1 text-[14px] leading-5 text-white/85">{item.value}</Text>
-          <Text className="mt-2 text-[11px] text-white/40">{item.status} · {item.source.replace(/_/g, ' ')}</Text>
+          <Text className="mt-2 text-[11px] text-tertiary">{item.status} · {item.source.replace(/_/g, ' ')}</Text>
         </View>
         <Pressable
           accessibilityRole="button"
@@ -195,30 +195,30 @@ export function CoachMemoryView({ onClose, onConsentChanged }: Props) {
           <View className="h-10 w-10 items-center justify-center rounded-full bg-brand-400/10"><Database size={19} color={colors.brand400} /></View>
           <View className="flex-1">
             <Text className="font-bold text-white">Long-term coach memory</Text>
-            <Text className="mt-0.5 text-[12px] leading-4 text-white/50">Save useful facts across sessions and devices.</Text>
+            <Text className="mt-0.5 text-[12px] leading-4 text-secondary">Save useful facts across sessions and devices.</Text>
           </View>
           <Switch value={workspace?.memoryEnabled === true} onValueChange={changeMemory} disabled={saving || net.isConnected === false} trackColor={{ true: colors.brand500, false: colors.ink600 }} thumbColor={colors.fg} />
         </View>
       </View>
       <View className="mx-[18px] mt-3 rounded-2xl border border-white/5 bg-ink-800 p-4">
         <View className="flex-row items-center gap-3">
-          <View className="flex-1"><Text className="font-bold text-white">Proactive check-ins</Text><Text className="mt-0.5 text-[12px] leading-4 text-white/50">Allow relevant, non-urgent coach prompts.</Text></View>
+          <View className="flex-1"><Text className="font-bold text-white">Proactive check-ins</Text><Text className="mt-0.5 text-[12px] leading-4 text-secondary">Allow relevant, non-urgent coach prompts.</Text></View>
           <Switch value={workspace?.proactiveEnabled === true} onValueChange={changeProactive} disabled={saving || net.isConnected === false} trackColor={{ true: colors.brand500, false: colors.ink600 }} thumbColor={colors.fg} />
         </View>
-        <Text className="mb-2 mt-5 text-[11px] font-bold uppercase tracking-wide text-white/40">Coaching style</Text>
+        <Text className="mb-2 mt-5 text-[11px] font-bold uppercase tracking-wide text-tertiary">Coaching style</Text>
         <View className="flex-row gap-2">
           {(['supportive', 'balanced', 'direct'] as const).map((style) => {
             const selected = workspace?.coachingStyle === style
             return (
               <Pressable key={style} disabled={saving || net.isConnected === false} onPress={() => void changeStyle(style)} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })} className={`min-h-11 flex-1 items-center justify-center rounded-xl border ${selected ? 'border-brand-400 bg-brand-400/10' : 'border-white/5 bg-white/[0.03]'}`}>
-                <Text className={`text-[12px] font-bold capitalize ${selected ? 'text-brand-400' : 'text-white/55'}`}>{style}</Text>
+                <Text className={`text-[12px] font-bold capitalize ${selected ? 'text-brand-400' : 'text-secondary'}`}>{style}</Text>
               </Pressable>
             )
           })}
         </View>
       </View>
       <View className="mx-[18px] mb-3 mt-4 flex-row items-center">
-        <Text className="flex-1 text-[12px] font-bold uppercase tracking-wide text-white/45">What your coach knows</Text>
+        <Text className="flex-1 text-[12px] font-bold uppercase tracking-wide text-secondary">What your coach knows</Text>
         {!!workspace?.memories.length && (
           <Pressable onPress={clearAll} hitSlop={8} style={({ pressed }) => ({ opacity: pressed ? 0.55 : 1 })} className="min-h-11 justify-center px-2">
             <Text className="text-[12px] font-bold text-danger">{confirmClear ? 'Tap again to clear' : 'Clear all'}</Text>
@@ -229,7 +229,7 @@ export function CoachMemoryView({ onClose, onConsentChanged }: Props) {
         <Text className="text-[12px] font-bold text-danger">{confirmDisable ? 'Tap again to turn off coach and delete its data' : 'Turn off coach & delete coach data'}</Text>
       </Pressable>
       {/* Exact deletion scope — no vague claims (audit F-015). */}
-      <Text className="mx-[18px] mb-4 text-[10.5px] leading-4 text-white/35">
+      <Text className="mx-[18px] mb-4 text-[10.5px] leading-4 text-tertiary">
         Deletes: consent, memories, coach safety state, and your coach conversation (cloud + this device). Kept: anonymised deletion audit and, until your subscription data is deleted with your account, billing records.
       </Text>
     </View>
@@ -248,7 +248,7 @@ export function CoachMemoryView({ onClose, onConsentChanged }: Props) {
           <Text className="mt-4 text-xl font-bold text-white">Let your coach understand you</Text>
           <Text className="mt-2 text-[14px] leading-5 text-white/65">Relevant profile, training, recovery and nutrition context—and your recent coach messages—will be processed by Google Gemini to answer you. Coach records are stored in Firebase. Operational safety state is stored separately.</Text>
           <View className="mt-5 flex-row items-center gap-3 rounded-2xl bg-white/5 p-3.5">
-            <View className="flex-1"><Text className="font-bold text-white/85">Remember useful details</Text><Text className="mt-0.5 text-[12px] leading-4 text-white/45">You can inspect, delete or pause memory at any time.</Text></View>
+            <View className="flex-1"><Text className="font-bold text-white/85">Remember useful details</Text><Text className="mt-0.5 text-[12px] leading-4 text-secondary">You can inspect, delete or pause memory at any time.</Text></View>
             <Switch value={memoryChoice} onValueChange={setMemoryChoice} trackColor={{ true: colors.brand500, false: colors.ink600 }} thumbColor={colors.fg} />
           </View>
           <Pressable
@@ -259,7 +259,7 @@ export function CoachMemoryView({ onClose, onConsentChanged }: Props) {
           >
             <Text className="font-bold text-ink-900">{saving ? 'Saving…' : 'Continue with coach'}</Text>
           </Pressable>
-          <Text className="mt-3 text-center text-[11px] leading-4 text-white/35">This consent is required for personalised AI coaching. You can still disable long-term memory separately.</Text>
+          <Text className="mt-3 text-center text-[11px] leading-4 text-tertiary">This consent is required for personalised AI coaching. You can still disable long-term memory separately.</Text>
         </View></View>
       </View>
     )
@@ -272,7 +272,7 @@ export function CoachMemoryView({ onClose, onConsentChanged }: Props) {
         <View className="flex-1 items-center justify-center px-8">
         <RefreshCw size={28} color={colors.brand400} />
         <Text className="mt-4 text-lg font-bold text-white">Couldn’t load your coach profile</Text>
-        <Text className="mt-2 text-center text-[14px] leading-5 text-white/50">Check your connection and try again.</Text>
+        <Text className="mt-2 text-center text-[14px] leading-5 text-secondary">Check your connection and try again.</Text>
         <Pressable onPress={load} style={({ pressed }) => ({ opacity: pressed ? 0.65 : 1 })} className="mt-5 min-h-[48px] justify-center rounded-2xl bg-brand-400 px-6"><Text className="font-bold text-ink-900">Try again</Text></Pressable>
         </View>
       </View>
@@ -288,7 +288,7 @@ export function CoachMemoryView({ onClose, onConsentChanged }: Props) {
         keyExtractor={(item) => item.id}
         renderItem={renderMemory}
         ListHeaderComponent={header}
-        ListEmptyComponent={<View className="mx-[18px] items-center rounded-2xl border border-dashed border-white/10 p-7"><Brain size={26} color={colors.brand400} /><Text className="mt-3 font-bold text-white/80">Nothing saved yet</Text><Text className="mt-1 text-center text-[13px] leading-5 text-white/45">As you chat, useful facts you explicitly share can appear here.</Text></View>}
+        ListEmptyComponent={<View className="mx-[18px] items-center rounded-2xl border border-dashed border-white/10 p-7"><Brain size={26} color={colors.brand400} /><Text className="mt-3 font-bold text-white/80">Nothing saved yet</Text><Text className="mt-1 text-center text-[13px] leading-5 text-secondary">As you chat, useful facts you explicitly share can appear here.</Text></View>}
         contentContainerStyle={{ paddingBottom: 36 }}
         showsVerticalScrollIndicator={false}
       />

@@ -168,7 +168,7 @@ export function GroupsTab({ onClaimUsername }: { onClaimUsername: () => void }) 
         <View className="mt-4 items-center rounded-2xl border border-dashed border-white/15 px-6 py-12">
           <Users size={28} color="rgba(255,255,255,0.35)" />
           <Text className="mt-3 font-bold text-white">No groups yet</Text>
-          <Text className="mt-1 max-w-[240px] text-center text-[13px] text-white/45">
+          <Text className="mt-1 max-w-[240px] text-center text-[13px] text-secondary">
             Create a group and share the code with friends, or join one you've been invited to.
           </Text>
         </View>
@@ -215,7 +215,7 @@ function GroupCard({ group, me, onOpen }: { group: CommunityGroup; me: MyLeaderS
           <Text numberOfLines={1} className="font-bold leading-tight text-white">{group.name}</Text>
           {owner && <Crown size={13} color="#F5C518" />}
         </View>
-        <Text className="text-[12px] text-white/45">{ranked.length} member{ranked.length === 1 ? '' : 's'} · you're #{yourRank}</Text>
+        <Text className="text-[12px] text-secondary">{ranked.length} member{ranked.length === 1 ? '' : 's'} · you're #{yourRank}</Text>
       </View>
       <ChevronRight size={18} color="rgba(255,255,255,0.3)" />
     </Pressable>
@@ -273,10 +273,10 @@ function CreateGroupSheet({ open, onClose, onCreated }: { open: boolean; onClose
 
   return (
     <Sheet open={open} onClose={onClose} title="Create a group">
-      <Text className="mb-4 text-[13px] leading-snug text-white/50">
+      <Text className="mb-4 text-[13px] leading-snug text-secondary">
         Start a private group and get a join code to share. You'll be the owner.
       </Text>
-      <Text className="mb-1.5 text-[12px] font-semibold uppercase tracking-wide text-white/40">Group name</Text>
+      <Text className="mb-1.5 text-[12px] font-semibold uppercase tracking-wide text-tertiary">Group name</Text>
       <View className="flex-row items-center rounded-2xl border bg-ink-700 px-3.5" style={{ borderColor: error ? `${colors.danger}aa` : 'rgba(255,255,255,0.12)', height: 54 }}>
         <TextInput
           value={name}
@@ -293,10 +293,10 @@ function CreateGroupSheet({ open, onClose, onCreated }: { open: boolean; onClose
       <View className="mt-2 min-h-[18px] px-1">
         {error
           ? <Text className="text-[12px] font-semibold" style={{ color: colors.danger }}>{error}</Text>
-          : <Text className="text-[12px] text-white/35">{name.trim().length}/30 · pick something your friends will recognise.</Text>}
+          : <Text className="text-[12px] text-tertiary">{name.trim().length}/30 · pick something your friends will recognise.</Text>}
       </View>
 
-      <Text className="mb-2 mt-4 text-[12px] font-semibold uppercase tracking-wide text-white/40">Icon</Text>
+      <Text className="mb-2 mt-4 text-[12px] font-semibold uppercase tracking-wide text-tertiary">Icon</Text>
       <View className="flex-row flex-wrap gap-2.5">
         {GROUP_ICONS.map((g, i) => {
           const active = i === pick
@@ -325,7 +325,7 @@ function CreateGroupSheet({ open, onClose, onCreated }: { open: boolean; onClose
         className={`mt-3 flex-row items-center justify-center gap-2 rounded-2xl py-4 ${canSubmit ? 'bg-brand-400 active:opacity-90' : 'bg-white/10'}`}
       >
         {busy && <ActivityIndicator size="small" color="#000" />}
-        <Text className={`text-[15px] font-bold ${canSubmit ? 'text-black' : 'text-white/40'}`}>{busy ? 'Creating…' : 'Create group'}</Text>
+        <Text className={`text-[15px] font-bold ${canSubmit ? 'text-black' : 'text-disabled'}`}>{busy ? 'Creating…' : 'Create group'}</Text>
       </Pressable>
     </Sheet>
   )
@@ -421,11 +421,11 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
             </View>
             <View className="flex-1">
               <Text className="font-bold text-white">{selected.name}</Text>
-              <Text className="text-[12px] text-white/45">{selected.memberCount} members · private</Text>
+              <Text className="text-[12px] text-secondary">{selected.memberCount} members · private</Text>
             </View>
           </View>
 
-          <Text className="mb-1.5 mt-5 text-[12px] font-semibold uppercase tracking-wide text-white/40">Passcode</Text>
+          <Text className="mb-1.5 mt-5 text-[12px] font-semibold uppercase tracking-wide text-tertiary">Passcode</Text>
           <View className="flex-row items-center gap-2 rounded-2xl border bg-ink-700 px-3.5" style={{ borderColor: error ? `${colors.danger}aa` : 'rgba(255,255,255,0.12)', height: 54 }}>
             <KeyRound size={18} color="rgba(255,255,255,0.4)" />
             <TextInput
@@ -454,7 +454,7 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
             className={`mt-3 flex-row items-center justify-center gap-2 rounded-2xl py-4 ${!busy && code.trim().length >= 4 ? 'bg-brand-400 active:opacity-90' : 'bg-white/10'}`}
           >
             {busy && <ActivityIndicator size="small" color="#000" />}
-            <Text className={`text-[15px] font-bold ${!busy && code.trim().length >= 4 ? 'text-black' : 'text-white/40'}`}>{busy ? 'Joining…' : 'Join group'}</Text>
+            <Text className={`text-[15px] font-bold ${!busy && code.trim().length >= 4 ? 'text-black' : 'text-disabled'}`}>{busy ? 'Joining…' : 'Join group'}</Text>
           </Pressable>
         </View>
       ) : (
@@ -486,7 +486,7 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
               <View className="items-center rounded-2xl border border-dashed border-white/15 px-6 py-10">
                 <Search size={24} color="rgba(255,255,255,0.35)" />
                 <Text className="mt-2 font-bold text-white">No groups found</Text>
-                <Text className="mt-1 max-w-[230px] text-center text-[13px] text-white/45">
+                <Text className="mt-1 max-w-[230px] text-center text-[13px] text-secondary">
                   {query.trim() ? 'Try a different name, or ask a friend for their group code.' : 'No public groups to show right now.'}
                 </Text>
               </View>
@@ -504,7 +504,7 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
                   </View>
                   <View className="flex-1">
                     <Text className="font-bold text-white">{g.name}</Text>
-                    <Text className="text-[12px] text-white/45">{g.memberCount} members · code required</Text>
+                    <Text className="text-[12px] text-secondary">{g.memberCount} members · code required</Text>
                   </View>
                   <ChevronRight size={18} color="rgba(255,255,255,0.3)" />
                 </Pressable>
@@ -589,10 +589,10 @@ function GroupDetailSheet({ open, groupId, onClose }: { open: boolean; groupId: 
             ) : (
               <View className="flex-row items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1">
                 <ShieldCheck size={12} color="rgba(255,255,255,0.6)" />
-                <Text className="text-[11px] font-bold text-white/60">@{group.ownerUsername}'s group</Text>
+                <Text className="text-[11px] font-bold text-secondary">@{group.ownerUsername}'s group</Text>
               </View>
             )}
-            <Text className="text-[12px] text-white/45">{ranked.length} member{ranked.length === 1 ? '' : 's'}</Text>
+            <Text className="text-[12px] text-secondary">{ranked.length} member{ranked.length === 1 ? '' : 's'}</Text>
           </View>
 
           {/* group pulse */}
@@ -603,7 +603,7 @@ function GroupDetailSheet({ open, groupId, onClose }: { open: boolean; groupId: 
 
           {/* passcode */}
           <View className="mt-4 rounded-2xl border border-white/8 bg-ink-800 p-3.5">
-            <Text className="text-[11px] font-semibold uppercase tracking-wide text-white/40">Invite code</Text>
+            <Text className="text-[11px] font-semibold uppercase tracking-wide text-tertiary">Invite code</Text>
             <View className="mt-1.5 flex-row items-center justify-between">
               <Text className="text-[22px] font-black tracking-[4px] text-white">{group.passcode}</Text>
               <View className="flex-row gap-2">
@@ -620,7 +620,7 @@ function GroupDetailSheet({ open, groupId, onClose }: { open: boolean; groupId: 
           {/* ranking metric toggle */}
           <View className="mt-5 flex-row items-center gap-1.5">
             <Gauge size={14} color={brand[400]} />
-            <Text className="text-[12px] font-semibold uppercase tracking-wide text-white/40">Rank by</Text>
+            <Text className="text-[12px] font-semibold uppercase tracking-wide text-tertiary">Rank by</Text>
           </View>
           <View className="mt-2 flex-row gap-2 rounded-2xl bg-ink-700 p-1">
             {METRICS.map((m) => {
@@ -634,7 +634,7 @@ function GroupDetailSheet({ open, groupId, onClose }: { open: boolean; groupId: 
                   accessibilityState={{ selected: active }}
                   className={`flex-1 items-center rounded-xl py-2 ${active ? 'bg-brand-400' : ''} active:opacity-80`}
                 >
-                  <Text className={`text-[13px] font-bold ${active ? 'text-black' : 'text-white/55'}`}>{m.label}</Text>
+                  <Text className={`text-[13px] font-bold ${active ? 'text-black' : 'text-secondary'}`}>{m.label}</Text>
                 </Pressable>
               )
             })}
@@ -659,7 +659,7 @@ function GroupDetailSheet({ open, groupId, onClose }: { open: boolean; groupId: 
             <>
               <View className="mb-2 mt-6 flex-row items-center gap-1.5">
                 <Activity size={14} color={brand[400]} />
-                <Text className="text-[12px] font-semibold uppercase tracking-wide text-white/40">Recent activity</Text>
+                <Text className="text-[12px] font-semibold uppercase tracking-wide text-tertiary">Recent activity</Text>
               </View>
               <View className="gap-2">
                 {activity.map((a) => (
@@ -683,7 +683,7 @@ function GroupDetailSheet({ open, groupId, onClose }: { open: boolean; groupId: 
               confirmDelete ? (
                 <View className="rounded-2xl border p-3.5" style={{ borderColor: `${colors.danger}55`, backgroundColor: `${colors.danger}12` }}>
                   <Text className="font-bold text-white">Delete this group?</Text>
-                  <Text className="mt-1 text-[13px] text-white/55">This removes it for everyone and can't be undone.</Text>
+                  <Text className="mt-1 text-[13px] text-secondary">This removes it for everyone and can't be undone.</Text>
                   <View className="mt-3 flex-row gap-2">
                     <Pressable onPress={() => setConfirmDelete(false)} accessibilityRole="button" accessibilityLabel="Cancel delete" className="flex-1 items-center rounded-xl border border-white/10 bg-white/5 py-3 active:opacity-80">
                       <Text className="text-[14px] font-bold text-white/80">Cancel</Text>
@@ -708,7 +708,7 @@ function GroupDetailSheet({ open, groupId, onClose }: { open: boolean; groupId: 
             )}
             {owner && (
               <Pressable onPress={leave} accessibilityRole="button" accessibilityLabel="Leave group" className="items-center py-1 active:opacity-70">
-                <Text className="text-[13px] font-semibold text-white/40">Leave without deleting</Text>
+                <Text className="text-[13px] font-semibold text-tertiary">Leave without deleting</Text>
               </Pressable>
             )}
           </View>
@@ -733,10 +733,10 @@ function PulseHeader({ pulse }: { pulse: ReturnType<typeof groupPulse> }) {
 function PulseTile({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
     <View className="flex-1 rounded-2xl border border-white/8 bg-ink-800 px-3 py-2.5">
-      <Text className="text-[10px] font-semibold uppercase tracking-wide text-white/35">{label}</Text>
+      <Text className="text-[10px] font-semibold uppercase tracking-wide text-tertiary">{label}</Text>
       <View className="mt-1 flex-row items-baseline gap-1">
         <Text className="text-[18px] font-black text-white">{value}</Text>
-        <Text className="text-[10px] text-white/40">{sub}</Text>
+        <Text className="text-[10px] text-tertiary">{sub}</Text>
       </View>
     </View>
   )
@@ -774,7 +774,7 @@ function TeamGoalCard({ done, goal, owner, color, onAdjust }: {
       </View>
       <View className="mt-2 flex-row items-baseline gap-1.5">
         <Text className="text-[24px] font-black text-white">{done}</Text>
-        <Text className="text-[14px] font-semibold text-white/45">/ {goal} sessions this week</Text>
+        <Text className="text-[14px] font-semibold text-secondary">/ {goal} sessions this week</Text>
       </View>
       <ProgressBar value={pct} color={color} className="mt-2.5" height={9} />
       <Text className="mt-2 text-[12px] font-semibold" style={{ color: reached ? color : 'rgba(255,255,255,0.5)' }}>
@@ -819,7 +819,7 @@ function MemberRow({ member, rank, metric, expanded, onToggle }: {
               </View>
             )}
           </View>
-          <Text className="text-[12px] text-white/40">{formatKgCompact(member.volume30)} kg · 30d</Text>
+          <Text className="text-[12px] text-tertiary">{formatKgCompact(member.volume30)} kg · 30d</Text>
         </View>
         <MetricValue member={member} metric={metric} colors={colors} />
         <ChevronDown size={16} color="rgba(255,255,255,0.3)" style={{ transform: [{ rotate: expanded ? '180deg' : '0deg' }] }} />
@@ -845,10 +845,10 @@ function MemberStats({ member, rank, colors }: { member: GroupMember; rank: numb
         {tiles.map((t) => (
           <View key={t.label} style={{ width: '33.333%', padding: 4 }}>
             <View className="rounded-xl bg-white/[0.04] px-2.5 py-2">
-              <Text numberOfLines={1} className="text-[9px] font-semibold uppercase tracking-wide text-white/35">{t.label}</Text>
+              <Text numberOfLines={1} className="text-[9px] font-semibold uppercase tracking-wide text-tertiary">{t.label}</Text>
               <View className="mt-0.5 flex-row items-baseline gap-1">
                 <Text className="text-[16px] font-black" style={{ color: t.color ?? '#fff' }}>{t.value}</Text>
-                {t.sub ? <Text className="text-[10px] text-white/40">{t.sub}</Text> : null}
+                {t.sub ? <Text className="text-[10px] text-tertiary">{t.sub}</Text> : null}
               </View>
             </View>
           </View>
@@ -864,7 +864,7 @@ function MetricValue({ member, metric, colors }: { member: GroupMember; metric: 
     return (
       <View className="items-end">
         <Text className="text-[15px] font-black text-white">{formatKgCompact(member.volume7)}</Text>
-        <Text className="text-[10px] font-semibold text-white/40">kg · 7d</Text>
+        <Text className="text-[10px] font-semibold text-tertiary">kg · 7d</Text>
       </View>
     )
   }
@@ -872,7 +872,7 @@ function MetricValue({ member, metric, colors }: { member: GroupMember; metric: 
   return (
     <View className="items-end">
       <Text className="text-[16px] font-black" style={{ color: odometerColor(member.odometer, colors) }}>{member.odometer}</Text>
-      <Text className="text-[10px] font-semibold text-white/40">/ 100</Text>
+      <Text className="text-[10px] font-semibold text-tertiary">/ 100</Text>
     </View>
   )
 }
@@ -898,7 +898,7 @@ function ActivityRow({ item, tally, onCheer }: { item: GroupActivity; tally?: Ch
       </View>
       <View className="min-w-0 flex-1">
         <Text className="text-[13px] leading-snug text-white/80">{item.text}</Text>
-        <Text className="text-[11px] text-white/35">{item.when}</Text>
+        <Text className="text-[11px] text-tertiary">{item.when}</Text>
       </View>
       <CheerButton tally={tally} onPress={onCheer} />
     </View>
@@ -939,7 +939,7 @@ function EmptyDetail() {
     <View className="items-center py-12">
       <Users size={28} color="rgba(255,255,255,0.35)" />
       <Text className="mt-3 font-bold text-white">Group unavailable</Text>
-      <Text className="mt-1 text-[13px] text-white/45">It may have been deleted.</Text>
+      <Text className="mt-1 text-[13px] text-secondary">It may have been deleted.</Text>
     </View>
   )
 }

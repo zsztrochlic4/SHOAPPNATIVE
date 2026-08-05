@@ -274,7 +274,7 @@ export function EmptyState({ icon, title, body }: { icon: ReactNode; title: stri
     <View className="items-center justify-center rounded-2xl border border-dashed border-white/15 px-6 py-12">
       <View className="mb-3 opacity-30">{icon}</View>
       <Text className="font-bold text-white">{title}</Text>
-      <Text className="mt-1 max-w-[220px] text-center text-[13px] text-white/45">{body}</Text>
+      <Text className="mt-1 max-w-[220px] text-center text-[13px] text-secondary">{body}</Text>
     </View>
   )
 }

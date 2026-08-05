@@ -82,12 +82,12 @@ export function IndexGauge({ index }: { index: WeeklyIndex }) {
 
       {/* readable anchors under the arc */}
       <View className="mt-1.5 w-full max-w-[236px] flex-row items-center justify-between">
-        <Text className="text-[10px] font-bold uppercase tracking-wide text-white/45">Behind</Text>
-        <Text className="text-[10px] font-bold uppercase tracking-wide text-white/45">Ahead</Text>
+        <Text className="text-[10px] font-bold uppercase tracking-wide text-secondary">Behind</Text>
+        <Text className="text-[10px] font-bold uppercase tracking-wide text-secondary">Ahead</Text>
       </View>
 
       <Text className="mt-1.5 text-[18px] font-black tracking-tight" style={{ color }}>{index.label}</Text>
-      <Text className="text-[12px] text-white/45">
+      <Text className="text-[12px] text-secondary">
         <Text className="font-bold" style={{ color }}>{scoreText}</Text>/100 · last 7 days
       </Text>
     </View>
