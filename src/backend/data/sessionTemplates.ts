@@ -110,10 +110,10 @@ export const SESSION_TEMPLATES: SessionSlot[] = [
     "order": 4,
     "slotName": "Vertical pull",
     "muscleGroupFilter": "Back",
-    "movementPatternFilter": "Vertical Pull",
+    "movementPatternFilter": "Vertical Pull>Horizontal Pull",
     "typeFilter": "Compound",
     "required": true,
-    "note": "Pulldown or chin up pattern."
+    "note": "Pulldown or chin-up pattern; falls back to a horizontal-pull compound (e.g. inverted/door row) only when no vertical-pull option is available, e.g. for an equipment-free lifter (R5-005)."
   },
   {
     "slotId": "Upper-5",

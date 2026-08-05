@@ -6224,6 +6224,57 @@ export const EXERCISES: Exercise[] = [
     "safetyNote": "Bodyweight posture drill. Keep the neck relaxed and stop on sharp or joint pain; swap to Prone Y-T-W Raise."
   },
   {
+    "id": "BK19",
+    "name": "Door Towel Row",
+    "muscleGroup": "Back",
+    "primaryMuscles": "Lats, rhomboids, mid traps, biceps",
+    "movementPattern": "Horizontal Pull",
+    "substitutionGroup": [
+      "Back",
+      "Horizontal Pull"
+    ],
+    "type": "Compound",
+    "equipmentTier": "Bodyweight",
+    "equipment": "Towel + sturdy door",
+    "skillLevel": "Beginner",
+    "unilateral": false,
+    "loadable": false,
+    "prescriptionClass": "Rep",
+    "primaryGoalFit": "General Fitness",
+    "minRir": 0,
+    "failureAllowed": true,
+    "spotterRecommended": false,
+    "requiredEquipmentTags": [
+      "towel"
+    ],
+    "optionalEquipmentTags": [],
+    "impactLevel": "Low",
+    "supported": true,
+    "active": true,
+    "measurementType": "reps",
+    "loadUnit": "bodyweight",
+    "stressRegions": [
+      "shoulder"
+    ],
+    "substitutionIds": [
+      "BK07",
+      "BK14",
+      "BK03",
+      "BK08"
+    ],
+    "substitutionCount": 4,
+    "bodyRegion": "upper",
+    "whyInDatabase": "The second genuine no-equipment compound back pull (alongside the Inverted Row), so an equipment-free Upper day can fill BOTH its horizontal-pull slot and its vertical-pull slot, which falls back to a horizontal-pull compound when no bar/rings are owned (R5-005). Only a towel and a sturdy door are needed.",
+    "whatItDoes": "A self-scaling row: loop a towel around both handles of a securely latched door, lean back with a straight body and pull your chest to the door. Trains the whole back and biceps, and gets harder the more you walk your feet forward.",
+    "steps": [
+      "Loop a towel around both handles of a securely closed, latched door and hold an end in each hand",
+      "Walk your feet toward the door and lean back with a straight line from head to heels",
+      "Pull your chest toward the door by driving the elbows back, then lower under control"
+    ],
+    "commonMistake": "Letting the hips sag or shrugging the shoulders instead of pulling from the mid-back.",
+    "safetyNote": "Check the door is fully latched and the towel is secure before loading it. Keep the body braced and stop on sharp shoulder or lower-back pain; swap to Inverted Row or Seated Towel Row Isometric."
+  },
+  {
     "id": "FB15",
     "name": "Step Jack",
     "muscleGroup": "Full Body & Conditioning",

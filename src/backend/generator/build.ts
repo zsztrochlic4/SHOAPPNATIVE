@@ -60,7 +60,8 @@ function skillOk(ex: Exercise, exp: string) { return (SKILL_RANK[ex.skillLevel] 
 
 interface ParsedSlot {
   muscles: string[] | null            // null = Any
-  patterns: string[] | null           // null = Any
+  patterns: string[] | null           // null = Any (union of every tier — used by matches())
+  patternTiers: string[][] | null     // ordered '>' preference tiers; null unless the filter uses '>'
   allowTypes: ('Compound' | 'Isolation')[]
   preferType: 'Compound' | 'Isolation' | null
   classConstraint: string[] | null    // e.g. ['Interval','Power']
@@ -78,11 +79,24 @@ function parseSlot(slot: SessionSlot, focal: FocalPoint[]): ParsedSlot {
   }
   if (muscles && muscles.length === 0) muscles = null
 
-  // pattern filter (strip trailing prose after a comma)
+  // pattern filter (strip trailing prose after a comma). Two forms:
+  //   'A|B'  → unordered OR: any of A/B is equally acceptable.
+  //   'A>B'  → ordered preference (mirrors typeFilter's Compound>Isolation): fill from A's
+  //            candidates, and only fall back to B when A yields nothing. Used so a required
+  //            slot (e.g. Upper vertical pull) can degrade to a horizontal-pull compound for an
+  //            equipment-free lifter without ever changing the pick for a user who has the
+  //            preferred option (R5-005). Each tier may itself be a '|' OR group.
   const patRaw = slot.movementPatternFilter.split(',')[0].trim()
-  const patterns = patRaw === '' || patRaw === 'Any'
-    ? null
-    : patRaw.split('|').map((s) => s.trim()).filter(Boolean)
+  let patterns: string[] | null
+  let patternTiers: string[][] | null = null
+  if (patRaw === '' || patRaw === 'Any') {
+    patterns = null
+  } else if (patRaw.includes('>')) {
+    patternTiers = patRaw.split('>').map((tier) => tier.split('|').map((s) => s.trim()).filter(Boolean)).filter((t) => t.length)
+    patterns = patternTiers.flat()
+  } else {
+    patterns = patRaw.split('|').map((s) => s.trim()).filter(Boolean)
+  }
 
   // type filter
   const tf = slot.typeFilter
@@ -99,7 +113,7 @@ function parseSlot(slot: SessionSlot, focal: FocalPoint[]): ParsedSlot {
   if (/Prescription Class\s*=\s*Interval or Power/i.test(cc)) classConstraint = ['Interval', 'Power']
   else if (/Prescription Class\s*=\s*Interval/i.test(cc)) classConstraint = ['Interval']
 
-  return { muscles, patterns, allowTypes, preferType, classConstraint }
+  return { muscles, patterns, patternTiers, allowTypes, preferType, classConstraint }
 }
 
 function matches(ex: Exercise, p: ParsedSlot): boolean {
@@ -165,33 +179,47 @@ export function pickForSlot(
   const injuryRegions = injuryStressRegions(ctx.affectedRegions)
   const injExcl = injuryExcludeIds(ctx.affectedRegions)
   const fullExclude = new Set<string>([...ctx.excludedIds, ...injExcl, ...usedInDay])
-
-  let pool = candidates(p, ctx, fullExclude)
-  // CS04 variety: on a repeated day type, prefer exercises not already used for that day
-  // type this week — but only if doing so still leaves a candidate (required slots fill).
-  if (avoid && avoid.size) {
-    const fresh = pool.filter((ex) => !avoid.has(ex.id))
-    if (fresh.length) pool = fresh
-  }
-  if (pool.length) {
-    pool.sort((a, b) => score(b, p, ctx, injuryRegions) - score(a, p, ctx, injuryRegions) || a.id.localeCompare(b.id))
-    return { ex: pool[0], viaSub: false }
-  }
-
-  // Injury emptied the slot → walk the best non-injury candidate's substitutions (rule 4).
   const baseExclude = new Set<string>([...ctx.excludedIds, ...usedInDay])
-  const base = candidates(p, ctx, baseExclude)
-  base.sort((a, b) => score(b, p, ctx, injuryRegions) - score(a, p, ctx, injuryRegions) || a.id.localeCompare(b.id))
-  for (const cand of base) {
-    for (const subId of cand.substitutionIds) {
-      const sub = EXERCISE_BY_ID[subId]
-      if (sub && sub.active && !fullExclude.has(sub.id) && tierOk(sub, ctx.equipmentTier) &&
-          tagsOk(sub, ctx.equipmentTags) && skillOk(sub, ctx.experience) && matches(sub, p)) {
-        return { ex: sub, viaSub: true }
+
+  // One selection attempt against a fully-resolved parsed slot (single pattern tier).
+  const attempt = (pp: ParsedSlot): { ex: Exercise; viaSub: boolean } | null => {
+    let pool = candidates(pp, ctx, fullExclude)
+    // CS04 variety: on a repeated day type, prefer exercises not already used for that day
+    // type this week — but only if doing so still leaves a candidate (required slots fill).
+    if (avoid && avoid.size) {
+      const fresh = pool.filter((ex) => !avoid.has(ex.id))
+      if (fresh.length) pool = fresh
+    }
+    if (pool.length) {
+      pool.sort((a, b) => score(b, pp, ctx, injuryRegions) - score(a, pp, ctx, injuryRegions) || a.id.localeCompare(b.id))
+      return { ex: pool[0], viaSub: false }
+    }
+
+    // Injury emptied the slot → walk the best non-injury candidate's substitutions (rule 4).
+    const base = candidates(pp, ctx, baseExclude)
+    base.sort((a, b) => score(b, pp, ctx, injuryRegions) - score(a, pp, ctx, injuryRegions) || a.id.localeCompare(b.id))
+    for (const cand of base) {
+      for (const subId of cand.substitutionIds) {
+        const sub = EXERCISE_BY_ID[subId]
+        if (sub && sub.active && !fullExclude.has(sub.id) && tierOk(sub, ctx.equipmentTier) &&
+            tagsOk(sub, ctx.equipmentTags) && skillOk(sub, ctx.experience) && matches(sub, pp)) {
+          return { ex: sub, viaSub: true }
+        }
       }
     }
+    return null
   }
-  return null
+
+  // Ordered '>' preference: try each tier in turn, only falling back when the preferred tier
+  // has no candidate at all. Non-'>' slots run a single attempt with unchanged behaviour.
+  if (p.patternTiers) {
+    for (const tier of p.patternTiers) {
+      const hit = attempt({ ...p, patterns: tier })
+      if (hit) return hit
+    }
+    return null
+  }
+  return attempt(p)
 }
 
 /* --------------------------- prescribe ----------------------------- */

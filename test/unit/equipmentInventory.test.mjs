@@ -115,3 +115,42 @@ test('a default Bodyweight plan never prescribes unavailable equipment', () => {
     }
   }
 })
+
+// R5-005 last coverage gap: the Upper split's vertical-pull slot (Upper-4) demands a Compound
+// Vertical Pull, but no such movement exists without a bar/rings/band anchor. The slot filter now
+// reads "Vertical Pull>Horizontal Pull" (ordered fallback), so an equipment-free user degrades to a
+// horizontal-pull compound (Inverted / Door Towel Row) instead of an unfilled required slot.
+test('R5-005: a Bodyweight Upper vertical-pull slot fills via a horizontal-pull compound fallback', () => {
+  let sawUpper4 = false
+  for (const goal of ['Hypertrophy', 'Strength', 'General Fitness']) {
+    const user = bodyweightUser({ goal, session_length_min: 60 })
+    const r = generateProgram(user)
+    assert.ok(r.ok, `${goal} bodyweight generation should succeed`)
+    assert.ok(!(r.program.audit || []).some((a) => a.includes('UNFILLED')), `${goal}: left a required slot unfilled`)
+    const up4 = r.program.days.flatMap((d) => d.exercises).find((e) => e.slotId === 'Upper-4')
+    if (up4) {
+      sawUpper4 = true
+      const ex = EXERCISE_BY_ID[up4.exerciseId]
+      assert.equal(ex.type, 'Compound', `${goal}: Upper-4 must be a compound`)
+      // A no-equipment lifter owns no vertical-pull compound, so the slot must degrade to horizontal.
+      assert.equal(ex.movementPattern, 'Horizontal Pull',
+        `${goal}: Upper-4 should fall back to a horizontal-pull compound for a no-equipment user, got ${ex.movementPattern} (${ex.id})`)
+    }
+  }
+  assert.ok(sawUpper4, 'at least one Bodyweight goal should exercise the Upper-4 vertical-pull slot')
+})
+
+test('an equipped user keeps a vertical pull in Upper-4 (ordered ">" fallback is strict, no regression)', () => {
+  for (const tier of ['Basic Gym', 'Full Gym']) {
+    for (const goal of ['Hypertrophy', 'Strength', 'General Fitness']) {
+      const user = bodyweightUser({ goal, equipment_tier: tier, equipment_tags: DEFAULT_INVENTORY_BY_TIER[tier], session_length_min: 60 })
+      const r = generateProgram(user)
+      assert.ok(r.ok, `${goal}/${tier} generation should succeed`)
+      const up4 = r.program.days.flatMap((d) => d.exercises).find((e) => e.slotId === 'Upper-4')
+      if (up4) {
+        assert.equal(EXERCISE_BY_ID[up4.exerciseId].movementPattern, 'Vertical Pull',
+          `${goal}/${tier}: Upper-4 must stay a vertical pull when the user owns one`)
+      }
+    }
+  }
+})
