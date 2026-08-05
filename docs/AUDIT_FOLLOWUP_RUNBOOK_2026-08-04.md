@@ -197,10 +197,18 @@ scheduled validator or unreviewed change can't reach `main`.
 
 ## 7. R5-013 — native Firebase-backed E2E + accessibility (device lab)
 
-Add **Maestro or Detox** flows on iOS/Android dev builds against an **isolated Firebase project / emulator**,
-gating the 18 core journeys (happy/empty/loading/error/offline/permission/large/conflict/background/restart)
-plus VoiceOver/TalkBack, 200 % text, contrast and reduced-motion. This needs a device lab / CI runners with
-emulators — infra you provision. Track under a `[QA] native E2E` issue.
+**Maestro** flows are now DRAFTED (untested) in `.maestro/` — 7 flows covering boot, navigation,
+permission, workout, community, background/restart and an accessibility-label baseline, plus a
+`.maestro/README.md` and a manual-dispatch CI stub `.github/workflows/native-e2e.yml`. They target
+a **demo-mode EAS dev build** (`EXPO_PUBLIC_DEMO_MODE=1`, bundle `com.zaggy887.strengthhub`); run
+with `maestro test .maestro`. Selectors came from the code + web e2e, so a few labels need a
+first-run refinement (each flow marks them `TODO (on device)`).
+
+The remaining work is infra you provision: a **device lab / CI runners with emulators** (or Maestro
+Cloud), the rest of the 18-journey matrix (empty/loading/error/offline/large/conflict states), and
+the a11y passes Maestro can't automate — **VoiceOver/TalkBack** order, **200 % text**, **contrast**,
+**reduced-motion** (use Xcode Accessibility Inspector / Android Accessibility Scanner). Track under a
+`[QA] native E2E` issue and, once green, add the workflow to the `main` ruleset's required checks.
 
 **Done when:** the native matrix gates release builds with 0 P0/P1 accessibility issues.
 
@@ -215,4 +223,4 @@ emulators — infra you provision. Track under a `[QA] native E2E` issue.
 | 4. Response-quality eval | owner + reviewers | **yes** |
 | 5. Native App Check | owner + dev build (client bridge drafted, PR #47) | **yes** |
 | 6. Branch protection | owner (GitHub) | governance |
-| 7. Native E2E/a11y | owner (device lab) | evidence |
+| 7. Native E2E/a11y | owner (device lab); Maestro flows drafted (PR #48) | evidence |

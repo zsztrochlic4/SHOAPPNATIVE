@@ -1,0 +1,24 @@
+appId: com.zaggy887.strengthhub
+tags:
+  - lifecycle
+  - core
+---
+# JOURNEY: background + cold restart. State must survive being backgrounded and a
+# full process restart (the app persists to AsyncStorage; auth uses RN persistence).
+- runFlow: ../subflows/boot.yaml
+- tapOn: "Nutrition"
+- assertVisible: "Snap your meal"
+
+# Background, then foreground — the app should resume on the same tab, not reset.
+- pressKey: Home
+- launchApp            # foreground WITHOUT clearState
+- assertVisible:
+    text: "Snap your meal"
+    timeout: 20000
+
+# Full cold restart — persisted session should still land in the app (not the sign-in wall).
+- stopApp
+- launchApp            # still no clearState
+- assertVisible:
+    text: "Dashboard"
+    timeout: 40000

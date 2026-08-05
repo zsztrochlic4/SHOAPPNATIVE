@@ -1,0 +1,29 @@
+appId: com.zaggy887.strengthhub
+tags:
+  - workout
+  - core
+---
+# JOURNEY: workout surface. Reach the Workout tab and its inner segments; open
+# today's session from the Dashboard "Start" affordance.
+- runFlow: ../subflows/boot.yaml
+
+- tapOn: "Workout"
+- assertVisible: "History"         # inner segmented tab proves the Workout screen rendered
+
+# Back to Dashboard and start today's workout (label from Dashboard.tsx workout tile).
+- tapOn: "Dashboard"
+# The workout tile shows "Start" unless it's a rest day; guard for the rest-day case.
+- runFlow:
+    when:
+      visible: "Start"
+    commands:
+      - tapOn: "Start"
+      # TODO (on device): confirm the ActiveWorkout screen label, then close it.
+      # ActiveWorkout has a "Close workout" accessibilityLabel (src/screens/ActiveWorkout.tsx).
+      - runFlow:
+          when:
+            visible: "Close workout"
+          commands:
+            - tapOn: "Close workout"
+
+- assertVisible: "Dashboard"

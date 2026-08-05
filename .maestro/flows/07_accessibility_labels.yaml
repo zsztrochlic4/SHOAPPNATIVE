@@ -1,0 +1,26 @@
+appId: com.zaggy887.strengthhub
+tags:
+  - a11y
+---
+# JOURNEY: accessibility baseline (audit F-016). The runtime audit found ZERO semantic
+# buttons and unlabeled controls. These assert that key controls are reachable BY THEIR
+# ACCESSIBILITY LABEL (Maestro matches accessibilityLabel as text), which is exactly what
+# a screen reader announces. This is the automatable slice of a11y; the manual passes
+# (VoiceOver/TalkBack swipe order, 200% text, contrast, reduced-motion) are in the README.
+- runFlow: ../subflows/boot.yaml
+
+# Bottom-nav tabs expose accessibilityRole="tab" + accessibilityLabel (BottomNav.tsx).
+- assertVisible: "Dashboard"
+- assertVisible: "Workout"
+- assertVisible: "Nutrition"
+- assertVisible: "Progress"
+- assertVisible: "Community"
+
+# A labeled control deeper in the app (Community settings button, Community.tsx).
+- tapOn: "Community"
+- assertVisible:
+    text: "Community settings"
+
+# TODO (on device): run Maestro's `assertVisible` against more labeled controls per screen,
+# and complement with an XCUITest/Espresso accessibility audit or Accessibility Scanner /
+# Accessibility Inspector for contrast + dynamic-type, which Maestro cannot verify directly.

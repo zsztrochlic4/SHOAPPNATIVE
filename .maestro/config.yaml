@@ -1,0 +1,10 @@
+# Maestro workspace config. Run the whole suite with:  maestro test .maestro
+# Docs: https://docs.maestro.dev
+flows:
+  - "flows/*.yaml"
+
+# Example filters (uncomment to scope a run):
+# includeTags:
+#   - smoke
+# excludeTags:
+#   - permission
