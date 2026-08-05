@@ -105,6 +105,37 @@ MODE=score SHEETS=jack.json,sam.json REPLIES=replies.json PROMPT_FILE=path/to/sy
 **Done when:** the score run prints `"pass": true` (mean ≥ 4.2, critical ≥ 4.0, IRR ≥ 0.75, 0 auto-fails)
 and you retain the redacted `eval-out/` bundle as the release evidence.
 
+### ⚠️ Reply-capture: what the offline harness can and cannot do (learned from Reviewer 1)
+
+`npm run eval:replies` (`scripts/generate-coach-eval-replies.mjs`) auto-captures replies to save manual
+work, but it is faithful for **normal-coaching cases only** (`multi_turn`, `single_response`):
+
+- **It bypasses the safety router.** In production `coachPrecheckAsync` runs first and BLOCKS/REFERS a
+  crisis or adversarial message (with contacts) *before* the coaching model is called. The offline
+  harness calls the model directly, so a `safety_sensitive` / `adversarial` reply it generates is NOT
+  what the coach would say (this produced a "crisis reply with no contacts" that a reviewer rightly
+  flagged). The harness therefore now REFUSES those groups (plus `tool_failure` / `long_context`, which
+  need forced failures / long threads) and lists them for capture from the **real coach**.
+- **It uses one standard test persona**, so `personalisation` / `context_use` scores are softened — a
+  real user with rich history gives the coach more to personalise with. Treat those marks as a soft
+  signal, not a verdict.
+
+**For a release-grade result, capture ALL 60 replies from the real coach** (coach-enabled dev/staging
+build, safety router live, a realistic user), not the offline harness.
+
+### Reviewers can score in the Word packet — convert it with the parser
+
+Reviewers may score in the human-friendly packet (`StrengthHub_Coach_Review_Packet.docx`) instead of
+hand-editing JSON. Convert each filled packet to the gate's reviewer-JSON with:
+
+```bash
+node scripts/parse-review-packet.mjs eval-out/<reviewer-1>.docx "Reviewer 1" eval-out/jack.json
+node scripts/parse-review-packet.mjs eval-out/<reviewer-2>.docx "Reviewer 2" eval-out/sam.json
+# then MODE=score SHEETS=eval-out/jack.json,eval-out/sam.json ... npm run eval:response
+```
+
+A case is included only if all 15 dimensions carry a 1–5, so an incomplete pass still fails the gate.
+
 ---
 
 ## 5. R5-008 — native App Check (App Attest / Play Integrity)
