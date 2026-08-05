@@ -119,8 +119,12 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           FP_THRESHOLD: '0.05'
+          # R5-002: the shipped prompt now includes the few-shot exemplars (measured 3.5% benign FP,
+          # 0 critical misses, repeatably), so the FP rate is a HARD gate — an over-threshold rate now
+          # fails the run instead of only warning. The `fewshot` input is retained for local A/B only;
+          # the harness includes the shipped exemplars by default (NO_FEWSHOT=1 measures the bare prompt).
+          FP_GATING: 'hard'
           CLASSIFIER_MODEL: ${{ inputs.classifier_model }}
-          FEWSHOT: ${{ inputs.fewshot && '1' || '' }}
           HOLDOUT_SETS: ${{ inputs.holdout_sets }}
           RAW_DUMP: ${{ inputs.raw_dump && '1' || '' }}
         run: node scripts/validate-safety-holdouts.mjs

@@ -37,9 +37,10 @@ const CONCURRENCY = Number(process.env.CLASSIFIER_CONCURRENCY ?? '6')
 // gemini-2.5-flash, gemini-2.5-pro). This only changes the MODEL, never the prompt — swapping models
 // and re-measuring is a fair comparison; editing the prompt to fit the holdouts would be memorising it.
 const MODEL = process.env.CLASSIFIER_MODEL || CLASSIFIER_MODEL_INFO.model
-// EXPERIMENT: FEWSHOT=1 injects hand-authored (non-holdout) exemplars into the prompt to test whether
-// few-shot calibration lowers the false-positive rate without hurting recall. Off by default.
-const FEWSHOT = process.env.FEWSHOT === '1'
+// R5-002: the hand-authored (non-holdout) few-shot exemplars are now part of the SHIPPED prompt
+// (src/backend/coach/safety/classifierExemplars.ts), so the holdout is measured WITH them by default
+// to reflect production. NO_FEWSHOT=1 measures the bare prompt for an A/B comparison only.
+const FEWSHOT = process.env.NO_FEWSHOT !== '1'
 const EXEMPLARS = FEWSHOT
   ? JSON.parse(readFileSync(resolve(ROOT, 'data', 'fewshot-exemplars.json'), 'utf8')).exemplars
   : []
