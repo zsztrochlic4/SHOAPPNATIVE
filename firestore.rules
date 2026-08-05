@@ -378,6 +378,42 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // --- Private friend groups (server-authoritative, membership-gated) --- //
+    // Public, secret-free directory used to SEARCH for a group by name. Carries
+    // no passcode and no member list. Written only by the group functions.
+    match /groupDirectory/{groupId} {
+      allow get, list: if request.auth != null;
+      allow write: if false;
+    }
+
+    // The private group document + its members and cheers. Readable only by a
+    // signed-in MEMBER (proven by the existence of their own member doc); every
+    // write goes through the group Cloud Functions (functions/src/communityGroups.ts)
+    // so passcodes, membership, goals and cheer counts can't be forged.
+    match /groups/{groupId} {
+      function isGroupMember() {
+        return request.auth != null
+          && exists(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid));
+      }
+      allow get: if isGroupMember();
+      allow list, write: if false;
+
+      match /members/{uid} {
+        allow get, list: if isGroupMember();
+        allow write: if false;
+      }
+      // One doc per activity event holding its cheer count; the per-user tally
+      // lives in the `users` subcollection so "did I cheer?" is a single get.
+      match /cheers/{activityId} {
+        allow get, list: if isGroupMember();
+        allow write: if false;
+        match /users/{uid} {
+          allow get, list: if isGroupMember();
+          allow write: if false;
+        }
+      }
+    }
+
     // ----------------------------------------------------------------- //
     //  Default deny — everything outside the paths above                 //
     // ----------------------------------------------------------------- //

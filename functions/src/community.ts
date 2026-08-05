@@ -105,6 +105,9 @@ interface SyncInput {
   streakCurrent?: number
   streakBest?: number
   freezeTokens?: number
+  volume7?: number
+  volume30?: number
+  sessionsThisWeek?: number
 }
 
 const intIn = (v: unknown, min: number, max: number): number => {
@@ -122,6 +125,9 @@ export const syncCommunityStats = onCall<SyncInput>(
     const streakCurrent = intIn(req.data?.streakCurrent, 0, 10000)
     const streakBest = intIn(req.data?.streakBest, 0, 10000)
     const freezeTokens = intIn(req.data?.freezeTokens, 0, FREEZE_CAP)
+    const volume7 = intIn(req.data?.volume7, 0, 100_000_000)
+    const volume30 = intIn(req.data?.volume30, 0, 400_000_000)
+    const sessionsThisWeek = intIn(req.data?.sessionsThisWeek, 0, 50)
 
     const db = getFirestore()
     const profRef = db.collection('communityProfiles').doc(uid)
@@ -132,11 +138,25 @@ export const syncCommunityStats = onCall<SyncInput>(
     const tier = clampTier(typeof prof.get('tier') === 'number' ? prof.get('tier') : 0)
     const weekKey = mondayKey(new Date())
 
+    // These stats also feed the friend-group leaderboards; they're stored on the
+    // profile and fanned out to the user's group member docs by syncGroupStats.
     await profRef.set(
-      { points, streakCurrent, streakBest, freezeTokens, tier, weekKey, updatedAt: FieldValue.serverTimestamp() },
+      { points, streakCurrent, streakBest, freezeTokens, volume7, volume30, sessionsThisWeek, tier, weekKey, updatedAt: FieldValue.serverTimestamp() },
       { merge: true },
     )
     await db.doc(`leagueStandings/${weekKey}/tiers/${tier}/members/${uid}`).set({ username, points }, { merge: true })
+
+    // Fan the fresh stats out to the user's friend-group member docs so group
+    // leaderboards reflect current activity (communityGroups.ts owns the shape).
+    const groupIds: string[] = Array.isArray(prof.get('groupIds')) ? prof.get('groupIds') : []
+    if (groupIds.length) {
+      const memberStats = { username, odometer: points, streak: streakCurrent, bestStreak: streakBest, volume7, volume30, sessionsThisWeek }
+      const batch = db.batch()
+      for (const gid of groupIds.slice(0, 50)) {
+        batch.set(db.doc(`groups/${gid}/members/${uid}`), memberStats, { merge: true })
+      }
+      await batch.commit()
+    }
     return { ok: true, tier, weekKey }
   },
 )
