@@ -81,6 +81,8 @@
     "eval:response": "tsc -p tsconfig.sweep.json && node scripts/run-coach-response-eval.mjs",
     "eval:replies": "tsc -p tsconfig.sweep.json && node scripts/generate-coach-eval-replies.mjs",
     "eval:replies:safety": "tsc -p tsconfig.sweep.json && node scripts/capture-coach-safety-replies.mjs",
+    "eval:replies:staged": "tsc -p tsconfig.sweep.json && node scripts/capture-coach-staged-replies.mjs",
+    "eval:packet": "tsc -p tsconfig.sweep.json && node scripts/build-review-packet.mjs",
     "recipes:build": "node scripts/build-recipes.mjs",
     "recipes:upload": "node scripts/upload-recipes.mjs",
     "media:upload": "node scripts/upload-exercise-media.mjs",
