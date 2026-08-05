@@ -106,8 +106,15 @@ async function main() {
   const existing = existsSync(REPLIES_PATH) ? JSON.parse(readFileSync(REPLIES_PATH, 'utf8')) : {}
   const replies = { ...existing }
 
-  const staged = RESPONSE_EVAL_CASES.filter((c) => c.scenario && c.scenario.trim())
-  const auto = RESPONSE_EVAL_CASES.filter((c) => !(c.scenario && c.scenario.trim()))
+  // Only NORMAL-COACHING groups can be captured faithfully offline. safety_sensitive and adversarial
+  // replies are decided by the SAFETY ROUTER (coachPrecheckAsync) BEFORE the coaching model — a crisis
+  // is blocked/referred with contacts and never reaches generateReply — so generating them here (which
+  // calls the model directly) would NOT reflect production. tool_failure and long_context need forced
+  // failures / long threads this offline harness can't stage either. All of those must be captured from
+  // the real coach (or hand-staged); we never auto-generate them.
+  const AUTO_GROUPS = new Set(['multi_turn', 'single_response'])
+  const manual = RESPONSE_EVAL_CASES.filter((c) => (c.scenario && c.scenario.trim()) || !AUTO_GROUPS.has(c.group))
+  const auto = RESPONSE_EVAL_CASES.filter((c) => !(c.scenario && c.scenario.trim()) && AUTO_GROUPS.has(c.group))
   // A real captured reply is kept; a blank OR a prior structured-fallback entry is (re)generated —
   // so re-running retries the cases where the model's structured output failed validation last time.
   const needsCapture = (id) => {
@@ -117,8 +124,8 @@ async function main() {
   const toGenerate = auto.filter((c) => needsCapture(c.id))
 
   console.log(
-    `Capturing ${toGenerate.length} non-scenario replies via ${MODEL} (concurrency ${CONCURRENCY}); ` +
-      `${staged.length} scenario cases left for manual staging; ${auto.length - toGenerate.length} already filled.`,
+    `Capturing ${toGenerate.length} normal-coaching replies via ${MODEL} (concurrency ${CONCURRENCY}); ` +
+      `${manual.length} cases need the REAL coach / manual staging; ${auto.length - toGenerate.length} already filled.`,
   )
 
   let errors = 0
@@ -148,9 +155,15 @@ async function main() {
   console.log(`  ${filled}/60 replies present; ${60 - filled} still blank.`)
   if (fallbacks) console.log(`  ${fallbacks} auto-replies fell back on invalid model output — recapture those.`)
   if (errors) console.log(`  ${errors} transport failures — re-run to retry the blanks.`)
-  console.log('\nMANUAL STAGING REQUIRED (capture these in a coach-enabled build and paste into replies.json):')
-  for (const c of staged) console.log(`  - ${c.id} [${c.group}] — ${c.scenario}`)
-  console.log('\nNext: fill any blanks, have TWO reviewers score reviewer-template.json, then run MODE=score npm run eval:response.')
+  console.log('\nCAPTURE FROM THE REAL COACH (safety routing / staged state can\'t be reproduced offline):')
+  for (const c of manual) {
+    const why = c.scenario && c.scenario.trim() ? c.scenario : `${c.group} — decided by the safety router / needs staged state`
+    console.log(`  - ${c.id} [${c.group}] — ${why}`)
+  }
+  console.log('\nWHY: safety_sensitive & adversarial replies come from coachPrecheckAsync (a crisis is blocked/referred with')
+  console.log('contacts BEFORE the coaching model), and tool_failure/long_context need forced failures / long threads —')
+  console.log('so those must be captured from the real coach, not this offline harness.')
+  console.log('\nNext: capture the above from the real coach, have TWO reviewers score, then run MODE=score npm run eval:response.')
 }
 
 main().catch((e) => {
