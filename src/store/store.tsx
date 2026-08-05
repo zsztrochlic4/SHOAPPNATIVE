@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { AppState as RNAppState } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { todayKey, setLiveClock, refreshClock } from '../lib/date'
+import { todayKey, setLiveClock, refreshClock, deviceTimezone } from '../lib/date'
 import {
   ANON_IDENTITY,
   LEGACY_STORAGE_KEY,
@@ -73,6 +73,9 @@ export type Action =
   | { type: 'APPLY_COACH_SWAP'; backendUser: UserDoc; generatedProgram: StoredProgram; workoutInstances: WorkoutInstanceDoc[] }
   // Coach Capability Plan: undo — restore the pre-action program snapshot.
   | { type: 'RESTORE_PROGRAM_SNAPSHOT'; snapshot: ProgramSnapshot }
+  // Coach Capability Plan (R5-006): sync the local programDoc.version to the value the cloud
+  // transaction authoritatively stamped, so the next apply/undo guards against the right revision.
+  | { type: 'SET_PROGRAM_VERSION'; version: number }
   | { type: 'START_PROGRAM_DAY'; dateKey: string }
   | { type: 'LOG_WEIGHT'; kg: number }
   | { type: 'ADJUST_WATER'; deltaL: number }
@@ -296,6 +299,13 @@ function reducer(state: AppState, action: Action): AppState {
         ? withPeriods(restored, action.snapshot.plannedPeriods)
         : restored
     }
+
+    // R5-006: mirror the cloud-authoritative program revision locally. No-op if there is no
+    // program doc (the version lives on the canonical program record).
+    case 'SET_PROGRAM_VERSION':
+      return state.programDoc
+        ? { ...state, programDoc: { ...state.programDoc, version: action.version } }
+        : state
 
     case 'START_PROGRAM_DAY': {
       // Materialise a loggable session for the given day from the generated program's
@@ -1023,6 +1033,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       cancelled = true
     }
   }, [identity, dispatch])
+
+  // R4-010: once hydrated, capture the device's IANA timezone into settings so it persists to the
+  // server and the coach names the correct LOCAL day (travel/other AU states follow the device).
+  useEffect(() => {
+    if (!hydrated) return
+    const tz = deviceTimezone()
+    if (tz && state.settings.timezone !== tz) dispatch({ type: 'SET_SETTINGS', patch: { timezone: tz } })
+  }, [hydrated, state.settings.timezone, dispatch])
 
   const savingRef = useRef(false)
   const savePendingRef = useRef(false)

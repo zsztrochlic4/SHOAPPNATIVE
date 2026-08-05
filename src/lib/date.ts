@@ -33,6 +33,16 @@ export function now(): Date {
   return _now
 }
 
+/** The device's IANA timezone (audit R4-010), e.g. 'Australia/Perth'; null if unavailable. */
+export function deviceTimezone(): string | null {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+    return tz && tz.length > 0 ? tz : null
+  } catch {
+    return null
+  }
+}
+
 /** Current hour 0–23 in device local time (frozen at 9 in demo). */
 export function currentHour(): number {
   return _now.getHours()

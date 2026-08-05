@@ -24,12 +24,13 @@ import {
   type StoredDay,
   type ProgramStatus,
 } from './activate'
-import { contextForUser, generateProgram } from '../generator/generate'
+import { contextForUser } from '../generator/generate'
 import { swapCandidates, requestSpecific, type SwapResult, type SwapReason } from '../generator/swaps'
-import { adjustProgram, DELOAD } from '../generator/deload'
+import { DELOAD } from '../generator/deload'
 import { changeGoal } from '../generator/goalChange'
 import { EXERCISE_BY_ID } from '../data/index'
 import { validateWorkoutActionPayload, SWAP_REASONS, type NudgeKindLit } from '../coach/workoutActions'
+import { validateProgramForUser, summarizeViolations, fitProgramToDuration, DURATION_TARGET_TOLERANCE } from './programInvariants'
 
 /** The slice of app state the resolver reads. */
 export interface CoachActionState {
@@ -66,6 +67,38 @@ export type CoachActionOutcome =
   | { ok: true; apply: 'share_pr'; message: string }
 
 const dedupe = (ids: string[]): string[] => Array.from(new Set(ids))
+
+/**
+ * CA-002 — the shared post-transform safety gate. Every program-mutating outcome (swap patch,
+ * goal/day/session regen, deload) is run through `validateProgramForUser` here BEFORE it is
+ * returned for preview/commit. If any hard user constraint (injury, exclusion, equipment,
+ * skill, duplicate) is broken we refuse and keep the prior plan rather than surface an illegal
+ * one — so the model choosing a bad intent can never produce an unsafe plan.
+ */
+function guardProgram(user: UserDoc, program: StoredProgram, ok: CoachActionOutcome): CoachActionOutcome {
+  // Structural safety invariants are HARD (injury, exclusion, equipment, skill, duplicate, sparse/
+  // unfilled, empty). Duration is NOT hard-enforced here — the generator's short-session time model
+  // overshoots (owner-tracked IP-10); enforcing it would falsely reject legitimate regens. Instead we
+  // surface time honestly below so the coach never claims a plan "fits" when it runs over (U-014).
+  const check = validateProgramForUser(user, program)
+  if (!check.ok) {
+    return {
+      ok: false,
+      reason: `invariant:${summarizeViolations(check.violations)}`,
+      message: "I couldn't make that change without breaking one of your safety limits, so I've left your plan as it is.",
+    }
+  }
+  // U-014 / R5-009: append an honest caveat only when a day runs over the +10% TARGET TOLERANCE.
+  // The duration-fitting path (set_session_length) already trims into tolerance and discloses the
+  // real per-day estimate, so this fires only for other regens (e.g. a goal change) that genuinely
+  // overshoot — it never contradicts an already-fitted message with a redundant "trim" nudge.
+  const worst = Object.values(check.estimatedMinutesByDay).length ? Math.max(...Object.values(check.estimatedMinutesByDay)) : 0
+  const overTolerance = worst > user.session_length_min * DURATION_TARGET_TOLERANCE
+  if (overTolerance && ok.ok === true && (ok.apply === 'patch' || ok.apply === 'regen')) {
+    return { ...ok, message: `${ok.message} Heads up: a couple of days come out closer to ${worst} min than your ${user.session_length_min}-min target — trim the last movement if you're tight on time.` }
+  }
+  return ok
+}
 
 const NUDGE_COPY: Record<NudgeKindLit, string> = {
   water: 'Quick one — log your water so we can keep an eye on hydration.',
@@ -119,7 +152,18 @@ function applySwap(state: CoachActionState, swap: SwapResult): CoachActionOutcom
   const nextUser: UserDoc = swap.excludeOriginal
     ? { ...state.backendUser, excluded_exercise_ids: dedupe([...state.backendUser.excluded_exercise_ids, fromId]) }
     : state.backendUser
-  return { ok: true, apply: 'patch', nextUser, program, instances, message: swap.note }
+  return guardProgram(nextUser, program, { ok: true, apply: 'patch', nextUser, program, instances, message: swap.note })
+}
+
+/** Deload the CURRENT stored plan in place (C-012): hold every load/rep/identity, cut sets
+ *  ~40% and add one RIR. Never regenerates — substitutions and logged loads are preserved. */
+function deloadStoredProgram(program: StoredProgram): StoredProgram {
+  const scaleSets = (sets: number) => Math.max(1, Math.round(sets * DELOAD.setMultiplier))
+  const days: StoredDay[] = program.days.map((d) => ({
+    ...d,
+    exercises: d.exercises.map((e) => ({ ...e, sets: scaleSets(e.sets), rirMin: e.rirMin + DELOAD.rirBump })),
+  }))
+  return { ...program, days, weeklySetsByMuscle: recomputeWeeklySets(days, program.weeklySetsByMuscle) }
 }
 
 /**
@@ -156,7 +200,17 @@ function regen(nextUser: UserDoc, now: string, message: string): CoachActionOutc
       message: 'That change needs a quick health re-check before I can apply it — open your Training profile to finish it.',
     }
   }
-  return { ok: true, apply: 'regen', nextUser, program: res.program, status: res.status, programDoc: res.programDoc, instances: res.instances, message }
+  // U-011: if generation could not fill a REQUIRED slot (e.g. an over-constrained equipment set),
+  // refuse rather than apply a sparse/incomplete plan — an honest constraint gap, not a bad plan.
+  const genChoices = res.programDoc.generation_audit?.flatMap((a) => a.choices ?? []) ?? []
+  if (genChoices.some((c) => typeof c === 'string' && c.includes('UNFILLED required slot'))) {
+    return {
+      ok: false,
+      reason: 'incomplete_plan',
+      message: "I couldn't build a complete plan from your current equipment and limits without leaving gaps, so I've left your plan as it is — try widening your available equipment.",
+    }
+  }
+  return guardProgram(nextUser, res.program, { ok: true, apply: 'regen', nextUser, program: res.program, status: res.status, programDoc: res.programDoc, instances: res.instances, message })
 }
 
 /**
@@ -180,11 +234,20 @@ export function resolveCoachAction(
       }
       const ctx = contextForUser(state.backendUser)
 
-      // A user-named specific lift: no choice, place it directly (SW07).
+      // A user-named specific lift: no choice, place it directly (SW07). Excludes lifts already
+      // in the program (no duplicates) and enforces compatibility + injury exclusions (C-002/C-004).
       if (action.reason === 'specific' && action.wantedExerciseId) {
-        const raw = requestSpecific(action.fromExerciseId, action.wantedExerciseId, ctx)
+        const raw = requestSpecific(action.fromExerciseId, action.wantedExerciseId, ctx, otherProgramIds(state.program, action.fromExerciseId))
         if ('ok' in raw && raw.ok === false) {
-          return { ok: false, reason: 'no_eligible_swap', message: "I couldn't place that lift with your equipment and level — want me to suggest an alternative instead?" }
+          const reason = raw.reason
+          const message = reason === 'injury_excluded'
+            ? "That lift isn't safe with one of your injuries, so I can't add it — want me to suggest a safe alternative instead?"
+            : reason === 'already_in_program'
+              ? "That lift is already in your program — want me to suggest a different alternative instead?"
+              : reason === 'not_compatible'
+                ? "That isn't a like-for-like replacement for what it'd swap out, so I'd rather not unbalance your plan — want me to suggest a closer match?"
+                : "I couldn't place that lift with your equipment and level — want me to suggest an alternative instead?"
+          return { ok: false, reason: `no_eligible_swap:${reason}`, message }
         }
         return applySwap(state, raw as SwapResult)
       }
@@ -216,11 +279,11 @@ export function resolveCoachAction(
       }
       const nextUser: UserDoc = { ...state.backendUser, goal: action.newGoal }
       const projected = projectProgram(nextUser.uid, now, result.program, result.version)
-      return {
+      return guardProgram(nextUser, projected.program, {
         ok: true, apply: 'regen', nextUser,
         program: projected.program, status: { ok: true, reason: null }, programDoc: projected.programDoc, instances: projected.instances,
         message: `Switched your goal to ${action.newGoal} and rebuilt your plan around it — your logged loads carry over. Take the first week one notch easier so the change doesn't spike your intensity.`,
-      }
+      })
     }
 
     case 'set_training_days': {
@@ -228,19 +291,56 @@ export function resolveCoachAction(
     }
 
     case 'set_session_length': {
-      return regen({ ...state.backendUser, session_length_min: action.sessionLengthMin }, now, `Set your sessions to ${action.sessionLengthMin} minutes and rebuilt your plan to fit.`)
+      // R5-009: a session-length request is an explicit HARD time constraint, so we must actually
+      // fit the plan to it — not merely disclose an overshoot. Regenerate, then trim trailing
+      // accessory work from any over-budget day (preserving the main lifts) until each day is within
+      // the +10% target, and mirror every removal into the canonical instances so they stay in sync.
+      const nextUser: UserDoc = { ...state.backendUser, session_length_min: action.sessionLengthMin }
+      const res = activateProgram(nextUser, now)
+      if (!res.status.ok || !res.program || !res.programDoc) {
+        return { ok: false, reason: res.status.reason ?? 'generation_blocked', message: 'That change needs a quick health re-check before I can apply it — open your Training profile to finish it.' }
+      }
+      const genChoices = res.programDoc.generation_audit?.flatMap((a) => a.choices ?? []) ?? []
+      if (genChoices.some((c) => typeof c === 'string' && c.includes('UNFILLED required slot'))) {
+        return { ok: false, reason: 'incomplete_plan', message: "I couldn't build a complete plan from your current equipment and limits without leaving gaps, so I've left your plan as it is — try widening your available equipment." }
+      }
+
+      const fit = fitProgramToDuration(res.program, action.sessionLengthMin)
+      // Mirror the trim into instances: keep only the exercises that survived on each weekday.
+      const keepByWeekday = new Map<string, Set<string>>()
+      for (const day of fit.program.days) keepByWeekday.set(day.weekday, new Set(day.exercises.map((e) => e.exerciseId)))
+      const instances = res.instances.map((inst) => {
+        const weekday = inst.instance_id.split('_').pop() ?? ''
+        const keep = keepByWeekday.get(weekday)
+        return keep ? { ...inst, exercises: inst.exercises.filter((pe) => keep.has(pe.exercise_id)) } : inst
+      })
+
+      const target = action.sessionLengthMin
+      const message = fit.fits
+        ? `Set your sessions to ${target} minutes and trimmed each day to fit — they land around ~${fit.worstMinutes} min.`
+        : `Set your sessions to ${target} minutes. Even trimmed to the essentials your split still needs about ~${fit.worstMinutes} min a day, so I kept the leanest version that preserves your main lifts — drop a training day or nudge the target up if you need it tighter.`
+      return guardProgram(nextUser, fit.program, {
+        ok: true, apply: 'regen', nextUser,
+        program: fit.program, status: res.status, programDoc: res.programDoc, instances,
+        message,
+      })
     }
 
     case 'deload': {
-      const gen = generateProgram(state.backendUser)
-      if (!gen.ok) return { ok: false, reason: `gen_${gen.reason}`, message: "I couldn't prepare a deload just now." }
-      const deloaded = adjustProgram(gen.program, DELOAD, 'COACH_DELOAD')
-      const projected = projectProgram(state.backendUser.uid, now, deloaded)
-      return {
-        ok: true, apply: 'regen', nextUser: state.backendUser,
-        program: projected.program, status: { ok: true, reason: null }, programDoc: projected.programDoc, instances: projected.instances,
+      // C-012: deload the CURRENT plan in place — do not regenerate. Exercise identity, any
+      // user substitutions and the logged loads are all preserved; only sets (−40%) and RIR
+      // (+1) move. This transforms both the render projection and the canonical instances.
+      if (!state.program) return { ok: false, reason: 'no_program', message: "You don't have an active program to deload yet." }
+      const program = deloadStoredProgram(state.program)
+      const scaleSets = (sets: number) => Math.max(1, Math.round(sets * DELOAD.setMultiplier))
+      const instances = state.instances.map((inst) => ({
+        ...inst,
+        exercises: inst.exercises.map((pe) => ({ ...pe, sets: scaleSets(pe.sets), rir_min: pe.rir_min + DELOAD.rirBump })),
+      }))
+      return guardProgram(state.backendUser, program, {
+        ok: true, apply: 'patch', nextUser: state.backendUser, program, instances,
         message: 'Set up a deload week — sets cut back about 40% and intensity eased a notch, with your working loads held, not lost.',
-      }
+      })
     }
 
     case 'start_session': {

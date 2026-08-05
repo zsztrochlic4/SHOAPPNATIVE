@@ -91,8 +91,41 @@ export type WorkoutActionValidation =
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/
+/** Max span for a planned absence / exam period — guards against absurd ranges (C-013/CA-010). */
+const MAX_PERIOD_DAYS = 366
 
 const fail = (reason: string): WorkoutActionValidation => ({ ok: false, reason })
+
+/**
+ * A real CALENDAR date, not just the right shape (C-013). `2026-99-99` matches the regex but is
+ * not a date; `2026-02-30` rolls over. We parse in UTC and require the components to round-trip
+ * exactly, so only genuine calendar days (leap years included) pass. Returns the ms epoch or null.
+ */
+function calendarDateMs(value: string): number | null {
+  if (!DATE_KEY.test(value)) return null
+  const [y, m, d] = value.split('-').map(Number)
+  if (m < 1 || m > 12 || d < 1 || d > 31) return null
+  const ms = Date.UTC(y, m - 1, d)
+  const back = new Date(ms)
+  // Reject rollover (e.g. Feb 30 → Mar 2): the parsed parts must match the input exactly.
+  if (back.getUTCFullYear() !== y || back.getUTCMonth() !== m - 1 || back.getUTCDate() !== d) return null
+  return ms
+}
+
+/** Validate a start/end pair: both real calendar dates, end ≥ start, span within the max. */
+function validateDateRange(startDate: unknown, endDate: unknown, prefix: string): { ok: true; startDate: string; endDate: string } | { ok: false; reason: string } {
+  const start = asString(startDate)
+  const end = asString(endDate)
+  if (!start) return { ok: false, reason: `${prefix}_bad_start` }
+  if (!end) return { ok: false, reason: `${prefix}_bad_end` }
+  const startMs = calendarDateMs(start)
+  const endMs = calendarDateMs(end)
+  if (startMs == null) return { ok: false, reason: `${prefix}_bad_start` }
+  if (endMs == null) return { ok: false, reason: `${prefix}_bad_end` }
+  if (endMs < startMs) return { ok: false, reason: `${prefix}_end_before_start` }
+  if ((endMs - startMs) / 86_400_000 > MAX_PERIOD_DAYS) return { ok: false, reason: `${prefix}_span_too_long` }
+  return { ok: true, startDate: start, endDate: end }
+}
 
 function asString(v: unknown): string | null {
   return typeof v === 'string' ? v : null
@@ -179,21 +212,15 @@ export function validateWorkoutActionPayload(payload: Record<string, string | nu
       if (!onlyKeys(payload, ['action', 'mode', 'startDate', 'endDate'])) return fail('absence_extra_keys')
       const mode = inSet(payload.mode, ABSENCE_MODES)
       if (!mode) return fail('absence_bad_mode')
-      const startDate = asString(payload.startDate)
-      const endDate = asString(payload.endDate)
-      if (!startDate || !DATE_KEY.test(startDate)) return fail('absence_bad_start')
-      if (!endDate || !DATE_KEY.test(endDate)) return fail('absence_bad_end')
-      if (endDate < startDate) return fail('absence_end_before_start')
-      return { ok: true, action: { action, mode, startDate, endDate } }
+      const range = validateDateRange(payload.startDate, payload.endDate, 'absence')
+      if (!range.ok) return fail(range.reason)
+      return { ok: true, action: { action, mode, startDate: range.startDate, endDate: range.endDate } }
     }
     case 'exam_mode': {
       if (!onlyKeys(payload, ['action', 'startDate', 'endDate'])) return fail('exam_extra_keys')
-      const startDate = asString(payload.startDate)
-      const endDate = asString(payload.endDate)
-      if (!startDate || !DATE_KEY.test(startDate)) return fail('exam_bad_start')
-      if (!endDate || !DATE_KEY.test(endDate)) return fail('exam_bad_end')
-      if (endDate < startDate) return fail('exam_end_before_start')
-      return { ok: true, action: { action, startDate, endDate } }
+      const range = validateDateRange(payload.startDate, payload.endDate, 'exam')
+      if (!range.ok) return fail(range.reason)
+      return { ok: true, action: { action, startDate: range.startDate, endDate: range.endDate } }
     }
     case 'start_session': {
       if (!onlyKeys(payload, ['action', 'variant'])) return fail('start_extra_keys')

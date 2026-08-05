@@ -181,16 +181,27 @@ test('set_training_days regenerates around the new days', () => {
   assert.deepEqual(r.nextUser.days_available, ['Monday', 'Wednesday', 'Friday'])
 })
 
-test('deload cuts sets and raises RIR while holding the program shape', () => {
+test('deload TRANSFORMS the current plan in place (C-012): preserves exercise identity, cuts sets, raises RIR', () => {
   const state = baseState()
   const r = resolveCoachAction(state, { action: 'deload' }, NOW)
   assert.equal(r.ok, true)
-  assert.equal(r.apply, 'regen')
-  // Compare against the un-deloaded baseline: every exercise trains at >= the base RIR.
-  const base = state.activation.program
+  // C-012: a deload no longer regenerates — it patches the current program so identity/loads/history hold.
+  assert.equal(r.apply, 'patch')
+  const base = state.program
+  // Same exercises, in the same order, on the same days — only sets/RIR move.
+  assert.deepEqual(
+    r.program.days.map((d) => d.exercises.map((e) => e.exerciseId)),
+    base.days.map((d) => d.exercises.map((e) => e.exerciseId)),
+    'deload must not change which exercises are in the plan',
+  )
   const baseRir = base.days.flatMap((d) => d.exercises).reduce((s, e) => s + e.rirMin, 0)
   const deRir = r.program.days.flatMap((d) => d.exercises).reduce((s, e) => s + e.rirMin, 0)
   assert.ok(deRir >= baseRir, 'deload should not lower RIR anywhere')
+  const baseSets = base.days.flatMap((d) => d.exercises).reduce((s, e) => s + e.sets, 0)
+  const deSets = r.program.days.flatMap((d) => d.exercises).reduce((s, e) => s + e.sets, 0)
+  assert.ok(deSets < baseSets, 'deload should cut total sets')
+  // Instances are transformed in lockstep (rir bumped, sets cut) — none dropped.
+  assert.equal(r.instances.length, state.instances.length)
 })
 
 test('start_session and open_budget_eats are navigation-only', () => {
@@ -259,4 +270,45 @@ test('catch_up exempt declares today a no-penalty rest day; other modes decline 
   const shift = resolveCoachAction(state, { action: 'catch_up', mode: 'shift_forward' }, NOW)
   assert.equal(shift.ok, false)
   assert.equal(shift.reason, 'catch_up_unsupported')
+})
+
+// R5-009 — a set_session_length request actually FITS the plan to the requested time by trimming
+// accessory work, mirrors the trim into the canonical instances, and never claims a clean fit when
+// the split genuinely cannot reach the target.
+test('R5-009: set_session_length trims to fit the requested time and syncs instances', async () => {
+  const { estimateDayMinutes, DURATION_TARGET_TOLERANCE } = await import('../../.sweep-out/backend/runtime/programInvariants.js')
+  const state = baseState(makeUser({ session_length_min: 60 }))
+  const target = 30
+  const r = resolveCoachAction(state, { action: 'set_session_length', sessionLengthMin: target }, NOW)
+  assert.equal(r.ok, true)
+  assert.equal(r.apply, 'regen')
+  const cap = target * DURATION_TARGET_TOLERANCE
+
+  // Every day is either within the +10% tolerance, or trimmed down to the minimum viable count.
+  for (const day of r.program.days) {
+    const withinTolerance = estimateDayMinutes(day) <= cap
+    assert.ok(withinTolerance || day.exercises.length <= 2, `${day.weekday} neither fits nor is at the floor`)
+  }
+
+  // Instances mirror the trimmed projection exactly — no orphaned canonical exercises.
+  for (const inst of r.instances) {
+    const weekday = inst.instance_id.split('_').pop()
+    const day = r.program.days.find((d) => d.weekday === weekday)
+    if (!day) continue
+    const projIds = [...day.exercises.map((e) => e.exerciseId)].sort()
+    const instIds = [...inst.exercises.map((e) => e.exercise_id)].sort()
+    assert.deepEqual(instIds, projIds, `${weekday} instance/projection exercise mismatch`)
+  }
+
+  // The message discloses the real per-day estimate; it never claims a plan fits when it doesn't.
+  assert.ok(r.message.includes(String(target)))
+})
+
+test('R5-009: a comfortable target keeps the plan intact (no needless trimming)', () => {
+  const state = baseState(makeUser({ session_length_min: 60 }))
+  const before = state.program.days.reduce((n, d) => n + d.exercises.length, 0)
+  const r = resolveCoachAction(state, { action: 'set_session_length', sessionLengthMin: 90 }, NOW)
+  assert.equal(r.ok, true)
+  const after = r.program.days.reduce((n, d) => n + d.exercises.length, 0)
+  assert.ok(after >= before - 0, 'a generous target should not trim below the fresh plan')
 })

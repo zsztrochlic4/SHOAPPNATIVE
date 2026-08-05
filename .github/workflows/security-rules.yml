@@ -25,16 +25,10 @@ on:
       - 'src/lib/sanitize.ts'
       - 'src/backend/coach/responseSchema.ts'
       - '.github/workflows/security-rules.yml'
+  # Runs on EVERY PR to main (no path filter) so `rules-tests` is a reliable required check —
+  # a path-filtered required check silently blocks PRs that don't touch those paths (audit C-009).
   pull_request:
-    paths:
-      - 'firestore.rules'
-      - 'storage.rules'
-      - 'firebase.json'
-      - 'test/rules/**'
-      - 'test/unit/**'
-      - 'src/lib/sanitize.ts'
-      - 'src/backend/coach/responseSchema.ts'
-      - '.github/workflows/security-rules.yml'
+    branches: [main]
   workflow_dispatch:
     inputs:
       deploy:

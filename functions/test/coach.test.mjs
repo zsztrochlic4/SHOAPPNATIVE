@@ -1,9 +1,10 @@
-// Server-side coach orchestration. COACH_ENABLED is OFF (audit F-003: the active classifier is
-// unvalidated and the STATUS record shows the last independent validation failing critical cases),
-// so runCoachTurn must refuse every turn with coach_disabled BEFORE any other work. The guarded
-// behaviour behind the gate — a crisis never reaches the model, an allowed turn does + is
-// validated, the daily cap is honoured — remains verified via coachTurnCore with injected fakes,
-// so it stays green for the eventual authorised enablement.
+// Server-side coach orchestration. COACH_ENABLED is now ON (owner decision 2026-08-03, zero
+// critical holdout misses — see coachGate.ts), so runCoachTurn proceeds past the enable-gate and
+// the remote kill switch is the live off-switch. The guarded behaviour — a crisis never reaches
+// the model, an allowed turn does + is validated, the daily cap is honoured, and the SERVER is
+// authoritative on action capability (audit C-006) — is verified via coachTurnCore with injected
+// fakes. (Audit C-009: the previous test asserted a stale coach_disabled rejection after the gate
+// had already been flipped; that assertion is corrected here to track the intended release state.)
 //   npm --prefix functions run build && node --test functions/test/coach.test.mjs
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -32,10 +33,17 @@ const baseDeps = (over = {}) => {
   return { deps, replyCalls: () => replyCalls }
 }
 
-test('runCoachTurn refuses every turn with coach_disabled while the gate is off (audit F-003)', async () => {
+test('runCoachTurn proceeds past the enable-gate now that COACH_ENABLED is true (audit C-009)', async () => {
   const { deps, replyCalls } = baseDeps()
-  await assert.rejects(() => runCoachTurn('u1', { message: 'how do I squat?' }, deps), /coach_disabled/)
-  assert.equal(replyCalls(), 0) // the model is never consulted while disabled
+  const out = await runCoachTurn('u1', { message: 'how do I squat?' }, deps)
+  assert.equal(out.blocked, false)
+  assert.equal(replyCalls(), 1) // the gate is open, so an allowed turn reaches the model exactly once
+})
+
+test('runCoachTurn returns coach_unavailable when the remote kill switch is engaged (live off-switch)', async () => {
+  const { deps, replyCalls } = baseDeps({ killSwitchEngaged: () => true })
+  await assert.rejects(() => runCoachTurn('u1', { message: 'how do I squat?' }, deps), /coach_unavailable/)
+  assert.equal(replyCalls(), 0) // the model is never consulted while the kill switch is engaged
 })
 
 test('a crisis message is blocked by the safety floor and NEVER reaches the model', async () => {
@@ -100,4 +108,67 @@ test('a classifier failure fails SAFE (blocks, model not called) rather than all
   const out = await coachTurnCore('u1', { message: 'anything at all' }, deps)
   assert.equal(out.blocked, true) // service-unavailable, never a silent allow
   assert.equal(replyCalls(), 0)
+})
+
+/* ---------------- C-006: the SERVER is authoritative on action capability ---------------- */
+
+const actionReplyDeps = (over = {}) => baseDeps({
+  // The model emits a valid workout_action proposal every turn.
+  generateReply: async () => JSON.stringify({
+    mode: 'general', message: 'Let’s deload this week.', citations: [], memory: null,
+    proposal: { kind: 'workout_action', title: 'Deload week', summary: 'Cut sets ~40%.', payload: { action: 'deload' } },
+  }),
+  saveProposal: async (_uid, p) => ({ ...p, id: 'prop1', status: 'pending', createdAt: '', expiresAt: '' }),
+  ...over,
+}).deps
+
+test('C-006: a workout_action is SURFACED when the client opts in and the server permits actions', async () => {
+  const deps = actionReplyDeps({ actionsDisabled: () => false })
+  const out = await coachTurnCore('u1', { message: 'can you set up a deload week for me?', allowActions: true }, deps)
+  assert.ok(out.proposal && out.proposal.kind === 'workout_action', 'action should be surfaced when permitted')
+})
+
+test('C-006: the server DOWNGRADES a workout_action when actioning is disabled server-side, even if the client sent allowActions=true', async () => {
+  const deps = actionReplyDeps({ actionsDisabled: () => true })
+  const out = await coachTurnCore('u1', { message: 'can you set up a deload week for me?', allowActions: true }, deps)
+  assert.equal(out.proposal, null) // a modified/stale client cannot force an action through
+})
+
+test('U-003: a cold-start action switch that resolves DISABLED after being read blocks the action (fail-closed freshness)', async () => {
+  // Simulate the real makeRemoteKillSwitch cold start: engaged() would return a stale false, but the
+  // awaited engagedFresh(true) resolves the true value before the action gate decides.
+  let resolvedDisabled = false
+  const deps = actionReplyDeps({
+    actionsDisabledFresh: async () => { resolvedDisabled = true; return true }, // fresh read says disabled
+  })
+  const out = await coachTurnCore('u1', { message: 'can you set up a deload week for me?', allowActions: true }, deps)
+  assert.equal(resolvedDisabled, true)
+  assert.equal(out.proposal, null) // no stale-false fail-open on cold start
+})
+
+// R5-010 — the coach names the correct LOCAL day on the FIRST turn after a timezone change by
+// trusting the validated per-turn timezone the client sends, instead of the lagging stored setting.
+test('R5-010: the per-turn timezone is threaded to loadTurnData', async () => {
+  const { deps } = baseDeps()
+  let captured = 'UNSET'
+  deps.loadTurnData = async (_uid, opts) => {
+    captured = opts?.requestTimezone
+    throw new Error('stop-after-capture') // short-circuit; we only assert the plumbing here
+  }
+  await assert.rejects(
+    () => coachTurnCore('u1', { message: 'what should I train today?', timezone: 'Australia/Perth' }, deps),
+    /stop-after-capture/,
+  )
+  assert.equal(captured, 'Australia/Perth')
+})
+
+test('R5-010: isValidTimezone accepts real IANA zones and rejects junk', async () => {
+  const { isValidTimezone } = await import('../lib/coachWorkspace.js')
+  assert.equal(isValidTimezone('Australia/Perth'), true)
+  assert.equal(isValidTimezone('America/New_York'), true)
+  assert.equal(isValidTimezone('UTC'), true)
+  assert.equal(isValidTimezone('Not/AZone'), false)
+  assert.equal(isValidTimezone(''), false)
+  assert.equal(isValidTimezone(undefined), false)
+  assert.equal(isValidTimezone(123), false)
 })

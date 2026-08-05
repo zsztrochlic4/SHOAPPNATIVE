@@ -17,14 +17,22 @@ import { getFirestore } from 'firebase-admin/firestore'
 export interface KillSwitchReader {
   /** Cached engaged state (synchronous). */
   engaged(): boolean
+  /**
+   * Freshness-bound read (audit U-003). Awaits a refresh when the cache was never populated (cold
+   * start) or has gone stale, so the FIRST request after a cold start can't serve a stale `false`.
+   * `failClosed` (for plan-mutating actions): if freshness still can't be confirmed after the
+   * awaited refresh, return `true` (engaged / disabled) rather than fail open.
+   */
+  engagedFresh(failClosed?: boolean): Promise<boolean>
   /** Force a refresh now (awaited) — used to warm on cold start and in tests. */
   refresh(): Promise<void>
 }
 
 type Fetcher = () => Promise<boolean>
 
-/** Wrap a boolean fetcher in a background-refreshing, fail-safe cache. Injectable for tests. */
-export function makeRemoteKillSwitch(fetchEngaged: Fetcher, ttlMs = 30_000): KillSwitchReader {
+/** Wrap a boolean fetcher in a background-refreshing, fail-safe cache. Injectable for tests
+ *  (`now` lets a test drive the clock deterministically to reproduce a stale-cache outage). */
+export function makeRemoteKillSwitch(fetchEngaged: Fetcher, ttlMs = 30_000, now: () => number = () => Date.now()): KillSwitchReader {
   let engaged = false
   let lastOk = 0
   let inflight: Promise<void> | null = null
@@ -33,7 +41,7 @@ export function makeRemoteKillSwitch(fetchEngaged: Fetcher, ttlMs = 30_000): Kil
     inflight = (async () => {
       try {
         engaged = await fetchEngaged()
-        lastOk = Date.now()
+        lastOk = now()
       } catch {
         // fail-safe: keep the last known value; a read error never engages the switch on its own.
       } finally {
@@ -42,9 +50,19 @@ export function makeRemoteKillSwitch(fetchEngaged: Fetcher, ttlMs = 30_000): Kil
     })()
     return inflight
   }
+  const isFresh = (): boolean => lastOk !== 0 && now() - lastOk <= ttlMs
   return {
     engaged() {
-      if (Date.now() - lastOk > ttlMs) void refresh() // non-blocking; serves the cached value now
+      if (now() - lastOk > ttlMs) void refresh() // non-blocking; serves the cached value now
+      return engaged
+    },
+    async engagedFresh(failClosed = false) {
+      if (!isFresh()) await refresh()
+      // audit R4-001: the cache is trustworthy ONLY if it is fresh AFTER the awaited refresh. A
+      // never-populated cache OR a stale value whose refresh failed (a Firestore outage) both leave
+      // us unable to confirm the switch state — so for plan-mutating actions we fail CLOSED
+      // (return true / disabled) rather than serve a stale `false`. Advisory reads fail safe.
+      if (!isFresh()) return failClosed ? true : engaged
       return engaged
     },
     refresh,
@@ -59,3 +77,18 @@ export async function fetchCoachKillSwitch(): Promise<boolean> {
 
 /** The process-wide production instance, warmed on cold start. */
 export const coachKillSwitch: KillSwitchReader = makeRemoteKillSwitch(fetchCoachKillSwitch)
+
+/**
+ * SERVER-OWNED action capability switch (audit C-006 / CA-004). The action-only off switch must
+ * NOT be a client build flag: a modified or stale client can set allowActions=true, so the server
+ * is the authority on whether plan-mutating actions are permitted. Actions are disabled server-side
+ * when config/coach.actionsDisabled === true (an owner can flip it live, no redeploy). Advisory
+ * chat is unaffected. FAIL-SAFE to the last known value like the kill switch.
+ */
+export async function fetchCoachActionsDisabled(): Promise<boolean> {
+  const snap = await getFirestore().doc('config/coach').get()
+  return snap.exists && snap.get('actionsDisabled') === true
+}
+
+/** Process-wide action capability switch (`disabled` == engaged), warmed on cold start. */
+export const coachActionsSwitch: KillSwitchReader = makeRemoteKillSwitch(fetchCoachActionsDisabled)

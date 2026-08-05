@@ -20,7 +20,7 @@ import {
 import { ageFromDob, routeByAge } from '../safety/ageRouting'
 import { evaluateScreening } from '../safety/screening'
 import { platformCleared } from '../coach/signOff'
-import { BASIC_GYM_TAGS, BODYWEIGHT_TAGS, FULL_GYM_TAGS } from '../data/equipmentTags'
+import { DEFAULT_INVENTORY_BY_TIER } from '../data/equipmentInventory'
 
 /* ------------------------------------------------------------------ */
 /*  Raw onboarding answer shape (the wizard's vocabulary)              */
@@ -165,15 +165,12 @@ export const EQUIPMENT_TAG_MAP: Record<string, string[]> = {
 }
 
 /**
- * Tier-implied base tags, in the Exercise Database's own vocabulary, generated from the
- * sheet (equipmentTags.ts): a tier provides whatever its exercises need. Full Gym has
- * everything; ticked chips add specific tags on top of the Basic/Bodyweight base.
+ * Tier-implied base tags. Full Gym / Basic Gym expose their full exercise-tag union (a gym
+ * stocks that equipment); Bodyweight is restricted to genuinely household-owned tags so a
+ * no-equipment user is never pre-granted a band/rack/rings/pull-up-bar (audit R5-005). Owning
+ * such items is opted into via the equipment chips below (EQUIPMENT_TAG_MAP).
  */
-const TIER_BASE_TAGS: Record<EquipmentTier, string[]> = {
-  'Full Gym': FULL_GYM_TAGS,
-  'Basic Gym': BASIC_GYM_TAGS,
-  Bodyweight: BODYWEIGHT_TAGS,
-}
+const TIER_BASE_TAGS: Record<EquipmentTier, string[]> = DEFAULT_INVENTORY_BY_TIER
 
 /* ------------------------------------------------------------------ */
 /*  Field mappers (each deterministic, exported for reuse/testing)     */

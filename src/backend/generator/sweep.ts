@@ -12,7 +12,7 @@
  */
 
 import { EXERCISE_BY_ID, prescriptionFor } from '../data'
-import { BODYWEIGHT_TAGS, BASIC_GYM_TAGS, FULL_GYM_TAGS } from '../data/equipmentTags'
+import { DEFAULT_INVENTORY_BY_TIER, equipmentTagsSatisfied } from '../data/equipmentInventory'
 import { PROFESSIONAL_SIGNOFF, REQUIRED_REVIEW_SHEETS } from '../coach/signOff'
 import { weeklyLoadCapKg } from '../safety/safetyRules'
 import type {
@@ -45,7 +45,7 @@ interface UserOverrides {
   outcome?: ScreeningOutcome
 }
 
-const TAGS_BY_TIER: Record<EquipmentTier, string[]> = { 'Full Gym': FULL_GYM_TAGS, 'Basic Gym': BASIC_GYM_TAGS, Bodyweight: BODYWEIGHT_TAGS }
+const TAGS_BY_TIER: Record<EquipmentTier, string[]> = DEFAULT_INVENTORY_BY_TIER
 
 function makeUser(goal: BackendGoal, experience: BackendExperience, days: number, o: UserOverrides = {}): UserDoc {
   const tier = o.equipment_tier ?? 'Full Gym'
@@ -82,6 +82,25 @@ function assertExerciseSafety(label: string, user: UserDoc, program: GeneratedPr
       if (ex.skillLevel === 'Advanced') push(user.experience === 'Advanced', `${e.exerciseId} advanced lift to non-advanced (S01)`)
       const solo = user.trains_alone === 'always' || user.trains_alone === 'usually'
       if (solo && ex.spotterRecommended) push(e.appliedRules.includes('S09_CUE'), `${e.exerciseId} solo spotter without cue (S09)`)
+    }
+  }
+}
+
+/**
+ * Equipment HARD invariant (R5-005): every prescribed exercise must be physically executable
+ * with the user's own inventory — no exercise may require a tag the user does not hold. A
+ * violation means the generator served an impossible movement (e.g. a band exercise to a
+ * no-equipment user), which is a defect, not a coverage gap.
+ */
+function assertNoImpossibleEquipment(label: string, user: UserDoc, program: GeneratedProgram, fails: string[]) {
+  const owned = new Set(user.equipment_tags)
+  for (const day of program.days) {
+    for (const e of day.exercises) {
+      const ex = EXERCISE_BY_ID[e.exerciseId]
+      if (!ex) continue
+      // A '"none"' requirement means no equipment — always executable (equipmentTagsSatisfied).
+      const ok = equipmentTagsSatisfied(ex.requiredEquipmentTags, owned)
+      if (!ok) fails.push(`${label}: prescribed ${e.exerciseId} requires unavailable equipment [${ex.requiredEquipmentTags.join(', ')}]`)
     }
   }
 }
@@ -214,10 +233,11 @@ function assertLoggingPath(user: UserDoc, fails: string[]) {
   }
 }
 
-export interface SweepResult { passed: boolean; count: number; failures: string[] }
+export interface SweepResult { passed: boolean; count: number; failures: string[]; warnings: string[] }
 
 export function runProfileSweep(): SweepResult {
   const failures: string[] = []
+  const warnings: string[] = []
   let count = 0
   // The platform sign-off gate is a deployment gate, not per-program safety — sign off for
   // the test only, and restore it so the sweep never enables the coach as a side effect.
@@ -237,6 +257,36 @@ export function runProfileSweep(): SweepResult {
       const r = generateProgram(user); count++
       if (!r.ok) { failures.push(`${goal}/${exp}/${d}d: generation failed (${r.reason})`); continue }
       assertProgram(`${goal}/${exp}/${d}d`, user, r.program, failures)
+    }
+
+    // Broader EQUIPMENT-TIER × SESSION-DURATION coverage (audit R4-004 / R5-005): the base matrix
+    // above is Full Gym / 60 min. Basic Gym is a HARD gate (it can fill every required slot).
+    //
+    // Bodyweight is split into two guarantees:
+    //   • HARD — every prescribed exercise must be physically executable with the user's actual
+    //     inventory (no band/rack/rings/pull-up-bar served to a no-equipment user). Since the base
+    //     inventory is now household-only (equipmentInventory.ts), this must always hold; a breach
+    //     is a real defect, not a coverage gap.
+    //   • REPORTED — the workbook still lacks enough true no-equipment options to fill every
+    //     required slot for some goals, so a genuine no-equipment user can have an unfilled slot.
+    //     That is a data-depth gap (not an impossible prescription); it is surfaced as a warning so
+    //     it is visible and cannot silently regress. The coach refuses to APPLY such a sparse plan
+    //     (U-011).
+    const durations = [30, 45, 90]
+    for (const goal of goals) for (const dur of durations) {
+      const user = makeUser(goal, 'Intermediate', 4, { equipment_tier: 'Basic Gym', session_length_min: dur })
+      const r = generateProgram(user); count++
+      if (!r.ok) { failures.push(`${goal}/Basic Gym/${dur}min: generation failed (${r.reason})`); continue }
+      assertProgram(`${goal}/Basic Gym/${dur}min`, user, r.program, failures)
+    }
+    for (const goal of goals) for (const dur of durations) {
+      const user = makeUser(goal, 'Intermediate', 4, { equipment_tier: 'Bodyweight', session_length_min: dur })
+      const r = generateProgram(user); count++
+      if (!r.ok) { warnings.push(`${goal}/Bodyweight/${dur}min: generation failed (${r.reason}) [coverage gap R5-005]`); continue }
+      assertNoImpossibleEquipment(`${goal}/Bodyweight/${dur}min`, user, r.program, failures)
+      if (r.program.audit.some((a) => a.includes('UNFILLED'))) {
+        warnings.push(`${goal}/Bodyweight/${dur}min: unfilled required slot [coverage gap R5-005]`)
+      }
     }
 
     // Runtime paths (swaps, progression, goal change) for a representative profile per goal.
@@ -320,5 +370,5 @@ export function runProfileSweep(): SweepResult {
     PROFESSIONAL_SIGNOFF.reviewer = prevReviewer
     PROFESSIONAL_SIGNOFF.accreditation = prevAccreditation
   }
-  return { passed: failures.length === 0, count, failures }
+  return { passed: failures.length === 0, count, failures, warnings }
 }

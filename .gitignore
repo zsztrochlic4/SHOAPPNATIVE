@@ -69,3 +69,6 @@ data/exercise-media/*
 /playwright-report/
 /test-results/
 /.playwright/
+
+# Coach response-eval generated sheets (C-017 runner output)
+/eval-out/

@@ -10,7 +10,8 @@
 
 import { EXERCISE_BY_ID, substitutesFor } from '../data'
 import type { Exercise } from '../data/types'
-import { prescribe, injuryStressRegions, type BuildContext, type PrescribedFields } from './build'
+import { prescribe, injuryStressRegions, injuryExcludeIds, type BuildContext, type PrescribedFields } from './build'
+import { equipmentTagsSatisfied } from '../data/equipmentInventory'
 import type { InjuryRegion } from '../schema'
 
 export type SwapReason = 'dislike' | 'pain' | 'equipment' | 'too_hard' | 'too_easy' | 'specific' | 'variety'
@@ -25,7 +26,7 @@ const SKILL_RANK: Record<string, number> = { Beginner: 0, Intermediate: 1, Advan
 export function eligibleForUser(ex: Exercise, ctx: BuildContext, exclude: Set<string>): boolean {
   return ex.active && !exclude.has(ex.id) &&
     (TIER_RANK[ex.equipmentTier] ?? 9) <= (TIER_RANK[ctx.equipmentTier] ?? 0) &&
-    ex.requiredEquipmentTags.every((t) => t.split('/').some((x) => ctx.equipmentTags.includes(x.trim()))) &&
+    equipmentTagsSatisfied(ex.requiredEquipmentTags, ctx.equipmentTags) &&
     (SKILL_RANK[ex.skillLevel] ?? 9) <= (SKILL_RANK[ctx.experience] ?? 0)
 }
 
@@ -50,10 +51,14 @@ export interface SwapResult {
 export function swapCandidates(fromId: string, reason: SwapReason, ctx: BuildContext, extraExclude: Set<string> = new Set(), limit = 1): SwapResult[] {
   const from = EXERCISE_BY_ID[fromId]
   if (!from) return []
-  const exclude = new Set<string>([...ctx.excludedIds, ...extraExclude, fromId])
-  const injuryRegions = reason === 'pain'
-    ? injuryStressRegions(ctx.affectedRegions).concat(ctx.affectedRegions as InjuryRegion[])
-    : injuryStressRegions(ctx.affectedRegions)
+  // C-002 (P0): injury hard-exclusions apply to EVERY candidate for EVERY reason — never only
+  // for a model-chosen `pain` label. A dislike/variety/specific swap can no longer route into a
+  // lift the user's injury table hard-excludes.
+  const injExcl = injuryExcludeIds(ctx.affectedRegions)
+  const exclude = new Set<string>([...ctx.excludedIds, ...injExcl, ...extraExclude, fromId])
+  // Stress-region avoidance: always steer away from exercises loading a flagged region; for a
+  // pain swap it is a hard skip (below), for other reasons the excludeIds above are the hard gate.
+  const injuryRegions = injuryStressRegions(ctx.affectedRegions).concat(ctx.affectedRegions as InjuryRegion[])
 
   const out: SwapResult[] = []
   for (const id of substitutesFor(fromId)) {
@@ -85,15 +90,36 @@ export function swapExercise(fromId: string, reason: SwapReason, ctx: BuildConte
   return swapCandidates(fromId, reason, ctx, extraExclude, 1)[0] ?? null
 }
 
+/** Is `wantedId` an approved substitute for `fromId` (curated list OR same muscle+pattern+type)? */
+export function isCompatibleSwap(fromId: string, wantedId: string): boolean {
+  if (fromId === wantedId) return false
+  if (substitutesFor(fromId).includes(wantedId)) return true
+  const from = EXERCISE_BY_ID[fromId]
+  const to = EXERCISE_BY_ID[wantedId]
+  if (!from || !to) return false
+  return from.muscleGroup === to.muscleGroup && from.movementPattern === to.movementPattern && from.type === to.type
+}
+
 /**
- * SW07 — the user names a specific exercise. Place it only if it exists, passes their
- * equipment/skill filters, and isn't excluded; otherwise return why (the caller explains
- * and offers the closest valid option via swapExercise).
+ * SW07 — the user names a specific exercise. Place it only if it exists, is a COMPATIBLE
+ * substitute for the lift being replaced (C-004), passes their equipment/skill filters, is
+ * not injury-hard-excluded (C-002), is not on their excluded list, and is not already in the
+ * program (`avoid`, C-004). Otherwise return why (the caller explains and offers the closest
+ * valid option via swapExercise).
  */
-export function requestSpecific(fromId: string, wantedId: string, ctx: BuildContext): SwapResult | { ok: false; reason: string } {
+export function requestSpecific(fromId: string, wantedId: string, ctx: BuildContext, avoid: Set<string> = new Set()): SwapResult | { ok: false; reason: string } {
   const ex = EXERCISE_BY_ID[wantedId]
   if (!ex) return { ok: false, reason: 'not_in_database' }
-  if (!eligibleForUser(ex, ctx, new Set(ctx.excludedIds))) return { ok: false, reason: 'fails_equipment_or_skill' }
+  // C-004: the requested lift must be an approved substitute for the one it replaces, so a
+  // swap can't quietly unbalance the plan by dropping in an unrelated movement.
+  if (!isCompatibleSwap(fromId, wantedId)) return { ok: false, reason: 'not_compatible' }
+  // C-004: never place a lift already in the program (would duplicate it).
+  if (avoid.has(wantedId)) return { ok: false, reason: 'already_in_program' }
+  // C-002: injury hard-exclusions apply here too, independent of any reason label.
+  const injExcl = injuryExcludeIds(ctx.affectedRegions)
+  if (injExcl.has(wantedId)) return { ok: false, reason: 'injury_excluded' }
+  const exclude = new Set<string>([...ctx.excludedIds, ...injExcl, ...avoid])
+  if (!eligibleForUser(ex, ctx, exclude)) return { ok: false, reason: 'fails_equipment_or_skill' }
   return {
     fromId, toId: ex.id, toName: ex.name, reasonCode: REASON_CODE.specific,
     prescribed: prescribe(ex, ctx), excludeOriginal: false,
