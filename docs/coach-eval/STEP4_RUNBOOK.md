@@ -28,7 +28,10 @@ safety router**, so the other **33 cases must come from the REAL coach**:
 | 5 `long_context` | Need a genuinely long prior thread. |
 | `MT03`, `MT14`, `MT15` | Multi-turn cases with a staged `scenario` (prior turns / injected state). |
 
-`npm run eval:replies` prints these 33 ids at the end each run.
+`npm run eval:replies` prints these 33 ids at the end each run. Of those 33, the non-staged
+`safety_sensitive` + `adversarial` cases (~19) are auto-captured through the production safety path by
+`npm run eval:replies:safety` (Part B1); only the staged `tool_failure` / `long_context` / scenario
+cases (~14) truly need hand capture (Part B2).
 
 ---
 
@@ -48,23 +51,33 @@ node -e "const {buildCoachSystemPrompt}=require('./.sweep-out/backend/coach/oper
 
 ## Part B — capture the 33 real-coach replies
 
-**Faithful method (staging build):** run a **coach-enabled dev/staging build** with the safety router
-live (`COACH_ENABLED=true` in that build only — never production). As the standard persona user
-(21 yo intermediate, full gym, no injuries), send each of the 33 prompts and paste the coach's reply
+### B1. Auto-capture the safety/adversarial cases through the production path
+
+Most of these (the non-staged `safety_sensitive` + `adversarial` cases, ~19 of the 33) run through the
+**real** safety router + model, no staging needed:
+
+```bash
+GEMINI_API_KEY=<key> MODEL=gemini-2.5-flash-lite npm run eval:replies:safety
+```
+
+It routes each case through `routeAsync` (rules floor ∪ LLM classifier ∪ scoping ∪ DOB suppression):
+a case the router **allows** gets a real coaching reply; a **blocked/referred** case's reply is the
+router's fixed response **rendered with its tap-to-call contacts** — exactly what a user sees (this is
+the "crisis reply with contacts" Reviewer 1 rightly demanded). It merges into `eval-out/replies.json`,
+never overwriting a hand-filled entry, and lists whatever still needs hand capture. Needs the real
+`GEMINI_API_KEY` because it runs the **production classifier** (a stubbed classifier would miss crises).
+
+### B2. Hand-capture the genuinely staged cases
+
+The rest need a staged state this harness can't reproduce — capture them on a **coach-enabled
+dev/staging build** (`COACH_ENABLED=true` in that build only, never production) and paste each reply
 **verbatim** into `eval-out/replies.json` under its case id:
 
-- `safety_sensitive` / `adversarial` → capture the **router's** referral/refusal reply (it should carry
-  crisis contacts where appropriate — that *is* the correct behaviour being scored).
-- `tool_failure` → force the tool/engine failure described in the case's `scenario`, then capture the recovery reply.
-- `long_context` → build the long prior thread the `scenario` describes, then capture.
-- `MT03/MT14/MT15` → play the prior turns first, then capture the final reply.
+- `tool_failure` (TF01–05) → force the tool/engine failure the case's `scenario` describes, then capture the recovery reply.
+- `long_context` (LC01–05) → build the long prior thread the `scenario` describes, then capture.
+- `MT03 / MT14 / MT15` (and any `adversarial` with a scenario, e.g. `AD03`) → play the prior turns first, then capture.
 
 `replies.json` must end with **all 60 ids non-empty** — the gate rejects a partial set.
-
-> Want this smaller? I can build a **production-path capture harness** (routes each safety/adversarial
-> case through `routeAsync` and captures the router's reply, mirroring `scripts/validate-coach-production.mjs`).
-> That auto-captures ~20 of the 33, leaving only the genuinely staged `tool_failure` / `long_context` /
-> scenario `multi_turn` cases for hand capture. Ask and I'll ship it as a PR.
 
 ## Part C — emit the reviewer sheet + provenance manifest (with all 60 replies)
 

@@ -80,6 +80,7 @@
     "benchmark:coach": "tsc -p tsconfig.sweep.json && node .sweep-out/backend/coach/eval/runConversationalBenchmark.js",
     "eval:response": "tsc -p tsconfig.sweep.json && node scripts/run-coach-response-eval.mjs",
     "eval:replies": "tsc -p tsconfig.sweep.json && node scripts/generate-coach-eval-replies.mjs",
+    "eval:replies:safety": "tsc -p tsconfig.sweep.json && node scripts/capture-coach-safety-replies.mjs",
     "recipes:build": "node scripts/build-recipes.mjs",
     "recipes:upload": "node scripts/upload-recipes.mjs",
     "media:upload": "node scripts/upload-exercise-media.mjs",
