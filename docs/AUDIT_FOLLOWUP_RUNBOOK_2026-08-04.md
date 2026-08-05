@@ -33,7 +33,23 @@ Then attach a log-based alert so a stranded action journal pages someone:
 
 ---
 
-## 2. R5-005 residual — the last Bodyweight coverage gap (fitness-reviewer decision)
+## 2. R5-005 residual — the last Bodyweight coverage gap  ✅ DONE (PR #46)
+
+**Resolved 2026-08-05 in PR #46** (Option A/B combined). The sweep now prints
+`PASSED — 109 profiles, 0 warnings`. Root cause and fix, for the record:
+
+- A genuine **Compound Vertical Pull is biomechanically impossible without a bar/rings/band anchor**,
+  so the runbook's original "Option A: add a no-equipment vertical-pull compound" was not real.
+- Fix: added an ordered `>` preference to `movementPatternFilter` (mirrors `typeFilter`'s
+  `Compound>Isolation`). `Upper-4` is now `"Vertical Pull>Horizontal Pull"` — it fills from the
+  preferred pattern and only falls back to a horizontal-pull compound when no vertical-pull option
+  exists (i.e. for an equipment-free lifter). Equipped users are provably unaffected (Upper-4 stays
+  a vertical pull across every goal × tier).
+- Added `BK19 "Door Towel Row"` (towel + sturdy door), the second no-equipment compound back pull,
+  so a bodyweight Upper day fills both pull slots without repeating a movement.
+- Regression tests added in `test/unit/equipmentInventory.test.mjs`.
+
+<details><summary>Original analysis (superseded)</summary>
 
 After PR #40 the sweep reports **9 profile warnings, and they all reduce to ONE root cause**:
 
@@ -60,6 +76,8 @@ Pick one (both are content/programming decisions — needs your fitness reviewer
 
 > Note: no user is ever served an *impossible* exercise today (the sweep hard-fails that) — this is a
 > completeness gap, not a safety gap, and the coach already refuses to apply a sparse plan.
+
+</details>
 
 ---
 
@@ -187,7 +205,7 @@ emulators — infra you provision. Track under a `[QA] native E2E` issue.
 | Item | Who | Blocking release? |
 |---|---|---|
 | 1. Deploy reconciler + alert | owner (deploy) | no (audit hygiene) |
-| 2. Last Bodyweight gap | fitness reviewer | no (completeness) |
+| 2. Last Bodyweight gap | ✅ DONE (PR #46) | no (completeness) |
 | 3. Classifier FP hard-gate | owner + paid key | **yes** |
 | 4. Response-quality eval | owner + reviewers | **yes** |
 | 5. Native App Check | owner + dev build | **yes** |
