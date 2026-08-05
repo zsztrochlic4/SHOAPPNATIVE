@@ -102,6 +102,9 @@ https://github.com/zsztrochlic4/SHOAPPNATIVE/actions/workflows/backend-validatio
 
 ## 4. R5-003 — run the paid response-quality evaluation (needs paid key + 2 reviewers)
 
+> **Exact copy-paste command runbook: [docs/coach-eval/STEP4_RUNBOOK.md](coach-eval/STEP4_RUNBOOK.md)**
+> (Parts A–E: capture 27 offline → capture 33 from the real coach → emit sheet → 2 reviewers → gate).
+
 The gate is hardened (R5-004): it now recomputes SHA-256 over the corpus/replies/prompt and requires the
 expected release SHA + model. To actually score the release:
 
