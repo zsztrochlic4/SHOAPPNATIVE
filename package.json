@@ -60,6 +60,7 @@
     "typecheck": "tsc --noEmit",
     "test": "npm run typecheck && npm run lint && npm run check && npm run sweep && npm run test:safety && npm run test:unit",
     "test:rules": "firebase emulators:exec --only firestore,storage \"node --test test/rules/*.test.mjs\"",
+    "test:community": "npm --prefix functions run build && firebase emulators:exec --only auth,firestore,functions \"node --test test/community/functions.emulator.test.mjs\"",
     "test:safety": "tsc -p tsconfig.sweep.json && node --test \"test/safety/**/*.test.mjs\"",
     "test:unit": "tsc -p tsconfig.sweep.json && node --test \"test/unit/**/*.test.mjs\"",
     "check": "tsc -p tsconfig.check.json && node -e \"global.__DEV__=false; require('./.check-out/store/periods.check.js')\"",
