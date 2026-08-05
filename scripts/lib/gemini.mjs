@@ -27,7 +27,7 @@ const RETRYABLE = new Set([429, 500, 502, 503, 504])
  * NOT miscounted as a classification (which would inflate the measured false-positive rate).
  *
  * @param {string} prompt
- * @param {object} opts { apiKey, model, systemInstruction, temperature, maxOutputTokens, timeoutMs, retries }
+ * @param {object} opts { apiKey, model, systemInstruction, temperature, maxOutputTokens, timeoutMs, retries, responseMimeType, responseSchema }
  */
 export async function generate(prompt, opts) {
   const {
@@ -38,13 +38,19 @@ export async function generate(prompt, opts) {
     maxOutputTokens = 120,
     timeoutMs = 20000,
     retries = 4,
+    // Structured-output opt-in (used by the coach reply-capture harness); defaults preserve the
+    // classifier's plain-text behaviour unchanged.
+    responseMimeType = 'text/plain',
+    responseSchema,
   } = opts
   if (!apiKey) throw new GeminiError('missing GEMINI_API_KEY', 0)
 
   const url = `${ENDPOINT}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`
+  const generationConfig = { temperature, maxOutputTokens, responseMimeType }
+  if (responseSchema) generationConfig.responseSchema = responseSchema
   const body = {
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    generationConfig: { temperature, maxOutputTokens, responseMimeType: 'text/plain' },
+    generationConfig,
   }
   if (systemInstruction) body.systemInstruction = { parts: [{ text: systemInstruction }] }
 
