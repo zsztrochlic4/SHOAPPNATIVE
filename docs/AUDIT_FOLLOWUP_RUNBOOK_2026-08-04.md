@@ -158,8 +158,13 @@ A case is included only if all 15 dimensions carry a 1–5, so an incomplete pas
 
 ## 5. R5-008 — native App Check (App Attest / Play Integrity)
 
-Web wiring exists (`src/lib/appCheck.ts`, reCAPTCHA Enterprise); **native attestation needs a dev build**.
-See `docs/APP_CHECK.md` / `docs/HARDENING_RUNBOOK.md §9`. Steps:
+Web wiring exists (`src/lib/appCheck.ts`, reCAPTCHA Enterprise). The **native client bridge is now
+DRAFTED (untested)** in `src/lib/appCheckNative.ts` — App Attest / Play Integrity → JS-SDK
+`CustomProvider` — and `app.config.js` auto-appends the `@react-native-firebase/*` config plugins +
+iOS App Attest entitlement once those packages are installed (guarded no-op until then). It stays
+dormant until you install the modules and uncomment the two marked lines in `src/lib/appCheck.ts`.
+The remaining work is genuinely device/console-only. See `docs/APP_CHECK.md §Native` for the full
+click-by-click checklist. Steps:
 
 1. Firebase console → **App Check** → register the iOS & Android apps with **App Attest** / **Play Integrity**:
    https://console.firebase.google.com/project/strengthhub-2ab33/appcheck
@@ -208,6 +213,6 @@ emulators — infra you provision. Track under a `[QA] native E2E` issue.
 | 2. Last Bodyweight gap | ✅ DONE (PR #46) | no (completeness) |
 | 3. Classifier FP hard-gate | owner + paid key | **yes** |
 | 4. Response-quality eval | owner + reviewers | **yes** |
-| 5. Native App Check | owner + dev build | **yes** |
+| 5. Native App Check | owner + dev build (client bridge drafted, PR #47) | **yes** |
 | 6. Branch protection | owner (GitHub) | governance |
 | 7. Native E2E/a11y | owner (device lab) | evidence |

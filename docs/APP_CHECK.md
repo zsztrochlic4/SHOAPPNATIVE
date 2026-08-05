@@ -43,17 +43,32 @@ own calls (e.g. the meal scan), because the client isn't attesting yet.
   `EXPO_PUBLIC_APPCHECK_RECAPTCHA_ENTERPRISE_KEY` is set and the console is
   configured. Set the key in your web build env and the client starts attaching
   tokens automatically. Verify with `appCheckStatus().active === true`.
-- **Native (iOS/Android): a build step you still own.** The `firebase` **JS SDK**
-  only supports the web reCAPTCHA provider — it cannot do App Attest / Play
-  Integrity. Native attestation requires the native module:
-  1. `npx expo install @react-native-firebase/app @react-native-firebase/app-check`
-  2. Register the **iOS** and **Android** apps in the Firebase project (only a WEB
-     app is registered today — see the firebase-verified-state note), with App
-     Attest (needs the paid Apple Developer account) and Play Integrity.
-  3. Initialise `@react-native-firebase/app-check` in a **dev/EAS build** (it does
-     not work in Expo Go), then ship it.
-  Until native ships, keep enforcement scoped so native calls aren't rejected
-  (enforce per-service, or keep monitor mode for the mobile clients).
+- **Native (iOS/Android): a build step you still own — but the client bridge is now DRAFTED.**
+  The `firebase` **JS SDK** only supports the web reCAPTCHA provider — it cannot do App Attest /
+  Play Integrity. So the app attests with the native module and feeds that token into the JS SDK
+  via a `CustomProvider`. That bridge lives in **`src/lib/appCheckNative.ts`** (⚠️ UNTESTED — never
+  run on a device; verify each step). It is intentionally dormant — not in the import graph and
+  guarded — so today's JS-SDK-only managed build is unchanged. Activation checklist:
+
+  1. **Register the iOS & Android apps** in the Firebase project (only a WEB app exists today — see
+     the firebase-verified-state note). Download `GoogleService-Info.plist` (iOS) and
+     `google-services.json` (Android); reference them via `ios.googleServicesFile` /
+     `android.googleServicesFile`.
+  2. Firebase console → **App Check** → register **iOS = App Attest** (needs the paid Apple
+     Developer account) and **Android = Play Integrity**.
+  3. `npx expo install @react-native-firebase/app @react-native-firebase/app-check`
+     — `app.config.js` then auto-appends their config plugins and turns on the iOS App Attest
+     entitlement (a guarded no-op until the packages resolve).
+  4. In **`src/lib/appCheck.ts`**, uncomment the two marked `./appCheckNative` lines (the import and
+     the native branch inside `initAppCheck`). That is the only code edit.
+  5. Build a **dev/EAS build** (App Attest / Play Integrity do NOT work in Expo Go). In `__DEV__`
+     the bridge uses the **debug** provider — register the printed debug token in the console
+     (DEV/STAGING only, never ship it). Release builds use App Attest / Play Integrity.
+  6. On a real device confirm `appCheckStatus().active === true` and that Functions logs stop
+     logging `appcheck.missing` for that client.
+
+  Until native ships, keep enforcement scoped so native calls aren't rejected (enforce per-service,
+  or keep monitor mode for the mobile clients).
 
 ### 3. Monitor (no enforcement yet)
 - With `APP_CHECK_ENFORCED = false`, calls still succeed, but every untokened
