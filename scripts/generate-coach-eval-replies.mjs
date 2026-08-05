@@ -26,7 +26,7 @@ import { ROOT } from './lib/result.mjs'
 import { RESPONSE_EVAL_CASES } from '../.sweep-out/backend/coach/eval/responseQualityCorpus.js'
 import { buildCoachSystemPrompt, buildConversationTurnHint } from '../.sweep-out/backend/coach/operatingRules.js'
 import { selectCoachContext, summarizeRecentTurns } from '../.sweep-out/backend/coach/contextSelection.js'
-import { STRUCTURED_COACH_RESPONSE_SCHEMA, validateStructuredCoachReply } from '../.sweep-out/backend/coach/structuredResponse.js'
+import { STRUCTURED_COACH_RESPONSE_SCHEMA, STRUCTURED_COACH_FALLBACK, validateStructuredCoachReply } from '../.sweep-out/backend/coach/structuredResponse.js'
 
 const apiKey = process.env.GEMINI_API_KEY
 const MODEL = process.env.MODEL || 'gemini-2.5-flash-lite'
@@ -74,17 +74,25 @@ function assembleSystemPrompt(userMessage) {
 
 async function replyFor(caseItem) {
   const systemPrompt = assembleSystemPrompt(caseItem.prompt)
-  const raw = await generate(caseItem.prompt, {
-    apiKey,
-    model: MODEL,
-    systemInstruction: systemPrompt,
-    temperature: 0.5,
-    maxOutputTokens: 800,
-    responseMimeType: 'application/json',
-    responseSchema: STRUCTURED_COACH_RESPONSE_SCHEMA,
-  })
-  const v = validateStructuredCoachReply(raw)
-  return v.ok ? { text: v.reply.message, fellBack: false } : { text: v.fallback, fellBack: true }
+  const call = () =>
+    generate(caseItem.prompt, {
+      apiKey,
+      model: MODEL,
+      systemInstruction: systemPrompt,
+      temperature: 0.5,
+      // Production's coach uses 800; a small headroom here avoids truncating a well-formed reply into
+      // invalid JSON during capture, without changing what the shipped coach would say.
+      maxOutputTokens: 1000,
+      responseMimeType: 'application/json',
+      responseSchema: STRUCTURED_COACH_RESPONSE_SCHEMA,
+    })
+  // The structured response can be transiently malformed; give it ONE more attempt before giving up
+  // (the shipped coach shows its fallback on a single bad response — for capture we prefer a real reply).
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const v = validateStructuredCoachReply(await call())
+    if (v.ok) return { text: v.reply.message, fellBack: false }
+  }
+  return { text: '', fellBack: true }
 }
 
 async function main() {
@@ -100,8 +108,13 @@ async function main() {
 
   const staged = RESPONSE_EVAL_CASES.filter((c) => c.scenario && c.scenario.trim())
   const auto = RESPONSE_EVAL_CASES.filter((c) => !(c.scenario && c.scenario.trim()))
-  // Never overwrite an already-captured reply; only (re)generate blanks among the non-scenario cases.
-  const toGenerate = auto.filter((c) => !String(replies[c.id] ?? '').trim())
+  // A real captured reply is kept; a blank OR a prior structured-fallback entry is (re)generated —
+  // so re-running retries the cases where the model's structured output failed validation last time.
+  const needsCapture = (id) => {
+    const v = String(replies[id] ?? '').trim()
+    return !v || v === STRUCTURED_COACH_FALLBACK.trim()
+  }
+  const toGenerate = auto.filter((c) => needsCapture(c.id))
 
   console.log(
     `Capturing ${toGenerate.length} non-scenario replies via ${MODEL} (concurrency ${CONCURRENCY}); ` +
@@ -113,8 +126,10 @@ async function main() {
   await mapPool(toGenerate, CONCURRENCY, async (c) => {
     try {
       const r = await replyFor(c)
+      // On a persistent validation failure leave the entry BLANK (not a fake fallback), so it is
+      // honestly counted as uncaptured and retried on the next run.
       replies[c.id] = r.text
-      if (r.fellBack) { fallbacks++; console.warn(`  ! ${c.id}: model output failed validation — wrote structured fallback (recapture recommended)`) }
+      if (r.fellBack) { fallbacks++; console.warn(`  ! ${c.id}: structured output failed validation twice — left BLANK (re-run to retry, or capture by hand)`) }
     } catch (e) {
       errors++
       const status = e instanceof GeminiError ? e.status : 0
