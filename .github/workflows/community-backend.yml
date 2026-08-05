@@ -1,0 +1,66 @@
+name: Community Backend
+
+# Runs the community backend emulator round-trips (`npm run test:community`) — the
+# six end-to-end checks that real signed-in users can claim usernames, create/join
+# groups, cheer activity, sync league stats, and delete groups, asserting both the
+# callable return values AND the resulting Firestore state (read back through the
+# security rules, so rules are exercised too). This is the "did it actually work"
+# gate to keep green before flipping COMMUNITY_BACKEND on.
+#
+# Make `community-tests` a REQUIRED status check (Settings → Branches → branch
+# protection) so a community backend regression blocks merge. It runs on EVERY PR
+# to main with no path filter — a path-filtered required check silently blocks PRs
+# that don't touch those paths (audit C-009), so the gate must be path-independent.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'functions/**'
+      - 'test/community/**'
+      - 'firestore.rules'
+      - 'firestore.indexes.json'
+      - 'firebase.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/community-backend.yml'
+  # Runs on EVERY PR to main (no path filter) so `community-tests` is a reliable
+  # required check (same rationale as security-rules.yml / audit C-009).
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: community-backend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  community-tests:
+    name: Community backend round-trips (emulator)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      # The Firestore/Auth emulators are Java processes.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install root dependencies
+        run: npm ci
+      # The functions codebase has its own package.json/lockfile — needed to build
+      # the callables (typescript) and to run them under the functions emulator.
+      - name: Install functions dependencies
+        run: npm --prefix functions ci
+      - name: Install firebase-tools (emulator runner)
+        run: npm install --no-save firebase-tools
+      # `test:community` builds the functions, boots auth+firestore+functions
+      # emulators, runs the six round-trips, and tears the emulators down.
+      - name: Community backend round-trips
+        run: npm run test:community
