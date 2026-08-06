@@ -35,7 +35,7 @@ gates below. Re-run all gates on the post-remediation SHA before signing.
 | 6 | App Check monitor / rate limits not wired | **Fixed** — all community+group callables call `auditAppCheck` + honour `enforceAppCheck`; `sync`/`appeal` rate-limited. |
 | 7,10 | Spec over-claimed anomaly rules; `clientTz` unvalidated; inventory incomplete | **Fixed (docs+code)** — §5 reconciled to as-built; `clientTz` validated to IANA token; A.1 inventory corrected; `historyDayCount` now counts active days. |
 | 4 | Store/privacy disclosures not launch-ready | **Docs updated** (DATA_SAFETY F-003 action, PRIVACY) — **still needs human privacy sign-off** (Part A). |
-| 8 | No user appeal UI; owner happy-path untested; override lifetime | **Open (owner/UI)** — appeal/moderation backend exists; UI + owner-claim emulator fixture + override-expiry policy are follow-ups (Part D). |
+| 8 | No user appeal UI; owner happy-path untested; override lifetime | **Partly done** — user-facing appeal UI (under-review banner + "ask for another look" sheet) now built in the League screen. Still open: moderator **admin UI**, an owner-claim emulator fixture for the clear/uphold/reset happy-path, and an override-expiry policy (Part D). |
 | 9 | Retention/TTL undecided | **Open (owner)** — mechanism can be added once a period is chosen (Part A retention field). |
 | 11 | `communityReviews` (incl. appeal text) excluded from export | **Addressed** — the user's OWN appeal note is mirrored to their profile and included in the export; moderator internals stay withheld by design (see C2). |
 

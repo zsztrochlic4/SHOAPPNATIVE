@@ -216,9 +216,16 @@ resubmit), so it is a soft signal only. These are tracked as hardening follow-up
   The override lives on the review doc, so `finalizeStanding` honours a moderator
   decision on every subsequent sync/sweep.
 
-**MVP boundary:** the moderator surface is server-side (a claim-gated callable + an
-owner-readable queue collection). A dedicated **admin UI** to browse/triage the
-queue is not built — the owner drives it via the callable / console for now.
+**User-facing appeal UI (BUILT):** the League screen shows an "under review" banner
+when the user's own standing is `held`/`provisional`, and a `held` standing offers
+an "Ask for another look" sheet (optional note) that calls `appealStanding` and
+reports the outcome ([`src/community/LeagueScreen.tsx`](../../src/community/LeagueScreen.tsx)
+`ReviewBanner`/`AppealSheet`; adapter `appealStandingRemote`). A `__DEV__`-guarded
+`EXPO_PUBLIC_COMMUNITY_REVIEW_PREVIEW` flag renders the states with the flag off.
+
+**MVP boundary:** the MODERATOR surface is server-side only (a claim-gated callable
++ an owner-readable queue collection). A dedicated **admin UI** to browse/triage the
+queue is still not built — the owner drives it via the callable / console for now.
 
 ## 7. Open owner decisions
 

@@ -60,6 +60,14 @@ export async function syncStatsRemote(payload: {
   return res.data
 }
 
+/** Ask for a held standing to be re-reviewed (F-003 appeal). Sends an optional
+ *  short note; the server re-checks and returns the resulting status — `ok` if the
+ *  activity now passes, otherwise it stays queued for a moderator. */
+export async function appealStandingRemote(note?: string): Promise<{ ok: true; status: 'ok' | 'provisional' | 'held'; appealed: boolean }> {
+  const res = await call<{ note?: string }, { ok: true; status: 'ok' | 'provisional' | 'held'; appealed: boolean }>('appealStanding')({ note: (note ?? '').slice(0, 500) })
+  return res.data
+}
+
 /* ---------------------------------- reads ---------------------------------- */
 
 export interface RemoteStanding { uid: string; username: string; points: number; isYou: boolean }
