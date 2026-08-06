@@ -237,10 +237,16 @@ Built and verified (2026-08-06):
 
 Deferred / owner + infra (block flipping the flag):
 
-- [ ] **Privacy review**: the per-day log is new granular personal data — add it to
-      [`PRIVACY.md`](../PRIVACY.md)/[`DATA_SAFETY.md`](../DATA_SAFETY.md) and the
-      account deletion/export workflow (`functions/src/account.ts`,
-      `src/lib/dataExport.ts`) before the gate. **Owner.**
+- [x] **Deletion + export wired**: account deletion recursively purges
+      `communityProfiles` (incl. `scoreDays`/`scoreEvents`) in
+      [`functions/src/account.ts`](../../functions/src/account.ts); "Download my
+      data" now gathers the community profile + scoring log
+      ([`src/store/cloudRepo.ts`](../../src/store/cloudRepo.ts) `collectUserExport`,
+      scope documented in [`dataExport.ts`](../../src/lib/dataExport.ts)).
+- [ ] **Privacy sign-off**: the per-day log is new granular personal data. The
+      mechanics are wired (above); a human privacy review of the data collected +
+      [`PRIVACY.md`](../PRIVACY.md)/[`DATA_SAFETY.md`](../DATA_SAFETY.md) copy is
+      still required before the gate. **Owner.**
 - [ ] **Review-queue / appeals scope** decision (MVP ships without them; `held`
       standings are computed + withheld but there is no moderator surface yet).
 - [ ] **App Check**: device-churn rule + real rate limiting need native App Check

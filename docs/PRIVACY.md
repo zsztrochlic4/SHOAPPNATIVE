@@ -125,8 +125,8 @@ also keep a per-day record of the activity that determines your ranking — for
 example how many workouts or habit check-ins you logged on a given day, and the
 time it was recorded. This record is used only to calculate your score on our
 servers (so rankings cannot be faked from a modified app), is visible only to you,
-and contains no body measurements, health notes or free text. It is removed when
-you delete your account.
+and contains no body measurements, health notes or free text. It is included when
+you download your data and removed when you delete your account.
 
 **Connected-service information**
 

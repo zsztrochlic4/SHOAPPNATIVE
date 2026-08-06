@@ -25,6 +25,7 @@ export const EXPORT_SCOPE = {
     'Weights, habits, meals, activities, food reviews, workout summaries',
     'Chat and coach-thread transcripts, notifications, push token records',
     'Coach workspace: consent/preferences, memories, conversation summaries, insights, proposals, actions, turns',
+    'Community competition profile (handle, tier, points, streak) and the per-day scoring log used for leaderboards',
     'Subscription entitlement record (status, period end — no payment details)',
   ],
   excluded: [
