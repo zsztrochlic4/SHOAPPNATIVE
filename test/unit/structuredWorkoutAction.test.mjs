@@ -5,7 +5,7 @@
 //   npm run test:unit
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { validateStructuredCoachReply, STRUCTURED_COACH_RESPONSE_SCHEMA } from '../../.sweep-out/backend/coach/structuredResponse.js'
+import { validateStructuredCoachReply, STRUCTURED_COACH_RESPONSE_SCHEMA, STRUCTURED_COACH_FALLBACK, assertsCompletedWorkoutAction } from '../../.sweep-out/backend/coach/structuredResponse.js'
 import { validateWorkoutActionPayload, WORKOUT_ACTION_NAMES } from '../../.sweep-out/backend/coach/workoutActions.js'
 import { buildCoachSystemPrompt, HARD_NEVERS } from '../../.sweep-out/backend/coach/operatingRules.js'
 
@@ -127,4 +127,71 @@ test('the workout_action allowlist only appears when actioning is opted in', () 
   const on = buildCoachSystemPrompt({ allowWorkoutActions: true })
   assert.ok(on.includes('WORKOUT ACTIONS'))
   assert.ok(on.includes('workout_action proposal may only use payload.action'))
+})
+
+// --- no false success: the coach PROPOSES, never claims a change is already done (R5-003 / MT04,06,14) ---
+
+test('a HARD NEVER forbids claiming a workout/program change is already done', () => {
+  const hit = HARD_NEVERS.find((n) => /already (?:done|saved|applied)/i.test(n) && /propose/i.test(n))
+  assert.ok(hit, 'no HARD NEVER covers false completion claims')
+  assert.match(hit, /confirm/i, 'the rule must defer success to the app confirm')
+  for (const withActions of [false, true]) {
+    assert.ok(buildCoachSystemPrompt({ allowWorkoutActions: withActions }).includes(hit), `missing in prompt (actions=${withActions})`)
+  }
+})
+
+test('assertsCompletedWorkoutAction FLAGS the eval MT04/06/14 completion claims', () => {
+  assert.equal(assertsCompletedWorkoutAction("Noted. I've swapped bench press for incline dumbbell press."), true)
+  assert.equal(assertsCompletedWorkoutAction("Okay, I've updated your training days to Tuesday and Thursday."), true)
+  assert.equal(assertsCompletedWorkoutAction("Okay, I've applied the deload for this week."), true)
+  assert.equal(assertsCompletedWorkoutAction('I swapped that out for you.'), true)
+  assert.equal(assertsCompletedWorkoutAction('All set — your goal is now Strength.'), true)
+  assert.equal(assertsCompletedWorkoutAction("Done. Your split's been changed."), true)
+})
+
+test('assertsCompletedWorkoutAction does NOT flag a PROPOSAL or an observation', () => {
+  assert.equal(assertsCompletedWorkoutAction('Want me to swap the bench for incline dumbbell press?'), false)
+  assert.equal(assertsCompletedWorkoutAction("I can apply a deload this week — want me to?"), false)
+  assert.equal(assertsCompletedWorkoutAction("I'll swap that once you confirm."), false)
+  assert.equal(assertsCompletedWorkoutAction("I've noticed your bench has stalled for three weeks."), false)
+  assert.equal(assertsCompletedWorkoutAction('Should I change your training days to Tue/Thu?'), false)
+  assert.equal(assertsCompletedWorkoutAction(''), false)
+})
+
+// A dropped proposal means NOTHING applies this turn; if the kept text still claims completion, that
+// is a guaranteed false success, so the message is neutralised to the honest fallback.
+test('degraded path NEUTRALISES a message that claims completion when the proposal is dropped', () => {
+  const r = validateStructuredCoachReply({
+    mode: 'personalised', message: "Okay, I've applied the deload for this week.", citations: [], memory: null,
+    proposal: { kind: 'workout_action', title: 'x', summary: 'y', payload: { action: 'Deload this week.' } },
+  })
+  assert.equal(r.ok, true)
+  assert.equal(r.reply.proposal.kind, 'none')
+  assert.equal(r.proposalDropped, true)
+  assert.equal(r.messageNeutralized, true)
+  assert.equal(r.reply.message, STRUCTURED_COACH_FALLBACK) // the false "done" is not surfaced
+})
+
+test('degraded path KEEPS a proposing message (no false claim) when the proposal is dropped', () => {
+  const r = validateStructuredCoachReply({
+    mode: 'personalised', message: 'Want me to apply a deload this week?', citations: [], memory: null,
+    proposal: { kind: 'workout_action', title: 'x', summary: 'y', payload: { action: 'not_an_action' } },
+  })
+  assert.equal(r.ok, true)
+  assert.equal(r.reply.proposal.kind, 'none')
+  assert.equal(r.proposalDropped, true)
+  assert.notEqual(r.messageNeutralized, true)
+  assert.equal(r.reply.message, 'Want me to apply a deload this week?') // proposing text survives
+})
+
+test('a VALID proposal keeps the model text (runtime neutralisation is degraded-path only)', () => {
+  // The confirm card gates the real apply here; the prompt HARD NEVER is what stops a claim in-text,
+  // and the eval measures it — the validator must not rewrite an otherwise-actionable reply.
+  const r = validateStructuredCoachReply(reply({
+    kind: 'workout_action', title: 'Swap bench press', summary: 'An alternative that hits the same muscles.',
+    payload: { action: 'swap', fromExerciseId: 'bench_press', reason: 'dislike' },
+  }))
+  assert.equal(r.ok, true)
+  assert.equal(r.reply.proposal.kind, 'workout_action')
+  assert.notEqual(r.messageNeutralized, true)
 })

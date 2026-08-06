@@ -23,8 +23,35 @@ export const STRUCTURED_COACH_FALLBACK =
 export type StructuredReplyValidation =
   // `proposalDropped` marks a reply whose CORE (mode/message/citations/memory) was valid but whose
   // PROPOSAL was malformed: we keep the text and drop just the unactionable proposal (see below).
-  | { ok: true; reply: StructuredCoachReply; proposalDropped?: boolean; droppedReason?: string }
+  // `messageNeutralized` marks the narrow case where that dropped-proposal reply ALSO claimed the
+  // change was already done — a guaranteed false success (nothing will apply), so the text is
+  // replaced with the honest fallback (see `assertsCompletedWorkoutAction`).
+  | { ok: true; reply: StructuredCoachReply; proposalDropped?: boolean; droppedReason?: string; messageNeutralized?: boolean }
   | { ok: false; fallback: string; reason: string }
+
+/**
+ * Does the reply TEXT assert that a workout/program change already happened? The coach may only
+ * PROPOSE actions (operatingRules HARD NEVER + WORKOUT_ACTION_ALLOWLIST): the app performs and
+ * reports a change only after the user confirms and it durably applies. A reply that says
+ * "I've swapped… / I've updated your training days / I've applied the deload / done" before that is
+ * a false success claim (Step-4 eval MT04/MT06/MT14, auto-fail rule "claimed success for an action
+ * that did not durably apply"). This detects that claim so the degraded path can neutralise it and
+ * the eval can flag it; it is deliberately conservative (first-person completion of a program-change
+ * verb, or an explicit "done"/"all set" phrase) — a PROPOSAL ("want me to…", "I can…", "I'll…")
+ * never matches.
+ */
+const _APPLIED_VERB = 'swapped|switched|changed|updated|applied|adjusted|rescheduled|replaced|removed|added|deloaded|set|scheduled|moved|reprogrammed|regenerated|rebuilt|sorted'
+// Perfect form — "I've applied", "I have updated", "I've just gone ahead and changed".
+const _APPLIED_PERFECT = new RegExp(`\\bi(?:['’]ve| have)(?:\\s+(?:just|now|already|gone ahead and))*\\s+(?:${_APPLIED_VERB})\\b`, 'i')
+// Simple past — "I swapped", "I just updated" (no bare "set/added", which are too ambiguous alone).
+const _APPLIED_PAST = /\bi (?:just |already |now )?(?:swapped|switched|changed|updated|applied|adjusted|rescheduled|replaced|removed|deloaded|scheduled|moved|reprogrammed|regenerated|rebuilt)\b/i
+// Bare completion phrases.
+const _APPLIED_DONE = /\b(?:all set|consider it done|that['’]s (?:done|sorted|applied|updated|changed|swapped))\b|\bdone[.!,—-]/i
+
+export function assertsCompletedWorkoutAction(message: string): boolean {
+  if (typeof message !== 'string' || !message) return false
+  return _APPLIED_PERFECT.test(message) || _APPLIED_PAST.test(message) || _APPLIED_DONE.test(message)
+}
 
 function cleanShort(value: unknown, max: number): string | null {
   if (typeof value !== 'string') return null
@@ -132,6 +159,21 @@ export function validateStructuredCoachReply(raw: unknown): StructuredReplyValid
     const parsedProposal = parseProposal(parsed.proposal)
     if (parsedProposal.ok) {
       return { ok: true, reply: { mode: mode as CoachAnswerMode, message, citations, memory, proposal: parsedProposal.proposal } }
+    }
+    // The proposal is dropped, so NOTHING will apply this turn. If the model's kept text ALSO claims
+    // the change already happened ("I've swapped…"), the user would see a false "done" with no confirm
+    // card — the exact regression PR #52's degradation could otherwise introduce (Step-4 eval
+    // MT04/06/14). With the proposal gone this is an unambiguous false success, so replace the text
+    // with the honest fallback rather than surface the claim. (The non-degraded path keeps the model
+    // text: the prompt HARD NEVER makes it PROPOSE, and its confirm card still gates the real apply.)
+    if (assertsCompletedWorkoutAction(message)) {
+      return {
+        ok: true,
+        reply: { mode: mode as CoachAnswerMode, message: STRUCTURED_COACH_FALLBACK, citations: [], memory: null, proposal: { kind: 'none' } },
+        proposalDropped: true,
+        droppedReason: parsedProposal.reason,
+        messageNeutralized: true,
+      }
     }
     return {
       ok: true,
