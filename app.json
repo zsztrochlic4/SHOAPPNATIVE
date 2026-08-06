@@ -14,6 +14,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.zaggy887.strengthhub",
       "buildNumber": "1",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -21,6 +22,7 @@
     "android": {
       "package": "com.zaggy887.strengthhub",
       "versionCode": 1,
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#0A0A0B",
         "foregroundImage": "./assets/android-icon-foreground.png",
