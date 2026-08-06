@@ -20,6 +20,18 @@ import {
 const PAYWALL_PREVIEW =
   typeof __DEV__ !== 'undefined' && __DEV__ && process.env.EXPO_PUBLIC_PAYWALL_PREVIEW === '1'
 
+/**
+ * DEV-ONLY paywall bypass for on-device testing. Set `EXPO_PUBLIC_SKIP_PAYWALL=1`
+ * in a local .env to grant entitlement unconditionally, so a real-backend dev/EAS
+ * build lets you into the app without an active Stripe subscription (e.g. when a
+ * test card won't create one). Guarded two ways so it can NEVER ship: `__DEV__`
+ * (constant-folded out of release bundles) AND the opt-in flag (off by default).
+ * It only opens the gate — it does NOT disable Stripe or grant server entitlement,
+ * so production billing is untouched. To restore the paywall, unset the flag.
+ */
+const SKIP_PAYWALL =
+  typeof __DEV__ !== 'undefined' && __DEV__ && process.env.EXPO_PUBLIC_SKIP_PAYWALL === '1'
+
 export function todayHabit(s: AppState): HabitDay {
   return habitForDay(s, todayKey)
 }
@@ -37,6 +49,7 @@ export function todayHabit(s: AppState): HabitDay {
  */
 export function isEntitled(s: AppState, firebaseEnabled: boolean): boolean {
   if (PAYWALL_PREVIEW) return false // dev-only: always show the paywall (see flag above)
+  if (SKIP_PAYWALL) return true // dev-only: bypass the paywall for on-device testing (see flag above)
   if (!firebaseEnabled) return true
   const status = s.subscription?.status
   if (status === 'trialing' || status === 'active') return true
