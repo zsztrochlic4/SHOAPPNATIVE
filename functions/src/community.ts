@@ -217,6 +217,11 @@ interface SyncInput {
  *  reads a rolling window wide enough for the 400-day streak. */
 const MAX_INGEST_DAYS = 45
 const MAX_HISTORY_DAYS = 460
+/** Retention for the per-day scoring log (privacy sign-off §A.4/C4 + finding 9):
+ *  the recompute window (MAX_HISTORY_DAYS) plus an appeal buffer. Rows older than
+ *  this serve no scoring purpose and are pruned daily (pruneScoreLog). Owner may
+ *  adjust; lengthen only with a documented reason (APP 11 data minimisation). */
+const RETENTION_DAYS = MAX_HISTORY_DAYS + 30
 const DAY_KEY_RE = /^\d{4}-\d{2}-\d{2}$/
 
 /** Target floors/caps. A self-reported target below its floor is a gaming lever
@@ -659,6 +664,43 @@ export const reprocessStandings = onSchedule(
   },
 )
 
+/* -------------------------------- pruneScoreLog ---------------------------- */
+
+/** Retention TTL for the per-day scoring log (privacy sign-off C4 / finding 9).
+ *  Daily, deletes each member's `scoreDays` and `scoreEvents` older than
+ *  RETENTION_DAYS — the recompute never reads that far back, so nothing scored is
+ *  affected; this is pure data minimisation (APP 11). Deletion-on-account already
+ *  removes everything; this bounds the log for LIVE accounts. Paginated + batched so
+ *  memory stays flat. Runs at 02:30, after the daily reprocess. */
+export const pruneScoreLog = onSchedule(
+  { schedule: '30 2 * * *', timeZone: 'Australia/Sydney', region: 'australia-southeast1', timeoutSeconds: 540, memory: '512MiB' },
+  async () => {
+    const db = getFirestore()
+    const cutoff = serverCtx(new Date()).offsetKey(RETENTION_DAYS) // YYYY-MM-DD floor
+    let prunedDays = 0
+    let prunedEvents = 0
+    const flushDeletes = async (docs: FirebaseFirestore.QueryDocumentSnapshot[]): Promise<number> => {
+      let batch = db.batch()
+      let ops = 0
+      for (const d of docs) {
+        batch.delete(d.ref)
+        if (++ops >= 400) { await batch.commit(); batch = db.batch(); ops = 0 }
+      }
+      if (ops > 0) await batch.commit()
+      return docs.length
+    }
+    await forEachPaged(db.collection('communityProfiles'), 100, async (doc) => {
+      // scoreDays is keyed by dayKey → delete by documentId below the cutoff.
+      const oldDays = await doc.ref.collection('scoreDays').where(FieldPath.documentId(), '<', cutoff).get()
+      if (!oldDays.empty) prunedDays += await flushDeletes(oldDays.docs)
+      // scoreEvents is auto-id'd but carries the `dayKey` field.
+      const oldEvents = await doc.ref.collection('scoreEvents').where('dayKey', '<', cutoff).get()
+      if (!oldEvents.empty) prunedEvents += await flushDeletes(oldEvents.docs)
+    })
+    logger.info('community.pruneScoreLog', { cutoff, retentionDays: RETENTION_DAYS, prunedDays, prunedEvents })
+  },
+)
+
 /* --------------------------- review queue: appeals ------------------------- */
 
 /** Recompute one member's standing from their PERSISTED state (targets are stored
@@ -697,6 +739,14 @@ export const appealStanding = onCall<AppealInput>(
 
     await db.collection('communityReviews').doc(uid).set(
       { uid, username: prof.get('username'), state: 'appealed', appealNote: note, appealedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() },
+      { merge: true },
+    )
+    // The review record is moderator-only (rules deny the subject reading it), so
+    // mirror the user's OWN appeal text onto their owner-readable profile — that way
+    // it's included in "Download my data" (privacy sign-off C2). Moderator internals
+    // (flags/override/resolutionNote) intentionally stay withheld.
+    await db.collection('communityProfiles').doc(uid).set(
+      { lastAppeal: { note, at: FieldValue.serverTimestamp() } },
       { merge: true },
     )
     const res = await recomputeForUid(db, uid)

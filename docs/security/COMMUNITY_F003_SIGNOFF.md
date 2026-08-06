@@ -37,7 +37,25 @@ gates below. Re-run all gates on the post-remediation SHA before signing.
 | 4 | Store/privacy disclosures not launch-ready | **Docs updated** (DATA_SAFETY F-003 action, PRIVACY) — **still needs human privacy sign-off** (Part A). |
 | 8 | No user appeal UI; owner happy-path untested; override lifetime | **Open (owner/UI)** — appeal/moderation backend exists; UI + owner-claim emulator fixture + override-expiry policy are follow-ups (Part D). |
 | 9 | Retention/TTL undecided | **Open (owner)** — mechanism can be added once a period is chosen (Part A retention field). |
-| 11 | `communityReviews` (incl. appeal text) excluded from export | **Open (reviewer decision)** — withholding anti-cheat internals may be correct; access to the user's own appeal text needs a documented approach (Part A). |
+| 11 | `communityReviews` (incl. appeal text) excluded from export | **Addressed** — the user's OWN appeal note is mirrored to their profile and included in the export; moderator internals stay withheld by design (see C2). |
+
+### Privacy-review conditions (from the returned Part A, "approved w/ conditions")
+
+A privacy-review pass returned Part A **approved with conditions C1–C5** (and set the
+retention window at ~460 days). Code-actionable conditions are now done; the rest are
+human/legal:
+
+| # | Condition | Status |
+|---|---|---|
+| C1 | PRIVACY.md under-states the wellness fields (steps/sleep/water/nutrition) | **Done** — §2 wording now names them + retention + appeal handling. |
+| C2 | User's own appeal text absent from export | **Done** — `appealStanding` mirrors the note to the owner-readable profile; `EXPORT_SCOPE` documents moderator internals are withheld. |
+| C4 | Implement the retention TTL | **Done** — `pruneScoreLog` prunes `scoreDays`/`scoreEvents` older than `RETENTION_DAYS` (460 window + 30d buffer); owner confirms the period. |
+| C3 | Lawful basis / consent for the competitive processing | **Open — owner/legal.** Confirm the basis (participation-as-consent, 18+ gate) and that PRIVACY.md reflects it. |
+| C5 | Re-verify A.1 inventory against the release-SHA code | **Open — do in Part B (CI)** on the exact release commit. |
+
+> ⚠️ The returned Part A was an **AI documentation-review pass, not a human privacy
+> professional** — it says so itself and requires **owner / privacy-reviewer
+> countersignature**. Treat A as **unsigned** until a human signs A.5.
 
 ---
 

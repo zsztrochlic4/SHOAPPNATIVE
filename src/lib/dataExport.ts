@@ -25,11 +25,12 @@ export const EXPORT_SCOPE = {
     'Weights, habits, meals, activities, food reviews, workout summaries',
     'Chat and coach-thread transcripts, notifications, push token records',
     'Coach workspace: consent/preferences, memories, conversation summaries, insights, proposals, actions, turns',
-    'Community competition profile (handle, tier, points, streak) and the per-day scoring log used for leaderboards',
+    'Community competition profile (handle, tier, points, streak), the per-day scoring log used for leaderboards, and your own appeal text if you appealed a review',
     'Subscription entitlement record (status, period end — no payment details)',
   ],
   excluded: [
     'Operational coach safety state (restricted; not client-readable by design)',
+    'Community moderation/anti-cheat internals (anomaly flags, moderator decisions) — restricted; your own appeal text is included with your community profile',
     'Server rate-limit counters (auto-expire within days; no content)',
     'Anonymised deletion audit records (retained for legal accountability)',
     'Card/payment details (held by Stripe, never by StrengthHub)',

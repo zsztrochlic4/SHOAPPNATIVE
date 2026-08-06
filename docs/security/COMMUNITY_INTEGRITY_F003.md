@@ -164,6 +164,11 @@ visible ladder.
 `calcVersion` bump or a late anomaly re-decides standings. `calcVersion` on each
 standing makes stale rows detectable.
 
+**Retention:** `pruneScoreLog` (daily) deletes `scoreDays`/`scoreEvents` older than
+`RETENTION_DAYS` (the 460-day recompute window + a 30-day appeal buffer) — pure data
+minimisation, since the recompute never reads that far back. Account deletion still
+removes everything immediately; this bounds the log for live accounts.
+
 ## 5. Anomaly rules (v1 — flag, don't trust)
 
 Cheap, explainable rules first (ML later, if ever). Each fires a named flag; a HARD
