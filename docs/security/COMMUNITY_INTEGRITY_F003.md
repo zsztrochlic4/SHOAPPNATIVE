@@ -20,6 +20,9 @@ remain owner calls; the MVP was built on the recommended path.
 | Selectors delegate to the shared core (no drift) | [`src/store/selectors.ts`](../../src/store/selectors.ts) |
 | Client sends RAW inputs, not metrics | [`src/community/backend.ts`](../../src/community/backend.ts), [`src/community/LeagueScreen.tsx`](../../src/community/LeagueScreen.tsx) |
 | Rules for the log (owner-read, client-write denied) | [`firestore.rules`](../../firestore.rules) + [`test/rules/firestore.test.mjs`](../../test/rules/firestore.test.mjs) |
+| Scheduled reprocessing sweep | [`functions/src/community.ts`](../../functions/src/community.ts) `reprocessStandings` |
+| Review queue + appeals + owner resolution | [`functions/src/community.ts`](../../functions/src/community.ts) `appealStanding` / `resolveStandingReview`, `communityReviews/{uid}` |
+| Deletion + export of the community log | [`functions/src/account.ts`](../../functions/src/account.ts), [`src/store/cloudRepo.ts`](../../src/store/cloudRepo.ts) |
 | Parity + anomaly unit tests | [`test/unit/communityScoring.test.mjs`](../../test/unit/communityScoring.test.mjs), [`communityAnomaly.test.mjs`](../../test/unit/communityAnomaly.test.mjs) |
 
 ---
@@ -181,15 +184,28 @@ logged with the inputs for the review queue and for tuning.
 
 ## 6. Provisional ranks · review queue · appeals
 
-- **Provisional rank (MVP):** `provisional` standings are computed, stored, and
-  shown to the user as "under review — not counting toward promotion yet." No
-  moderator needed; auto-clears if the next recompute is clean.
-- **Review queue (deferred):** `held` standings land in an admin surface (Zone B)
-  for a human to clear/void. Requires an admin UI + auth — not built.
-- **Appeals (deferred):** user-initiated recheck for a withheld standing. Requires
-  the review queue first.
+- **Provisional rank:** `provisional` standings are computed, stored, and shown to
+  the user as "under review — not counting toward promotion yet." No moderator
+  needed; auto-clears if the next recompute is clean.
+- **Review queue (BUILT):** a `held` standing opens a `communityReviews/{uid}`
+  item (its anomaly flags + snapshot) — a Zone-B collection readable **only** by a
+  moderator (the `owner` custom claim, `scripts/set-owner-claim.mjs`; the subject
+  can't read it, so anti-cheat internals don't leak). `finalizeStanding` maintains
+  the queue: a fresh held episode opens `pending`, an in-flight appeal/decision is
+  preserved, a return to a rankable status auto-closes it.
+- **Appeals (BUILT):** `appealStanding` lets a user request a re-review of their own
+  held standing (with an optional note); it records the appeal and immediately
+  recomputes — if the data now passes, it auto-clears; if still held, it stays
+  queued for the owner.
+- **Resolution (BUILT):** `resolveStandingReview` (owner-claim only) writes a durable
+  override on the review record and recomputes at once: `clear` → force `ok` (ranks),
+  `uphold` → pin `held`, `reset` → drop the override and let the rules decide again.
+  The override lives on the review doc, so `finalizeStanding` honours a moderator
+  decision on every subsequent sync/sweep.
 
-See [§7](#7-open-owner-decisions) for the MVP-vs-full scope decision.
+**MVP boundary:** the moderator surface is server-side (a claim-gated callable + an
+owner-readable queue collection). A dedicated **admin UI** to browse/triage the
+queue is not built — the owner drives it via the callable / console for now.
 
 ## 7. Open owner decisions
 
@@ -247,8 +263,11 @@ Deferred / owner + infra (block flipping the flag):
       mechanics are wired (above); a human privacy review of the data collected +
       [`PRIVACY.md`](../PRIVACY.md)/[`DATA_SAFETY.md`](../DATA_SAFETY.md) copy is
       still required before the gate. **Owner.**
-- [ ] **Review-queue / appeals scope** decision (MVP ships without them; `held`
-      standings are computed + withheld but there is no moderator surface yet).
+- [x] **Review queue + appeals + resolution** — built server-side:
+      `communityReviews/{uid}` (owner-claim-readable queue), `appealStanding`
+      (user), `resolveStandingReview` (owner: clear/uphold/reset with a durable
+      override honoured by the recompute). Remaining slice: a dedicated **admin UI**
+      to triage the queue (owner drives it via the callable for now).
 - [ ] **App Check**: device-churn rule + real rate limiting need native App Check
       (memory `firebase-verified-state`). Ship stubbed+logged or wait — **owner.**
 - [ ] **Emulator suites green in CI** (`test:rules`, `test:community`) + coach/pro

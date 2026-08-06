@@ -364,3 +364,16 @@ test('leagueStandings: any signed-in user may read; client writes denied', async
   await assertSucceeds(getDoc(doc(bobDb(), 'leagueStandings', '2026-07-27', 'tiers', '0', 'members', ALICE)))
   await assertFails(setDoc(doc(aliceDb(), 'leagueStandings', '2026-07-27', 'tiers', '0', 'members', ALICE), { username: 'alex', points: 100 }, { merge: true }))
 })
+
+test('communityReviews: only a moderator (owner claim) may read; no client writes, subject cannot peek', async () => {
+  await seed((db) => setDoc(doc(db, 'communityReviews', ALICE), { uid: ALICE, state: 'pending', flags: ['impossible_session_cadence'] }))
+  const modDb = testEnv.authenticatedContext('mod', { owner: true }).firestore()
+  await assertSucceeds(getDoc(doc(modDb, 'communityReviews', ALICE)))
+  await assertSucceeds(getDocs(collection(modDb, 'communityReviews')))
+  // The flagged user must NOT be able to read moderation internals about themself.
+  await assertFails(getDoc(doc(aliceDb(), 'communityReviews', ALICE)))
+  await assertFails(getDocs(collection(aliceDb(), 'communityReviews')))
+  // No client — not even the moderator — may write; only the Cloud Functions do.
+  await assertFails(setDoc(doc(modDb, 'communityReviews', ALICE), { state: 'cleared' }, { merge: true }))
+  await assertFails(setDoc(doc(aliceDb(), 'communityReviews', ALICE), { state: 'cleared' }, { merge: true }))
+})

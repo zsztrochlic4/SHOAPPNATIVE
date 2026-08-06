@@ -160,6 +160,31 @@ test('syncCommunityStats: an impossible session cadence is held back from the ra
   assert.equal(standing.get('status'), 'held')
 })
 
+test('appealStanding: a held standing is appealable; it clears once the data is honest', async () => {
+  const today = new Date().toISOString().slice(0, 10)
+  const targets = { stepTarget: 10000, sleepTargetH: 8, waterTargetL: 2.5, daysPerWeek: 4 }
+  // Put B in a held state (impossible cadence), then appeal — data unchanged, so it
+  // stays held but is now queued as an appeal.
+  const held = await B.call('syncCommunityStats', { targets, days: [{ dayKey: today, hasHabit: true, steps: 10000, sleepH: 8, waterL: 2.5, nutritionScore: 8, sessions: 15, volume: 9999, activities: 0 }] })
+  assert.equal(held.status, 'held')
+  const appeal1 = await B.call('appealStanding', { note: 'genuinely trained a lot' })
+  assert.equal(appeal1.appealed, true)
+  assert.equal(appeal1.status, 'held')
+  // Correct the data to a believable day → recompute clears it; nothing left to appeal.
+  const fixed = await B.call('syncCommunityStats', { targets, days: [{ dayKey: today, hasHabit: true, steps: 10000, sleepH: 8, waterL: 2.5, nutritionScore: 8, sessions: 1, volume: 1500, activities: 0 }] })
+  assert.equal(fixed.status, 'ok')
+  const appeal2 = await B.call('appealStanding', {})
+  assert.equal(appeal2.status, 'ok')
+  assert.equal(appeal2.appealed, false)
+})
+
+test('resolveStandingReview: rejects a caller without the owner claim', async () => {
+  // The moderator endpoint is gated by the `owner` custom claim; an ordinary
+  // signed-in user must be refused. (The owner happy-path needs a custom-claim test
+  // fixture — see the rules test for the owner-only read gate.)
+  await rejectsCode(B.call('resolveStandingReview', { uid: B.uid, decision: 'clear' }), 'permission-denied')
+})
+
 test('deleteGroup: owner-only', async () => {
   const g = await B.call('createGroup', { name: 'Delete Test', icon: 'brain', color: '#8B5CF6' })
   await C.call('joinGroupByPasscode', { groupId: g.groupId, passcode: g.passcode })

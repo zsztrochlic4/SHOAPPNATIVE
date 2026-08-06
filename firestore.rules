@@ -395,6 +395,17 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // F-003 moderation review queue. A held standing lands here (with its anomaly
+    // flags + any moderator override) for the app owner to clear / uphold / reset
+    // via resolveStandingReview. Written ONLY by the community functions. Readable
+    // ONLY by a moderator — the `owner` custom claim (scripts/set-owner-claim.mjs),
+    // the same gate as the notification sender — NEVER by the subject, so anti-cheat
+    // internals don't leak to a flagged user.
+    match /communityReviews/{uid} {
+      allow get, list: if request.auth != null && request.auth.token.owner == true;
+      allow write: if false;
+    }
+
     // --- Private friend groups (server-authoritative, membership-gated) --- //
     // Public, secret-free directory used to SEARCH for a group by name. Carries
     // no passcode and no member list. Written only by the group functions.

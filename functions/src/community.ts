@@ -17,6 +17,8 @@
  *   communityProfiles/{uid}/scoreDays/{dayKey}         → server-owned current per-day inputs
  *   communityProfiles/{uid}/scoreEvents/{autoId}       → append-only immutable change log
  *   leagueStandings/{weekKey}/tiers/{tier}/members/{uid} → { username, points, status, calcVersion }
+ *   communityReviews/{uid}                             → moderation queue for held standings
+ *                                                          (flags, state, override) — owner-claim read only
  *
  * F-003 (competitive integrity). syncCommunityStats no longer trusts client-computed
  * metrics. The client sends RAW daily inputs; the server appends them to an
@@ -38,7 +40,7 @@ import { FieldPath, FieldValue, getFirestore, type Query } from 'firebase-admin/
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { onSchedule } from 'firebase-functions/v2/scheduler'
 import * as logger from 'firebase-functions/logger'
-import { requireAuth } from './lib/guards'
+import { requireAuth, requireOwner } from './lib/guards'
 import {
   CALC_VERSION,
   computeCompetitionMetrics,
@@ -333,6 +335,14 @@ async function finalizeStanding(
   const username = prof.get('username') as string
   const tier = clampTier(typeof prof.get('tier') === 'number' ? prof.get('tier') : 0)
 
+  // The review record holds any moderator OVERRIDE + the queue state. Read once,
+  // up front: an override can force the final status regardless of the anomaly
+  // outcome. It lives here (owner-readable only), never on the user's profile, so
+  // moderation internals don't leak to a flagged user (see firestore.rules).
+  const reviewRef = db.collection('communityReviews').doc(uid)
+  const reviewSnap = await reviewRef.get()
+  const override = reviewSnap.exists ? (reviewSnap.get('override') as string | undefined) : undefined
+
   // Recompute from the durable per-day log (server-authoritative).
   const histSnap = await profRef.collection('scoreDays').orderBy(FieldPath.documentId(), 'desc').limit(MAX_HISTORY_DAYS).get()
   const records: DayRecord[] = histSnap.docs.map((doc) => toDayRecord(doc.id, doc))
@@ -350,7 +360,12 @@ async function finalizeStanding(
     targetBelowFloor: extras.targetBelowFloor,
     deviceTokenCount: 1, // inert until native App Check is enforced (see anomaly.ts)
   }
-  const { status, flags } = evaluateAnomalies(signals)
+  const { status: computed, flags } = evaluateAnomalies(signals)
+
+  // A moderator decision (resolveStandingReview) wins: `upheld` pins a sanctioned
+  // account to held; `cleared` vouches for it and forces ok. Absent an override the
+  // anomaly result stands.
+  const status = override === 'upheld' ? 'held' : override === 'cleared' ? 'ok' : computed
 
   // Implausible standings are computed + stored, but withheld from the ranked
   // ladder (points → 0 in the standing) until a clean recompute clears them.
@@ -361,6 +376,7 @@ async function finalizeStanding(
     windowEnd: ctx.todayKey,
     anomalyFlags: flags,
     backfilledDayCount: extras.backfilledDayCount,
+    ...(override ? { override } : {}),
   }
 
   await profRef.set(
@@ -387,6 +403,21 @@ async function finalizeStanding(
     { username, points: rankedPoints, status, calcVersion: CALC_VERSION },
     { merge: true },
   )
+
+  // Maintain the moderator review queue. A fresh `held` episode opens a `pending`
+  // item; an in-flight appeal or a prior decision (cleared/upheld) is preserved; a
+  // return to a rankable status auto-closes an open (pending/appealed) item.
+  const reviewState = reviewSnap.exists ? (reviewSnap.get('state') as string | undefined) : undefined
+  const openOrDecided = ['pending', 'appealed', 'cleared', 'upheld']
+  if (status === 'held') {
+    if (reviewState && openOrDecided.includes(reviewState)) {
+      await reviewRef.set({ username, weekKey, flags, points: metrics.odometer, status, updatedAt: FieldValue.serverTimestamp() }, { merge: true })
+    } else {
+      await reviewRef.set({ uid, username, weekKey, flags, points: metrics.odometer, status, state: 'pending', openedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true })
+    }
+  } else if (reviewState === 'pending' || reviewState === 'appealed') {
+    await reviewRef.set({ status, state: 'auto_cleared', updatedAt: FieldValue.serverTimestamp() }, { merge: true })
+  }
 
   // Fan the recomputed stats out to the user's friend-group member docs so group
   // leaderboards reflect authoritative activity (communityGroups.ts owns the shape).
@@ -592,5 +623,91 @@ export const reprocessStandings = onSchedule(
       else if (status === 'provisional') provisional++
     })
     logger.info('community.reprocessStandings', { weekKey, processed, held, provisional })
+  },
+)
+
+/* --------------------------- review queue: appeals ------------------------- */
+
+/** Recompute one member's standing from their PERSISTED state (targets are stored
+ *  on the profile). Used by the appeal + resolve callables so a review action takes
+ *  effect immediately, without waiting for the daily sweep. Returns null if there's
+ *  no such member. */
+async function recomputeForUid(db: FirebaseFirestore.Firestore, uid: string): Promise<{ status: string } | null> {
+  const prof = await db.collection('communityProfiles').doc(uid).get()
+  if (!prof.exists || !prof.get('username')) return null
+  const now = new Date()
+  const targets = clampTargets((prof.get('scoringTargets') as Partial<ScoringTargets> | undefined) ?? {}).targets
+  const targetBelowFloor = prof.get('targetBelowFloor') === true
+  return finalizeStanding(db, prof, serverCtx(now), mondayKey(now), targets, { backfilledDayCount: 0, targetBelowFloor })
+}
+
+interface AppealInput { note?: string }
+
+/** A user asks for their HELD standing to be re-reviewed. Records the appeal (with
+ *  an optional short note) on the review record and immediately recomputes: if the
+ *  underlying data now passes the anomaly rules the appeal auto-clears; if it's
+ *  still held, the item stays queued for the owner with the note attached. Only a
+ *  `held` standing is appealable — `provisional` clears itself on the next clean
+ *  recompute, and `ok` needs nothing. */
+export const appealStanding = onCall<AppealInput>(
+  { region: 'australia-southeast2' },
+  async (req) => {
+    const uid = requireAuth(req)
+    const note = typeof req.data?.note === 'string' ? req.data.note.slice(0, 500) : ''
+    const db = getFirestore()
+    const prof = await db.collection('communityProfiles').doc(uid).get()
+    if (!prof.exists || !prof.get('username')) throw new HttpsError('failed-precondition', 'Claim a username first.')
+    const status = prof.get('status') as string | undefined
+    if (status !== 'held') return { ok: true, status: status ?? 'ok', appealed: false }
+
+    await db.collection('communityReviews').doc(uid).set(
+      { uid, username: prof.get('username'), state: 'appealed', appealNote: note, appealedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() },
+      { merge: true },
+    )
+    const res = await recomputeForUid(db, uid)
+    return { ok: true, status: res?.status ?? 'held', appealed: true }
+  },
+)
+
+interface ResolveInput { uid?: string; decision?: 'clear' | 'uphold' | 'reset'; note?: string }
+
+/** Owner/moderator resolution of a review item (gated by the `owner` custom claim,
+ *  scripts/set-owner-claim.mjs — the same gate as the notification sender). Sets a
+ *  durable override on the review record and recomputes so it takes effect at once:
+ *    - clear  → vouch for the account; force its standing to `ok` (it ranks).
+ *    - uphold → sanction; pin the standing to `held` regardless of the data.
+ *    - reset  → remove the override; the anomaly rules decide again (re-queues if
+ *               still held). */
+export const resolveStandingReview = onCall<ResolveInput>(
+  { region: 'australia-southeast2' },
+  async (req) => {
+    const ownerUid = requireOwner(req)
+    const targetUid = typeof req.data?.uid === 'string' ? req.data.uid : ''
+    const decision = req.data?.decision
+    if (!targetUid || (decision !== 'clear' && decision !== 'uphold' && decision !== 'reset')) {
+      throw new HttpsError('invalid-argument', 'Provide a member uid and a decision of clear | uphold | reset.')
+    }
+    const note = typeof req.data?.note === 'string' ? req.data.note.slice(0, 500) : ''
+
+    const db = getFirestore()
+    const prof = await db.collection('communityProfiles').doc(targetUid).get()
+    if (!prof.exists || !prof.get('username')) throw new HttpsError('not-found', 'No such community member.')
+    const reviewRef = db.collection('communityReviews').doc(targetUid)
+
+    if (decision === 'reset') {
+      await reviewRef.set(
+        { override: FieldValue.delete(), state: 'auto_cleared', resolvedBy: ownerUid, resolutionNote: note, resolvedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() },
+        { merge: true },
+      )
+    } else {
+      const override = decision === 'clear' ? 'cleared' : 'upheld'
+      await reviewRef.set(
+        { uid: targetUid, username: prof.get('username'), override, state: override, resolvedBy: ownerUid, resolutionNote: note, resolvedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() },
+        { merge: true },
+      )
+    }
+    const res = await recomputeForUid(db, targetUid)
+    logger.info('community.resolveStandingReview', { targetUid, decision, status: res?.status })
+    return { ok: true, status: res?.status ?? null }
   },
 )

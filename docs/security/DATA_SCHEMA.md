@@ -25,6 +25,7 @@ communityProfiles/{uid}          Zone B — league profile (server-only writes, 
 communityProfiles/{uid}/scoreDays/{dayKey}   Zone B — F-003 per-day scoring inputs (server-write, owner read)
 communityProfiles/{uid}/scoreEvents/{id}     Zone B — F-003 append-only immutable change trail
 leagueStandings/…/members/{uid}  Zone B — weekly standings (server-write, signed-in read)
+communityReviews/{uid}           Zone B — F-003 moderation queue (server-write, owner-claim read only)
 <everything else>                default-deny
 ```
 
@@ -40,6 +41,10 @@ raw daily inputs in an immutable, server-timestamped log and **recomputes** leag
 `calcVersion` + provenance + integrity `status` on each standing. The per-day log
 (`scoreDays`/`scoreEvents`) is **owner-readable** for transparency/export and
 carries no bodies or free text — only activity counts, habit values and timestamps.
+A held standing opens a `communityReviews/{uid}` moderation item, readable **only**
+by a moderator (the `owner` custom claim) and never by the flagged user, so
+anti-cheat internals don't leak; it is cleared/upheld/reset via the
+`resolveStandingReview` callable and appealed via `appealStanding`.
 See [`COMMUNITY_INTEGRITY_F003.md`](COMMUNITY_INTEGRITY_F003.md).
 
 ### Root document `users/{uid}`
