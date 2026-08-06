@@ -40,7 +40,8 @@ import { FieldPath, FieldValue, getFirestore, type Query } from 'firebase-admin/
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { onSchedule } from 'firebase-functions/v2/scheduler'
 import * as logger from 'firebase-functions/logger'
-import { requireAuth, requireOwner } from './lib/guards'
+import { requireAuth, requireOwner, auditAppCheck, APP_CHECK_ENFORCED } from './lib/guards'
+import { enforceDailyLimit } from './lib/rateLimit'
 import {
   CALC_VERSION,
   computeCompetitionMetrics,
@@ -148,9 +149,10 @@ interface ClaimInput { username?: string }
 /** Atomically claim a unique username (case-insensitive). Releases any previous
  *  handle the user held. Throws `already-exists` if another user owns it. */
 export const claimUsername = onCall<ClaimInput>(
-  { region: 'australia-southeast2' },
+  { region: 'australia-southeast2', enforceAppCheck: APP_CHECK_ENFORCED },
   async (req) => {
     const uid = requireAuth(req)
+    auditAppCheck(req, 'claimUsername')
     const raw = (req.data?.username ?? '').trim()
     const lower = raw.toLowerCase()
     if (!USERNAME_RE.test(lower)) {
@@ -222,6 +224,12 @@ const DAY_KEY_RE = /^\d{4}-\d{2}-\d{2}$/
  *  the standing for review. Caps also bound absurd values. */
 const TARGET_FLOORS: ScoringTargets = { stepTarget: 3000, sleepTargetH: 5, waterTargetL: 1, daysPerWeek: 2 }
 const TARGET_CAPS: ScoringTargets = { stepTarget: 50000, sleepTargetH: 14, waterTargetL: 10, daysPerWeek: 14 }
+
+/** Accept only IANA-shaped timezone tokens (e.g. `Australia/Sydney`, `UTC`,
+ *  `Etc/GMT+10`); anything else becomes '' so we never store arbitrary user text
+ *  in the event log (F-003 finding — clientTz was previously kept verbatim). */
+const TZ_RE = /^[A-Za-z][A-Za-z0-9_+-]*(?:\/[A-Za-z0-9_+-]+){0,2}$/
+const sanitizeTz = (v: unknown): string => (typeof v === 'string' && v.length <= 64 && TZ_RE.test(v) ? v : '')
 
 const clampNum = (v: unknown, min: number, max: number, dflt = min): number => {
   const n = typeof v === 'number' && Number.isFinite(v) ? v : dflt
@@ -343,10 +351,18 @@ async function finalizeStanding(
   const reviewSnap = await reviewRef.get()
   const override = reviewSnap.exists ? (reviewSnap.get('override') as string | undefined) : undefined
 
-  // Recompute from the durable per-day log (server-authoritative).
-  const histSnap = await profRef.collection('scoreDays').orderBy(FieldPath.documentId(), 'desc').limit(MAX_HISTORY_DAYS).get()
+  // Recompute from the durable per-day log (server-authoritative). Bound the read
+  // to the recent window with a documentId range (dayKeys sort lexicographically),
+  // NOT a descending key scan — the Firestore emulator rejects `orderBy(__name__,
+  // 'desc')` with FAILED_PRECONDITION, and this avoids it while staying bounded.
+  const windowFloor = ctx.offsetKey(MAX_HISTORY_DAYS)
+  const histSnap = await profRef.collection('scoreDays').where(FieldPath.documentId(), '>=', windowFloor).get()
   const records: DayRecord[] = histSnap.docs.map((doc) => toDayRecord(doc.id, doc))
   const metrics = computeCompetitionMetrics({ records, targets, ctx })
+
+  // Days that carry ANY real activity — not just stored docs — so a run of empty
+  // day records can't pad history to bypass the perfect-week/no-history signal.
+  const activeDays = records.filter((r) => r.hasHabit || r.sessions > 0 || r.activities > 0 || r.rest || r.freeze)
 
   // Anomaly evaluation → status (ok | provisional | held).
   const signals: AnomalySignals = {
@@ -355,7 +371,7 @@ async function finalizeStanding(
     volume7: metrics.volume7,
     medianPriorWeeklyVolume: medianPriorWeeklyVolume(records, weekKey),
     odometer: metrics.odometer,
-    historyDayCount: records.length,
+    historyDayCount: activeDays.length,
     backfilledDayCount: extras.backfilledDayCount,
     targetBelowFloor: extras.targetBelowFloor,
     deviceTokenCount: 1, // inert until native App Check is enforced (see anomaly.ts)
@@ -370,9 +386,10 @@ async function finalizeStanding(
   // Implausible standings are computed + stored, but withheld from the ranked
   // ladder (points → 0 in the standing) until a clean recompute clears them.
   const rankedPoints = status === 'ok' ? metrics.odometer : 0
+  const dayKeysSeen = records.map((r) => r.dayKey)
   const provenance = {
     eventCount: records.length,
-    windowStart: records.length ? records[records.length - 1].dayKey : ctx.todayKey,
+    windowStart: dayKeysSeen.length ? dayKeysSeen.reduce((a, b) => (a < b ? a : b)) : ctx.todayKey,
     windowEnd: ctx.todayKey,
     anomalyFlags: flags,
     backfilledDayCount: extras.backfilledDayCount,
@@ -424,16 +441,21 @@ async function finalizeStanding(
 
   // Fan the recomputed stats out to the user's friend-group member docs so group
   // leaderboards reflect authoritative activity (communityGroups.ts owns the shape).
+  // A non-ok standing is WITHHELD from group rankings too: every ranking metric is
+  // zeroed (mirroring the league points→0), so a held/provisional user can't lead a
+  // friend group even if a client ignores `status`. `status` is also carried so the
+  // UI can show an "under review" state (src/community/groupsBackend.ts).
   const groupIds: string[] = Array.isArray(prof.get('groupIds')) ? prof.get('groupIds') : []
   if (groupIds.length) {
+    const ranked = status === 'ok'
     const memberStats = {
       username,
-      odometer: metrics.odometer,
-      streak: metrics.streakCurrent,
-      bestStreak: metrics.streakBest,
-      volume7: metrics.volume7,
-      volume30: metrics.volume30,
-      sessionsThisWeek: metrics.sessions7,
+      odometer: ranked ? metrics.odometer : 0,
+      streak: ranked ? metrics.streakCurrent : 0,
+      bestStreak: ranked ? metrics.streakBest : 0,
+      volume7: ranked ? metrics.volume7 : 0,
+      volume30: ranked ? metrics.volume30 : 0,
+      sessionsThisWeek: ranked ? metrics.sessions7 : 0,
       status,
     }
     const batch = db.batch()
@@ -453,13 +475,17 @@ async function finalizeStanding(
  * from the ranked ladder). No client-computed metric is ever trusted.
  */
 export const syncCommunityStats = onCall<SyncInput>(
-  { region: 'australia-southeast2' },
+  { region: 'australia-southeast2', enforceAppCheck: APP_CHECK_ENFORCED },
   async (req) => {
     const uid = requireAuth(req)
+    auditAppCheck(req, 'syncCommunityStats')
+    // Per-account abuse control: an authenticated client mutates days on app open /
+    // league view; 500/day is generous for legitimate use and bounds scoreEvents growth.
+    await enforceDailyLimit('community_sync', uid, 500)
     const now = new Date()
     const ctx = serverCtx(now)
     const weekKey = mondayKey(now)
-    const clientTz = typeof req.data?.clientTz === 'string' ? req.data.clientTz.slice(0, 64) : ''
+    const clientTz = sanitizeTz(req.data?.clientTz)
 
     const { targets, targetBelowFloor } = clampTargets(req.data?.targets)
     const incoming = Array.isArray(req.data?.days) ? req.data!.days!.slice(0, MAX_INGEST_DAYS) : []
@@ -509,11 +535,12 @@ export const syncCommunityStats = onCall<SyncInput>(
 
 /** Weekly promotion/demotion. Runs every Monday: for the just-ended week it moves
  *  each tier's top cohort up and its bottom cohort down, then resets everyone's
- *  points. The movers are found with two *bounded* queries (top N by points desc,
- *  bottom M by points asc) rather than loading the whole tier — promotion wins ties
- *  with demotion in a small cohort (the bottom set is minus the top set), exactly
- *  reproducing the previous rank-based logic. The points reset streams the cohort
- *  in pages so memory stays flat as the user base grows. */
+ *  points. ONLY `status == 'ok'` standings are eligible to move — a held/provisional
+ *  standing has withheld points (0) and must neither be promoted (it would rise on a
+ *  fake score in a sparse/all-zero cohort — F-003 finding) nor demoted (it holds
+ *  until review clears it). Movers come from one bounded, ordered read of the ok
+ *  cohort (small by design); promotion wins ties with demotion. The points reset
+ *  streams the whole cohort in pages so memory stays flat as the user base grows. */
 export const rolloverLeagues = onSchedule(
   { schedule: '5 0 * * 1', timeZone: 'Australia/Sydney', region: 'australia-southeast1', timeoutSeconds: 540, memory: '512MiB' },
   async () => {
@@ -528,16 +555,19 @@ export const rolloverLeagues = onSchedule(
       const cfg = TIERS[tier]
       const members = db.collection(`leagueStandings/${prevWeek}/tiers/${tier}/members`)
 
-      // Movers: bounded reads of just the top (promote up) and bottom (demote down).
+      // Movers: only the `ok` cohort is eligible to move, read once ordered by
+      // points desc (needs the members(status,points) composite index —
+      // firestore.indexes.json). The top `promote` rise; the bottom `demote` of the
+      // SAME ok list fall; promotion wins a tie in a cohort smaller than promote +
+      // demote. Held/provisional rows are absent here, so they hold their tier.
       const moves = new Map<string, number>() // uid → new tier
-      if (cfg.promote > 0) {
-        const top = await members.orderBy('points', 'desc').limit(cfg.promote).get()
-        for (const d of top.docs) moves.set(d.id, clampTier(tier + 1))
-      }
-      if (cfg.demote > 0) {
-        const bottom = await members.orderBy('points', 'asc').limit(cfg.demote).get()
-        // Promotion wins in a cohort smaller than promote + demote.
-        for (const d of bottom.docs) if (!moves.has(d.id)) moves.set(d.id, clampTier(tier - 1))
+      if (cfg.promote > 0 || cfg.demote > 0) {
+        const okDocs = (await members.where('status', '==', 'ok').orderBy('points', 'desc').get()).docs
+        for (let i = 0; i < cfg.promote && i < okDocs.length; i++) moves.set(okDocs[i].id, clampTier(tier + 1))
+        for (let i = 0; i < cfg.demote && i < okDocs.length; i++) {
+          const d = okDocs[okDocs.length - 1 - i]
+          if (!moves.has(d.id)) moves.set(d.id, clampTier(tier - 1))
+        }
       }
 
       // Reset the whole cohort's points (and apply any tier move), paginated.
@@ -653,9 +683,11 @@ interface AppealInput { note?: string }
  *  `held` standing is appealable — `provisional` clears itself on the next clean
  *  recompute, and `ok` needs nothing. */
 export const appealStanding = onCall<AppealInput>(
-  { region: 'australia-southeast2' },
+  { region: 'australia-southeast2', enforceAppCheck: APP_CHECK_ENFORCED },
   async (req) => {
     const uid = requireAuth(req)
+    auditAppCheck(req, 'appealStanding')
+    await enforceDailyLimit('community_appeal', uid, 10)
     const note = typeof req.data?.note === 'string' ? req.data.note.slice(0, 500) : ''
     const db = getFirestore()
     const prof = await db.collection('communityProfiles').doc(uid).get()
@@ -682,9 +714,10 @@ interface ResolveInput { uid?: string; decision?: 'clear' | 'uphold' | 'reset'; 
  *    - reset  → remove the override; the anomaly rules decide again (re-queues if
  *               still held). */
 export const resolveStandingReview = onCall<ResolveInput>(
-  { region: 'australia-southeast2' },
+  { region: 'australia-southeast2', enforceAppCheck: APP_CHECK_ENFORCED },
   async (req) => {
     const ownerUid = requireOwner(req)
+    auditAppCheck(req, 'resolveStandingReview')
     const targetUid = typeof req.data?.uid === 'string' ? req.data.uid : ''
     const decision = req.data?.decision
     if (!targetUid || (decision !== 'clear' && decision !== 'uphold' && decision !== 'reset')) {

@@ -142,10 +142,24 @@ info → Payment info** is not collected by us.)
    uid + timestamp deletion-audit record only. For security, Firebase may ask a
    user to re-authenticate just before deleting — that's expected.
 
-5. **Community/social is a preview.** The feed/groups/challenges/leaderboards are
-   currently example content stored only in the user's own account — there is no
-   user-to-user sharing yet. Keep **"Share = No"**. When social features go live,
-   revisit sharing/visibility answers here and in [PRIVACY.md](PRIVACY.md).
+5. **Community/social is a preview (backend flag OFF).** The feed/groups/challenges
+   /leaderboards are example content today; `COMMUNITY_BACKEND = false`, so nothing
+   is stored server-side or shared user-to-user. Keep **"Share = No"** for now.
+
+   **F-003 launch action — before flipping `COMMUNITY_BACKEND` to true, these forms
+   MUST be updated** (see `docs/security/COMMUNITY_F003_SIGNOFF.md`). Going live adds
+   server-stored, user-linked data that must be declared:
+   - a **per-day activity log** (`scoreDays`/`scoreEvents`): daily steps, sleep
+     hours, water, nutrition-adherence score, session/activity counts, training
+     volume, rest/freeze flags, timestamps — used for leaderboard scoring, anomaly
+     detection, moderation, appeals and reprocessing (not scoring alone);
+   - a **community handle** and account id (Apple treats a handle/account id as a
+     User ID; declare under identifiers, Linked);
+   - **moderation records** incl. user-entered **appeal text** (free-form) — declare
+     the user-generated-content/"Other user content" type even while Coach is off;
+   - set **"Share = Yes"** for leaderboard/group visibility to other users.
+   Have the privacy reviewer confirm the exact Apple App Privacy + Google Data Safety
+   answers and update [PRIVACY.md](PRIVACY.md) in step.
 
 6. **Keep it truthful and in sync.** These answers match the current app and the
    finalised Privacy Policy. Change one (add analytics, start storing photos,

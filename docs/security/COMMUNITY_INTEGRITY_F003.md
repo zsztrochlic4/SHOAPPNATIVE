@@ -166,21 +166,29 @@ standing makes stale rows detectable.
 
 ## 5. Anomaly rules (v1 — flag, don't trust)
 
-Cheap, explainable rules first (ML later, if ever). Each fires an `anomalyFlag`;
-enough weight → `provisional` (rank-withheld, self-serve appeal) or `held`
-(needs review).
+Cheap, explainable rules first (ML later, if ever). Each fires a named flag; a HARD
+flag → `held` (needs review), a SOFT flag → `provisional` (rank-withheld, self-serve
+appeal). **This table is the AS-BUILT set** in [`src/community/anomaly.ts`](../../src/community/anomaly.ts)
+(`evaluateAnomalies`) — kept honest against the code, not aspirational.
 
-| Rule | Signal |
-|------|--------|
-| Rate | > N scoreable events in a rolling hour / day (physically implausible session cadence). |
-| Volume jump | week volume > k× the user's trailing median. |
-| Backfill | many events whose `dayKey` lags `serverTs` by > 24h (retro-stuffing a week). |
-| Perfect-week velocity | 0→100 odometer with an event history too short to support it. |
-| Clock skew | `dayKey`/`tz` inconsistent with `serverTs` beyond DST tolerance. |
-| Device churn | same uid, many App Check device tokens in a week (farming). Needs native App Check — see [`APP_CHECK.md`](../APP_CHECK.md), memory `firebase-verified-state`. |
+| Flag (as built) | Kind | Signal |
+|------|------|--------|
+| `impossible_session_cadence` | HARD | > N completed sessions **or** > M activities logged against a single day. |
+| `target_below_floor` | HARD | a self-reported goal was below its floor (gaming the ratio); clamped up + flagged. |
+| `volume_jump` | SOFT | week volume > k× the user's trailing-week median (needs ≥2 prior weeks). |
+| `perfect_week_no_history` | SOFT | near-max odometer with too few **active** days to support it. |
+| `backfill` | SOFT | ≥ N days in this ingest whose `dayKey` lags the server clock by > 24h. |
+| `device_churn` | HARD | many App Check device tokens for one uid in a week. **Inert** until native App Check (`deviceTokenCount` fixed at 1 today) — see [`APP_CHECK.md`](../APP_CHECK.md), memory `firebase-verified-state`. |
 
-Thresholds live in config, not code, so they tune without redeploy. Every fire is
-logged with the inputs for the review queue and for tuning.
+Thresholds live in the `ANOMALY_CONFIG` **code constant** today; moving them to a
+server-owned `config/community` document (tune without redeploy) is a documented
+follow-up, **not yet done**. Every fire is logged and lands on the review queue (§6).
+
+**Not yet implemented (was over-claimed in earlier drafts):** a per-hour rate rule
+and a `dayKey`/`tz`-vs-`serverTs` clock-skew rule. `clientTz` is now validated to an
+IANA-shaped token and stored, but is **not** consumed by anomaly evaluation yet.
+`backfilledDayCount` is measured per ingest (not durable across a later identical
+resubmit), so it is a soft signal only. These are tracked as hardening follow-ups.
 
 ## 6. Provisional ranks · review queue · appeals
 

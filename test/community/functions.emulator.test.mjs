@@ -185,6 +185,21 @@ test('resolveStandingReview: rejects a caller without the owner claim', async ()
   await rejectsCode(B.call('resolveStandingReview', { uid: B.uid, decision: 'clear' }), 'permission-denied')
 })
 
+test('a held standing is withheld from friend-group rankings too (Finding 3)', async () => {
+  const g = await B.call('createGroup', { name: 'Withhold Test', icon: 'trending', color: '#10B981' })
+  const today = new Date().toISOString().slice(0, 10)
+  const targets = { stepTarget: 10000, sleepTargetH: 8, waterTargetL: 2.5, daysPerWeek: 4 }
+  const res = await B.call('syncCommunityStats', { targets, days: [{ dayKey: today, hasHabit: true, steps: 10000, sleepH: 8, waterL: 2.5, nutritionScore: 8, sessions: 15, volume: 99999, activities: 0 }] })
+  assert.equal(res.status, 'held')
+  // The group member row carries status AND has every ranking metric zeroed, so a
+  // held user cannot lead the group even if the client ignores status.
+  const member = await getDoc(doc(B.db, `groups/${g.groupId}/members/${B.uid}`))
+  assert.equal(member.get('status'), 'held')
+  assert.equal(member.get('odometer'), 0)
+  assert.equal(member.get('volume7'), 0)
+  assert.equal(member.get('streak'), 0)
+})
+
 test('deleteGroup: owner-only', async () => {
   const g = await B.call('createGroup', { name: 'Delete Test', icon: 'brain', color: '#8B5CF6' })
   await C.call('joinGroupByPasscode', { groupId: g.groupId, passcode: g.passcode })

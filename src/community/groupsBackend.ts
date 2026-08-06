@@ -63,6 +63,7 @@ export async function searchGroupsRemote(q: string): Promise<DirectoryHit[]> {
 
 function memberFrom(id: string, data: Record<string, unknown>, myUid?: string): GroupMember {
   const n = (k: string) => (typeof data[k] === 'number' ? (data[k] as number) : 0)
+  const s = data.status
   return {
     id,
     username: String(data.username ?? ''),
@@ -73,6 +74,9 @@ function memberFrom(id: string, data: Record<string, unknown>, myUid?: string): 
     volume7: n('volume7'),
     volume30: n('volume30'),
     sessionsThisWeek: n('sessionsThisWeek'),
+    // Server already zeroes a non-ok member's metrics; carry status so the UI can
+    // label "under review" instead of ranking them (F-003).
+    status: s === 'held' || s === 'provisional' ? s : 'ok',
   }
 }
 

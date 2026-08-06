@@ -20,6 +20,25 @@ contract is [`DATA_SCHEMA.md`](DATA_SCHEMA.md).
   green, **C** App Check decision, **D** moderation ownership.
 - **Do not flip the flag until Parts A–D below are signed.**
 
+## Remediation against the independent review (2026-08-06)
+
+An independent review returned **NO-GO** and found real defects. Code-level findings
+have been remediated (commit to follow this doc); the rest are the human/decision
+gates below. Re-run all gates on the post-remediation SHA before signing.
+
+| # | Finding | Status |
+|---|---|---|
+| 1 | `test:community` red — descending `__name__` scan | **Fixed** — bounded `where(documentId ≥ floor)` read in `finalizeStanding`. Re-confirm in CI. |
+| 2 | `rolloverLeagues` could promote held/provisional rows | **Fixed** — only `status=='ok'` standings move (promote or demote); new `members(status,points)` index. |
+| 3 | Held users still ranked in friend groups | **Fixed** — group ranking metrics zeroed for non-ok users server-side; `status` carried to the client. |
+| 5 | Community deletion could complete while data remains | **Fixed** — per-resource cleanup that throws on failure, keeping the job `in_progress` for the sweep. |
+| 6 | App Check monitor / rate limits not wired | **Fixed** — all community+group callables call `auditAppCheck` + honour `enforceAppCheck`; `sync`/`appeal` rate-limited. |
+| 7,10 | Spec over-claimed anomaly rules; `clientTz` unvalidated; inventory incomplete | **Fixed (docs+code)** — §5 reconciled to as-built; `clientTz` validated to IANA token; A.1 inventory corrected; `historyDayCount` now counts active days. |
+| 4 | Store/privacy disclosures not launch-ready | **Docs updated** (DATA_SAFETY F-003 action, PRIVACY) — **still needs human privacy sign-off** (Part A). |
+| 8 | No user appeal UI; owner happy-path untested; override lifetime | **Open (owner/UI)** — appeal/moderation backend exists; UI + owner-claim emulator fixture + override-expiry policy are follow-ups (Part D). |
+| 9 | Retention/TTL undecided | **Open (owner)** — mechanism can be added once a period is chosen (Part A retention field). |
+| 11 | `communityReviews` (incl. appeal text) excluded from export | **Open (reviewer decision)** — withholding anti-cheat internals may be correct; access to the user's own appeal text needs a documented approach (Part A). |
+
 ---
 
 ## Part A — Privacy sign-off (REQUIRED)
@@ -37,11 +56,11 @@ score) that a reviewer should weigh.
 
 | Collection | Fields | Sensitivity | Who can read |
 |---|---|---|---|
-| `communityProfiles/{uid}` | `username`, `usernameLower`, `tier`, `points` (0–100), `streakCurrent/Best`, `freezeTokens`, `weekKey`, `calcVersion`, `status`, `provenance`, `scoringTargets` (step/sleep/water/day goals), `targetBelowFloor`, `groupIds` | Handle (user-chosen; could be identifying) + non-sensitive scalars | **Owner (the user)** |
-| `communityProfiles/{uid}/scoreDays/{dayKey}` | `hasHabit`, **`steps`, `sleepH`, `waterL`, `nutritionScore`**, `sessions` (count), `volume` (kg), `activities` (count), `rest`, `freeze`, `rev`, timestamps | **Daily wellness values** (steps/sleep/water/nutrition). No weight/body/notes. | **Owner (the user)** |
-| `communityProfiles/{uid}/scoreEvents/{id}` | `dayKey`, `action`, `after` (a day snapshot), `lagDays`, `weekKey`, **`clientTz`** (IANA zone), `serverTs` | Append-only change trail; `clientTz` is a coarse location signal | **Owner (the user)** |
-| `communityReviews/{uid}` | `uid`, `username`, `flags`, `points`, `status`, `state`, `override`, **`appealNote`** (user free-text ≤500), **`resolutionNote`** (owner free-text ≤500), `resolvedBy`, timestamps | Moderation record; two short free-text fields | **Moderator only** (`owner` claim) — NOT the subject |
-| `leagueStandings/…/members/{uid}` | `username`, `points`, `status`, `calcVersion` | Public-ish leaderboard row | Any signed-in user |
+| `communityProfiles/{uid}` | `username`, `usernameLower`, `tier`, `points` (0–100), `streakCurrent/Best`, **`volume7`, `volume30`, `sessionsThisWeek`**, `freezeTokens`, `weekKey`, `calcVersion`, `status`, `provenance` (incl. `anomalyFlags`), `scoringTargets` (step/sleep/water/day goals), `targetBelowFloor`, `groupIds` | Handle (user-chosen; could be identifying) + training volumes/counts + non-sensitive scalars | **Owner (the user)** |
+| `communityProfiles/{uid}/scoreDays/{dayKey}` | `hasHabit`, **`steps`, `sleepH`, `waterL`, `nutritionScore`**, `sessions` (count), `volume` (kg), `activities` (count), `rest`, `freeze`, `rev`, `firstTs`/`lastTs` | **Daily wellness values** (steps/sleep/water/nutrition). No weight/body/notes. | **Owner (the user)** |
+| `communityProfiles/{uid}/scoreEvents/{id}` | `dayKey`, `action`, `after` (a day snapshot), `lagDays`, `weekKey`, **`clientTz`** (validated to an IANA-shaped token or dropped), `serverTs` | Append-only change trail; `clientTz` is a coarse location signal | **Owner (the user)** |
+| `communityReviews/{uid}` | `uid`, `username`, `weekKey`, `flags`, `points`, `status`, `state`, `override`, **`appealNote`** (user free-text ≤500), **`resolutionNote`** (owner free-text ≤500), `resolvedBy`, `openedAt`/`appealedAt`/`resolvedAt`/`updatedAt` | Moderation record; two short free-text fields | **Moderator only** (`owner` claim) — NOT the subject |
+| `leagueStandings/…/members/{uid}` | **`uid`**, `username`, `points`, `status`, `calcVersion` | Public-ish leaderboard row (`uid` added so deletion can find rows) | Any signed-in user |
 | `usernames/{lower}` | `uid` | Uniqueness map | Any signed-in user |
 | `groups/{gid}/members/{uid}` | `username`, `odometer`, `streak`, `bestStreak`, `volume7/30`, `sessionsThisWeek`, `status` | Denormalised stats for friend groups | Group members |
 
@@ -111,14 +130,21 @@ The rules + backend behaviour are covered by emulator suites that **could not ru
 the build sandbox (no JDK)**. They must pass in CI (or a JDK-equipped machine)
 before go-live.
 
+> **Independent review 2026-08-06 found `test:community` RED (6/9)** — root cause a
+> descending document-id scan (`orderBy(__name__, 'desc')`) the Firestore emulator
+> rejects. **Fixed** in `finalizeStanding` (now a bounded `where(documentId >=
+> floor)` range read). This MUST be re-confirmed green in CI on the release SHA — it
+> was the exact gap that hid the bug the first time (no JDK locally).
+
 ```bash
 npm run test:rules       # firestore.rules — incl. scoreDays/scoreEvents/communityReviews gates
 npm run test:community   # syncCommunityStats recompute, held/withheld, appeal flow, non-owner reject
 ```
 
 - ☐ `test:rules` green
-- ☐ `test:community` green
-- ☐ Deployed `firestore.rules` match the repo (`firebase deploy --only firestore:rules`)
+- ☐ `test:community` green (was 6/9; re-run after the descending-scan fix)
+- ☐ Deployed `firestore.rules` **and `firestore.indexes.json`** match the repo (the
+      rollover promotion query needs the new `members(status, points)` index)
 - ☐ Deployed functions build from this commit
 
 | Run by | Date | Commit SHA | Result |
@@ -129,15 +155,23 @@ npm run test:community   # syncCommunityStats recompute, held/withheld, appeal f
 
 ## Part C — App Check decision (REQUIRED)
 
-Two anomaly signals — **device-churn** and meaningful **rate limiting** — depend on
-**native App Check**, which is not yet enforceable (no native app registered — see
-[`APP_CHECK.md`](../APP_CHECK.md), memory `firebase-verified-state`). The
-device-churn rule is currently **stubbed + inert** (`deviceTokenCount` fixed at 1).
+The **device-churn** anomaly signal depends on **native App Check**, which is not
+yet enforceable (no native app registered — see [`APP_CHECK.md`](../APP_CHECK.md),
+memory `firebase-verified-state`). That rule is **stubbed + inert**
+(`deviceTokenCount` fixed at 1).
+
+> **Remediated since the independent review:** all community + group callables now
+> call the `auditAppCheck` monitor and honour `enforceAppCheck: APP_CHECK_ENFORCED`
+> (flip via the `APPCHECK_ENFORCE` env var — no code change), and `syncCommunityStats`
+> / `appealStanding` now apply per-account daily **rate limits** (`enforceDailyLimit`).
+> So "ship now, monitored" is now an accurate description of the code — the only
+> residual is that the device-churn rule stays inert until native attestation exists.
 
 Decide one:
-- ☐ **Ship now** with the device-churn rule stubbed + logged (accept the residual
-  risk that a single account can't be caught farming device tokens yet), OR
-- ☐ **Wait** for native App Check before flipping the flag.
+- ☐ **Ship now** with App Check in monitor mode + rate limits, device-churn inert
+  (accept the residual that a single account can't yet be caught farming device
+  tokens), OR
+- ☐ **Wait** for native App Check enforcement before flipping the flag.
 
 | Decision | Owner | Date |
 |---|---|---|
