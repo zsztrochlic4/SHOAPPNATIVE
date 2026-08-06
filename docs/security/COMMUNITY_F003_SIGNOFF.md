@@ -59,8 +59,10 @@ Source of truth: [`functions/src/community.ts`](../../functions/src/community.ts
   sufficient?*
 - **Deletion:** account deletion **recursively purges** `communityProfiles`
   (profile + `scoreDays` + `scoreEvents`) — [`functions/src/account.ts`](../../functions/src/account.ts)
-  `RECURSIVE_DOCS`. *(Note: `communityReviews/{uid}`, `usernames/{lower}` and past
-  `leagueStandings` member rows are NOT yet in the deletion registry — see A.4.)*
+  `RECURSIVE_DOCS` — and additionally deletes `communityReviews/{uid}`, releases the
+  `usernames/{lower}` handle reservation (if still owned), and removes every
+  historical `leagueStandings` member row (found by the `uid` field via a
+  collection-group query). See A.4 (now resolved).
 - **Export:** "Download my data" includes the community profile + scoreDays +
   scoreEvents — [`src/store/cloudRepo.ts`](../../src/store/cloudRepo.ts)
   `collectUserExport`, scope in [`dataExport.ts`](../../src/lib/dataExport.ts).
@@ -80,12 +82,14 @@ Source of truth: [`functions/src/community.ts`](../../functions/src/community.ts
 - ☐ Lawful basis / consent approach for the competitive processing is settled.
 - ☐ No unresolved privacy concerns (or all listed under "Conditions" below).
 
-### A.4 Known residual for the reviewer to rule on
+### A.4 Residual — RESOLVED (2026-08-06)
 
-Deletion currently purges `communityProfiles/**` but **not** `communityReviews/{uid}`,
-the `usernames/{lower}` handle-reservation, or historical `leagueStandings` member
-rows. Decide whether these must also be purged on account deletion before go-live
-(engineering can add them to the deletion registry quickly if required).
+Account deletion now also purges `communityReviews/{uid}`, releases the
+`usernames/{lower}` handle reservation (only if the user still owns it), and deletes
+every historical `leagueStandings` member row (via the `uid` field). Wired in
+[`functions/src/account.ts`](../../functions/src/account.ts) `purgeAccountData`,
+best-effort + logged so it never blocks the essential deletion. The reviewer only
+needs to confirm this covers their expectation — no open decision remains here.
 
 ### A.5 Privacy record (complete + sign)
 
@@ -94,7 +98,7 @@ rows. Decide whether these must also be purged on account deletion before go-liv
 | Reviewer name / role | ______ |
 | Date (ISO) | ______ |
 | Retention decision | ______ |
-| A.4 residual decision (purge reviews/usernames/standings on delete?) | ______ |
+| A.4 deletion coverage (reviews/usernames/standings) confirmed adequate | ☐ yes ☐ needs change: ______ |
 | Conditions / required changes | ______ |
 | Decision | ☐ Approved ☐ Approved w/ conditions ☐ Rejected |
 | Signature | ______ |

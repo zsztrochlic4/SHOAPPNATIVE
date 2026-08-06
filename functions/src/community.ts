@@ -400,7 +400,10 @@ async function finalizeStanding(
     { merge: true },
   )
   await db.doc(`leagueStandings/${weekKey}/tiers/${tier}/members/${uid}`).set(
-    { username, points: rankedPoints, status, calcVersion: CALC_VERSION },
+    // `uid` is stored (in addition to being the doc id) so account deletion can find
+    // every one of a user's historical standing rows via a collection-group query
+    // (functions/src/account.ts). It's the doc id anyway, so it leaks nothing new.
+    { uid, username, points: rankedPoints, status, calcVersion: CALC_VERSION },
     { merge: true },
   )
 

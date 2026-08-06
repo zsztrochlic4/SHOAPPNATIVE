@@ -254,11 +254,13 @@ Built and verified (2026-08-06):
 Deferred / owner + infra (block flipping the flag):
 
 - [x] **Deletion + export wired**: account deletion recursively purges
-      `communityProfiles` (incl. `scoreDays`/`scoreEvents`) in
+      `communityProfiles` (incl. `scoreDays`/`scoreEvents`) AND deletes
+      `communityReviews/{uid}`, releases the `usernames/{lower}` handle, and removes
+      historical `leagueStandings` rows (by `uid`) — all in
       [`functions/src/account.ts`](../../functions/src/account.ts); "Download my
-      data" now gathers the community profile + scoring log
+      data" gathers the community profile + scoring log
       ([`src/store/cloudRepo.ts`](../../src/store/cloudRepo.ts) `collectUserExport`,
-      scope documented in [`dataExport.ts`](../../src/lib/dataExport.ts)).
+      scope in [`dataExport.ts`](../../src/lib/dataExport.ts)).
 - [ ] **Privacy sign-off**: the per-day log is new granular personal data. The
       mechanics are wired (above); a human privacy review of the data collected +
       [`PRIVACY.md`](../PRIVACY.md)/[`DATA_SAFETY.md`](../DATA_SAFETY.md) copy is
