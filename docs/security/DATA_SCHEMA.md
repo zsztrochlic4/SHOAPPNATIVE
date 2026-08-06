@@ -21,8 +21,26 @@ users/{uid}                      Zone A — singleton root document
 users/{uid}/{collection}/{id}    Zone A — allowlisted per-entry logs
 entitlements/{uid}               Zone B — authoritative paid entitlement (server-only writes)
 config/coach                     global coach runtime config (auth read-only)
+communityProfiles/{uid}          Zone B — league profile (server-only writes, owner read)
+communityProfiles/{uid}/scoreDays/{dayKey}   Zone B — F-003 per-day scoring inputs (server-write, owner read)
+communityProfiles/{uid}/scoreEvents/{id}     Zone B — F-003 append-only immutable change trail
+leagueStandings/…/members/{uid}  Zone B — weekly standings (server-write, signed-in read)
 <everything else>                default-deny
 ```
+
+### Community competitive integrity (F-003)
+
+The competition hub's scoring inputs and standings are **Zone B (server-owned)**:
+all client writes are denied, and the community Cloud Functions
+([`functions/src/community.ts`](../../functions/src/community.ts)) are the only
+writers. `syncCommunityStats` no longer trusts client-computed metrics — it stores
+raw daily inputs in an immutable, server-timestamped log and **recomputes** league
+/group points itself with the shared scoring core
+([`src/community/scoring.ts`](../../src/community/scoring.ts)), stamping a
+`calcVersion` + provenance + integrity `status` on each standing. The per-day log
+(`scoreDays`/`scoreEvents`) is **owner-readable** for transparency/export and
+carries no bodies or free text — only activity counts, habit values and timestamps.
+See [`COMMUNITY_INTEGRITY_F003.md`](COMMUNITY_INTEGRITY_F003.md).
 
 ### Root document `users/{uid}`
 

@@ -325,3 +325,42 @@ test('sessions: oversized exercises list and non-list exercises are denied', asy
   await assertFails(setDoc(doc(db, 'users', ALICE, 'sessions', 's-3'), { id: 's-3', dateKey: DK, name: 'Push', exercises: 'not-a-list', volumeKg: 1, durationMin: 1 }))
   await assertFails(setDoc(doc(db, 'users', ALICE, 'sessions', 's-4'), { id: 's-4', dateKey: DK, name: 'Push', exercises: ex(3), volumeKg: 99999999, durationMin: 20 }))
 })
+
+/* ------------- community competitive integrity (F-003) --------------- */
+
+test('communityProfiles: owner reads own; other reads + all client writes denied', async () => {
+  await seed((db) => setDoc(doc(db, 'communityProfiles', ALICE), { username: 'alex', tier: 0, points: 40 }))
+  await assertSucceeds(getDoc(doc(aliceDb(), 'communityProfiles', ALICE)))
+  await assertFails(getDoc(doc(bobDb(), 'communityProfiles', ALICE)))
+  // The whole point of F-003: a client can never write its own points/tier.
+  await assertFails(setDoc(doc(aliceDb(), 'communityProfiles', ALICE), { points: 100 }, { merge: true }))
+})
+
+test('scoreDays: owner may read the log; client create/update/delete all denied', async () => {
+  await seed((db) => setDoc(doc(db, 'communityProfiles', ALICE, 'scoreDays', DK), { hasHabit: true, steps: 9000, volume: 4200, rev: 1 }))
+  // Owner transparency: read + list own event-derived day docs.
+  await assertSucceeds(getDoc(doc(aliceDb(), 'communityProfiles', ALICE, 'scoreDays', DK)))
+  await assertSucceeds(getDocs(collection(aliceDb(), 'communityProfiles', ALICE, 'scoreDays')))
+  // Immutable from every client: no forging or editing the scoring inputs.
+  await assertFails(setDoc(doc(aliceDb(), 'communityProfiles', ALICE, 'scoreDays', DK), { steps: 999999 }, { merge: true }))
+  await assertFails(setDoc(doc(aliceDb(), 'communityProfiles', ALICE, 'scoreDays', '2026-07-27'), { hasHabit: true, steps: 1 }))
+  await assertFails(deleteDoc(doc(aliceDb(), 'communityProfiles', ALICE, 'scoreDays', DK)))
+  // And another user can neither read nor write someone else's log.
+  await assertFails(getDoc(doc(bobDb(), 'communityProfiles', ALICE, 'scoreDays', DK)))
+})
+
+test('scoreEvents: append-only audit trail is owner-read, client-write denied', async () => {
+  await seed((db) => setDoc(doc(db, 'communityProfiles', ALICE, 'scoreEvents', 'e1'), { dayKey: DK, action: 'set', lagDays: 0 }))
+  await assertSucceeds(getDoc(doc(aliceDb(), 'communityProfiles', ALICE, 'scoreEvents', 'e1')))
+  await assertSucceeds(getDocs(collection(aliceDb(), 'communityProfiles', ALICE, 'scoreEvents')))
+  await assertFails(setDoc(doc(aliceDb(), 'communityProfiles', ALICE, 'scoreEvents', 'e2'), { dayKey: DK, action: 'set' }))
+  await assertFails(setDoc(doc(aliceDb(), 'communityProfiles', ALICE, 'scoreEvents', 'e1'), { action: 'change' }, { merge: true }))
+  await assertFails(deleteDoc(doc(aliceDb(), 'communityProfiles', ALICE, 'scoreEvents', 'e1')))
+  await assertFails(getDocs(collection(bobDb(), 'communityProfiles', ALICE, 'scoreEvents')))
+})
+
+test('leagueStandings: any signed-in user may read; client writes denied', async () => {
+  await seed((db) => setDoc(doc(db, 'leagueStandings', '2026-07-27', 'tiers', '0', 'members', ALICE), { username: 'alex', points: 40, status: 'ok' }))
+  await assertSucceeds(getDoc(doc(bobDb(), 'leagueStandings', '2026-07-27', 'tiers', '0', 'members', ALICE)))
+  await assertFails(setDoc(doc(aliceDb(), 'leagueStandings', '2026-07-27', 'tiers', '0', 'members', ALICE), { username: 'alex', points: 100 }, { merge: true }))
+})

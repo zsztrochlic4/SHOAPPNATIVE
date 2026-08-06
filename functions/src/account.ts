@@ -49,7 +49,10 @@ export type DeletionPhase = 'accepted' | 'auth_revoked' | 'data_deleted' | 'comp
  * be added here (and to the export in src/store/cloudRepo.ts where
  * client-readable).
  */
-const RECURSIVE_DOCS = ['users', 'coachUsers'] as const // root doc + all subcollections
+// Root docs whose whole subtree is removed. `communityProfiles` carries the F-003
+// per-day scoring log (scoreDays/scoreEvents) as subcollections, so it MUST be a
+// recursive delete — deleting the parent doc alone would orphan that personal data.
+const RECURSIVE_DOCS = ['users', 'coachUsers', 'communityProfiles'] as const
 const SINGLE_DOCS = ['coachSafety', 'entitlements'] as const
 
 function jobRef(uid: string) {

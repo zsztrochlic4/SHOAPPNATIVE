@@ -120,6 +120,14 @@ audience identified in the feature, such as a campus, residence, society or
 wider community. Until a social feature is active, content of this kind that you
 create is stored only in your own account.
 
+To keep competitive leaderboards fair, when you take part in leagues or groups we
+also keep a per-day record of the activity that determines your ranking — for
+example how many workouts or habit check-ins you logged on a given day, and the
+time it was recorded. This record is used only to calculate your score on our
+servers (so rankings cannot be faked from a modified app), is visible only to you,
+and contains no body measurements, health notes or free text. It is removed when
+you delete your account.
+
 **Connected-service information**
 
 If you connect a compatible on-device health service such as Apple Health (iOS)

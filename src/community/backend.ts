@@ -14,6 +14,7 @@ import { httpsCallable } from 'firebase/functions'
 import { collection, doc, getDoc, getDocs, orderBy, query } from 'firebase/firestore'
 import { auth, db, firebaseEnabled, functions } from '../lib/firebase'
 import { COMMUNITY_BACKEND } from './backendConfig'
+import type { DayRecord, ScoringTargets } from './scoring'
 
 /** True only when the flag is on AND Firebase is actually configured. */
 export function isCommunityBackendOn(): boolean {
@@ -46,15 +47,16 @@ export async function claimUsernameRemote(username: string): Promise<{ ok: true;
   return res.data
 }
 
-/** Push this device's honest weekly consistency + streak to the server, which
- *  mirrors it into the current week's league standings. */
-export async function syncStatsRemote(stats: {
-  points: number
-  streakCurrent: number
-  streakBest: number
-  freezeTokens: number
-}): Promise<{ ok: true; tier: number; weekKey: string }> {
-  const res = await call<typeof stats, { ok: true; tier: number; weekKey: string }>('syncCommunityStats')(stats)
+/** Push this device's RAW daily activity + goal targets to the server (F-003).
+ *  The server never trusts a client-computed metric: it stores these inputs in an
+ *  immutable log and RECOMPUTES the league/group numbers itself, returning the
+ *  authoritative tier + integrity status. See functions/src/community.ts. */
+export async function syncStatsRemote(payload: {
+  targets: ScoringTargets
+  days: DayRecord[]
+  clientTz?: string
+}): Promise<{ ok: true; tier: number; weekKey: string; calcVersion: string; status: 'ok' | 'provisional' | 'held' }> {
+  const res = await call<typeof payload, { ok: true; tier: number; weekKey: string; calcVersion: string; status: 'ok' | 'provisional' | 'held' }>('syncCommunityStats')(payload)
   return res.data
 }
 

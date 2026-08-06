@@ -38,6 +38,11 @@ const ENTRIES = [
   'backend/coach/safety/llmClassifier.ts',
   'backend/coach/safety/types.ts',
   'backend/coach/safety/runCoachSafetyTests.ts',
+  // Community competition scoring — the server recomputes league/group metrics
+  // from its immutable event log using the SAME pure code the app displays, so
+  // points can't be forged and the two can't drift (F-003). Both are firebase-free.
+  'community/scoring.ts',
+  'community/anomaly.ts',
 ].map((p) => join(srcRoot, p))
 
 /** Resolve a relative import specifier from `fromFile` to an existing .ts under src/. */

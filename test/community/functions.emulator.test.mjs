@@ -106,19 +106,58 @@ test('cheerGroupActivity: toggles the count up then back down', async () => {
   await rejectsCode(C.call('cheerGroupActivity', { groupId: g.groupId, activityId: 'a-streak' }), 'permission-denied')
 })
 
-test('syncCommunityStats: writes league standings and fans out to group members', async () => {
+test('syncCommunityStats: recomputes from RAW inputs, ignores client-claimed points (F-003)', async () => {
   const g = await B.call('createGroup', { name: 'Stats Test', icon: 'trending', color: '#3B82F6' })
+
+  // A recent civil day (server anchors to Australia/Sydney; ±1 day tz slack is fine
+  // — the day stays inside the 7-day windows either way).
+  const today = new Date()
+  const iso = (d) => d.toISOString().slice(0, 10)
+  const dayKey = iso(today)
+
   const res = await B.call('syncCommunityStats', {
-    points: 80, streakCurrent: 5, streakBest: 12, freezeTokens: 1, volume7: 15000, volume30: 60000, sessionsThisWeek: 4,
+    // A modified client tries to inject a finished score — it MUST be ignored.
+    points: 999,
+    targets: { stepTarget: 10000, sleepTargetH: 8, waterTargetL: 2.5, daysPerWeek: 4 },
+    days: [
+      { dayKey, hasHabit: true, steps: 10000, sleepH: 8, waterL: 2.5, nutritionScore: 8, sessions: 1, volume: 15000, activities: 0 },
+    ],
+    clientTz: 'Australia/Sydney',
   })
   assert.equal(res.ok, true)
-  // League standing for this week/tier reflects the points.
+  assert.equal(res.calcVersion, 'v1')
+  assert.equal(res.status, 'ok') // one honest day → clean
+
+  // The standing carries a SERVER-recomputed score, never the injected 999.
   const standing = await getDoc(doc(B.db, `leagueStandings/${res.weekKey}/tiers/${res.tier}/members/${B.uid}`))
-  assert.equal(standing.get('points'), 80)
-  // The group member doc got the fresh stats (denormalised fan-out).
+  const points = standing.get('points')
+  assert.notEqual(points, 999)
+  assert.ok(typeof points === 'number' && points > 0 && points <= 100)
+  assert.equal(standing.get('status'), 'ok')
+  assert.equal(standing.get('calcVersion'), 'v1')
+
+  // Group fan-out reflects the recomputed values (volume is a deterministic sum).
   const member = await getDoc(doc(B.db, `groups/${g.groupId}/members/${B.uid}`))
-  assert.equal(member.get('odometer'), 80)
+  assert.equal(member.get('odometer'), points)
   assert.equal(member.get('volume7'), 15000)
+
+  // The immutable per-day log was written and is owner-readable.
+  const day = await getDoc(doc(B.db, `communityProfiles/${B.uid}/scoreDays/${dayKey}`))
+  assert.equal(day.exists(), true)
+  assert.equal(day.get('volume'), 15000)
+})
+
+test('syncCommunityStats: an impossible session cadence is held back from the ranked ladder', async () => {
+  const today = new Date().toISOString().slice(0, 10)
+  const res = await B.call('syncCommunityStats', {
+    targets: { stepTarget: 10000, sleepTargetH: 8, waterTargetL: 2.5, daysPerWeek: 4 },
+    days: [{ dayKey: today, hasHabit: true, steps: 10000, sleepH: 8, waterL: 2.5, nutritionScore: 8, sessions: 15, volume: 99999, activities: 0 }],
+  })
+  assert.equal(res.status, 'held')
+  // Held → points withheld from the ranked standing (0), even though a raw odometer exists.
+  const standing = await getDoc(doc(B.db, `leagueStandings/${res.weekKey}/tiers/${res.tier}/members/${B.uid}`))
+  assert.equal(standing.get('points'), 0)
+  assert.equal(standing.get('status'), 'held')
 })
 
 test('deleteGroup: owner-only', async () => {

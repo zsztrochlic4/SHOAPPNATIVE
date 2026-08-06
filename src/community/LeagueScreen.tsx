@@ -10,8 +10,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { View, Text, Pressable } from 'react-native'
 import { Trophy, Snowflake, Moon, Info, ChevronRight, ArrowUp, ArrowDown, ShieldCheck, Clock, UserPlus, Users } from 'lucide-react-native'
 import { useStore } from '../store/store'
-import { myLeaderStats, streakRisk } from '../store/selectors'
-import { todayKey } from '../lib/date'
+import { myLeaderStats, streakRisk, buildDayRecords, targetsFrom } from '../store/selectors'
+import { todayKey, deviceTimezone } from '../lib/date'
+import type { DayRecord, ScoringTargets } from './scoring'
 import { shareText } from '../lib/share'
 import { useColors, brand } from '../theme'
 import { Avatar } from '../components/Avatar'
@@ -32,7 +33,10 @@ interface LeagueData { rows: LeagueRow[]; youRank: number; zone: Zone; tier: Tie
  * it pushes the user's honest weekly points, then reads the real cohort standings
  * for their tier, with loading/error states.
  */
-function useLeagueData(me: ReturnType<typeof myLeaderStats>, storedTier: number, freezeTokens: number, enabled: boolean): LeagueData {
+/** The raw inputs the client sends the server to recompute from (F-003). */
+type SyncPayload = { targets: ScoringTargets; days: DayRecord[]; clientTz?: string }
+
+function useLeagueData(me: ReturnType<typeof myLeaderStats>, sync: SyncPayload, storedTier: number, enabled: boolean): LeagueData {
   const local = useMemo<LeagueData>(() => {
     const t = tierOf(storedTier)
     const r = simulateLeague(me, t, weekKey())
@@ -52,10 +56,12 @@ function useLeagueData(me: ReturnType<typeof myLeaderStats>, storedTier: number,
         // Firebase adapter loaded on demand, only when the flag is on.
         const backend = await import('./backend')
         if (!backend.isCommunityBackendOn()) { if (!cancelled) setRemote(null); return }
-        const sync = await backend.syncStatsRemote({ points: me.odometer, streakCurrent: me.streakCurrent, streakBest: me.streakBest, freezeTokens })
-        const raw = await backend.loadLeagueStandingsRemote(sync.weekKey, sync.tier)
+        // F-003: send RAW inputs; the server recomputes points itself and returns
+        // the authoritative tier. We never post a computed points/streak.
+        const res = await backend.syncStatsRemote(sync)
+        const raw = await backend.loadLeagueStandingsRemote(res.weekKey, res.tier)
         if (cancelled) return
-        const tier = tierOf(sync.tier)
+        const tier = tierOf(res.tier)
         const rows: LeagueRow[] = raw.map((r, i) => ({ rank: i + 1, username: r.username, points: r.points, isYou: r.isYou, zone: zoneFor(i + 1, tier, raw.length) }))
         const you = rows.find((r) => r.isYou)
         setRemote({ rows, youRank: you?.rank ?? 0, zone: you?.zone ?? 'safe', tier, status: 'ready', reload })
@@ -65,7 +71,7 @@ function useLeagueData(me: ReturnType<typeof myLeaderStats>, storedTier: number,
     })()
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, nonce, me.odometer, me.streakCurrent, me.streakBest, freezeTokens, storedTier])
+  }, [enabled, nonce, sync, storedTier])
 
   // Flag off → always the local simulation; on → remote once ready, local until then.
   return COMMUNITY_BACKEND && remote ? remote : local
@@ -76,8 +82,15 @@ export function LeagueScreen({ onClaimUsername }: { onClaimUsername: () => void 
   const me = useMemo(() => myLeaderStats(state), [state])
   const [view, setView] = useState<'league' | 'global'>('league')
   const [howOpen, setHowOpen] = useState(false)
-  const freezeTokens = state.community.freezeTokens ?? 0
   const storedTier = state.community.league?.tier ?? 0
+
+  // F-003: the client sends RAW daily inputs + goal targets; the server recomputes
+  // the competitive metrics itself. Built here (the component holds full state) and
+  // threaded through, so useLeagueData never posts a client-computed points/streak.
+  const syncPayload = useMemo<SyncPayload>(
+    () => ({ targets: targetsFrom(state.profile), days: buildDayRecords(state), clientTz: deviceTimezone() ?? undefined }),
+    [state],
+  )
 
   // Weekly freeze grant — idempotent, only fires when a new week has started.
   useEffect(() => {
@@ -85,7 +98,7 @@ export function LeagueScreen({ onClaimUsername }: { onClaimUsername: () => void 
   }, [dispatch])
 
   // Hooks must run before any early return.
-  const data = useLeagueData(me, storedTier, freezeTokens, !!me.username)
+  const data = useLeagueData(me, syncPayload, storedTier, !!me.username)
 
   // No username yet: browse the global streak board and claim when ready.
   if (!me.username) return <GlobalLeaderboard onClaimUsername={onClaimUsername} />

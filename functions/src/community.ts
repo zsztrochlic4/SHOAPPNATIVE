@@ -11,13 +11,23 @@
  *   usernames/{lower}                                  → { uid }        (uniqueness map)
  *   communityProfiles/{uid}                            → { username, usernameLower, tier,
  *                                                          points, streakCurrent, streakBest,
- *                                                          freezeTokens, weekKey, updatedAt }
- *   leagueStandings/{weekKey}/tiers/{tier}/members/{uid} → { username, points }
+ *                                                          freezeTokens, weekKey, calcVersion,
+ *                                                          status, provenance, updatedAt }
+ *   communityProfiles/{uid}/scoreDays/{dayKey}         → server-owned current per-day inputs
+ *   communityProfiles/{uid}/scoreEvents/{autoId}       → append-only immutable change log
+ *   leagueStandings/{weekKey}/tiers/{tier}/members/{uid} → { username, points, status, calcVersion }
  *
- * Everything stored is non-sensitive by design — a handle and consistency points
- * (0–100), never bodies, weight or logs.
+ * F-003 (competitive integrity). syncCommunityStats no longer trusts client-computed
+ * metrics. The client sends RAW daily inputs; the server appends them to an
+ * immutable, server-timestamped event log and RECOMPUTES odometer/streak/volume/
+ * sessions itself, using the exact same pure code the app displays
+ * (src/community/scoring.ts, synced into ./_shared). Every standing carries a
+ * calcVersion + provenance, and implausible ones are held back from the ranked
+ * ladder by the anomaly rules (src/community/anomaly.ts). See
+ * docs/security/COMMUNITY_INTEGRITY_F003.md. Everything stored is non-sensitive by
+ * design — handle, 0–100 points, streak, per-day activity — never bodies or logs.
  *
- * STATUS: first implementation. Client is feature-flagged OFF
+ * STATUS: F-003 remediation. Client is feature-flagged OFF
  * (src/community/backendConfig.ts COMMUNITY_BACKEND = false). Run the emulator
  * rules/functions tests and review before enabling + deploying. Callables run in
  * australia-southeast2 (matching the app); scheduled jobs in australia-southeast1
@@ -28,6 +38,14 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { onSchedule } from 'firebase-functions/v2/scheduler'
 import * as logger from 'firebase-functions/logger'
 import { requireAuth } from './lib/guards'
+import {
+  CALC_VERSION,
+  computeCompetitionMetrics,
+  type DayRecord,
+  type ScoringTargets,
+  type TimeContext,
+} from './_shared/community/scoring'
+import { evaluateAnomalies, type AnomalySignals } from './_shared/community/anomaly'
 
 /** Promotion/demotion counts per tier — mirror of src/community/league.ts TIERS. */
 const TIERS = [
@@ -66,6 +84,36 @@ function mondayKey(d: Date): string {
   const dow = WEEKDAY_INDEX[get('weekday')] ?? 0
   const monday = new Date(Date.UTC(y, m - 1, day - dow))
   return monday.toISOString().slice(0, 10)
+}
+
+/** The civil date (YYYY-MM-DD) of instant `d` in the app's home timezone. This is
+ *  the server's "today" — the counterpart to the client's device-local todayKey. */
+function civilDayKey(d: Date): string {
+  const parts = APP_TZ_PARTS.formatToParts(d)
+  const get = (t: string): string => parts.find((p) => p.type === t)?.value ?? ''
+  return `${get('year')}-${get('month')}-${get('day')}`
+}
+
+/** YYYY-MM-DD `n` days before the civil day `today` (n=0 → today). Pure calendar
+ *  arithmetic on the civil date, matching the client's lib/date.dayKey. */
+function offsetKeyFrom(today: string, n: number): string {
+  const [y, m, day] = today.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, day - n)).toISOString().slice(0, 10)
+}
+
+/** Whole calendar days that `dayKey` sits behind `today` (0 = today, 1 = yesterday;
+ *  negative if in the future). Used to flag backfilled (retro-stuffed) events. */
+function dayLag(today: string, key: string): number {
+  const t = Date.parse(today + 'T00:00:00Z')
+  const k = Date.parse(key + 'T00:00:00Z')
+  return Math.round((t - k) / 86400000)
+}
+
+/** Build the injected time context the shared scoring module needs, anchored to
+ *  the app's home timezone so server recompute matches the client's civil week. */
+function serverCtx(now: Date): TimeContext {
+  const today = civilDayKey(now)
+  return { todayKey: today, offsetKey: (n: number) => offsetKeyFrom(today, n) }
 }
 
 /** Stream a query in bounded pages (ordered by document id), invoking `onDoc` for
@@ -137,64 +185,259 @@ export const claimUsername = onCall<ClaimInput>(
 
 /* ------------------------------ syncCommunityStats ------------------------- */
 
-interface SyncInput {
-  points?: number
-  streakCurrent?: number
-  streakBest?: number
-  freezeTokens?: number
-  volume7?: number
-  volume30?: number
-  sessionsThisWeek?: number
+/** One raw day of self-reported activity, as the client sends it. The server
+ *  NEVER trusts a client-computed metric — only these atomic inputs, which it
+ *  timestamps, stores immutably, and recomputes from (F-003). */
+interface DayInput {
+  dayKey?: string
+  hasHabit?: boolean
+  steps?: number
+  sleepH?: number
+  waterL?: number
+  nutritionScore?: number
+  sessions?: number
+  volume?: number
+  activities?: number
+  rest?: boolean
+  freeze?: boolean
 }
 
-const intIn = (v: unknown, min: number, max: number): number => {
-  const n = typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : min
+interface SyncInput {
+  targets?: Partial<ScoringTargets>
+  days?: DayInput[]
+  clientTz?: string
+}
+
+/** Bounds. Ingest is capped per call (rate-limited elsewhere too); recompute
+ *  reads a rolling window wide enough for the 400-day streak. */
+const MAX_INGEST_DAYS = 45
+const MAX_HISTORY_DAYS = 460
+const DAY_KEY_RE = /^\d{4}-\d{2}-\d{2}$/
+
+/** Target floors/caps. A self-reported target below its floor is a gaming lever
+ *  (lower your goal → inflate your ratio), so the server clamps it up AND flags
+ *  the standing for review. Caps also bound absurd values. */
+const TARGET_FLOORS: ScoringTargets = { stepTarget: 3000, sleepTargetH: 5, waterTargetL: 1, daysPerWeek: 2 }
+const TARGET_CAPS: ScoringTargets = { stepTarget: 50000, sleepTargetH: 14, waterTargetL: 10, daysPerWeek: 14 }
+
+const clampNum = (v: unknown, min: number, max: number, dflt = min): number => {
+  const n = typeof v === 'number' && Number.isFinite(v) ? v : dflt
   return Math.max(min, Math.min(max, n))
 }
+const clampInt = (v: unknown, min: number, max: number, dflt = min): number => Math.round(clampNum(v, min, max, dflt))
 
-/** Push the user's honest weekly consistency (odometer points) + streak to the
- *  server, which mirrors it into this week's league standings for their tier. */
+/** Clamp self-reported targets into [floor, cap]; report whether any value came
+ *  in below its floor (a review signal, not a hard reject — legit users can have
+ *  low goals; the anomaly layer decides). */
+function clampTargets(raw: Partial<ScoringTargets> | undefined): { targets: ScoringTargets; targetBelowFloor: boolean } {
+  const r = raw ?? {}
+  let below = false
+  const one = (key: keyof ScoringTargets): number => {
+    const v = r[key]
+    if (typeof v === 'number' && Number.isFinite(v) && v < TARGET_FLOORS[key]) below = true
+    return clampNum(v, TARGET_FLOORS[key], TARGET_CAPS[key], TARGET_FLOORS[key])
+  }
+  return {
+    targets: { stepTarget: one('stepTarget'), sleepTargetH: one('sleepTargetH'), waterTargetL: one('waterTargetL'), daysPerWeek: one('daysPerWeek') },
+    targetBelowFloor: below,
+  }
+}
+
+/** Validate + clamp one incoming day into a canonical DayRecord, or null if the
+ *  dayKey is malformed or outside the acceptable window (too far future/past).
+ *  Field ranges mirror the Zone A habit/session caps in firestore.rules. */
+function validateDay(d: DayInput, today: string): DayRecord | null {
+  const dayKey = typeof d.dayKey === 'string' ? d.dayKey : ''
+  if (!DAY_KEY_RE.test(dayKey)) return null
+  const lag = dayLag(today, dayKey)
+  if (lag < -1 || lag > MAX_HISTORY_DAYS) return null // >1 day future, or older than the window
+  return {
+    dayKey,
+    hasHabit: d.hasHabit === true,
+    steps: clampInt(d.steps, 0, 500000),
+    sleepH: clampNum(d.sleepH, 0, 24),
+    waterL: clampNum(d.waterL, 0, 50),
+    nutritionScore: clampNum(d.nutritionScore, 0, 10),
+    sessions: clampInt(d.sessions, 0, 20),
+    volume: clampNum(d.volume, 0, 1_000_000),
+    activities: clampInt(d.activities, 0, 30),
+    rest: d.rest === true,
+    freeze: d.freeze === true,
+  }
+}
+
+/** The stored per-day fields (everything a DayRecord carries except its id key). */
+type DayContent = Omit<DayRecord, 'dayKey'>
+function dayContent(r: DayRecord): DayContent {
+  const { dayKey: _drop, ...rest } = r
+  return rest
+}
+/** Read a stored scoreDays doc back into a DayRecord for recompute. */
+function toDayRecord(id: string, doc: FirebaseFirestore.DocumentSnapshot): DayRecord {
+  const num = (f: string): number => (typeof doc.get(f) === 'number' ? doc.get(f) : 0)
+  return {
+    dayKey: id,
+    hasHabit: doc.get('hasHabit') === true,
+    steps: num('steps'), sleepH: num('sleepH'), waterL: num('waterL'), nutritionScore: num('nutritionScore'),
+    sessions: num('sessions'), volume: num('volume'), activities: num('activities'),
+    rest: doc.get('rest') === true, freeze: doc.get('freeze') === true,
+  }
+}
+const DAY_FIELDS: (keyof DayContent)[] = ['hasHabit', 'steps', 'sleepH', 'waterL', 'nutritionScore', 'sessions', 'volume', 'activities', 'rest', 'freeze']
+function sameDayContent(a: DayContent, b: DayContent): boolean {
+  return DAY_FIELDS.every((f) => a[f] === b[f])
+}
+
+/** Monday (YYYY-MM-DD) of the civil week a dayKey falls in — pure calendar math,
+ *  for bucketing history into weeks when measuring volume trends. */
+function mondayOfCivil(key: string): string {
+  const [y, m, d] = key.split('-').map(Number)
+  const dow = (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7 // Mon = 0
+  return new Date(Date.UTC(y, m - 1, d - dow)).toISOString().slice(0, 10)
+}
+
+/** Median of prior complete weeks' total volume (excluding the current week), or
+ *  null with too little history — the baseline the volume-jump anomaly rule uses. */
+function medianPriorWeeklyVolume(records: DayRecord[], currentWeekKey: string): number | null {
+  const byWeek = new Map<string, number>()
+  for (const r of records) {
+    const wk = mondayOfCivil(r.dayKey)
+    if (wk === currentWeekKey) continue
+    byWeek.set(wk, (byWeek.get(wk) ?? 0) + r.volume)
+  }
+  const weeks = [...byWeek.values()].sort((a, b) => a - b)
+  if (weeks.length < 2) return null
+  const mid = Math.floor(weeks.length / 2)
+  return weeks.length % 2 ? weeks[mid] : (weeks[mid - 1] + weeks[mid]) / 2
+}
+
+/**
+ * F-003 authoritative recompute. The client posts RAW daily inputs; the server
+ * appends any changed day to an immutable, server-timestamped log, then recomputes
+ * every competitive metric itself with the shared scoring code, flags implausible
+ * results, and writes a provenance-stamped standing (implausible ones held back
+ * from the ranked ladder). No client-computed metric is ever trusted.
+ */
 export const syncCommunityStats = onCall<SyncInput>(
   { region: 'australia-southeast2' },
   async (req) => {
     const uid = requireAuth(req)
-    const points = intIn(req.data?.points, 0, 100)
-    const streakCurrent = intIn(req.data?.streakCurrent, 0, 10000)
-    const streakBest = intIn(req.data?.streakBest, 0, 10000)
-    const freezeTokens = intIn(req.data?.freezeTokens, 0, FREEZE_CAP)
-    const volume7 = intIn(req.data?.volume7, 0, 100_000_000)
-    const volume30 = intIn(req.data?.volume30, 0, 400_000_000)
-    const sessionsThisWeek = intIn(req.data?.sessionsThisWeek, 0, 50)
+    const now = new Date()
+    const ctx = serverCtx(now)
+    const weekKey = mondayKey(now)
+    const clientTz = typeof req.data?.clientTz === 'string' ? req.data.clientTz.slice(0, 64) : ''
+
+    const { targets, targetBelowFloor } = clampTargets(req.data?.targets)
+    const incoming = Array.isArray(req.data?.days) ? req.data!.days!.slice(0, MAX_INGEST_DAYS) : []
+    const days = incoming.map((d) => validateDay(d, ctx.todayKey)).filter((d): d is DayRecord => d != null)
 
     const db = getFirestore()
     const profRef = db.collection('communityProfiles').doc(uid)
     const prof = await profRef.get()
     const username = prof.get('username') as string | undefined
     if (!username) throw new HttpsError('failed-precondition', 'Claim a username first.')
-
     const tier = clampTier(typeof prof.get('tier') === 'number' ? prof.get('tier') : 0)
-    const weekKey = mondayKey(new Date())
 
-    // These stats also feed the friend-group leaderboards; they're stored on the
-    // profile and fanned out to the user's group member docs by syncGroupStats.
+    const scoreDays = profRef.collection('scoreDays')
+    const scoreEvents = profRef.collection('scoreEvents')
+
+    // --- ingest: append immutable events + upsert current per-day docs -------
+    // Only days whose content actually CHANGED produce a write, so re-syncing the
+    // same window is idempotent and the event log stays bounded. Every change is
+    // recorded in the append-only scoreEvents trail (never updated/deleted).
+    let backfilledDayCount = 0
+    if (days.length) {
+      const refs = days.map((d) => scoreDays.doc(d.dayKey))
+      const snaps = await db.getAll(...refs)
+      const batch = db.batch()
+      days.forEach((d, i) => {
+        const existing = snaps[i]
+        const content = dayContent(d)
+        if (existing.exists && sameDayContent(toDayRecord(d.dayKey, existing), d)) return
+        const lag = dayLag(ctx.todayKey, d.dayKey)
+        if (lag > 1) backfilledDayCount++
+        const rev = (existing.exists && typeof existing.get('rev') === 'number' ? existing.get('rev') : 0) + 1
+        batch.set(refs[i], { ...content, rev, firstTs: existing.exists ? existing.get('firstTs') ?? FieldValue.serverTimestamp() : FieldValue.serverTimestamp(), lastTs: FieldValue.serverTimestamp() }, { merge: true })
+        batch.set(scoreEvents.doc(), { dayKey: d.dayKey, action: existing.exists ? 'change' : 'set', after: content, lagDays: lag, weekKey, clientTz, serverTs: FieldValue.serverTimestamp() })
+      })
+      await batch.commit()
+    }
+
+    // --- recompute from the durable per-day log (server-authoritative) -------
+    const histSnap = await scoreDays.orderBy(FieldPath.documentId(), 'desc').limit(MAX_HISTORY_DAYS).get()
+    const records: DayRecord[] = histSnap.docs.map((doc) => toDayRecord(doc.id, doc))
+    const metrics = computeCompetitionMetrics({ records, targets, ctx })
+
+    // --- anomaly evaluation → status (ok | provisional | held) --------------
+    const signals: AnomalySignals = {
+      maxSessionsPerDay: records.reduce((m, r) => Math.max(m, r.sessions), 0),
+      maxActivitiesPerDay: records.reduce((m, r) => Math.max(m, r.activities), 0),
+      volume7: metrics.volume7,
+      medianPriorWeeklyVolume: medianPriorWeeklyVolume(records, weekKey),
+      odometer: metrics.odometer,
+      historyDayCount: records.length,
+      backfilledDayCount,
+      targetBelowFloor,
+      deviceTokenCount: 1, // inert until native App Check is enforced (see anomaly.ts)
+    }
+    const { status, flags } = evaluateAnomalies(signals)
+
+    // Implausible standings are computed + stored, but withheld from the ranked
+    // ladder (points → 0 in the standing) until a clean recompute clears them.
+    const rankedPoints = status === 'ok' ? metrics.odometer : 0
+    const provenance = {
+      eventCount: records.length,
+      windowStart: records.length ? records[records.length - 1].dayKey : ctx.todayKey,
+      windowEnd: ctx.todayKey,
+      anomalyFlags: flags,
+      backfilledDayCount,
+    }
+
     await profRef.set(
-      { points, streakCurrent, streakBest, freezeTokens, volume7, volume30, sessionsThisWeek, tier, weekKey, updatedAt: FieldValue.serverTimestamp() },
+      {
+        points: metrics.odometer,
+        streakCurrent: metrics.streakCurrent,
+        streakBest: metrics.streakBest,
+        volume7: metrics.volume7,
+        volume30: metrics.volume30,
+        sessionsThisWeek: metrics.sessions7,
+        tier,
+        weekKey,
+        calcVersion: CALC_VERSION,
+        status,
+        provenance,
+        updatedAt: FieldValue.serverTimestamp(),
+      },
       { merge: true },
     )
-    await db.doc(`leagueStandings/${weekKey}/tiers/${tier}/members/${uid}`).set({ username, points }, { merge: true })
+    await db.doc(`leagueStandings/${weekKey}/tiers/${tier}/members/${uid}`).set(
+      { username, points: rankedPoints, status, calcVersion: CALC_VERSION },
+      { merge: true },
+    )
 
-    // Fan the fresh stats out to the user's friend-group member docs so group
-    // leaderboards reflect current activity (communityGroups.ts owns the shape).
+    // Fan the recomputed stats out to the user's friend-group member docs so group
+    // leaderboards reflect authoritative activity (communityGroups.ts owns the shape).
     const groupIds: string[] = Array.isArray(prof.get('groupIds')) ? prof.get('groupIds') : []
     if (groupIds.length) {
-      const memberStats = { username, odometer: points, streak: streakCurrent, bestStreak: streakBest, volume7, volume30, sessionsThisWeek }
+      const memberStats = {
+        username,
+        odometer: metrics.odometer,
+        streak: metrics.streakCurrent,
+        bestStreak: metrics.streakBest,
+        volume7: metrics.volume7,
+        volume30: metrics.volume30,
+        sessionsThisWeek: metrics.sessions7,
+        status,
+      }
       const batch = db.batch()
       for (const gid of groupIds.slice(0, 50)) {
         batch.set(db.doc(`groups/${gid}/members/${uid}`), memberStats, { merge: true })
       }
       await batch.commit()
     }
-    return { ok: true, tier, weekKey }
+
+    if (status !== 'ok') logger.info('community.syncCommunityStats.flagged', { status, flags, backfilledDayCount })
+    return { ok: true, tier, weekKey, calcVersion: CALC_VERSION, status }
   },
 )
 
