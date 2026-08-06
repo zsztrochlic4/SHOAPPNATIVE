@@ -525,6 +525,10 @@ export interface GroupMember {
   /** sessions logged in the last 7 days — contributes to the team goal. Optional
    *  on legacy data (treated as 0). */
   sessionsThisWeek?: number
+  /** F-003 competitive-integrity status. `held`/`provisional` standings have their
+   *  ranking metrics withheld (server-zeroed) and should be shown as "under review"
+   *  rather than ranked. Absent = treat as 'ok' (local simulation / legacy data). */
+  status?: 'ok' | 'provisional' | 'held'
 }
 
 /** One "cheer" (reaction-only social) tally on a group activity event, keyed by

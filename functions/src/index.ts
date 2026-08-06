@@ -31,7 +31,7 @@ export { sendNotification, dedupePushToken } from './notifications'
 export { createCheckoutSession, createBillingPortalSession, stripeWebhook } from './billing'
 // Community competition hub (leagues + forgiving streaks). Client is feature-
 // flagged OFF until these are emulator-tested and deployed.
-export { claimUsername, syncCommunityStats, rolloverLeagues, grantStreakFreezes } from './community'
+export { claimUsername, syncCommunityStats, rolloverLeagues, grantStreakFreezes, reprocessStandings, pruneScoreLog, appealStanding, resolveStandingReview } from './community'
 // Private friend groups (create / join / leave / delete / goal / cheer). Also
 // feature-flagged OFF client-side.
 export { createGroup, joinGroupByPasscode, leaveGroup, deleteGroup, setGroupGoal, cheerGroupActivity } from './communityGroups'

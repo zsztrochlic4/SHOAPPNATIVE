@@ -3,6 +3,7 @@ import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore'
 import { getStorage } from 'firebase-admin/storage'
 import { getAuth } from 'firebase-admin/auth'
+import * as logger from 'firebase-functions/logger'
 import { requireAuth, auditAppCheck, APP_CHECK_ENFORCED } from './lib/guards'
 
 /**
@@ -47,9 +48,14 @@ export type DeletionPhase = 'accepted' | 'auth_revoked' | 'data_deleted' | 'comp
  * Deletion registry — every UID-bearing Firestore location (audit F-013). Keep
  * this list in sync with firestore.rules; anything new that stores a uid MUST
  * be added here (and to the export in src/store/cloudRepo.ts where
- * client-readable).
+ * client-readable). Community data outside communityProfiles/{uid}
+ * (communityReviews, the usernames reservation, historical leagueStandings rows)
+ * is handled explicitly in purgeAccountData below.
  */
-const RECURSIVE_DOCS = ['users', 'coachUsers'] as const // root doc + all subcollections
+// Root docs whose whole subtree is removed. `communityProfiles` carries the F-003
+// per-day scoring log (scoreDays/scoreEvents) as subcollections, so it MUST be a
+// recursive delete — deleting the parent doc alone would orphan that personal data.
+const RECURSIVE_DOCS = ['users', 'coachUsers', 'communityProfiles'] as const
 const SINGLE_DOCS = ['coachSafety', 'entitlements'] as const
 
 function jobRef(uid: string) {
@@ -83,6 +89,17 @@ async function revokeIdentity(uid: string): Promise<void> {
 /** Step 2 — delete all Firestore data + Storage objects. Idempotent. */
 async function purgeAccountData(uid: string): Promise<void> {
   const db = getFirestore()
+
+  // Capture the community handle BEFORE the profile subtree is deleted — we need
+  // its lowercase form to release the `usernames/{lower}` reservation below.
+  let usernameLower: string | null = null
+  try {
+    const prof = await db.collection('communityProfiles').doc(uid).get()
+    if (prof.exists) usernameLower = (prof.get('usernameLower') as string) || (prof.get('username') as string) || null
+  } catch {
+    /* community backend off / not readable — nothing to release */
+  }
+
   for (const col of RECURSIVE_DOCS) {
     await db.recursiveDelete(db.collection(col).doc(uid))
   }
@@ -94,6 +111,44 @@ async function purgeAccountData(uid: string): Promise<void> {
   // this makes "delete all my data" literally true now.
   const buckets = await db.collection('rateLimits').where('uid', '==', uid).get()
   for (const d of buckets.docs) await d.ref.delete()
+
+  // Community data that lives OUTSIDE communityProfiles/{uid} (so the recursive
+  // delete above didn't reach it): the moderation review record, the username
+  // reservation, and every historical league-standing row (F-003 privacy sign-off
+  // §A.4). Each step is idempotent and attempted independently so a retry makes
+  // progress; if ANY fails we THROW, which keeps the deletion job at 'auth_revoked'
+  // (in_progress) so the scheduled sweep retries it — the job must NOT be marked
+  // complete while personal data remains (the audit record would lie).
+  const failed: string[] = []
+  const attempt = async (label: string, fn: () => Promise<void>): Promise<void> => {
+    try { await fn() } catch (err) { failed.push(label); logger.warn('account.purge.community_step_failed', { uid, step: label, err: String(err) }) }
+  }
+  await attempt('reviews', () => db.collection('communityReviews').doc(uid).delete().then(() => undefined))
+  await attempt('username', async () => {
+    // Release the handle only if this user still owns it (guards a since-reassigned
+    // reservation — claimUsername keeps usernames/{lower}.uid in sync with the owner).
+    if (!usernameLower) return
+    const nameRef = db.collection('usernames').doc(usernameLower)
+    const nameSnap = await nameRef.get()
+    if (nameSnap.exists && nameSnap.get('uid') === uid) await nameRef.delete()
+  })
+  await attempt('standings', async () => {
+    // Historical standings: one member doc per week/tier, each carrying a `uid`
+    // field for exactly this lookup. Scoped to leagueStandings so a future `uid` on
+    // a group member doc could never be swept here.
+    const standings = await db.collectionGroup('members').where('uid', '==', uid).get()
+    let batch = db.batch()
+    let ops = 0
+    for (const d of standings.docs) {
+      if (!d.ref.path.startsWith('leagueStandings/')) continue
+      batch.delete(d.ref)
+      if (++ops >= 400) { await batch.commit(); batch = db.batch(); ops = 0 }
+    }
+    if (ops > 0) await batch.commit()
+  })
+  if (failed.length) {
+    throw new Error(`community cleanup incomplete: ${failed.join(', ')} — deletion job kept in progress for retry`)
+  }
   // Any Storage objects for this user (best-effort; none are stored today).
   try {
     await getStorage().bucket().deleteFiles({ prefix: `users/${uid}/` })

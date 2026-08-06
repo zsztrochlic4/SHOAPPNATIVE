@@ -120,6 +120,21 @@ audience identified in the feature, such as a campus, residence, society or
 wider community. Until a social feature is active, content of this kind that you
 create is stored only in your own account.
 
+To keep competitive leaderboards fair, when you take part in leagues or groups we
+also keep a per-day record of the activity that determines your ranking. This
+includes, for each day, the daily wellness figures you log — your **step count,
+hours of sleep, water intake and a nutrition-adherence score** — along with how
+many workouts or other activities you logged, your training volume, any rest or
+streak-freeze days, and the time each was recorded. This record is used to
+calculate your leaderboard score on our servers (so rankings cannot be faked from a
+modified app) and to detect implausible activity; it is visible only to you,
+contains no body measurements, weight or health notes, and is retained only for the
+period needed for scoring before being automatically deleted. It is included when
+you download your data and removed when you delete your account. If you appeal a
+review decision, the note you write is kept with your community profile (and is in
+your data download); the anti-cheat and moderation details behind a review are not
+shown to you.
+
 **Connected-service information**
 
 If you connect a compatible on-device health service such as Apple Health (iOS)

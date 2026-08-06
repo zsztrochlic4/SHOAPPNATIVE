@@ -203,6 +203,21 @@ export async function collectUserExport(
     const snap = await getDocs(collection(db!, 'coachUsers', uid, name))
     if (snap.size) collections[`coach_${name}`] = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
   }))
+  // Community competitive profile + the F-003 scoring log (owner-readable). This is
+  // server-owned data outside users/{uid}: the league handle/tier/points/streak
+  // plus the per-day inputs (scoreDays) and the immutable change trail (scoreEvents)
+  // the server recomputes standings from. No bodies or free text. Deleted with the
+  // account via functions/src/account.ts (communityProfiles is a recursive delete).
+  try {
+    const communitySnap = await getDoc(doc(db, 'communityProfiles', uid))
+    if (communitySnap.exists()) profile.communityProfile = communitySnap.data()
+    await Promise.all((['scoreDays', 'scoreEvents'] as const).map(async (name) => {
+      const snap = await getDocs(collection(db!, 'communityProfiles', uid, name))
+      if (snap.size) collections[`community_${name}`] = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+    }))
+  } catch {
+    /* rules may deny when the community backend is off — the manifest documents scope */
+  }
   return { profile, collections }
 }
 

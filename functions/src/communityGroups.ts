@@ -21,7 +21,7 @@
  */
 import { FieldValue, getFirestore, type DocumentSnapshot } from 'firebase-admin/firestore'
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
-import { requireAuth } from './lib/guards'
+import { requireVerifiedUser, APP_CHECK_ENFORCED } from './lib/guards'
 
 const REGION = 'australia-southeast2'
 const NAME_MIN = 2
@@ -63,8 +63,8 @@ async function requireProfile(uid: string): Promise<DocumentSnapshot> {
 
 interface CreateInput { name?: string; icon?: string; color?: string }
 
-export const createGroup = onCall<CreateInput>({ region: REGION }, async (req) => {
-  const uid = requireAuth(req)
+export const createGroup = onCall<CreateInput>({ region: REGION, enforceAppCheck: APP_CHECK_ENFORCED }, async (req) => {
+  const uid = requireVerifiedUser(req, 'communityGroups')
   const name = (req.data?.name ?? '').trim()
   if (name.length < NAME_MIN || name.length > NAME_MAX) {
     throw new HttpsError('invalid-argument', `Group name must be ${NAME_MIN}–${NAME_MAX} characters.`)
@@ -101,8 +101,8 @@ export const createGroup = onCall<CreateInput>({ region: REGION }, async (req) =
 
 interface JoinInput { groupId?: string; passcode?: string }
 
-export const joinGroupByPasscode = onCall<JoinInput>({ region: REGION }, async (req) => {
-  const uid = requireAuth(req)
+export const joinGroupByPasscode = onCall<JoinInput>({ region: REGION, enforceAppCheck: APP_CHECK_ENFORCED }, async (req) => {
+  const uid = requireVerifiedUser(req, 'communityGroups')
   const groupId = (req.data?.groupId ?? '').trim()
   const code = normalizeCode(req.data?.passcode ?? '')
   if (!groupId || !code) throw new HttpsError('invalid-argument', 'A group and passcode are required.')
@@ -133,8 +133,8 @@ export const joinGroupByPasscode = onCall<JoinInput>({ region: REGION }, async (
 
 /* ---------------------------------- leave ---------------------------------- */
 
-export const leaveGroup = onCall<{ groupId?: string }>({ region: REGION }, async (req) => {
-  const uid = requireAuth(req)
+export const leaveGroup = onCall<{ groupId?: string }>({ region: REGION, enforceAppCheck: APP_CHECK_ENFORCED }, async (req) => {
+  const uid = requireVerifiedUser(req, 'communityGroups')
   const groupId = (req.data?.groupId ?? '').trim()
   if (!groupId) throw new HttpsError('invalid-argument', 'A group is required.')
 
@@ -155,8 +155,8 @@ export const leaveGroup = onCall<{ groupId?: string }>({ region: REGION }, async
 
 /* --------------------------------- delete ---------------------------------- */
 
-export const deleteGroup = onCall<{ groupId?: string }>({ region: REGION }, async (req) => {
-  const uid = requireAuth(req)
+export const deleteGroup = onCall<{ groupId?: string }>({ region: REGION, enforceAppCheck: APP_CHECK_ENFORCED }, async (req) => {
+  const uid = requireVerifiedUser(req, 'communityGroups')
   const groupId = (req.data?.groupId ?? '').trim()
   if (!groupId) throw new HttpsError('invalid-argument', 'A group is required.')
 
@@ -186,8 +186,8 @@ export const deleteGroup = onCall<{ groupId?: string }>({ region: REGION }, asyn
 
 /* -------------------------------- set goal --------------------------------- */
 
-export const setGroupGoal = onCall<{ groupId?: string; goal?: number }>({ region: REGION }, async (req) => {
-  const uid = requireAuth(req)
+export const setGroupGoal = onCall<{ groupId?: string; goal?: number }>({ region: REGION, enforceAppCheck: APP_CHECK_ENFORCED }, async (req) => {
+  const uid = requireVerifiedUser(req, 'communityGroups')
   const groupId = (req.data?.groupId ?? '').trim()
   const goal = Math.max(1, Math.min(200, Math.round(typeof req.data?.goal === 'number' ? req.data.goal : 12)))
   if (!groupId) throw new HttpsError('invalid-argument', 'A group is required.')
@@ -207,8 +207,8 @@ export const setGroupGoal = onCall<{ groupId?: string; goal?: number }>({ region
 
 interface CheerInput { groupId?: string; activityId?: string }
 
-export const cheerGroupActivity = onCall<CheerInput>({ region: REGION }, async (req) => {
-  const uid = requireAuth(req)
+export const cheerGroupActivity = onCall<CheerInput>({ region: REGION, enforceAppCheck: APP_CHECK_ENFORCED }, async (req) => {
+  const uid = requireVerifiedUser(req, 'communityGroups')
   const groupId = (req.data?.groupId ?? '').trim()
   const activityId = (req.data?.activityId ?? '').trim()
   if (!groupId || !activityId) throw new HttpsError('invalid-argument', 'A group and activity are required.')

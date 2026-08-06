@@ -1,5 +1,5 @@
 import { currentWeekKeys, dayKey, todayKey, fromKey, toKey, addDays } from '../lib/date'
-import type { AppState, HabitDay, WorkoutSession } from './types'
+import type { AppState, HabitDay, WorkoutSession, Profile } from './types'
 import {
   workoutPoints,
   strengthProgressFromPoints,
@@ -7,6 +7,66 @@ import {
   bestLiftIdFromPoints,
   volumeByWeekFromPoints,
 } from './workoutSummary'
+import {
+  weeklyIndexCore,
+  computeStreak,
+  computeCompetitionMetrics,
+  dayMeetsGoals,
+  type ScoringTargets,
+  type DayRecord,
+  type TimeContext,
+} from '../community/scoring'
+
+/** The competition-scoring goal targets, read from the user's profile. Applied
+ *  uniformly across history (matching the app's use of current profile targets). */
+export function targetsFrom(p: Profile): ScoringTargets {
+  return {
+    stepTarget: p.stepTarget,
+    sleepTargetH: p.sleepTargetH,
+    waterTargetL: p.waterTargetL,
+    daysPerWeek: p.daysPerWeek,
+  }
+}
+
+/** Live client time context for the shared scoring module — reads lib/date's
+ *  live-binding clock (frozen in demo, real otherwise). Built per call so the
+ *  reassigned `todayKey` binding is always current. */
+function clientCtx(): TimeContext {
+  return { todayKey, offsetKey: dayKey }
+}
+
+/** Normalize AppState into the day-log the shared scoring module consumes — one
+ *  record per active day, aggregating habits, completed sessions, self-logged
+ *  activities and streak protections. This is also what the community backend
+ *  sends the server to recompute from (see src/community/backend.ts). */
+export function buildDayRecords(s: AppState): DayRecord[] {
+  const map = new Map<string, DayRecord>()
+  const get = (k: string): DayRecord => {
+    let r = map.get(k)
+    if (!r) {
+      r = { dayKey: k, hasHabit: false, steps: 0, sleepH: 0, waterL: 0, nutritionScore: 0, sessions: 0, volume: 0, activities: 0, rest: false, freeze: false }
+      map.set(k, r)
+    }
+    return r
+  }
+  for (const h of s.habits) {
+    const r = get(h.dateKey)
+    r.hasHabit = true
+    r.steps = h.steps
+    r.sleepH = h.sleepH
+    r.waterL = h.waterL
+    r.nutritionScore = h.nutritionScore
+  }
+  for (const x of completedSessions(s)) {
+    const r = get(x.dateKey)
+    r.sessions += 1
+    r.volume += x.volumeKg
+  }
+  for (const a of s.activities ?? []) get(a.dateKey).activities += 1
+  for (const k of s.community?.restDays ?? []) get(k).rest = true
+  for (const k of s.community?.frozenDays ?? []) get(k).freeze = true
+  return [...map.values()]
+}
 
 /**
  * DEV-ONLY paywall preview. Set `EXPO_PUBLIC_PAYWALL_PREVIEW=1` in a local .env
@@ -119,51 +179,14 @@ export function totalVolumeRange(s: AppState, days: number) {
 }
 
 /* -------------------------- Streak -------------------------- */
-/** A day "counts" if it meets >= 3 of 4 daily goals. */
-function dayMeetsGoals(h: HabitDay, s: AppState): boolean {
-  const checks = [
-    h.steps >= s.profile.stepTarget * 0.9,
-    h.waterL >= s.profile.waterTargetL * 0.85,
-    h.sleepH >= s.profile.sleepTargetH * 0.85,
-    h.nutritionScore >= 7,
-  ]
-  return checks.filter(Boolean).length >= 3
-}
-
+/** Forgiving streaks (Recommendation 2): the definition now lives in the shared
+ *  scoring module (src/community/scoring.ts) so the community backend computes the
+ *  SAME streak server-side (F-003). A day "counts" if it's protected (rest/freeze)
+ *  or its habit meets ≥3 of 4 daily goals. */
 export function streakStats(s: AppState) {
-  const byKey = new Map(s.habits.map((h) => [h.dateKey, h]))
-  // Forgiving streaks (Recommendation 2): a day also "counts" if the user marked
-  // it a rest day or protected it with a freeze token — so a planned off day or a
-  // single covered miss never resets the streak. Empty by default (identical to
-  // the original behaviour), so nothing changes for users who don't use them.
+  const habitByDay = new Map<string, HabitDay>(s.habits.map((h) => [h.dateKey, h]))
   const protectedDays = new Set([...(s.community?.restDays ?? []), ...(s.community?.frozenDays ?? [])])
-  const dayOk = (k: string): boolean => {
-    if (protectedDays.has(k)) return true
-    const h = byKey.get(k)
-    return h ? dayMeetsGoals(h, s) : false
-  }
-
-  // current: count back from yesterday (today is in-progress), including today if it already qualifies
-  let current = 0
-  const start = dayOk(todayKey) ? 0 : 1
-  for (let n = start; n < 400; n++) {
-    if (dayOk(dayKey(n))) current++
-    else break
-  }
-  // best: longest run across all history (protected days count too)
-  const keys = [...new Set([...s.habits.map((h) => h.dateKey), ...protectedDays])].sort()
-  let best = 0
-  let run = 0
-  let prev: string | null = null
-  for (const k of keys) {
-    const ok = dayOk(k)
-    const consecutive = prev ? isNextDay(prev, k) : true
-    if (ok && (consecutive || run === 0)) run++
-    else run = ok ? 1 : 0
-    best = Math.max(best, run)
-    prev = k
-  }
-  return { current, best: Math.max(best, current) }
+  return computeStreak({ habitByDay, protectedDays, targets: targetsFrom(s.profile), ctx: clientCtx() })
 }
 
 /** Is yesterday an unprotected miss (so the streak just broke / is about to)?
@@ -173,14 +196,8 @@ export function streakRisk(s: AppState): { atRisk: boolean; dayKey: string } {
   const isProtected = (s.community?.restDays ?? []).includes(y) || (s.community?.frozenDays ?? []).includes(y)
   if (isProtected) return { atRisk: false, dayKey: y }
   const h = s.habits.find((x) => x.dateKey === y)
-  const met = h ? dayMeetsGoals(h, s) : false
+  const met = h ? dayMeetsGoals(h, targetsFrom(s.profile)) : false
   return { atRisk: !met, dayKey: y }
-}
-
-function isNextDay(a: string, b: string) {
-  const da = new Date(a + 'T00:00:00').getTime()
-  const db = new Date(b + 'T00:00:00').getTime()
-  return Math.round((db - da) / 86400000) === 1
 }
 
 /* -------------------------- Nutrition -------------------------- */
@@ -338,34 +355,15 @@ export type WeeklyIndex = {
 /** Reviews the last 7 days of activity vs the user's targets into a single
  *  needle position. 1.0x of targets = the middle ("on track"). */
 export function weeklyIndex(s: AppState): WeeklyIndex {
-  const p = s.profile
   const byKey = new Map(s.habits.map((h) => [h.dateKey, h]))
   const last7 = Array.from({ length: 7 }, (_, d) => dayKey(d))
   const days = last7.map((k) => byKey.get(k)).filter(Boolean) as HabitDay[]
-  const n = Math.max(1, days.length)
-
-  const avg = (sel: (h: HabitDay) => number) => days.reduce((a, h) => a + sel(h), 0) / n
   // Count prescribed sessions and self-logged activities. All fitness counts.
   const workouts = workoutsInRange(s, 7) + activitiesInRange(s, 7).length
 
-  // Each ratio: 1.0 means the target was met across the week.
-  const r = {
-    workouts: workouts / Math.max(1, p.daysPerWeek),
-    steps: p.stepTarget ? avg((h) => h.steps) / p.stepTarget : 0,
-    sleep: p.sleepTargetH ? avg((h) => h.sleepH) / p.sleepTargetH : 0,
-    water: p.waterTargetL ? avg((h) => h.waterL) / p.waterTargetL : 0,
-    nutrition: avg((h) => h.nutritionScore) / 8, // 8/10 counts as on-track
-  }
-  const clamp = (x: number) => Math.max(0, Math.min(1.7, x))
-  const weighted =
-    clamp(r.workouts) * 0.30 +
-    clamp(r.steps) * 0.20 +
-    clamp(r.sleep) * 0.20 +
-    clamp(r.water) * 0.15 +
-    clamp(r.nutrition) * 0.15
-
-  // weighted ≈ 1 → middle (50). 1.7x → ~85+, 0 → 0.
-  const score = Math.round(Math.max(0, Math.min(100, weighted * 50)))
+  // Score + per-dimension ratios come from the shared scoring core so the
+  // dashboard odometer and the server-recomputed league points can never drift.
+  const { score, ratios: r } = weeklyIndexCore(days, workouts, targetsFrom(s.profile))
 
   const band: WeeklyIndex['band'] =
     score >= 80 ? 'crushing' : score >= 62 ? 'ahead' : score >= 44 ? 'ontrack' : score >= 28 ? 'behind' : 'off'
@@ -399,18 +397,19 @@ export function weeklyIndex(s: AppState): WeeklyIndex {
  *  single source the community leaderboards use for the "you" row so a rank
  *  always reflects actual training, not a stored snapshot. */
 export function myLeaderStats(s: AppState) {
-  const streak = streakStats(s)
-  const idx = weeklyIndex(s)
+  // Single source with the server: the same computeCompetitionMetrics runs here
+  // over AppState and server-side over the immutable event log (F-003 parity).
+  const m = computeCompetitionMetrics({ records: buildDayRecords(s), targets: targetsFrom(s.profile), ctx: clientCtx() })
   return {
     username: s.community.username,
-    odometer: idx.score,
-    streakCurrent: streak.current,
-    streakBest: streak.best,
-    volume7: Math.round(totalVolumeRange(s, 7)),
-    volume30: Math.round(totalVolumeRange(s, 30)),
+    odometer: m.odometer,
+    streakCurrent: m.streakCurrent,
+    streakBest: m.streakBest,
+    volume7: m.volume7,
+    volume30: m.volume30,
     // Sessions logged in the last 7 days (prescribed + self-logged) — the unit the
     // shared weekly team goal counts.
-    sessionsThisWeek: workoutsInRange(s, 7) + activitiesInRange(s, 7).length,
+    sessionsThisWeek: m.sessions7,
   }
 }
 

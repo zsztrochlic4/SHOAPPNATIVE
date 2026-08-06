@@ -362,12 +362,29 @@ service cloud.firestore {
     }
 
     // Per-user community record: username, current league tier, this week's
-    // points, streak + freeze tokens. Owner-readable; written only by the
-    // community functions (claimUsername / syncCommunityStats / rolloverLeagues),
-    // so points and tier can't be forged by a modified client.
+    // points, streak + freeze tokens, plus F-003 provenance (calcVersion, status).
+    // Owner-readable; written only by the community functions (claimUsername /
+    // syncCommunityStats / rolloverLeagues), so points and tier can't be forged.
     match /communityProfiles/{uid} {
       allow get: if request.auth != null && request.auth.uid == uid;
       allow list, write: if false;
+
+      // F-003 competitive-integrity event log. The server (syncCommunityStats)
+      // recomputes league/group metrics from these instead of trusting client
+      // numbers. Owner may READ their own for transparency/export; ALL client
+      // writes are denied — the callable (Admin SDK) is the ONLY writer, and it
+      // only ever appends (scoreEvents is never updated or deleted), so the log
+      // is immutable from every client's perspective.
+      //   scoreDays/{dayKey}  — current server-owned per-day inputs (recompute source)
+      //   scoreEvents/{id}    — append-only immutable change trail (audit/anomaly)
+      match /scoreDays/{dayKey} {
+        allow get, list: if request.auth != null && request.auth.uid == uid;
+        allow write: if false;
+      }
+      match /scoreEvents/{eventId} {
+        allow get, list: if request.auth != null && request.auth.uid == uid;
+        allow write: if false;
+      }
     }
 
     // Weekly league standings, one member doc per user, grouped by week + tier.
@@ -375,6 +392,17 @@ service cloud.firestore {
     // leaderboard data); only the functions write them.
     match /leagueStandings/{weekKey}/tiers/{tier}/members/{uid} {
       allow get, list: if request.auth != null;
+      allow write: if false;
+    }
+
+    // F-003 moderation review queue. A held standing lands here (with its anomaly
+    // flags + any moderator override) for the app owner to clear / uphold / reset
+    // via resolveStandingReview. Written ONLY by the community functions. Readable
+    // ONLY by a moderator — the `owner` custom claim (scripts/set-owner-claim.mjs),
+    // the same gate as the notification sender — NEVER by the subject, so anti-cheat
+    // internals don't leak to a flagged user.
+    match /communityReviews/{uid} {
+      allow get, list: if request.auth != null && request.auth.token.owner == true;
       allow write: if false;
     }
 
