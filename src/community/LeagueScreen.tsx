@@ -52,7 +52,11 @@ function useLeagueData(me: ReturnType<typeof myLeaderStats>, storedTier: number,
         // Firebase adapter loaded on demand, only when the flag is on.
         const backend = await import('./backend')
         if (!backend.isCommunityBackendOn()) { if (!cancelled) setRemote(null); return }
-        const sync = await backend.syncStatsRemote({ points: me.odometer, streakCurrent: me.streakCurrent, streakBest: me.streakBest, freezeTokens })
+        const sync = await backend.syncStatsRemote({
+          points: me.odometer, streakCurrent: me.streakCurrent, streakBest: me.streakBest, freezeTokens,
+          // Full metric set so the server doesn't fan out zeros to group members (audit F-011).
+          volume7: me.volume7, volume30: me.volume30, sessionsThisWeek: me.sessionsThisWeek,
+        })
         const raw = await backend.loadLeagueStandingsRemote(sync.weekKey, sync.tier)
         if (cancelled) return
         const tier = tierOf(sync.tier)

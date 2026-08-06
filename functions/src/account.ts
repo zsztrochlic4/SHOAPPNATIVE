@@ -51,6 +51,9 @@ export type DeletionPhase = 'accepted' | 'auth_revoked' | 'data_deleted' | 'comp
  */
 const RECURSIVE_DOCS = ['users', 'coachUsers'] as const // root doc + all subcollections
 const SINGLE_DOCS = ['coachSafety', 'entitlements'] as const
+// Community data (communityProfiles, usernames, group memberships, owned groups,
+// league standings) is UID-bearing but needs bespoke lifecycle handling (handle
+// release, owner-vs-member group cleanup) — see purgeCommunityData below (audit F-004).
 
 function jobRef(uid: string) {
   return getFirestore().collection('deletionJobs').doc(uid)
@@ -80,6 +83,60 @@ async function revokeIdentity(uid: string): Promise<void> {
   }
 }
 
+/**
+ * Community lifecycle purge (audit F-004): a deleted user must not linger in
+ * leaderboards or groups, and their handle must be released. Idempotent — safe to
+ * re-run from the deletion sweep. Owned groups are deleted; joined groups are left
+ * (counts decremented); the current league standing + profile are removed.
+ */
+async function purgeCommunityData(uid: string): Promise<void> {
+  const db = getFirestore()
+  const profRef = db.collection('communityProfiles').doc(uid)
+  const prof = await profRef.get()
+  if (!prof.exists) return
+
+  // Release the username so the handle becomes available again.
+  const usernameLower = prof.get('usernameLower') as string | undefined
+  if (usernameLower) await db.collection('usernames').doc(usernameLower).delete().catch(() => {})
+
+  const groupIds: string[] = Array.isArray(prof.get('groupIds')) ? prof.get('groupIds') : []
+  for (const gid of groupIds) {
+    const groupRef = db.collection('groups').doc(gid)
+    const group = await groupRef.get()
+    if (!group.exists) continue
+    if (group.get('ownerUid') === uid) {
+      // Owner leaving for good → delete the whole group (blocks joins first, pulls
+      // the id from members' profiles, then recursively removes it).
+      await groupRef.set({ status: 'deleting' }, { merge: true }).catch(() => {})
+      await db.collection('groupDirectory').doc(gid).delete().catch(() => {})
+      const members = await groupRef.collection('members').listDocuments()
+      let batch = db.batch()
+      let ops = 0
+      for (const m of members) {
+        if (m.id === uid) continue // this profile is about to be deleted
+        batch.set(db.collection('communityProfiles').doc(m.id), { groupIds: FieldValue.arrayRemove(gid) }, { merge: true })
+        if (++ops >= 400) { await batch.commit(); batch = db.batch(); ops = 0 }
+      }
+      if (ops > 0) await batch.commit()
+      await db.recursiveDelete(groupRef)
+    } else {
+      // Member leaving → drop membership + decrement counts.
+      await groupRef.collection('members').doc(uid).delete().catch(() => {})
+      await groupRef.set({ memberCount: FieldValue.increment(-1) }, { merge: true }).catch(() => {})
+      await db.collection('groupDirectory').doc(gid).set({ memberCount: FieldValue.increment(-1) }, { merge: true }).catch(() => {})
+    }
+  }
+
+  // Remove this user's current league standing (older weeks age out).
+  const weekKey = prof.get('weekKey') as string | undefined
+  const tier = typeof prof.get('tier') === 'number' ? (prof.get('tier') as number) : undefined
+  if (weekKey && tier !== undefined) {
+    await db.doc(`leagueStandings/${weekKey}/tiers/${tier}/members/${uid}`).delete().catch(() => {})
+  }
+
+  await profRef.delete().catch(() => {})
+}
+
 /** Step 2 — delete all Firestore data + Storage objects. Idempotent. */
 async function purgeAccountData(uid: string): Promise<void> {
   const db = getFirestore()
@@ -89,6 +146,8 @@ async function purgeAccountData(uid: string): Promise<void> {
   for (const col of SINGLE_DOCS) {
     await db.collection(col).doc(uid).delete()
   }
+  // Community lifecycle: release handle, exit/own-group cleanup, drop standings.
+  await purgeCommunityData(uid)
   // Rate-limit buckets carry a `uid` field precisely so deletion can find them
   // (their doc ids embed the uid + day). TTL would reap them within days anyway;
   // this makes "delete all my data" literally true now.

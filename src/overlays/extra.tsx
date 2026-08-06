@@ -14,6 +14,7 @@ import { Chip, ProgressBar } from '../components/ui'
 import { TechniqueClip } from '../components/TechniqueClip'
 import { posterOverrideUrl } from '../lib/media'
 import { useDispatch, useStore } from '../store/store'
+import { shareText as shareViaOS } from '../lib/share'
 import { useToast } from '../components/Toast'
 import { useNav } from '../nav'
 import {
@@ -347,15 +348,19 @@ export function ExerciseDetailSheet({ open, onClose, params }: Props) {
 
 /* ====================== PR celebration =========================== */
 export function PRCelebrationSheet({ open, onClose, params }: Props) {
-  const dispatch = useDispatch()
   const toast = useToast()
   const lift = (params?.lift as string) ?? 'a lift'
   const weight = (params?.weight as string) ?? ''
   const reps = (params?.reps as number) ?? 0
 
-  function share() {
-    dispatch({ type: 'ADD_POST', text: `New ${lift} best, ${weight} for ${reps}. Proof that turning up works.` })
-    toast('Shared to your campus feed')
+  // There is no in-app feed to post to (Community is League + Groups only), so
+  // sharing a PR goes through the OS share sheet — a real destination — instead of
+  // writing to a dead feed and falsely confirming "Shared to your campus feed"
+  // (audit F-012).
+  async function share() {
+    const res = await shareViaOS(`New ${lift} best — ${weight} for ${reps} reps. Proof that turning up works.`, 'Personal best')
+    if (res === 'copied') toast('Copied — share it anywhere')
+    else if (res === 'failed') toast("Couldn't open share")
     onClose()
   }
 
