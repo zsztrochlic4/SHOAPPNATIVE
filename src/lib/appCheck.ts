@@ -27,10 +27,11 @@ import { initializeAppCheck, ReCaptchaEnterpriseProvider, type AppCheck } from '
  *    docs/APP_CHECK.md §Native and src/lib/appCheckNative.ts for the full activation checklist.
  */
 
-// NATIVE ACTIVATION (owner) — after `npx expo install @react-native-firebase/app
-// @react-native-firebase/app-check`, uncomment the next line and the native branch in
-// initAppCheck(). Kept commented so the JS-SDK-only build never tries to resolve the native module.
-// import { initNativeAppCheck } from './appCheckNative'
+// NATIVE ACTIVATION — the native bridge is ACTIVE. Metro loads `appCheckNative.native.ts`
+// (App Attest / Play Integrity via @react-native-firebase) on native, and the web no-op
+// `appCheckNative.ts` on web, so the native module never enters the web bundle. UNTESTED on device
+// — verify with an EAS dev build (docs/APP_CHECK.md §Native).
+import { initNativeAppCheck } from './appCheckNative'
 
 const RECAPTCHA_SITE_KEY =
   process.env.EXPO_PUBLIC_APPCHECK_RECAPTCHA_ENTERPRISE_KEY ||
@@ -49,11 +50,10 @@ let appCheck: AppCheck | null = null
 export function initAppCheck(app: FirebaseApp): AppCheck | null {
   if (appCheck) return appCheck
   if (Platform.OS !== 'web') {
-    // NATIVE ACTIVATION (owner): uncomment to bridge App Attest / Play Integrity into the JS SDK.
-    // Requires @react-native-firebase/* installed + a dev/EAS build (see ./appCheckNative header).
-    //   appCheck = initNativeAppCheck(app)
-    //   return appCheck
-    return null   // until activated: reCAPTCHA is web-only, native attestation is a dev-build step
+    // Native: bridge App Attest / Play Integrity into the JS SDK (no-op on web via the platform
+    // split). Returns null if the native module isn't present / init fails — a safe no-op.
+    appCheck = initNativeAppCheck(app)
+    return appCheck
   }
   if (!RECAPTCHA_SITE_KEY) return null       // no key yet → stay a no-op until the console + key are set
   try {
@@ -84,10 +84,9 @@ export interface AppCheckStatus {
   /** App Check actually initialised on this client. */
   active: boolean
   /**
-   * Whether this platform can attest with the CURRENT (JS SDK) wiring. Web can
-   * (reCAPTCHA Enterprise). Native attestation (App Attest / Play Integrity)
-   * needs the native module + a dev build — see docs/APP_CHECK.md — so it reports
-   * false until that path ships.
+   * Whether this platform can attest with the current wiring: web via reCAPTCHA Enterprise, native
+   * via the App Attest / Play Integrity bridge (now active). On native this is a capability flag —
+   * `active` reports whether the bridge actually initialised on THIS device/build.
    */
   attestableNow: boolean
 }
@@ -103,6 +102,6 @@ export function appCheckStatus(): AppCheckStatus {
     siteKeyConfigured: !!RECAPTCHA_SITE_KEY,
     debugToken: !!DEBUG_TOKEN,
     active: appCheck !== null,
-    attestableNow: Platform.OS === 'web' && !!RECAPTCHA_SITE_KEY,
+    attestableNow: Platform.OS === 'web' ? !!RECAPTCHA_SITE_KEY : true,
   }
 }

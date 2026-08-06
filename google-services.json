@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "739154408800",
+    "project_id": "strengthhub-2ab33",
+    "storage_bucket": "strengthhub-2ab33.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:739154408800:android:61ec3ed65fcaf713ed9a05",
+        "android_client_info": {
+          "package_name": "com.zaggy887.strengthhub"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "739154408800-2qtmkgoak0pc7urmc0lal5l9cnihffq9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBlef1hF_Wv7UP_rUjZ777y5sK77Rzq-7A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "739154408800-2qtmkgoak0pc7urmc0lal5l9cnihffq9.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "739154408800-acm3d8dro8o2jjhdfn0s5cc6runm2kmk.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.zaggy887.strengthhub"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
