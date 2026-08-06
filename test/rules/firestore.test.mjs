@@ -325,3 +325,44 @@ test('sessions: oversized exercises list and non-list exercises are denied', asy
   await assertFails(setDoc(doc(db, 'users', ALICE, 'sessions', 's-3'), { id: 's-3', dateKey: DK, name: 'Push', exercises: 'not-a-list', volumeKg: 1, durationMin: 1 }))
   await assertFails(setDoc(doc(db, 'users', ALICE, 'sessions', 's-4'), { id: 's-4', dateKey: DK, name: 'Push', exercises: ex(3), volumeKg: 99999999, durationMin: 20 }))
 })
+
+/* ----------------- community leagues: cohorts (audit F-005) ----------------- */
+
+const WK = '2026-07-27' // a Monday week key
+const COHORT = 't0-1'
+
+test('league cohort meta + members: signed-in read allowed; client write + anon read denied', async () => {
+  await seed(async (db) => {
+    await setDoc(doc(db, 'leagueStandings', WK, 'tiers', '0', 'cohorts', COHORT), { segKey: 't0', size: 2, band: 0, tz: '+1000' })
+    await setDoc(doc(db, 'leagueStandings', WK, 'tiers', '0', 'cohorts', COHORT, 'members', ALICE), { uid: ALICE, username: 'alice', points: 60, rankKey: '040...' })
+  })
+  // Any signed-in user may read the cohort meta + its members (public board).
+  await assertSucceeds(getDoc(doc(aliceDb(), 'leagueStandings', WK, 'tiers', '0', 'cohorts', COHORT)))
+  await assertSucceeds(getDocs(collection(aliceDb(), 'leagueStandings', WK, 'tiers', '0', 'cohorts', COHORT, 'members')))
+  await assertSucceeds(getDoc(doc(bobDb(), 'leagueStandings', WK, 'tiers', '0', 'cohorts', COHORT, 'members', ALICE)))
+  // Anonymous is denied.
+  await assertFails(getDoc(doc(anonDb(), 'leagueStandings', WK, 'tiers', '0', 'cohorts', COHORT, 'members', ALICE)))
+  // Clients can never write standings — only the community functions do.
+  await assertFails(setDoc(doc(aliceDb(), 'leagueStandings', WK, 'tiers', '0', 'cohorts', COHORT, 'members', ALICE), { points: 100 }))
+  await assertFails(setDoc(doc(aliceDb(), 'leagueStandings', WK, 'tiers', '0', 'cohorts', COHORT), { size: 999 }))
+})
+
+test('allocator bookkeeping and rollover markers are inaccessible to all clients', async () => {
+  await seed(async (db) => {
+    await setDoc(doc(db, 'leagueAllocator', WK, 'tiers', '0'), { level: 0 })
+    await setDoc(doc(db, 'leagueAllocator', WK, 'tiers', '0', 'segments', 't0'), { openCohortId: COHORT, openCount: 2, seq: 1 })
+    await setDoc(doc(db, 'leagueRollovers', WK), { done: true, cohorts: 1 })
+  })
+  await assertFails(getDoc(doc(aliceDb(), 'leagueAllocator', WK, 'tiers', '0')))
+  await assertFails(getDoc(doc(aliceDb(), 'leagueAllocator', WK, 'tiers', '0', 'segments', 't0')))
+  await assertFails(getDoc(doc(aliceDb(), 'leagueRollovers', WK)))
+  await assertFails(setDoc(doc(aliceDb(), 'leagueAllocator', WK, 'tiers', '0'), { level: 2 }))
+  await assertFails(setDoc(doc(aliceDb(), 'leagueRollovers', WK), { done: false }))
+})
+
+test('community profile: owner read allowed; stranger read + all client writes denied', async () => {
+  await seed((db) => setDoc(doc(db, 'communityProfiles', ALICE), { username: 'alice', tier: 0, points: 60, cohortId: COHORT, cohortWeekKey: WK }))
+  await assertSucceeds(getDoc(doc(aliceDb(), 'communityProfiles', ALICE)))
+  await assertFails(getDoc(doc(bobDb(), 'communityProfiles', ALICE)))
+  await assertFails(setDoc(doc(aliceDb(), 'communityProfiles', ALICE), { points: 100 }))
+})

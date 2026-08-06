@@ -11,9 +11,10 @@
  *   3. Flip COMMUNITY_BACKEND to true and route service.ts through these calls.
  */
 import { httpsCallable } from 'firebase/functions'
-import { collection, doc, getDoc, getDocs, orderBy, query } from 'firebase/firestore'
+import { collection, doc, getDoc, getDocs, limit, orderBy, query } from 'firebase/firestore'
 import { auth, db, firebaseEnabled, functions } from '../lib/firebase'
 import { COMMUNITY_BACKEND } from './backendConfig'
+import { COHORT_CAP } from './league'
 
 /** True only when the flag is on AND Firebase is actually configured. */
 export function isCommunityBackendOn(): boolean {
@@ -47,14 +48,21 @@ export async function claimUsernameRemote(username: string): Promise<{ ok: true;
 }
 
 /** Push this device's honest weekly consistency + streak to the server, which
- *  mirrors it into the current week's league standings. */
+ *  places the user into (or reuses) their weekly cohort and mirrors the stats into
+ *  that cohort's standings. `sessionsThisWeek` feeds the cohort activity band and
+ *  `tz` its timezone bucket; both are optional. Returns the assigned `cohortId` so
+ *  the caller can read exactly that cohort. */
 export async function syncStatsRemote(stats: {
   points: number
   streakCurrent: number
   streakBest: number
   freezeTokens: number
-}): Promise<{ ok: true; tier: number; weekKey: string }> {
-  const res = await call<typeof stats, { ok: true; tier: number; weekKey: string }>('syncCommunityStats')(stats)
+  sessionsThisWeek?: number
+  volume7?: number
+  volume30?: number
+  tz?: string
+}): Promise<{ ok: true; tier: number; weekKey: string; cohortId: string }> {
+  const res = await call<typeof stats, { ok: true; tier: number; weekKey: string; cohortId: string }>('syncCommunityStats')(stats)
   return res.data
 }
 
@@ -62,12 +70,18 @@ export async function syncStatsRemote(stats: {
 
 export interface RemoteStanding { uid: string; username: string; points: number; isYou: boolean }
 
-/** This week's standings for a tier, ranked by points (server-written, read-only).
- *  Each row is tagged `isYou` against the signed-in uid so the UI can highlight it. */
-export async function loadLeagueStandingsRemote(weekKey: string, tier: number): Promise<RemoteStanding[]> {
-  if (!db) return []
+/** This week's standings for the user's COHORT, already rank-ordered by the server-
+ *  written `rankKey` (points, then tie-breaks) and bounded to a full cohort
+ *  (≤ COHORT_CAP) — read-only. Each row is tagged `isYou` against the signed-in uid
+ *  so the UI can highlight it. */
+export async function loadLeagueStandingsRemote(weekKey: string, tier: number, cohortId: string): Promise<RemoteStanding[]> {
+  if (!db || !cohortId) return []
   const myUid = auth?.currentUser?.uid
-  const q = query(collection(db, `leagueStandings/${weekKey}/tiers/${tier}/members`), orderBy('points', 'desc'))
+  const q = query(
+    collection(db, `leagueStandings/${weekKey}/tiers/${tier}/cohorts/${cohortId}/members`),
+    orderBy('rankKey', 'asc'),
+    limit(COHORT_CAP),
+  )
   const snap = await getDocs(q)
   return snap.docs.map((d) => ({
     uid: d.id,
@@ -85,6 +99,7 @@ export interface RemoteCommunityProfile {
   streakBest: number
   freezeTokens: number
   weekKey: string | null
+  cohortId: string | null
 }
 
 /** The signed-in user's own community profile (tier, points, streak, freezes). */
@@ -101,5 +116,6 @@ export async function loadMyCommunityProfile(): Promise<RemoteCommunityProfile |
     streakBest: Number(snap.get('streakBest') ?? 0),
     freezeTokens: Number(snap.get('freezeTokens') ?? 0),
     weekKey: (snap.get('weekKey') as string) ?? null,
+    cohortId: (snap.get('cohortId') as string) ?? null,
   }
 }

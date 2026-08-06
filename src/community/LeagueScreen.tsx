@@ -52,8 +52,14 @@ function useLeagueData(me: ReturnType<typeof myLeaderStats>, storedTier: number,
         // Firebase adapter loaded on demand, only when the flag is on.
         const backend = await import('./backend')
         if (!backend.isCommunityBackendOn()) { if (!cancelled) setRemote(null); return }
-        const sync = await backend.syncStatsRemote({ points: me.odometer, streakCurrent: me.streakCurrent, streakBest: me.streakBest, freezeTokens })
-        const raw = await backend.loadLeagueStandingsRemote(sync.weekKey, sync.tier)
+        // Timezone (best-effort) buckets the cohort; sessions feed its activity band.
+        let tz: string | undefined
+        try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone } catch { tz = undefined }
+        const sync = await backend.syncStatsRemote({
+          points: me.odometer, streakCurrent: me.streakCurrent, streakBest: me.streakBest, freezeTokens,
+          sessionsThisWeek: me.sessionsThisWeek, volume7: me.volume7, volume30: me.volume30, tz,
+        })
+        const raw = await backend.loadLeagueStandingsRemote(sync.weekKey, sync.tier, sync.cohortId)
         if (cancelled) return
         const tier = tierOf(sync.tier)
         const rows: LeagueRow[] = raw.map((r, i) => ({ rank: i + 1, username: r.username, points: r.points, isYou: r.isYou, zone: zoneFor(i + 1, tier, raw.length) }))

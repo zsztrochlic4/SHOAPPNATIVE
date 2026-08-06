@@ -38,6 +38,12 @@ export const TIERS: Tier[] = [
 
 export const tierOf = (t: number): Tier => TIERS[Math.max(0, Math.min(TIERS.length - 1, t))]
 
+/** Cohort sizing — mirror of functions/src/lib/cohorts.ts. The server places each
+ *  user into a small weekly cohort (target 25, hard cap 30); the client reads at
+ *  most a full cohort. */
+export const COHORT_TARGET = 25
+export const COHORT_CAP = 30
+
 /** Monday date-key of the current week — the stable id for this week's league. */
 export function weekKey(): string {
   return currentWeekKeys()[0]

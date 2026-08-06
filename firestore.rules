@@ -370,12 +370,29 @@ service cloud.firestore {
       allow list, write: if false;
     }
 
-    // Weekly league standings, one member doc per user, grouped by week + tier.
-    // Any signed-in user may read their cohort's standings (public, non-sensitive
-    // leaderboard data); only the functions write them.
-    match /leagueStandings/{weekKey}/tiers/{tier}/members/{uid} {
+    // Weekly league standings, grouped by week → tier → COHORT (audit F-005). A
+    // cohort is a small (~25, cap 30) immutable weekly group; both the cohort meta
+    // (size/band/tz) and its member rows are public, non-sensitive leaderboard data
+    // that any signed-in user may read. Only the community functions write them.
+    match /leagueStandings/{weekKey}/tiers/{tier}/cohorts/{cohortId} {
       allow get, list: if request.auth != null;
       allow write: if false;
+
+      match /members/{uid} {
+        allow get, list: if request.auth != null;
+        allow write: if false;
+      }
+    }
+
+    // Allocator bookkeeping (open-cohort pointers, per-tier segmentation level) and
+    // the rollover idempotency markers are SERVER-ONLY. They're covered by the
+    // default-deny below, but pinned explicitly so their intent is unmistakable and
+    // a future refactor can't accidentally expose them.
+    match /leagueAllocator/{document=**} {
+      allow read, write: if false;
+    }
+    match /leagueRollovers/{document=**} {
+      allow read, write: if false;
     }
 
     // --- Private friend groups (server-authoritative, membership-gated) --- //

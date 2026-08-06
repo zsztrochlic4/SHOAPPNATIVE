@@ -11,8 +11,17 @@
  *   usernames/{lower}                                  → { uid }        (uniqueness map)
  *   communityProfiles/{uid}                            → { username, usernameLower, tier,
  *                                                          points, streakCurrent, streakBest,
- *                                                          freezeTokens, weekKey, updatedAt }
- *   leagueStandings/{weekKey}/tiers/{tier}/members/{uid} → { username, points }
+ *                                                          freezeTokens, weekKey, cohortId,
+ *                                                          cohortTier, cohortWeekKey, updatedAt }
+ *   leagueStandings/{weekKey}/tiers/{tier}/cohorts/{cohortId}            → { segKey, tz, band, level, size, … }
+ *   leagueStandings/{weekKey}/tiers/{tier}/cohorts/{cohortId}/members/{uid} → { username, points, rankKey, … }
+ *   leagueAllocator/{weekKey}/tiers/{tier}[/segments/{segKey}]          → allocator bookkeeping (server-only)
+ *   leagueRollovers/{weekKey}                                           → rollover idempotency marker (server-only)
+ *
+ * Weekly leagues run in COHORTS (audit F-005): each user is placed once per week
+ * into a small (target 25, cap 30) immutable cohort, segmented adaptively by tier,
+ * then timezone, then activity band — so promotion stays fair and reads stay cheap
+ * at any population. The cohort math is the pure module functions/src/lib/cohorts.ts.
  *
  * Everything stored is non-sensitive by design — a handle and consistency points
  * (0–100), never bodies, weight or logs.
@@ -23,11 +32,14 @@
  * australia-southeast2 (matching the app); scheduled jobs in australia-southeast1
  * (Cloud Scheduler has no southeast2 region).
  */
-import { FieldPath, FieldValue, getFirestore, type Query } from 'firebase-admin/firestore'
+import { FieldPath, FieldValue, getFirestore, type Query, type Transaction } from 'firebase-admin/firestore'
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { onSchedule } from 'firebase-functions/v2/scheduler'
 import * as logger from 'firebase-functions/logger'
-import { requireAuth } from './lib/guards'
+import { requireAuth, requireOwner } from './lib/guards'
+import {
+  COHORT_CAP, TIE_RULES_VERSION, bandOf, tzBucketOf, segmentKeyForLevel, nextLevel, rankKeyFor,
+} from './lib/cohorts'
 
 /** Promotion/demotion counts per tier — mirror of src/community/league.ts TIERS. */
 const TIERS = [
@@ -145,6 +157,72 @@ interface SyncInput {
   volume7?: number
   volume30?: number
   sessionsThisWeek?: number
+  /** IANA timezone (e.g. 'Australia/Sydney'), used only to bucket the user's
+   *  cohort by timezone once a tier is large enough to segment. Absent → home tz. */
+  tz?: string
+}
+
+/** A reserved slot in a weekly cohort. */
+interface CohortSlot { cohortId: string; joinedAtMillis: number }
+
+/** Reserve (or create) an open cohort slot for a user in a given week+tier inside a
+ *  transaction, updating the allocator bookkeeping. Performs its reads before any
+ *  write, so the CALLER must not have written to the transaction yet (Firestore's
+ *  all-reads-before-writes rule). Returns the chosen cohortId; the caller writes the
+ *  member + profile docs. Segmentation level is read from the tier control doc and
+ *  advanced (for FUTURE joiners only) once the segment has enough cohorts.
+ *
+ *  Contention note: at level 0 every joiner in a tier touches the same segment doc;
+ *  transactions retry under contention, which is fine at launch write rates and self-
+ *  distributes once a tier splits by timezone/band. */
+async function reserveCohortSlot(
+  tx: Transaction,
+  db: FirebaseFirestore.Firestore,
+  weekKey: string,
+  tier: number,
+  tzBucket: string,
+  band: number,
+  nowMs: number,
+): Promise<CohortSlot> {
+  const ctrlRef = db.doc(`leagueAllocator/${weekKey}/tiers/${tier}`)
+  const ctrlSnap = await tx.get(ctrlRef)
+  const level = typeof ctrlSnap.get('level') === 'number' ? ctrlSnap.get('level') : 0
+  const segKey = segmentKeyForLevel(tier, tzBucket, band, level)
+  const segDocId = segKey.replace(/[^\w+-]/g, '_')
+  const segRef = db.doc(`leagueAllocator/${weekKey}/tiers/${tier}/segments/${segDocId}`)
+  const segSnap = await tx.get(segRef)
+
+  let openCohortId = typeof segSnap.get('openCohortId') === 'string' ? segSnap.get('openCohortId') : ''
+  let openCount = typeof segSnap.get('openCount') === 'number' ? segSnap.get('openCount') : 0
+  let seq = typeof segSnap.get('seq') === 'number' ? segSnap.get('seq') : 0
+  let cohortCount = typeof segSnap.get('cohortCount') === 'number' ? segSnap.get('cohortCount') : 0
+
+  let minted = false
+  if (!openCohortId || openCount >= COHORT_CAP) {
+    seq += 1
+    openCohortId = `${segDocId}-${seq}`
+    openCount = 0
+    cohortCount += 1
+    minted = true
+  }
+  openCount += 1
+
+  // --- writes (all reads above are done) ---
+  const cohortRef = db.doc(`leagueStandings/${weekKey}/tiers/${tier}/cohorts/${openCohortId}`)
+  if (minted) {
+    tx.set(cohortRef, {
+      segKey, tz: tzBucket, band, level, size: 1,
+      tieRulesVersion: TIE_RULES_VERSION, rolledOver: false,
+      createdAt: FieldValue.serverTimestamp(),
+    })
+  } else {
+    tx.set(cohortRef, { size: FieldValue.increment(1) }, { merge: true })
+  }
+  tx.set(segRef, { openCohortId, openCount, seq, cohortCount }, { merge: true })
+  const lvl = nextLevel(cohortCount, level)
+  if (lvl !== level) tx.set(ctrlRef, { level: lvl }, { merge: true })
+
+  return { cohortId: openCohortId, joinedAtMillis: nowMs }
 }
 
 const intIn = (v: unknown, min: number, max: number): number => {
@@ -165,48 +243,90 @@ export const syncCommunityStats = onCall<SyncInput>(
     const volume7 = intIn(req.data?.volume7, 0, 100_000_000)
     const volume30 = intIn(req.data?.volume30, 0, 400_000_000)
     const sessionsThisWeek = intIn(req.data?.sessionsThisWeek, 0, 50)
+    const tzRaw = typeof req.data?.tz === 'string' ? req.data.tz.slice(0, 64) : undefined
 
     const db = getFirestore()
     const profRef = db.collection('communityProfiles').doc(uid)
-    const prof = await profRef.get()
-    const username = prof.get('username') as string | undefined
-    if (!username) throw new HttpsError('failed-precondition', 'Claim a username first.')
+    const nowMs = Date.now()
+    const weekKey = mondayKey(new Date(nowMs))
+    const tzBucket = tzBucketOf(tzRaw, nowMs)
+    const band = bandOf(sessionsThisWeek)
 
-    const tier = clampTier(typeof prof.get('tier') === 'number' ? prof.get('tier') : 0)
-    const weekKey = mondayKey(new Date())
+    // Everything competitive is written in ONE transaction so cohort assignment,
+    // the member standing and the profile stay consistent (and a user is never
+    // double-allocated by two concurrent first-syncs).
+    const res = await db.runTransaction(async (tx) => {
+      // --- reads first ---
+      const prof = await tx.get(profRef)
+      const username = prof.get('username') as string | undefined
+      if (!username) throw new HttpsError('failed-precondition', 'Claim a username first.')
+      const tier = clampTier(typeof prof.get('tier') === 'number' ? prof.get('tier') : 0)
 
-    // These stats also feed the friend-group leaderboards; they're stored on the
-    // profile and fanned out to the user's group member docs by syncGroupStats.
-    await profRef.set(
-      { points, streakCurrent, streakBest, freezeTokens, volume7, volume30, sessionsThisWeek, tier, weekKey, updatedAt: FieldValue.serverTimestamp() },
-      { merge: true },
-    )
-    await db.doc(`leagueStandings/${weekKey}/tiers/${tier}/members/${uid}`).set({ username, points }, { merge: true })
+      // The weekly cohort is IMMUTABLE: reuse it while it's still this week and this
+      // tier; otherwise (first sync of the week, or a late join) reserve a new slot.
+      const reuse = prof.get('cohortWeekKey') === weekKey
+        && prof.get('cohortTier') === tier
+        && typeof prof.get('cohortId') === 'string' && !!prof.get('cohortId')
+      let slot: CohortSlot
+      if (reuse) {
+        slot = {
+          cohortId: prof.get('cohortId') as string,
+          joinedAtMillis: typeof prof.get('cohortJoinedAtMillis') === 'number' ? prof.get('cohortJoinedAtMillis') : nowMs,
+        }
+      } else {
+        slot = await reserveCohortSlot(tx, db, weekKey, tier, tzBucket, band, nowMs)
+      }
+      const groupIds: string[] = Array.isArray(prof.get('groupIds')) ? prof.get('groupIds') : []
+
+      // --- writes ---
+      const rankKey = rankKeyFor({ points, sessionsThisWeek, joinedAtMillis: slot.joinedAtMillis, uid })
+      tx.set(
+        db.doc(`leagueStandings/${weekKey}/tiers/${tier}/cohorts/${slot.cohortId}/members/${uid}`),
+        { uid, username, points, sessionsThisWeek, joinedAtMillis: slot.joinedAtMillis, rankKey, tieRulesVersion: TIE_RULES_VERSION },
+        { merge: true },
+      )
+      // These stats also feed the friend-group leaderboards; they're stored on the
+      // profile and fanned out to the user's group member docs below.
+      tx.set(
+        profRef,
+        {
+          points, streakCurrent, streakBest, freezeTokens, volume7, volume30, sessionsThisWeek,
+          tier, weekKey, ...(tzRaw ? { tz: tzRaw } : {}),
+          cohortId: slot.cohortId, cohortTier: tier, cohortWeekKey: weekKey, cohortJoinedAtMillis: slot.joinedAtMillis,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      )
+      return { tier, username, groupIds, cohortId: slot.cohortId }
+    })
 
     // Fan the fresh stats out to the user's friend-group member docs so group
     // leaderboards reflect current activity (communityGroups.ts owns the shape).
-    const groupIds: string[] = Array.isArray(prof.get('groupIds')) ? prof.get('groupIds') : []
-    if (groupIds.length) {
-      const memberStats = { username, odometer: points, streak: streakCurrent, bestStreak: streakBest, volume7, volume30, sessionsThisWeek }
+    if (res.groupIds.length) {
+      const memberStats = { username: res.username, odometer: points, streak: streakCurrent, bestStreak: streakBest, volume7, volume30, sessionsThisWeek }
       const batch = db.batch()
-      for (const gid of groupIds.slice(0, 50)) {
+      for (const gid of res.groupIds.slice(0, 50)) {
         batch.set(db.doc(`groups/${gid}/members/${uid}`), memberStats, { merge: true })
       }
       await batch.commit()
     }
-    return { ok: true, tier, weekKey }
+    return { ok: true, tier: res.tier, weekKey, cohortId: res.cohortId }
   },
 )
 
 /* -------------------------------- rolloverLeagues -------------------------- */
 
-/** Weekly promotion/demotion. Runs every Monday: for the just-ended week it moves
- *  each tier's top cohort up and its bottom cohort down, then resets everyone's
- *  points. The movers are found with two *bounded* queries (top N by points desc,
- *  bottom M by points asc) rather than loading the whole tier — promotion wins ties
- *  with demotion in a small cohort (the bottom set is minus the top set), exactly
- *  reproducing the previous rank-based logic. The points reset streams the cohort
- *  in pages so memory stays flat as the user base grows. */
+/** Weekly promotion/demotion, per COHORT. Runs every Monday: for the just-ended
+ *  week it walks every cohort in every tier, moves that cohort's top finishers up
+ *  and its bottom finishers down (bounded reads by `rankKey`, promotion winning ties
+ *  in a small cohort), and resets everyone's points. Because promotion is now scoped
+ *  to a ~25-person cohort rather than the whole tier, the odds are real at any scale.
+ *
+ *  Idempotent (schedulers retry): a done-marker at leagueRollovers/{prevWeek} short-
+ *  circuits a completed run, and each cohort's member resets + its `rolledOver` flag
+ *  land in ONE atomic batch (a cohort is ≤ COHORT_CAP, well under the 500-op limit),
+ *  so a re-run skips already-processed cohorts and never double-counts the
+ *  non-idempotent `seasonWins` increment. */
 export const rolloverLeagues = onSchedule(
   { schedule: '5 0 * * 1', timeZone: 'Australia/Sydney', region: 'australia-southeast1', timeoutSeconds: 540, memory: '512MiB' },
   async () => {
@@ -215,47 +335,124 @@ export const rolloverLeagues = onSchedule(
     const now = new Date()
     const prevWeek = mondayKey(new Date(now.getTime() - 7 * 86400000))
 
+    const rolloverRef = db.doc(`leagueRollovers/${prevWeek}`)
+    if ((await rolloverRef.get()).get('done') === true) {
+      logger.info('community.rolloverLeagues.skip', { prevWeek })
+      return
+    }
+
     let promoted = 0
     let demoted = 0
+    let cohorts = 0
     for (let tier = 0; tier < TIERS.length; tier++) {
       const cfg = TIERS[tier]
-      const members = db.collection(`leagueStandings/${prevWeek}/tiers/${tier}/members`)
+      const cohortsCol = db.collection(`leagueStandings/${prevWeek}/tiers/${tier}/cohorts`)
 
-      // Movers: bounded reads of just the top (promote up) and bottom (demote down).
-      const moves = new Map<string, number>() // uid → new tier
-      if (cfg.promote > 0) {
-        const top = await members.orderBy('points', 'desc').limit(cfg.promote).get()
-        for (const d of top.docs) moves.set(d.id, clampTier(tier + 1))
-      }
-      if (cfg.demote > 0) {
-        const bottom = await members.orderBy('points', 'asc').limit(cfg.demote).get()
-        // Promotion wins in a cohort smaller than promote + demote.
-        for (const d of bottom.docs) if (!moves.has(d.id)) moves.set(d.id, clampTier(tier - 1))
-      }
+      await forEachPaged(cohortsCol, 200, async (cohortDoc) => {
+        if (cohortDoc.get('rolledOver') === true) return
+        const members = db.collection(`leagueStandings/${prevWeek}/tiers/${tier}/cohorts/${cohortDoc.id}/members`)
 
-      // Reset the whole cohort's points (and apply any tier move), paginated.
-      let batch = db.batch()
-      let ops = 0
-      await forEachPaged(members, 400, async (doc) => {
-        const uid = doc.id
-        const newTier = moves.get(uid) ?? tier
-        if (newTier > tier) promoted++
-        else if (newTier < tier) demoted++
-        batch.set(
-          db.collection('communityProfiles').doc(uid),
-          {
-            tier: newTier,
-            points: 0,
-            ...(newTier > tier ? { seasonWins: FieldValue.increment(1) } : {}),
-            updatedAt: FieldValue.serverTimestamp(),
-          },
+        // Movers: bounded reads of just the top (promote up) and bottom (demote down).
+        const promoteIds = new Set<string>()
+        const demoteIds = new Set<string>()
+        if (cfg.promote > 0) {
+          const top = await members.orderBy('rankKey', 'asc').limit(cfg.promote).get()
+          for (const d of top.docs) promoteIds.add(d.id)
+        }
+        if (cfg.demote > 0) {
+          const bottom = await members.orderBy('rankKey', 'desc').limit(cfg.demote).get()
+          // Promotion wins in a cohort smaller than promote + demote.
+          for (const d of bottom.docs) if (!promoteIds.has(d.id)) demoteIds.add(d.id)
+        }
+
+        // Reset the whole cohort's points + apply moves in ONE atomic batch (≤ cap+1
+        // ops), flagging the cohort in the same commit so retries skip it.
+        const all = await members.get()
+        const batch = db.batch()
+        for (const doc of all.docs) {
+          const memberUid = doc.id
+          const newTier = promoteIds.has(memberUid) ? clampTier(tier + 1)
+            : demoteIds.has(memberUid) ? clampTier(tier - 1)
+            : tier
+          if (newTier > tier) promoted++
+          else if (newTier < tier) demoted++
+          batch.set(
+            db.collection('communityProfiles').doc(memberUid),
+            {
+              tier: newTier,
+              points: 0,
+              ...(newTier > tier ? { seasonWins: FieldValue.increment(1) } : {}),
+              updatedAt: FieldValue.serverTimestamp(),
+            },
+            { merge: true },
+          )
+        }
+        batch.set(cohortDoc.ref, { rolledOver: true }, { merge: true })
+        await batch.commit()
+        cohorts++
+      })
+    }
+    await rolloverRef.set({ done: true, cohorts, at: FieldValue.serverTimestamp() }, { merge: true })
+    logger.info('community.rolloverLeagues', { prevWeek, promoted, demoted, cohorts })
+  },
+)
+
+/* -------------------------------- backfillCohorts ------------------------- */
+
+interface BackfillInput { weekKey?: string }
+
+/** One-shot, owner-only migration/repair: assign every active community member into
+ *  a cohort for `weekKey` (defaults to the current week). Use it to migrate from the
+ *  old flat standings model or to repair users the JIT allocator missed. Idempotent —
+ *  a user already placed in that week's cohort is skipped, and each user's placement
+ *  runs in its own transaction (correct even if syncCommunityStats runs concurrently).
+ *  The lazy allocator in syncCommunityStats handles ordinary late joins, so this is
+ *  only for bulk backfills. */
+export const backfillCohorts = onCall<BackfillInput>(
+  { region: 'australia-southeast2', timeoutSeconds: 540, memory: '512MiB' },
+  async (req) => {
+    requireOwner(req)
+    const db = getFirestore()
+    const nowMs = Date.now()
+    const weekKey = typeof req.data?.weekKey === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.data.weekKey)
+      ? req.data.weekKey
+      : mondayKey(new Date(nowMs))
+
+    let assigned = 0
+    let skipped = 0
+    await forEachPaged(db.collection('communityProfiles'), 200, async (doc) => {
+      if (!doc.get('username')) { skipped++; return }
+      if (doc.get('cohortWeekKey') === weekKey && typeof doc.get('cohortId') === 'string' && doc.get('cohortId')) {
+        skipped++
+        return
+      }
+      const uid = doc.id
+      await db.runTransaction(async (tx) => {
+        // Re-read inside the txn so a concurrent syncCommunityStats can't be clobbered.
+        const prof = await tx.get(doc.ref)
+        if (!prof.get('username')) return
+        if (prof.get('cohortWeekKey') === weekKey && typeof prof.get('cohortId') === 'string' && prof.get('cohortId')) return
+        const tier = clampTier(typeof prof.get('tier') === 'number' ? prof.get('tier') : 0)
+        const points = intIn(prof.get('points'), 0, 100)
+        const sessionsThisWeek = intIn(prof.get('sessionsThisWeek'), 0, 50)
+        const tzBucket = tzBucketOf(typeof prof.get('tz') === 'string' ? prof.get('tz') : undefined, nowMs)
+        const slot = await reserveCohortSlot(tx, db, weekKey, tier, tzBucket, bandOf(sessionsThisWeek), nowMs)
+        const rankKey = rankKeyFor({ points, sessionsThisWeek, joinedAtMillis: slot.joinedAtMillis, uid })
+        tx.set(
+          db.doc(`leagueStandings/${weekKey}/tiers/${tier}/cohorts/${slot.cohortId}/members/${uid}`),
+          { uid, username: prof.get('username'), points, sessionsThisWeek, joinedAtMillis: slot.joinedAtMillis, rankKey, tieRulesVersion: TIE_RULES_VERSION },
           { merge: true },
         )
-        if (++ops >= 400) { await batch.commit(); batch = db.batch(); ops = 0 }
+        tx.set(
+          doc.ref,
+          { cohortId: slot.cohortId, cohortTier: tier, cohortWeekKey: weekKey, cohortJoinedAtMillis: slot.joinedAtMillis, updatedAt: FieldValue.serverTimestamp() },
+          { merge: true },
+        )
+        assigned++
       })
-      if (ops > 0) await batch.commit()
-    }
-    logger.info('community.rolloverLeagues', { prevWeek, promoted, demoted })
+    })
+    logger.info('community.backfillCohorts', { weekKey, assigned, skipped })
+    return { ok: true, weekKey, assigned, skipped }
   },
 )
 
