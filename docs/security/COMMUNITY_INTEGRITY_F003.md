@@ -183,7 +183,7 @@ appeal). **This table is the AS-BUILT set** in [`src/community/anomaly.ts`](../.
 | `volume_jump` | SOFT | week volume > k× the user's trailing-week median (needs ≥2 prior weeks). |
 | `perfect_week_no_history` | SOFT | near-max odometer with too few **active** days to support it. |
 | `backfill` | SOFT | ≥ N days in this ingest whose `dayKey` lags the server clock by > 24h. |
-| `device_churn` | HARD | many App Check device tokens for one uid in a week. **Inert** until native App Check (`deviceTokenCount` fixed at 1 today) — see [`APP_CHECK.md`](../APP_CHECK.md), memory `firebase-verified-state`. |
+| `device_churn` | HARD | **Dormant placeholder, not achievable via App Check.** App Check exposes no per-device id to the backend (privacy by design), so "count devices per uid" can't be computed from it. The real control is App Check *enforcement* (blocks non-genuine clients entirely) — native bridge now wired ([#63](https://github.com/zsztrochlic4/SHOAPPNATIVE/pull/63)), see [`APP_CHECK.md`](../APP_CHECK.md). `deviceTokenCount` stays 1; the rule never fires. |
 
 Thresholds live in the `ANOMALY_CONFIG` **code constant** today; moving them to a
 server-owned `config/community` document (tune without redeploy) is a documented

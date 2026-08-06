@@ -18,10 +18,15 @@
  * Thresholds live in ANOMALY_CONFIG (a constant here for v1) and are intended to
  * move to a server-owned config/community document so they tune without a deploy.
  *
- * NOT YET IMPLEMENTED (needs native App Check enforcement — see docs/APP_CHECK.md,
- * memory firebase-verified-state): the device-churn rule (one uid farming many
- * device tokens). Its signal is threaded through as `deviceTokenCount` and stays
- * inert until App Check lands; see evaluateAnomalies.
+ * `deviceTokenCount` / the `device_churn` flag are a DORMANT placeholder, not a
+ * pending feature. App Check attests that a call comes from a genuine app instance
+ * but exposes NO stable per-device identifier to the backend (privacy by design —
+ * `req.app` is just presence + appId), so "count distinct devices per uid" is not
+ * achievable from App Check tokens. The real abuse control is App Check
+ * ENFORCEMENT (blocking non-genuine/scripted clients from calling at all), driven
+ * by APPCHECK_ENFORCE once the native bridge is device-verified — see
+ * docs/APP_CHECK.md. The signal stays fixed at 1 and the rule never fires unless a
+ * genuine device counter is wired from some future source.
  */
 
 export type StandingStatus = 'ok' | 'provisional' | 'held'

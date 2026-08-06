@@ -173,17 +173,34 @@ npm run test:community   # syncCommunityStats recompute, held/withheld, appeal f
 
 ## Part C — App Check decision (REQUIRED)
 
-The **device-churn** anomaly signal depends on **native App Check**, which is not
-yet enforceable (no native app registered — see [`APP_CHECK.md`](../APP_CHECK.md),
-memory `firebase-verified-state`). That rule is **stubbed + inert**
-(`deviceTokenCount` fixed at 1).
+**Corrected understanding (2026-08-06).** The old framing tied this gate to a
+"device-churn" rule. That rule is **not achievable via App Check** — App Check
+attests a call comes from a genuine app instance but exposes **no per-device
+identifier** to the backend, so "count devices per uid" can't be computed from it.
+`deviceTokenCount`/`device_churn` are a **dormant placeholder**, not a pending
+feature. The real App Check control is **enforcement**: blocking non-genuine /
+scripted / emulated clients from calling the backend at all.
 
-> **Remediated since the independent review:** all community + group callables now
-> call the `auditAppCheck` monitor and honour `enforceAppCheck: APP_CHECK_ENFORCED`
-> (flip via the `APPCHECK_ENFORCE` env var — no code change), and `syncCommunityStats`
-> / `appealStanding` now apply per-account daily **rate limits** (`enforceDailyLimit`).
-> So "ship now, monitored" is now an accurate description of the code — the only
-> residual is that the device-churn rule stays inert until native attestation exists.
+**What's now in place:**
+- All community + group callables call the `auditAppCheck` monitor and honour
+  `enforceAppCheck: APP_CHECK_ENFORCED` (flip via the `APPCHECK_ENFORCE` env var —
+  no code change). `syncCommunityStats`/`appealStanding` are also rate-limited.
+- The **native App Check bridge (App Attest / Play Integrity) is now wired**
+  ([#63](https://github.com/zsztrochlic4/SHOAPPNATIVE/pull/63)) — the "no native app
+  registered" blocker is **removed**. But it is **UNTESTED ON DEVICE** and
+  enforcement is **OFF**.
+
+**Path to enforcement (before or shortly after launch):**
+1. EAS dev build → confirm `appCheckStatus().active === true` on real iOS + Android.
+2. Monitor phase — `auditAppCheck` logs show real traffic carrying tokens.
+3. Flip `APPCHECK_ENFORCE=1` (and optionally console enforcement for Firestore).
+
+Decide one:
+- ☐ **Ship in monitor mode now** (rate limits on; enforcement flipped once the
+  native build is device-verified) — recommended, low-risk, and now clearly
+  time-bounded since the bridge exists.
+- ☐ **Wait for `APPCHECK_ENFORCE=1`** (device-verified enforcement) before flipping
+  the community flag.
 
 Decide one:
 - ☐ **Ship now** with App Check in monitor mode + rate limits, device-churn inert
