@@ -159,15 +159,15 @@ npm run test:rules       # firestore.rules — incl. scoreDays/scoreEvents/commu
 npm run test:community   # syncCommunityStats recompute, held/withheld, appeal flow, non-owner reject
 ```
 
-- ☐ `test:rules` green
-- ☐ `test:community` green (was 6/9; re-run after the descending-scan fix)
+- ☑ `test:rules` green (CI **Security Rules** workflow)
+- ☑ `test:community` green (CI **Community Backend** workflow — was 6/9; passes after the descending-scan fix)
 - ☐ Deployed `firestore.rules` **and `firestore.indexes.json`** match the repo (the
-      rollover promotion query needs the new `members(status, points)` index)
-- ☐ Deployed functions build from this commit
+      rollover promotion query needs the new `members(status, points)` index) — *do at deploy*
+- ☐ Deployed functions build from this commit — *do at deploy*
 
 | Run by | Date | Commit SHA | Result |
 |---|---|---|---|
-| ______ | ______ | ______ | ______ |
+| CI (GitHub Actions) | 2026-08-06 | `e600fef` (merged w/ main) | **Community Backend + Security Rules + Code gate PASS.** Deploy-match rows pending until deploy. |
 
 ---
 
@@ -196,21 +196,20 @@ scripted / emulated clients from calling the backend at all.
 3. Flip `APPCHECK_ENFORCE=1` (and optionally console enforcement for Firestore).
 
 Decide one:
-- ☐ **Ship in monitor mode now** (rate limits on; enforcement flipped once the
-  native build is device-verified) — recommended, low-risk, and now clearly
-  time-bounded since the bridge exists.
+- ☑ **Ship in monitor mode now** (rate limits on; enforcement flipped once the
+  native build is device-verified) — **SELECTED.**
 - ☐ **Wait for `APPCHECK_ENFORCE=1`** (device-verified enforcement) before flipping
   the community flag.
 
-Decide one:
-- ☐ **Ship now** with App Check in monitor mode + rate limits, device-churn inert
-  (accept the residual that a single account can't yet be caught farming device
-  tokens), OR
-- ☐ **Wait** for native App Check enforcement before flipping the flag.
+**Decision recorded:**
 
 | Decision | Owner | Date |
 |---|---|---|
-| ______ | ______ | ______ |
+| **Ship in monitor mode.** App Check monitor + per-account rate limits are on at flip; move to full enforcement by setting `APPCHECK_ENFORCE=1` once an EAS dev build confirms App Attest / Play Integrity attest on real iOS + Android. `device_churn` is a dormant placeholder (not achievable via App Check — no per-device id) and is superseded by enforcement, so it is **not** an outstanding gap. | zsztrochlic4 (owner) | 2026-08-06 |
+
+**Prerequisite (tracked, ops):** EAS dev build → confirm `appCheckStatus().active === true`
+on device and that the `appcheck.missing` Functions logs go quiet → then flip
+`APPCHECK_ENFORCE=1`. Rate limits bound abuse until then.
 
 ---
 
@@ -237,9 +236,9 @@ Flip `COMMUNITY_BACKEND = true` only when **all** of A–D are signed above.
 
 | Gate | Signed? |
 |---|---|
-| A — Privacy sign-off | ☐ |
-| B — CI emulator green | ☐ |
-| C — App Check decision | ☐ |
-| D — Moderation ownership | ☐ |
+| A — Privacy sign-off | ☐ — approved-w/-conditions by an AI pass; **needs human countersignature** + C3 (lawful basis) |
+| B — CI emulator green | ◑ — CI green on `e600fef`; deploy-match rows pending at deploy |
+| C — App Check decision | ☑ — **decided: ship in monitor mode** (2026-08-06); EAS-build → enforce follow-through |
+| D — Moderation ownership | ☐ — name moderator(s) + owner-claim UID(s) + SLA |
 
 **Authorised to enable community backend:** name ______ · date ______ · signature ______
