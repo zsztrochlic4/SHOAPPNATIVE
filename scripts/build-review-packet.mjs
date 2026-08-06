@@ -110,7 +110,10 @@ const intro = [
   `<w:p><w:pPr><w:spacing w:after="120"/></w:pPr>${run('How to score: write a number 1–5 in the “Score” cell of each row. Leave nothing blank on a completed case (a blank dimension makes the case incomplete and it will not count).', { sz: 18, i: true })}</w:p>`,
 ].join('')
 
-const body = RESPONSE_EVAL_CASES.map(caseBlock).join('')
+// CASES=AD04,LC05 builds a focused re-score packet with only those cases (for a targeted re-review).
+const only = (process.env.CASES || '').split(',').map((s) => s.trim()).filter(Boolean)
+const selected = only.length ? RESPONSE_EVAL_CASES.filter((c) => only.includes(c.id)) : RESPONSE_EVAL_CASES
+const body = selected.map(caseBlock).join('')
 const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${intro}${body}<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720"/></w:sectPr></w:body></w:document>`
 
@@ -144,7 +147,7 @@ const docx = zip([
   ['_rels/.rels', RELS],
   ['word/document.xml', documentXml],
 ])
-const outPath = resolve(root, OUT, FILL ? 'review-packet-selftest.docx' : 'StrengthHub_Coach_Review_Packet.docx')
+const outPath = resolve(root, OUT, FILL ? 'review-packet-selftest.docx' : only.length ? `StrengthHub_Coach_Rescore_${only.join('_')}.docx` : 'StrengthHub_Coach_Review_Packet.docx')
 writeFileSync(outPath, docx)
 const filled = RESPONSE_EVAL_CASES.filter((c) => String(replies[c.id] ?? '').trim()).length
 console.log(`Wrote ${outPath}`)
