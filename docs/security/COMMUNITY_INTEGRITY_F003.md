@@ -227,11 +227,16 @@ Built and verified (2026-08-06):
 - [x] Anomaly rules v1 firing + logged; thresholds in an `ANOMALY_CONFIG` constant.
 - [x] App-side `tsc`, `eslint`, and the 326-test unit suite green.
 
+- [x] **Reprocessing sweep** — `reprocessStandings` ([`functions/src/community.ts`](../../functions/src/community.ts))
+      runs daily (01:30 Sydney), recomputing every member's current-week standing
+      from their durable log via the shared `finalizeStanding` helper, so a
+      `calcVersion` bump or a newly-tripped anomaly re-decides standings without the
+      user opening the app. Targets are now persisted on the profile
+      (`scoringTargets`/`targetBelowFloor`) so the sweep needs no client input.
+      (Scaling note in code: O(members) log reads — revisit with a work queue.)
+
 Deferred / owner + infra (block flipping the flag):
 
-- [ ] **Reprocessing sweep** for the active week (recompute-on-schedule so a
-      `calcVersion` bump or late anomaly re-decides standings). Not built — the
-      per-sync recompute covers the live path; the scheduled sweep is the follow-up.
 - [ ] **Privacy review**: the per-day log is new granular personal data — add it to
       [`PRIVACY.md`](../PRIVACY.md)/[`DATA_SAFETY.md`](../DATA_SAFETY.md) and the
       account deletion/export workflow (`functions/src/account.ts`,

@@ -12,7 +12,8 @@
  *   communityProfiles/{uid}                            → { username, usernameLower, tier,
  *                                                          points, streakCurrent, streakBest,
  *                                                          freezeTokens, weekKey, calcVersion,
- *                                                          status, provenance, updatedAt }
+ *                                                          status, provenance, scoringTargets,
+ *                                                          targetBelowFloor, updatedAt }
  *   communityProfiles/{uid}/scoreDays/{dayKey}         → server-owned current per-day inputs
  *   communityProfiles/{uid}/scoreEvents/{autoId}       → append-only immutable change log
  *   leagueStandings/{weekKey}/tiers/{tier}/members/{uid} → { username, points, status, calcVersion }
@@ -312,6 +313,105 @@ function medianPriorWeeklyVolume(records: DayRecord[], currentWeekKey: string): 
 }
 
 /**
+ * Recompute ONE member's competition metrics from their durable per-day log and
+ * write the provenance-stamped standing (+ profile + group fan-out). Shared by the
+ * live sync path and the scheduled reprocessing sweep, so both produce identical
+ * results. Does NOT ingest — it reads whatever `scoreDays` currently hold. `prof`
+ * must already carry a username. Persists `scoringTargets`/`targetBelowFloor` so
+ * the sweep can recompute later without any client input.
+ */
+async function finalizeStanding(
+  db: FirebaseFirestore.Firestore,
+  prof: FirebaseFirestore.DocumentSnapshot,
+  ctx: TimeContext,
+  weekKey: string,
+  targets: ScoringTargets,
+  extras: { backfilledDayCount: number; targetBelowFloor: boolean },
+): Promise<{ status: string; flags: string[] }> {
+  const uid = prof.id
+  const profRef = prof.ref
+  const username = prof.get('username') as string
+  const tier = clampTier(typeof prof.get('tier') === 'number' ? prof.get('tier') : 0)
+
+  // Recompute from the durable per-day log (server-authoritative).
+  const histSnap = await profRef.collection('scoreDays').orderBy(FieldPath.documentId(), 'desc').limit(MAX_HISTORY_DAYS).get()
+  const records: DayRecord[] = histSnap.docs.map((doc) => toDayRecord(doc.id, doc))
+  const metrics = computeCompetitionMetrics({ records, targets, ctx })
+
+  // Anomaly evaluation → status (ok | provisional | held).
+  const signals: AnomalySignals = {
+    maxSessionsPerDay: records.reduce((m, r) => Math.max(m, r.sessions), 0),
+    maxActivitiesPerDay: records.reduce((m, r) => Math.max(m, r.activities), 0),
+    volume7: metrics.volume7,
+    medianPriorWeeklyVolume: medianPriorWeeklyVolume(records, weekKey),
+    odometer: metrics.odometer,
+    historyDayCount: records.length,
+    backfilledDayCount: extras.backfilledDayCount,
+    targetBelowFloor: extras.targetBelowFloor,
+    deviceTokenCount: 1, // inert until native App Check is enforced (see anomaly.ts)
+  }
+  const { status, flags } = evaluateAnomalies(signals)
+
+  // Implausible standings are computed + stored, but withheld from the ranked
+  // ladder (points → 0 in the standing) until a clean recompute clears them.
+  const rankedPoints = status === 'ok' ? metrics.odometer : 0
+  const provenance = {
+    eventCount: records.length,
+    windowStart: records.length ? records[records.length - 1].dayKey : ctx.todayKey,
+    windowEnd: ctx.todayKey,
+    anomalyFlags: flags,
+    backfilledDayCount: extras.backfilledDayCount,
+  }
+
+  await profRef.set(
+    {
+      points: metrics.odometer,
+      streakCurrent: metrics.streakCurrent,
+      streakBest: metrics.streakBest,
+      volume7: metrics.volume7,
+      volume30: metrics.volume30,
+      sessionsThisWeek: metrics.sessions7,
+      tier,
+      weekKey,
+      calcVersion: CALC_VERSION,
+      status,
+      provenance,
+      // Persisted so reprocessStandings can recompute without the client.
+      scoringTargets: targets,
+      targetBelowFloor: extras.targetBelowFloor,
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true },
+  )
+  await db.doc(`leagueStandings/${weekKey}/tiers/${tier}/members/${uid}`).set(
+    { username, points: rankedPoints, status, calcVersion: CALC_VERSION },
+    { merge: true },
+  )
+
+  // Fan the recomputed stats out to the user's friend-group member docs so group
+  // leaderboards reflect authoritative activity (communityGroups.ts owns the shape).
+  const groupIds: string[] = Array.isArray(prof.get('groupIds')) ? prof.get('groupIds') : []
+  if (groupIds.length) {
+    const memberStats = {
+      username,
+      odometer: metrics.odometer,
+      streak: metrics.streakCurrent,
+      bestStreak: metrics.streakBest,
+      volume7: metrics.volume7,
+      volume30: metrics.volume30,
+      sessionsThisWeek: metrics.sessions7,
+      status,
+    }
+    const batch = db.batch()
+    for (const gid of groupIds.slice(0, 50)) {
+      batch.set(db.doc(`groups/${gid}/members/${uid}`), memberStats, { merge: true })
+    }
+    await batch.commit()
+  }
+  return { status, flags }
+}
+
+/**
  * F-003 authoritative recompute. The client posts RAW daily inputs; the server
  * appends any changed day to an immutable, server-timestamped log, then recomputes
  * every competitive metric itself with the shared scoring code, flags implausible
@@ -363,78 +463,8 @@ export const syncCommunityStats = onCall<SyncInput>(
       await batch.commit()
     }
 
-    // --- recompute from the durable per-day log (server-authoritative) -------
-    const histSnap = await scoreDays.orderBy(FieldPath.documentId(), 'desc').limit(MAX_HISTORY_DAYS).get()
-    const records: DayRecord[] = histSnap.docs.map((doc) => toDayRecord(doc.id, doc))
-    const metrics = computeCompetitionMetrics({ records, targets, ctx })
-
-    // --- anomaly evaluation → status (ok | provisional | held) --------------
-    const signals: AnomalySignals = {
-      maxSessionsPerDay: records.reduce((m, r) => Math.max(m, r.sessions), 0),
-      maxActivitiesPerDay: records.reduce((m, r) => Math.max(m, r.activities), 0),
-      volume7: metrics.volume7,
-      medianPriorWeeklyVolume: medianPriorWeeklyVolume(records, weekKey),
-      odometer: metrics.odometer,
-      historyDayCount: records.length,
-      backfilledDayCount,
-      targetBelowFloor,
-      deviceTokenCount: 1, // inert until native App Check is enforced (see anomaly.ts)
-    }
-    const { status, flags } = evaluateAnomalies(signals)
-
-    // Implausible standings are computed + stored, but withheld from the ranked
-    // ladder (points → 0 in the standing) until a clean recompute clears them.
-    const rankedPoints = status === 'ok' ? metrics.odometer : 0
-    const provenance = {
-      eventCount: records.length,
-      windowStart: records.length ? records[records.length - 1].dayKey : ctx.todayKey,
-      windowEnd: ctx.todayKey,
-      anomalyFlags: flags,
-      backfilledDayCount,
-    }
-
-    await profRef.set(
-      {
-        points: metrics.odometer,
-        streakCurrent: metrics.streakCurrent,
-        streakBest: metrics.streakBest,
-        volume7: metrics.volume7,
-        volume30: metrics.volume30,
-        sessionsThisWeek: metrics.sessions7,
-        tier,
-        weekKey,
-        calcVersion: CALC_VERSION,
-        status,
-        provenance,
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true },
-    )
-    await db.doc(`leagueStandings/${weekKey}/tiers/${tier}/members/${uid}`).set(
-      { username, points: rankedPoints, status, calcVersion: CALC_VERSION },
-      { merge: true },
-    )
-
-    // Fan the recomputed stats out to the user's friend-group member docs so group
-    // leaderboards reflect authoritative activity (communityGroups.ts owns the shape).
-    const groupIds: string[] = Array.isArray(prof.get('groupIds')) ? prof.get('groupIds') : []
-    if (groupIds.length) {
-      const memberStats = {
-        username,
-        odometer: metrics.odometer,
-        streak: metrics.streakCurrent,
-        bestStreak: metrics.streakBest,
-        volume7: metrics.volume7,
-        volume30: metrics.volume30,
-        sessionsThisWeek: metrics.sessions7,
-        status,
-      }
-      const batch = db.batch()
-      for (const gid of groupIds.slice(0, 50)) {
-        batch.set(db.doc(`groups/${gid}/members/${uid}`), memberStats, { merge: true })
-      }
-      await batch.commit()
-    }
+    // Recompute from the durable log, evaluate anomalies, and write the standing.
+    const { status, flags } = await finalizeStanding(db, prof, ctx, weekKey, targets, { backfilledDayCount, targetBelowFloor })
 
     if (status !== 'ok') logger.info('community.syncCommunityStats.flagged', { status, flags, backfilledDayCount })
     return { ok: true, tier, weekKey, calcVersion: CALC_VERSION, status }
@@ -524,5 +554,43 @@ export const grantStreakFreezes = onSchedule(
     })
     if (ops > 0) await batch.commit()
     logger.info('community.grantStreakFreezes', { granted })
+  },
+)
+
+/* ------------------------------ reprocessStandings ------------------------- */
+
+/** Scheduled reprocessing sweep (F-003). Re-runs the authoritative recompute for
+ *  every community member against the CURRENT week, from their durable scoreDays
+ *  log — no client involvement. This is what makes a `calcVersion` bump or a late
+ *  anomaly rule actually re-decide standings; the live sync only recomputes the one
+ *  user who happens to open the app. Members who never synced under F-003 (no
+ *  persisted `scoringTargets`) are skipped. Paginated so memory stays flat.
+ *
+ *  Runs daily at 01:30 (after Monday's rollover at 00:05), so a definition change
+ *  or a newly-tripped anomaly propagates within a day. NOTE: this reads each
+ *  member's scoreDays log (bounded, but O(members) queries) — fine at launch scale;
+ *  revisit with sharded fan-out / a work queue as the base grows. */
+export const reprocessStandings = onSchedule(
+  { schedule: '30 1 * * *', timeZone: 'Australia/Sydney', region: 'australia-southeast1', timeoutSeconds: 540, memory: '512MiB' },
+  async () => {
+    const db = getFirestore()
+    const now = new Date()
+    const ctx = serverCtx(now)
+    const weekKey = mondayKey(now)
+    let processed = 0
+    let held = 0
+    let provisional = 0
+    await forEachPaged(db.collection('communityProfiles'), 200, async (doc) => {
+      if (!doc.get('username')) return
+      const stored = doc.get('scoringTargets')
+      if (!stored || typeof stored !== 'object') return // never synced under F-003 — nothing to recompute
+      const targets = clampTargets(stored as Partial<ScoringTargets>).targets // re-clamp defensively
+      const targetBelowFloor = doc.get('targetBelowFloor') === true
+      const { status } = await finalizeStanding(db, doc, ctx, weekKey, targets, { backfilledDayCount: 0, targetBelowFloor })
+      processed++
+      if (status === 'held') held++
+      else if (status === 'provisional') provisional++
+    })
+    logger.info('community.reprocessStandings', { weekKey, processed, held, provisional })
   },
 )
