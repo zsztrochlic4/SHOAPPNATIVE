@@ -48,7 +48,14 @@ completed by a real, named legal professional.
 
 ---
 
-## Sign-off record — ⏳ PENDING (do not mark complete until genuinely signed)
+## Sign-off record — 🟡 OWNER-REPORTED APPROVED, ATTRIBUTION PENDING
+
+> **Status (2026-08-07):** The owner reports the lawyer reviewed all three documents
+> and **approved them as-is**. This is **not yet a completed legal sign-off**: the
+> reviewer's **name, qualification, date, and written confirmation are not on record**.
+> Do not represent these documents as "legally reviewed" to users, stores, or auditors
+> until the fields below are filled with a real, named reviewer and the confirmation
+> (email / signed PDF) is filed. Owner to supply the details to finalize.
 
 ```
 Privacy Policy
