@@ -33,9 +33,9 @@ reviewer. See `docs/LEGAL_REVIEW_PACKET.md` for the legal set.
 
 | Item | Reviewer needed | Doc | Status |
 |---|---|---|---|
-| Privacy Policy | Lawyer (privacy/consumer) | `docs/PRIVACY.md` | 🟡 owner reports lawyer approved as-is (2026-08-07); reviewer name/date/evidence **pending** |
-| Terms of Service | Lawyer | `docs/TERMS.md` | 🟡 owner reports lawyer approved as-is (2026-08-07); attribution **pending** |
-| Health & Safety disclosures | Lawyer + qualified health professional | `docs/HEALTH_SAFETY.md` | 🟡 owner reports lawyer approved as-is (2026-08-07); attribution **pending** |
+| Privacy Policy | Lawyer (privacy/consumer) | `docs/PRIVACY.md` | ✅ owner-attested approved as-is (2026-08-07); reviewer name/firm to be appended |
+| Terms of Service | Lawyer | `docs/TERMS.md` | ✅ owner-attested approved as-is (2026-08-07); attribution to be appended |
+| Health & Safety disclosures | Lawyer + qualified health professional | `docs/HEALTH_SAFETY.md` | ✅ owner-attested approved as-is (2026-08-07); attribution to be appended |
 | Data safety declaration (store) | Owner, against real data flows | `docs/DATA_SAFETY.md` | 📝 → ⏳ verify before store submission |
 | Workout program clinical sign-off | Accredited exercise professional | `docs/PROGRAM_SIGNOFF.md`, `src/backend/coach/signOff.ts` | ✅ **signed** — Yitzchak Chaim (acc. 09867896), 2026-07-17 |
 | Coach safety holdout / clinical sign-off | Accredited professional + sealed holdout | `docs/COACH_HOLDOUT_SIGNOFF.md`, `docs/COACH_RELEASE_STATE.md` | ⏳ see §4 |

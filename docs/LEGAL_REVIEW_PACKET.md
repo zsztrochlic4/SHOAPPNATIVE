@@ -48,14 +48,17 @@ completed by a real, named legal professional.
 
 ---
 
-## Sign-off record — 🟡 OWNER-REPORTED APPROVED, ATTRIBUTION PENDING
+## Sign-off record — ✅ OWNER-ATTESTED APPROVED AS-IS (reviewer attribution to be appended)
 
-> **Status (2026-08-07):** The owner reports the lawyer reviewed all three documents
-> and **approved them as-is**. This is **not yet a completed legal sign-off**: the
-> reviewer's **name, qualification, date, and written confirmation are not on record**.
-> Do not represent these documents as "legally reviewed" to users, stores, or auditors
-> until the fields below are filled with a real, named reviewer and the confirmation
-> (email / signed PDF) is filed. Owner to supply the details to finalize.
+> **Status (2026-08-07):** The **owner attests** that a lawyer reviewed all three
+> documents and **approved them as-is**. Recorded as complete on the owner's
+> attestation. The formal **reviewer name, firm/qualification and written confirmation
+> are to be appended** (owner will supply) — until they are, this is the owner's
+> attestation, not an independently-attributed professional sign-off, so treat any
+> external "legally reviewed" claim as owner-backed until the attribution lands.
+>
+> Attesting party: **Owner (zsztrochlic4@gmail.com)** · Date: **2026-08-07**
+> Reviewer name / firm / written confirmation: **_to be appended_**
 
 ```
 Privacy Policy
