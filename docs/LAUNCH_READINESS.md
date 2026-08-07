@@ -9,6 +9,7 @@ taking responsibility for a review that happened, not a checkbox._
 ## Legend
 - ✅ **Done** — implemented, merged, and where relevant deployed/verified.
 - 📝 **Drafted** — content/code exists but needs a qualified human review before it counts.
+- 🟡 **Reported / provisional** — someone reports it's done, but the accountable record (named signer + evidence) isn't captured yet; not safe to represent as complete.
 - ⏳ **Pending sign-off / owner action** — blocked on a person, device, console, or account only the owner controls.
 - ⚠️ **Decision required** — a state that contradicts a stated intent; the owner must consciously choose.
 
@@ -32,15 +33,19 @@ reviewer. See `docs/LEGAL_REVIEW_PACKET.md` for the legal set.
 
 | Item | Reviewer needed | Doc | Status |
 |---|---|---|---|
-| Privacy Policy | Lawyer (privacy/consumer) | `docs/PRIVACY.md` | 📝 AI-drafted → ⏳ legal review |
-| Terms of Service | Lawyer | `docs/TERMS.md` | 📝 AI-drafted → ⏳ legal review |
-| Health & Safety disclosures | Lawyer + qualified health professional | `docs/HEALTH_SAFETY.md` | 📝 AI-drafted → ⏳ review |
+| Privacy Policy | Lawyer (privacy/consumer) | `docs/PRIVACY.md` | 🟡 owner reports lawyer approved as-is (2026-08-07); reviewer name/date/evidence **pending** |
+| Terms of Service | Lawyer | `docs/TERMS.md` | 🟡 owner reports lawyer approved as-is (2026-08-07); attribution **pending** |
+| Health & Safety disclosures | Lawyer + qualified health professional | `docs/HEALTH_SAFETY.md` | 🟡 owner reports lawyer approved as-is (2026-08-07); attribution **pending** |
 | Data safety declaration (store) | Owner, against real data flows | `docs/DATA_SAFETY.md` | 📝 → ⏳ verify before store submission |
 | Workout program clinical sign-off | Accredited exercise professional | `docs/PROGRAM_SIGNOFF.md`, `src/backend/coach/signOff.ts` | ✅ **signed** — Yitzchak Chaim (acc. 09867896), 2026-07-17 |
 | Coach safety holdout / clinical sign-off | Accredited professional + sealed holdout | `docs/COACH_HOLDOUT_SIGNOFF.md`, `docs/COACH_RELEASE_STATE.md` | ⏳ see §4 |
 
 > The **workout** professional sign-off is genuinely on file (a real named,
-> accredited reviewer) — that one is done. The **legal** and **coach** ones are not.
+> accredited reviewer) — that one is done. The **legal** review is **owner-reported
+> approved as-is but not yet attributed** — finalize by recording the lawyer's name,
+> qualification, date and written confirmation in `docs/LEGAL_REVIEW_PACKET.md`; until
+> then it must not be represented as a completed legal sign-off. The **coach** clinical
+> sign-off is not done.
 
 ## 3. Owner / hardware / console — ⏳ not doable from a dev session
 
