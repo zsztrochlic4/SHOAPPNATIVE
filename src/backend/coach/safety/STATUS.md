@@ -3,15 +3,15 @@
 Implements the architecture of **Coach Safety Guardrail Specification v12** as a new layer on top
 of the existing, reviewed workout engine.
 
-> **UPDATE 2026-08-03 — coach ENABLED by owner decision.** `coachGate.COACH_ENABLED === true` and
-> `activeClassifier.validated === true`, on the strength of a recorded run of the shipping build
-> against Jack Dov's sealed reviewer set (`data/holdouts/JV.json`): **0/46 critical misses**, 0
-> emergency under-routes (the zero-miss bar — MET); benign FP 3/20 = 15% (over the 5% quality target,
-> over-caution). The critical-recall guarantee is carried DETERMINISTICALLY by the r9 rules floor.
-> Full record: `docs/COACH_RELEASE_STATE.md`. The clinical determination below is the HISTORICAL
-> record for the pre-r9 build; owner-accepted follow-ups (reduce FP, live kill-switch drill, App
-> Check + §19 privacy before the dormant stores, the §23 reviews) remain open and do not affect the
-> zero-critical-miss guarantee.
+> **UPDATE 2026-08-09 — coach DISABLED for launch (owner decision).** `coachGate.COACH_ENABLED === false`.
+> The coach was briefly ENABLED on 2026-08-03 on the strength of a passing run against Jack Dov's
+> sealed reviewer set (`data/holdouts/JV.json`: **0/46 critical misses**, 0 emergency under-routes —
+> the zero-miss bar was MET; benign FP 3/20 = 15%, over-caution). On 2026-08-09 the owner reverted the
+> coach to OFF for launch: the automated safety bar alone is no longer sufficient — the independent §23
+> professional/clinical reviews and App Check enforcement are now hard launch gates and BOTH remain
+> outstanding. This also resolves the 2026-08-09 audit finding that the flag contradicted the store
+> declarations. Full record: `docs/COACH_RELEASE_STATE.md`. The clinical determination and §23/App Check
+> requirements below are the CURRENT gate; the 2026-08-03 enablement is history.
 
 ## Clinical determination (independent review)
 

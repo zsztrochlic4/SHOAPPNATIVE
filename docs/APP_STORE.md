@@ -134,12 +134,16 @@ Play Console**:
 
 - **Bundle id** is `com.zaggy887.strengthhub` (an older handle). Not a blocker,
   but pick the final id **before first submission** — it cannot be changed after.
-- **AI Coach is DISABLED** (`COACH_ENABLED = false` — the 2026-08-01 enablement
-  was rolled back on 2026-08-02 because it contradicted the coach's own safety
-  record; see [COACH_RELEASE_STATE.md](COACH_RELEASE_STATE.md) for the
-  authoritative state and re-enable conditions). The coach UI shows a "coming
-  soon" surface; no user message reaches the model. Store privacy answers must
-  describe the DISABLED state until the release record changes.
+- **AI Coach is DISABLED** (`COACH_ENABLED = false`). It was enabled by owner
+  decision on 2026-08-03 and then **disabled again for launch on 2026-08-09**,
+  because the owner's launch gate requires the independent §23 professional/clinical
+  reviews and App Check enforcement, both of which remain outstanding (see
+  [COACH_RELEASE_STATE.md](COACH_RELEASE_STATE.md) for the authoritative state and
+  re-enable conditions). The coach UI shows a "coming soon" surface; no user message
+  reaches the model. Store privacy answers must describe the DISABLED state until the
+  release record changes. **Deploy note:** the server flag lives in the generated
+  `functions/src/_shared` mirror — redeploy Cloud Functions (runs `sync-shared`) so
+  the deployed coach picks up the disabled flag.
 - **External images:** some screens load remote demo images. For a store build,
   prefer bundling rights-cleared assets.
 - **Apple review polish:** the app is fully functional on real + seeded data;

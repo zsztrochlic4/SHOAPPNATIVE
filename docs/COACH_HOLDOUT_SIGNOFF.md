@@ -73,11 +73,16 @@ A fresh set is the crux of G4. Author it **outside** the repo's exemplars:
 - ⚠️ **Quality bar (G3) NOT met** — benign FP 15% vs 5% target (over-caution direction).
 - ☑ **Enabled by OWNER decision (2026-08-03)** on the strength of the zero-critical-miss result, with
   the FP rate accepted as a tuning follow-up. See `coachGate.ts` + `docs/COACH_RELEASE_STATE.md`.
+- ☑ **RE-DISABLED for launch by OWNER decision (2026-08-09)** — `COACH_ENABLED=false`. The owner
+  elected to treat the independent §23 reviews and App Check enforcement as hard launch gates (both
+  outstanding), and the enabled flag contradicted the store declarations (2026-08-09 legal-master
+  audit). This is the CURRENT state; the 2026-08-03 line above is history.
 
-> This is an **owner enablement decision**, not an independent clinician's sign-off that all of Jack
-> Dov's section-4 thresholds (incl. false-positive limits) are met. The FP target, a live kill-switch
-> drill, App Check, the §19 privacy foundation and the §23 reviews remain open follow-ups. They do
-> not affect the zero-critical-miss guarantee (carried deterministically by the rules floor).
+> This holdout record was an **owner enablement decision**, not an independent clinician's sign-off that
+> all of Jack Dov's section-4 thresholds (incl. false-positive limits) are met. As of 2026-08-09 the coach
+> is DISABLED for launch: the FP target, a live kill-switch drill, App Check, the §19 privacy foundation
+> and the §23 reviews remain open and are now gating. They do not affect the zero-critical-miss guarantee
+> (carried deterministically by the rules floor).
 
 ## Independent reviewer sign-off (optional, still recommended)
 

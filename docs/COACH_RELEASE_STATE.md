@@ -1,22 +1,32 @@
 # Coach release-state record — AUTHORITATIVE
 
-_Updated 2026-08-02 (audit remediation, finding F-003). This file supersedes the
-2026-08-02 "candidate branch" note that previously lived here. Where any other
-document disagrees with this record or with `src/backend/coach/safety/STATUS.md`,
-those two lose only to each other in one direction: **STATUS.md is the safety
-record of truth; this file must always match it.**_
+_Updated 2026-08-09 (launch reconciliation — owner decision to disable). This file supersedes
+the 2026-08-03 enablement record below (retained as history). Where any other document disagrees
+with this record or with `src/backend/coach/safety/STATUS.md`, those two lose only to each other
+in one direction: **STATUS.md is the safety record of truth; this file must always match it.**_
 
-## Current release state: ENABLED (owner decision, 2026-08-03)
+## Current release state: DISABLED (owner decision, 2026-08-09)
 
 | Control | Value | Source |
 |---|---|---|
-| `COACH_ENABLED` | **`true`** (enabled 2026-08-03) | `src/backend/coach/coachGate.ts` |
-| Safety classifier | `activeClassifier` LLM path + deterministic rules floor, **`validated: true`** | `src/backend/coach/safety/classifier.ts` |
+| `COACH_ENABLED` | **`false`** (disabled for launch 2026-08-09) | `src/backend/coach/coachGate.ts` |
+| Safety classifier | `activeClassifier` LLM path + deterministic rules floor | `src/backend/coach/safety/classifier.ts` |
 | App Check enforcement | `false` (monitor mode; env-driven `APPCHECK_ENFORCE`) | `functions/src/lib/guards.ts` → `APP_CHECK_ENFORCED` |
 | Remote kill switch | `config/coach.killSwitch` (Firestore); disables the coach WITHOUT a redeploy | `functions/src/killSwitchRemote.ts`, `src/backend/coach/safety/killSwitch.ts` |
 | Daily cap + burst + global cost cap | server-enforced (audit SA-011) | `dailyLimit.ts`, `functions/src/lib/rateLimit.ts` |
 
-### Enablement record (2026-08-03)
+### Disable decision (2026-08-09) — CURRENT
+
+The coach is **OFF for launch**. The 2026-08-09 legal-master verification audit found the shipping
+flag was `true` while the pre-launch sign-off packet, `docs/DATA_SAFETY.md` and `docs/APP_STORE.md`
+all declared the coach DISABLED — an unsignable contradiction. The owner reconciled this by keeping
+the coach **off**: although the automated critical-safety holdout passed (see the 2026-08-03 record
+below), the owner's launch gate also requires the **independent §23 professional/clinical reviews**
+and **App Check enforcement**, and BOTH remain outstanding. The coach does not ship until the
+re-enable conditions below are met. This flag change reverts `COACH_ENABLED` to `false` and aligns
+every record.
+
+### Enablement record (2026-08-03) — HISTORY, SUPERSEDED 2026-08-09
 
 Enabled by **owner decision** on the strength of a recorded passing run against the reviewer-owned
 sealed holdout:
@@ -68,26 +78,30 @@ rollback.
 
 ## Conditions for re-enabling (all required, in order)
 
-_Policy (2026-08-02): re-enablement is gated on an **objective automated safety
-bar** — **no human or clinician sign-off is required**. The bar is a reproducible
-safety run, nothing more, nothing less._
+_Policy (2026-08-09, supersedes the 2026-08-02 automated-bar-only policy): the owner's
+launch gate requires **both** the objective automated safety bar **and** the independent
+§23 professional/clinical reviews **and** App Check enforcement. The 2026-08-02 position
+that "no human/clinician sign-off is required" no longer holds for launch — the owner has
+elected to treat the §23 reviews as a hard gate._
 
-1. **Automated safety holdout passes** on the exact shipping build (r9 or later):
-   the crisis / self-harm / eating-disorder holdout suite reports **zero critical
-   misses and zero emergency under-routes**. Record the run in `STATUS.md`: commit
-   SHA, dataset id, date, and the pass summary.
-2. **`activeClassifier.validated` flipped only on the strength of that recorded
-   run** — tied to the commit and dataset. Never by hand-asserting a pass; that
-   hand-assertion is exactly the failure mode F-003 caught.
-3. **Live rollback drill**: set `config/coach.killSwitch = true` in production,
-   confirm the callable refuses without a redeploy, record the drill owner/date.
-4. Only then: one commit that flips `COACH_ENABLED = true`, updates this file and
+1. **Automated safety holdout passes** on the exact shipping build: the crisis /
+   self-harm / eating-disorder holdout suite reports **zero critical misses and zero
+   emergency under-routes**. Record the run in `STATUS.md`: commit SHA, dataset id,
+   date, and the pass summary. _(Met on 2026-08-03; must be re-run on the build that ships.)_
+2. **Independent §23 professional/clinical reviews completed and recorded** — the
+   accredited-professional sign-off(s) named in the pre-launch packet, verified with the
+   issuing body. This is the gate that is currently outstanding.
+3. **App Check enforcement live** on the AI endpoint (`APP_CHECK_ENFORCED = true`),
+   consistent with `docs/APP_CHECK.md` and native attestation.
+4. **Live rollback drill**: set `config/coach.killSwitch = true` in production, confirm
+   the callable refuses without a redeploy, record the drill owner/date.
+5. Only then: one commit that flips `COACH_ENABLED = true`, updates this file and
    `STATUS.md` in the same change, and names the deployed Functions revision + the
    passing run.
 
-> The bar is deliberately **at least as strict on the safety outcome** as before
-> (zero critical misses / zero emergency under-routes) — what's removed is the
-> human sign-off overhead, not the requirement that the build actually pass.
+> The safety-outcome bar is unchanged (zero critical misses / zero emergency under-routes).
+> What changed on 2026-08-09 is that the independent §23 reviews and App Check are now
+> explicit hard gates for launch, not deferred follow-ups.
 
 ## What remains true while disabled
 

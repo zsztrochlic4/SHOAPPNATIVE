@@ -557,7 +557,7 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
             <Trash2 size={18} color="#f87171" />
             <View className="flex-1">
               <Text className="font-bold text-red-300">{deleting ? 'Deleting…' : confirmingDelete ? 'Tap again to permanently delete' : 'Delete account'}</Text>
-              <Text className="text-[12px] text-secondary">{confirmingDelete ? 'Erases your account and all data — this cannot be undone' : 'Permanently delete your account and data'}</Text>
+              <Text className="text-[12px] text-secondary">{confirmingDelete ? 'Erases your account and all data — this cannot be undone. Cancel your subscription first; deleting your account does not stop billing' : 'Permanently delete your account and data (cancel your subscription first — this does not stop billing)'}</Text>
             </View>
           </Pressable>
         )}

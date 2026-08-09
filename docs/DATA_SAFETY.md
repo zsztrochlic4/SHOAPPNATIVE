@@ -52,7 +52,7 @@ you across apps and websites owned by other companies?" → **No.**
 | Health & Fitness → **Fitness** | Yes | App Functionality | Workouts, activity, streaks; on-device Apple Health reads (steps/sleep/workouts) once the native build ships |
 | Health & Fitness → **Health** | Yes | App Functionality | Weight/body metrics, screening answers, nutrition you log |
 | User Content → **Other User Content** | **Only when the AI Coach is enabled (currently OFF)** | App Functionality | AI Coach messages & saved coach memories. Do **not** declare while `COACH_ENABLED = false`. |
-| User Content → **Photos or Videos** | Yes | App Functionality | Meal photos. **Linked to user = No** (analysed transiently, not stored). See ⚠️ below |
+| User Content → **Photos or Videos** | Yes | App Functionality | Meal photos. **Linked to user = Yes** (sent via an authenticated, per-user request even though the image is not stored). See ⚠️ below |
 | Purchases → **Purchase History** | Yes | App Functionality (+ Account) | Subscription plan / status / trial & renewal dates (via Stripe). We never receive the full card number. |
 | Identifiers → **Device ID** | Yes | App Functionality | Push-notification token |
 
@@ -114,12 +114,18 @@ info → Payment info** is not collected by us.)
 
 ## ⚠️ Judgment calls — read before you submit
 
-1. **Meal photos.** Sent to Google's Gemini AI to estimate nutrition and **not
-   stored** on our servers (only the estimate is saved, and only if you log it).
-   Declare them (as above) under App Functionality; on Google, choose
-   **"processed ephemerally"** if that option appears. This is the honest,
-   defensible position — if a lawyer prefers a more conservative declaration,
-   follow their advice.
+1. **Meal photos — Linked = Yes (corrected, audit #8).** The photo is sent to
+   Google's Gemini AI to estimate nutrition and is **not stored** on our servers
+   (only the estimate is saved, and only if you log it). BUT it is uploaded through
+   an **authenticated Firebase callable that resolves the user's UID and applies a
+   per-user rate limit** before calling Gemini — so the request is associated with
+   the account. Under Apple's rules, data is "Linked to the user" when connected to
+   an account/identity **unless identifiers are stripped before collection and
+   re-linking is prevented**, which is not the case here. Declare **Linked = Yes**.
+   On Google, you may still note ephemeral processing (not stored), but do not claim
+   the image is unlinked. To *legitimately* claim unlinked, you would need a
+   documented de-identification design (no UID in the request path, no re-linking)
+   and reviewer approval — not currently implemented.
 
 2. **AI Coach messages.** The AI Coach is **currently DISABLED** (`COACH_ENABLED =
    false`; see [COACH_RELEASE_STATE.md](COACH_RELEASE_STATE.md)) — the server turn

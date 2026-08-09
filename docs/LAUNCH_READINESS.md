@@ -57,19 +57,21 @@ reviewer. See `docs/LEGAL_REVIEW_PACKET.md` for the legal set.
 | Step 7 native E2E / a11y evidence | No (evidence) | Device/emulator lab to run `.maestro/` + manual VoiceOver/TalkBack, 200% text, contrast. |
 | Stripe checkout on device | No (for now) | This build has no `EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY` baked in; entitlement is granted manually for testing. Bake the key via EAS env to test real purchases. |
 
-## 4. ⚠️ Decision required — coach enablement
+## 4. ✅ Decision made — coach disabled for launch (2026-08-09)
 
-`src/backend/coach/coachGate.ts` currently has **`COACH_ENABLED = true`** on `main`
-(set 2026-08-03 per the file comment). This contradicts the standing instruction
-that the coach must stay **OFF** pending its final review. Before launch the owner
-must consciously confirm the intended state:
+`src/backend/coach/coachGate.ts` now has **`COACH_ENABLED = false`**. The owner
+resolved the open enablement question on 2026-08-09: the coach was briefly enabled
+on 2026-08-03, but is **disabled for launch** because its independent §23 clinical
+review and App Check enforcement (§2–§3) remain outstanding, and the enabled flag
+contradicted the store declarations (2026-08-09 legal-master audit). All records
+(coachGate.ts, `COACH_RELEASE_STATE.md`, safety `STATUS.md`, `DATA_SAFETY.md`,
+`APP_STORE.md`) now consistently state DISABLED.
 
-- If the coach **ships**: its safety holdout + clinical sign-off (§2) must be genuinely
-  completed and App Check enforcement (§3) in place — these are the gates that exist
-  precisely for a live coach.
-- If the coach **does not ship** at launch: set `COACH_ENABLED = false`.
-
-_This document does not change that flag. It records the state and the open decision._
+To ship the coach later, complete the re-enable conditions in
+[COACH_RELEASE_STATE.md](COACH_RELEASE_STATE.md): safety holdout on the shipping
+build, the §23 clinical sign-off, App Check enforcement, and a kill-switch drill.
+**Deploy note:** redeploy Cloud Functions (runs `sync-shared`) so the server mirror
+picks up `COACH_ENABLED = false`.
 
 ## 5. Bottom line
 

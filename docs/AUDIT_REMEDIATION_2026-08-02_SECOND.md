@@ -149,6 +149,10 @@ the final action is the owner's. Each now has a prepared, signable/runnable arti
    `docs/COACH_HOLDOUT_SIGNOFF.md`, `safety/STATUS.md`. Open follow-ups (do NOT affect the zero-miss
    guarantee, which the deterministic rules floor carries): reduce FP, live kill-switch drill,
    App Check + §19 privacy before the dormant analytics/state stores, the §23 independent reviews.
+   **> SUPERSEDED 2026-08-09:** the owner subsequently **disabled the coach for launch**
+   (`COACH_ENABLED=false`, `activeClassifier.validated=false`) — the §23 reviews and App Check are
+   now hard launch gates and remain outstanding. See `docs/COACH_RELEASE_STATE.md` (current) and
+   `docs/LAUNCH_READINESS.md` §4. This 2026-08-03 entry is retained as history.
 3. **SA-015 (live)** — run `npm run record:release` against the real deploy and commit the attestation.
 4. **SA-019 (live)** — web attestation is wired; add native (`@react-native-firebase/app-check` in a
    dev build) per **`docs/APP_CHECK.md`**, then set `APPCHECK_ENFORCE=1`.
