@@ -60,7 +60,7 @@ export function IndexGauge({ index }: { index: WeeklyIndex }) {
 
   return (
     <View className="items-center">
-      <AccessibleChart summary={`Weekly readiness: ${index.label}. Score ${index.score} of 100 over the last 7 days.`} style={{ width: '100%', alignItems: 'center' }}>
+      <AccessibleChart summary={`Weekly readiness: ${index.label}. Score ${index.score} of 100 over the last 14 days.`} style={{ width: '100%', alignItems: 'center' }}>
         <Svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} style={{ maxWidth: 228 }}>
           <Defs>
             <LinearGradient id="gaugeArc" x1="0" y1="0" x2="1" y2="0">
@@ -88,7 +88,7 @@ export function IndexGauge({ index }: { index: WeeklyIndex }) {
 
       <Text className="mt-1.5 text-[18px] font-black tracking-tight" style={{ color }}>{index.label}</Text>
       <Text className="text-[12px] text-secondary">
-        <Text className="font-bold" style={{ color }}>{scoreText}</Text>/100 · last 7 days
+        <Text className="font-bold" style={{ color }}>{scoreText}</Text>/100 · last 14 days
       </Text>
     </View>
   )

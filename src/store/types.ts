@@ -531,12 +531,15 @@ export interface GroupMember {
   status?: 'ok' | 'provisional' | 'held'
 }
 
-/** One "cheer" (reaction-only social) tally on a group activity event, keyed by
- *  the event's stable id. `mine` reflects whether the current user has cheered. */
-export interface CheerTally {
+/** One emoji-reaction tally on a group activity event. `mine` reflects whether
+ *  the current user has added this reaction. */
+export interface ReactionTally {
   count: number
   mine: boolean
 }
+
+/** All reactions on a single activity event, keyed by emoji (💪🔥👏🙌⚡🏆). */
+export type ActivityReactions = Record<string, ReactionTally>
 
 /** A private friend group the user created or joined. `ownerUsername` matches
  *  the current user's username when they created it (drives owner-only delete). */
@@ -555,8 +558,8 @@ export interface CommunityGroup {
   /** Shared target: combined member sessions the group aims to log this week.
    *  Owner-editable. Optional on legacy groups (UI falls back to a default). */
   weeklyGoal?: number
-  /** Reaction-only "cheers" on activity events, keyed by event id. */
-  cheers?: Record<string, CheerTally>
+  /** Emoji reactions on activity events, keyed by event id → emoji → tally. */
+  reactions?: Record<string, ActivityReactions>
 }
 
 /** The user's weekly league placement. Tier 0 = Bronze … 4 = Diamond. `weekKey`

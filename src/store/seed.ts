@@ -39,7 +39,7 @@ import type {
 // v13: + AppState.community (competition hub — persistent username + friend groups).
 // The current user's leaderboard row is always live (selectors.myLeaderStats); other
 // members are simulated locally until the Firestore backend lands.
-export const SCHEMA_VERSION = 13
+export const SCHEMA_VERSION = 14
 const DAYS = 40 // 0..38 completed history, 39 = today (in progress)
 
 /* round to nearest 2.5 (plate increments) */
@@ -397,10 +397,10 @@ export function buildSeed(): AppState {
           { id: 'danp', username: 'danp', odometer: 48, streak: 9, bestStreak: 27, volume7: 19800, volume30: 73100, sessionsThisWeek: 3 },
           { id: 'leo_t', username: 'leo_t', odometer: 40, streak: 12, bestStreak: 12, volume7: 9700, volume30: 41200, sessionsThisWeek: 2 },
         ],
-        cheers: {
-          'a-streak': { count: 6, mine: false },
-          'a-vol': { count: 4, mine: true },
-          'a-odo': { count: 3, mine: false },
+        reactions: {
+          'a-streak': { '🔥': { count: 6, mine: false } },
+          'a-vol': { '💪': { count: 4, mine: true }, '🔥': { count: 2, mine: false } },
+          'a-odo': { '👏': { count: 3, mine: false } },
         },
       },
       {
@@ -418,9 +418,9 @@ export function buildSeed(): AppState {
           { id: 'ana_v', username: 'ana_v', odometer: 66, streak: 7, bestStreak: 15, volume7: 8100, volume30: 33400, sessionsThisWeek: 3 },
           { id: 'samw', username: 'samw', odometer: 52, streak: 5, bestStreak: 20, volume7: 10600, volume30: 44800, sessionsThisWeek: 2 },
         ],
-        cheers: {
-          'a-streak': { count: 8, mine: true },
-          'a-vol': { count: 2, mine: false },
+        reactions: {
+          'a-streak': { '🔥': { count: 8, mine: true } },
+          'a-vol': { '💪': { count: 2, mine: false } },
         },
       },
     ],

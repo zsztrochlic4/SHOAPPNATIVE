@@ -8,9 +8,10 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import { View, Text, Pressable, TextInput, ActivityIndicator } from 'react-native'
-import { Trophy, Snowflake, Moon, Info, ChevronRight, ArrowUp, ArrowDown, ShieldCheck, ShieldAlert, Clock, UserPlus, Users } from 'lucide-react-native'
+import Svg, { Circle } from 'react-native-svg'
+import { Moon, Flame, Info, ChevronRight, ChevronDown, ArrowUp, ArrowDown, ShieldCheck, ShieldAlert, UserPlus, Users } from 'lucide-react-native'
 import { useStore } from '../store/store'
-import { myLeaderStats, streakRisk, buildDayRecords, targetsFrom } from '../store/selectors'
+import { myLeaderStats, buildDayRecords, targetsFrom } from '../store/selectors'
 import { todayKey, deviceTimezone } from '../lib/date'
 import type { DayRecord, ScoringTargets } from './scoring'
 import { shareText } from '../lib/share'
@@ -19,9 +20,9 @@ import { Avatar } from '../components/Avatar'
 import { Sheet } from '../components/Sheet'
 import { Skeleton } from '../components/Skeleton'
 import { useToast } from '../components/Toast'
-import { RankBadge, StreakFlame } from './ui'
+import { RankBadge } from './ui'
 import { GlobalLeaderboard } from './GlobalLeaderboard'
-import { TIERS, tierOf, weekKey, daysLeftInWeek, simulateLeague, zoneFor, type Tier, type LeagueRow, type Zone } from './league'
+import { TIERS, tierOf, weekKey, monthlyResetKey, daysLeftInMonth, simulateLeague, zoneFor, type Tier, type LeagueRow, type Zone } from './league'
 import { COMMUNITY_BACKEND } from './backendConfig'
 
 type LeagueStatus = 'loading' | 'ready' | 'error'
@@ -96,7 +97,6 @@ export function LeagueScreen({ onClaimUsername }: { onClaimUsername: () => void 
   const { state, dispatch } = useStore()
   const me = useMemo(() => myLeaderStats(state), [state])
   const [view, setView] = useState<'league' | 'global'>('league')
-  const [howOpen, setHowOpen] = useState(false)
   const [appealOpen, setAppealOpen] = useState(false)
   const storedTier = state.community.league?.tier ?? 0
 
@@ -108,9 +108,10 @@ export function LeagueScreen({ onClaimUsername }: { onClaimUsername: () => void 
     [state],
   )
 
-  // Weekly freeze grant — idempotent, only fires when a new week has started.
+  // Monthly freeze grant — idempotent, fires once when a new monthly league
+  // period begins (first Monday of the month). Grants the fresh 2 freezes.
   useEffect(() => {
-    dispatch({ type: 'GRANT_WEEKLY_FREEZE', weekKey: weekKey() })
+    dispatch({ type: 'GRANT_WEEKLY_FREEZE', weekKey: monthlyResetKey() })
   }, [dispatch])
 
   // Hooks must run before any early return.
@@ -149,14 +150,12 @@ export function LeagueScreen({ onClaimUsername }: { onClaimUsername: () => void 
       ) : (
         <>
           {data.integrity !== 'ok' && <ReviewBanner integrity={data.integrity} onAppeal={() => setAppealOpen(true)} />}
-          <LeagueHero tier={data.tier} rank={data.youRank} points={me.odometer} cohort={data.rows.length} zone={data.zone} onHow={() => setHowOpen(true)} />
-          <StreakCard />
+          <UnifiedHero tier={data.tier} rank={data.youRank} points={me.odometer} cohort={data.rows.length} zone={data.zone} />
           {data.rows.length < LOW_POP_COHORT && <LeagueFillingCard count={data.rows.length} />}
           <LeagueStandings rows={data.rows} tier={data.tier} />
         </>
       )}
 
-      <HowLeaguesSheet open={howOpen} onClose={() => setHowOpen(false)} />
       <AppealSheet open={appealOpen} onClose={() => setAppealOpen(false)} onDone={data.reload} />
     </View>
   )
@@ -342,103 +341,98 @@ function LeagueFillingCard({ count }: { count: number }) {
 
 /* --------------------------------- hero ------------------------------------ */
 
-function LeagueHero({ tier, rank, points, cohort, zone, onHow }: {
-  tier: ReturnType<typeof tierOf>
+/** Unified league + streak hero: a rank progress ring tinted to the current tier,
+ *  the promotion status (with the NEXT tier's colour on its name), then the streak
+ *  row with the schedule-driven rest / manual-freeze control. */
+function UnifiedHero({ tier, rank, points, cohort, zone }: {
+  tier: Tier
   rank: number
   points: number
   cohort: number
   zone: Zone
-  onHow: () => void
 }) {
-  const days = daysLeftInWeek()
-  const nextTier = TIERS[Math.min(TIERS.length - 1, tier.key + 1)]
-  const status =
-    zone === 'promote' ? { text: `In the promotion zone — hold it to reach ${nextTier.name}!`, color: brand[400] }
-    : zone === 'demote' ? { text: 'In the drop zone — one good session moves you up.', color: '#F5A524' }
-    : { text: `Reach rank ${tier.promote} or better to promote to ${nextTier.name}.`, color: 'rgba(255,255,255,0.6)' }
-
-  return (
-    <View className="overflow-hidden rounded-2xl border p-4" style={{ borderColor: `${tier.color}66`, backgroundColor: `${tier.color}14` }}>
-      <View className="flex-row items-center gap-3">
-        <View className="h-14 w-14 items-center justify-center rounded-2xl" style={{ backgroundColor: `${tier.color}26` }}>
-          <Trophy size={26} color={tier.color} />
-        </View>
-        <View className="flex-1">
-          <Text className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: tier.color }}>{tier.name} League</Text>
-          <View className="flex-row items-end gap-1.5">
-            <Text className="text-[30px] font-black leading-tight text-white">#{rank}</Text>
-            <Text className="mb-1.5 text-[13px] font-semibold text-secondary">of {cohort}</Text>
-          </View>
-        </View>
-        <View className="items-end">
-          <View className="flex-row items-center gap-1">
-            <Clock size={12} color="rgba(255,255,255,0.45)" />
-            <Text className="text-[12px] font-bold text-secondary">{days}d left</Text>
-          </View>
-          <Text className="mt-1 text-[12px] text-secondary">{points} pts</Text>
-        </View>
-      </View>
-      <Text className="mt-3 text-[13px] font-semibold" style={{ color: status.color }}>{status.text}</Text>
-      <Pressable onPress={onHow} accessibilityRole="button" accessibilityLabel="How leagues work" className="mt-2 flex-row items-center gap-1 active:opacity-70">
-        <Info size={13} color="rgba(255,255,255,0.45)" />
-        <Text className="text-[12px] font-semibold text-secondary">How leagues work</Text>
-      </Pressable>
-    </View>
-  )
-}
-
-/* ----------------------------- streak card (Rec 2) ------------------------- */
-
-function StreakCard() {
   const { state, dispatch } = useStore()
   const toast = useToast()
   const me = useMemo(() => myLeaderStats(state), [state])
   const tokens = state.community.freezeTokens ?? 0
-  const risk = streakRisk(state)
   const restingToday = (state.community.restDays ?? []).includes(todayKey)
+  const days = daysLeftInMonth()
+  const nextTier = TIERS[Math.min(TIERS.length - 1, tier.key + 1)]
 
-  const protect = () => {
-    dispatch({ type: 'USE_STREAK_FREEZE', dateKey: risk.dayKey })
-    toast('Streak protected — nice save')
-  }
+  // Rank progress ring — a better rank fills more of the circle. C = 2πr, r = 32.
+  const C = 2 * Math.PI * 32
+  const dashoffset = C * (cohort > 0 ? Math.min(1, rank / cohort) : 1)
+
+  const statusMain =
+    zone === 'promote' ? 'In the promotion zone'
+    : zone === 'demote' ? 'In the drop zone'
+    : `Holding in ${tier.name}`
+
+  // Rest days come from the schedule; the manual control is a fallback freeze.
   const toggleRest = () => {
     dispatch({ type: 'TOGGLE_REST_DAY', dateKey: todayKey })
-    toast(restingToday ? 'Rest day removed' : 'Rest day banked — recovery is training')
+    toast(restingToday ? 'Rest day removed' : 'Streak protected for today')
   }
 
   return (
-    <View className="mt-3 rounded-2xl border border-white/8 bg-ink-800 p-4">
-      <View className="flex-row items-center gap-3">
-        <StreakFlame days={me.streakCurrent} size={20} />
-        <View className="flex-1">
-          <Text className="text-[13px] font-bold text-white">{me.streakCurrent}-day streak</Text>
-          <Text className="text-[12px] text-secondary">Best {me.streakBest} · rest days &amp; freezes keep it alive</Text>
+    <View className="rounded-[20px] border bg-ink-800 p-4" style={{ borderColor: `${tier.color}38` }}>
+      <View className="flex-row items-center gap-4">
+        <View style={{ width: 74, height: 74 }}>
+          <Svg width={74} height={74} style={{ position: 'absolute', top: 0, left: 0 }}>
+            <Circle cx={37} cy={37} r={32} fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth={6} />
+            <Circle cx={37} cy={37} r={32} fill="none" stroke={tier.color} strokeWidth={6} strokeLinecap="round" strokeDasharray={C} strokeDashoffset={dashoffset} transform="rotate(-90 37 37)" />
+          </Svg>
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
+            <Text className="text-[24px] font-black leading-none text-white">#{rank}</Text>
+            <Text className="mt-0.5 text-[10px] font-semibold text-white/50">of {cohort}</Text>
+          </View>
         </View>
-        <View className="flex-row items-center gap-1.5 rounded-full bg-white/8 px-2.5 py-1">
-          <Snowflake size={13} color="#6AD1E3" />
-          <Text className="text-[12px] font-bold text-white/70">{tokens}</Text>
+        <View className="min-w-0 flex-1">
+          <Text className="text-[11px] font-bold uppercase tracking-wide" style={{ color: tier.color }}>{tier.name} League</Text>
+          <Text className="mt-0.5 text-[15px] font-extrabold" style={{ color: tier.color }}>{statusMain}</Text>
+          <Text className="mt-0.5 text-[12px] font-semibold text-white/65">{points} pts · {days} day{days === 1 ? '' : 's'} left</Text>
+          <Text className="mt-px text-[12px] text-white/45">
+            {zone === 'demote'
+              ? 'One good session moves you up'
+              : <>{zone === 'promote' ? 'Hold your spot to reach ' : 'Climb the table to reach '}<Text className="font-bold" style={{ color: nextTier.color }}>{nextTier.name}</Text></>}
+          </Text>
         </View>
       </View>
 
-      <View className="mt-3 flex-row gap-2">
-        {risk.atRisk && tokens > 0 && (
-          <Pressable onPress={protect} accessibilityRole="button" accessibilityLabel="Use a freeze to protect yesterday" className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl bg-brand-400 py-2.5 active:opacity-90">
-            <Snowflake size={14} color="#000" />
-            <Text className="text-[13px] font-bold text-black">Protect yesterday</Text>
-          </Pressable>
-        )}
-        <Pressable
-          onPress={toggleRest}
-          accessibilityRole="button"
-          accessibilityLabel={restingToday ? 'Remove rest day' : 'Mark today a rest day'}
-          accessibilityState={{ selected: restingToday }}
-          className={`flex-1 flex-row items-center justify-center gap-1.5 rounded-xl py-2.5 active:opacity-90 ${restingToday ? 'bg-brand-400/20' : 'border border-white/10 bg-white/5'}`}
-        >
-          <Moon size={14} color={restingToday ? brand[400] : 'rgba(255,255,255,0.7)'} />
-          <Text className={`text-[13px] font-bold ${restingToday ? 'text-brand-300' : 'text-white/80'}`}>{restingToday ? 'Resting today' : 'Rest day'}</Text>
-        </Pressable>
+      <View className="my-3.5 h-px bg-white/[0.07]" />
+
+      <View className="flex-row items-center gap-2.5">
+        <View className="flex-row items-center gap-1.5">
+          <Flame size={19} color="#F5A524" fill="#F5A524" />
+          <Text className="text-[16px] font-black text-white">{me.streakCurrent}</Text>
+        </View>
+        <View className="min-w-0 flex-1">
+          <Text className="text-[13px] font-bold text-white">day streak</Text>
+          <Text className="text-[11px] text-white/50">Best {me.streakBest} · {tokens} <Text style={{ color: '#6AD1E3' }}>❄</Text> left</Text>
+        </View>
+        <FreezeControl resting={restingToday} onPress={toggleRest} />
       </View>
     </View>
+  )
+}
+
+/** Rest / freeze control: schedule-driven "Resting today" (green) when today is a
+ *  planned rest day, else a manual "Freeze streak" (freeze blue #6AD1E3) action.
+ *  BACKEND: rest days pull through from "Plan around your life" + the workout
+ *  schedule (source of truth). A manual freeze is spent only once the day rolls
+ *  over with no workout, and credited back if a workout is later back-dated. */
+function FreezeControl({ resting, onPress }: { resting: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={resting ? 'Resting today' : 'Freeze streak'}
+      accessibilityState={{ selected: resting }}
+      className={`min-h-[44px] flex-row items-center justify-center gap-1.5 rounded-xl px-4 active:opacity-80 ${resting ? 'bg-brand-400/20' : 'border border-white/12 bg-white/5'}`}
+    >
+      <Moon size={14} color={resting ? brand[400] : '#6AD1E3'} />
+      <Text className="text-[13px] font-bold" style={{ color: resting ? '#9fe264' : '#6AD1E3' }}>{resting ? 'Resting today' : 'Freeze streak'}</Text>
+    </Pressable>
   )
 }
 
@@ -471,8 +465,40 @@ function LeagueStandings({ rows, tier }: { rows: LeagueRow[]; tier: ReturnType<t
   }
   return (
     <View className="mt-4">
-      <Text className="mb-1 section-title">This week's standings</Text>
+      <HowExplainer />
+      <Text className="mb-1 mt-3.5 section-title">This month's standings</Text>
       {items}
+    </View>
+  )
+}
+
+/** Collapsible explainer above the standings — points are the 14-day consistency
+ *  odometer (showing up, not load); streaks are forgiving via monthly freezes. */
+function HowExplainer() {
+  const [open, setOpen] = useState(false)
+  return (
+    <View className="rounded-[14px] border p-3" style={{ borderColor: `${brand[400]}33`, backgroundColor: `${brand[400]}0f` }}>
+      <Pressable
+        onPress={() => setOpen((o) => !o)}
+        accessibilityRole="button"
+        accessibilityLabel="How points and streaks work"
+        accessibilityState={{ expanded: open }}
+        className="flex-row items-center gap-2.5 active:opacity-80"
+      >
+        <Info size={16} color={brand[400]} />
+        <Text className="flex-1 text-[12px] font-bold text-white">How points &amp; streaks work</Text>
+        <ChevronDown size={16} color="rgba(255,255,255,0.5)" style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
+      </Pressable>
+      {open && (
+        <View className="mt-2 pl-[26px]">
+          <Text className="text-[12px] leading-snug text-white/70">
+            <Text className="font-bold text-white">Points</Text> are your odometer: a score out of 100 that reflects your last 14 days of training and how on track you are to hit your goals. It rewards consistency, not just how heavy you lift. For example, 30 out of 100 means you're behind; 60 means you're on track. Every workout and goal you hit raises it. Standings reset on the first Monday of each month, and the top of the table moves up a tier.
+          </Text>
+          <Text className="mt-2.5 text-[12px] leading-snug text-white/70">
+            <Text className="font-bold text-white">Streaks</Text> count the days in a row you show up. You get <Text className="font-bold" style={{ color: '#6AD1E3' }}>2 freezes</Text> at the reset of every month for days you can't make it. Miss a day you didn't plan and one freeze (the ❄ count) is spent automatically to save your streak. Your streak only resets once you miss a day with no rest planned and no freezes left. Rest days from the workout section and planned days off you register in <Text className="font-bold text-white">Plan around your life</Text> mode pull through automatically and show as a rest day above.
+          </Text>
+        </View>
+      )}
     </View>
   )
 }
@@ -496,39 +522,3 @@ function StandingRow({ row }: { row: LeagueRow }) {
   )
 }
 
-/* --------------------------- how leagues work ------------------------------ */
-
-function HowLeaguesSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  return (
-    <Sheet open={open} onClose={onClose} title="How leagues work">
-      <View className="gap-3">
-        <HowRow n="1" title="Compete for the week" body="You're placed in a league with others at your level — up to ~25 as it fills. Your score this week is your dashboard odometer — how consistently you hit your goals. It's about showing up, not how much you lift." />
-        <HowRow n="2" title="Climb the ladder" body="Every Monday the league resets. Finish near the top and you promote to the next tier — Bronze, Silver, Gold, Platinum, Diamond. The higher you go, the tougher the climb." />
-        <HowRow n="3" title="Mind the drop zone" body="Finish in the bottom few and you slip down a tier. It's easy to climb straight back — a couple of good days does it." />
-        <HowRow n="4" title="Streaks are forgiving" body="A planned rest day or a freeze token keeps your streak alive through an off day. Rest is part of training — no guilt, no all-or-nothing." />
-      </View>
-      <View className="mt-4 flex-row flex-wrap gap-2">
-        {TIERS.map((t) => (
-          <View key={t.key} className="flex-row items-center gap-1.5 rounded-full px-2.5 py-1" style={{ backgroundColor: `${t.color}1f` }}>
-            <View className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: t.color }} />
-            <Text className="text-[11px] font-bold text-white/80">{t.name}</Text>
-          </View>
-        ))}
-      </View>
-    </Sheet>
-  )
-}
-
-function HowRow({ n, title, body }: { n: string; title: string; body: string }) {
-  return (
-    <View className="flex-row gap-3">
-      <View className="h-6 w-6 items-center justify-center rounded-full bg-brand-400/20">
-        <Text className="text-[12px] font-black text-brand-300">{n}</Text>
-      </View>
-      <View className="flex-1">
-        <Text className="font-bold text-white">{title}</Text>
-        <Text className="mt-0.5 text-[13px] leading-snug text-secondary">{body}</Text>
-      </View>
-    </View>
-  )
-}

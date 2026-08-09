@@ -4,8 +4,8 @@
  * summary card pinned above so their standing is visible without scrolling.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { View, Text, Pressable } from 'react-native'
-import { Trophy, Flame, RefreshCw, TrendingUp } from 'lucide-react-native'
+import { View, Text, Pressable, ActivityIndicator } from 'react-native'
+import { Trophy, Flame, RefreshCw, TrendingUp, ChevronDown } from 'lucide-react-native'
 import { useStore } from '../store/store'
 import { myLeaderStats } from '../store/selectors'
 import { useColors, brand } from '../theme'
@@ -25,6 +25,13 @@ export function GlobalLeaderboard({ onClaimUsername }: { onClaimUsername: () => 
   const [status, setStatus] = useState<Status>('loading')
   const [rows, setRows] = useState<LeaderRow[]>([])
   const [youRank, setYouRank] = useState<number | null>(null)
+  // BACKEND: the global board is the WHOLE user population, paginated 20 at a time.
+  // Maps to a server paginated endpoint (page size 20); the local sim just slices
+  // the deterministic board and fakes the fetch latency of each page.
+  const PAGE = 20
+  const [shown, setShown] = useState(PAGE)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const moreTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   // A monotonically-incrementing token so a slow in-flight load can't overwrite a
   // newer one (e.g. after a retry).
   const loadTokenRef = useRef(0)
@@ -37,6 +44,7 @@ export function GlobalLeaderboard({ onClaimUsername }: { onClaimUsername: () => 
       if (token !== loadTokenRef.current) return
       setRows(res.rows)
       setYouRank(res.youRank)
+      setShown(PAGE)
       setStatus('ready')
     } catch {
       if (token !== loadTokenRef.current) return
@@ -49,6 +57,18 @@ export function GlobalLeaderboard({ onClaimUsername }: { onClaimUsername: () => 
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => () => { if (moreTimer.current) clearTimeout(moreTimer.current) }, [])
+
+  const loadMore = () => {
+    if (loadingMore) return
+    setLoadingMore(true)
+    if (moreTimer.current) clearTimeout(moreTimer.current)
+    moreTimer.current = setTimeout(() => {
+      setShown((n) => n + PAGE)
+      setLoadingMore(false)
+    }, 650)
+  }
 
   if (status === 'loading') return <BoardSkeleton />
 
@@ -66,6 +86,8 @@ export function GlobalLeaderboard({ onClaimUsername }: { onClaimUsername: () => 
   }
 
   const total = rows.length
+  const visible = rows.slice(0, Math.min(shown, total))
+  const hasMore = visible.length < total
 
   return (
     <View>
@@ -80,10 +102,34 @@ export function GlobalLeaderboard({ onClaimUsername }: { onClaimUsername: () => 
       </View>
 
       <View className="gap-1.5">
-        {rows.map((r) => (
+        {visible.map((r) => (
           <LeaderRowView key={r.username} row={r} />
         ))}
       </View>
+
+      {hasMore && (
+        <Pressable
+          onPress={loadMore}
+          disabled={loadingMore}
+          accessibilityRole="button"
+          accessibilityLabel="Load 20 more"
+          accessibilityState={{ busy: loadingMore, disabled: loadingMore }}
+          className="mt-3 min-h-[44px] flex-row items-center justify-center gap-1.5 rounded-2xl border border-white/10 bg-white/5 active:opacity-80"
+        >
+          {loadingMore ? (
+            <>
+              <ActivityIndicator size="small" color="rgba(255,255,255,0.7)" />
+              <Text className="text-[14px] font-bold text-white/60">Loading…</Text>
+            </>
+          ) : (
+            <>
+              <ChevronDown size={15} color="rgba(255,255,255,0.7)" />
+              <Text className="text-[14px] font-bold text-white/80">Load 20 more</Text>
+            </>
+          )}
+        </Pressable>
+      )}
+      <Text className="mt-2.5 text-center text-[12px] text-tertiary">Showing {visible.length} of {total}</Text>
     </View>
   )
 }

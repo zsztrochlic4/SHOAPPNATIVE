@@ -1,11 +1,11 @@
 name: Community Backend
 
 # Runs the community backend emulator round-trips (`npm run test:community`) — the
-# six end-to-end checks that real signed-in users can claim usernames, create/join
-# groups, cheer activity, sync league stats, and delete groups, asserting both the
-# callable return values AND the resulting Firestore state (read back through the
-# security rules, so rules are exercised too). This is the "did it actually work"
-# gate to keep green before flipping COMMUNITY_BACKEND on.
+# end-to-end checks that real signed-in users can claim usernames, create/join
+# groups, react to activity, transfer ownership, sync league stats, and delete
+# groups, asserting both the callable return values AND the resulting Firestore
+# state (read back through the security rules, so rules are exercised too). This is
+# the "did it actually work" gate to keep green before flipping COMMUNITY_BACKEND on.
 #
 # Make `community-tests` a REQUIRED status check (Settings → Branches → branch
 # protection) so a community backend regression blocks merge. It runs on EVERY PR

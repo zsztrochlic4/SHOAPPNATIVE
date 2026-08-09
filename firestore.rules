@@ -414,10 +414,10 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // The private group document + its members and cheers. Readable only by a
+    // The private group document + its members and reactions. Readable only by a
     // signed-in MEMBER (proven by the existence of their own member doc); every
     // write goes through the group Cloud Functions (functions/src/communityGroups.ts)
-    // so passcodes, membership, goals and cheer counts can't be forged.
+    // so passcodes, membership, goals and reaction counts can't be forged.
     match /groups/{groupId} {
       function isGroupMember() {
         return request.auth != null
@@ -430,14 +430,18 @@ service cloud.firestore {
         allow get, list: if isGroupMember();
         allow write: if false;
       }
-      // One doc per activity event holding its cheer count; the per-user tally
-      // lives in the `users` subcollection so "did I cheer?" is a single get.
-      match /cheers/{activityId} {
+      // Emoji reactions on activity events: one count doc per (activity, emoji),
+      // with the per-user tally under `users` so "did I react?" is a single get.
+      match /reactions/{activityId} {
         allow get, list: if isGroupMember();
         allow write: if false;
-        match /users/{uid} {
+        match /emojis/{emoji} {
           allow get, list: if isGroupMember();
           allow write: if false;
+          match /users/{uid} {
+            allow get, list: if isGroupMember();
+            allow write: if false;
+          }
         }
       }
     }

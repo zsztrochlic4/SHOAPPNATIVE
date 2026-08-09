@@ -38,7 +38,7 @@ export const TIERS: Tier[] = [
 
 export const tierOf = (t: number): Tier => TIERS[Math.max(0, Math.min(TIERS.length - 1, t))]
 
-/** Monday date-key of the current week — the stable id for this week's league. */
+/** Monday date-key of the current week — the stable seed id for the cohort. */
 export function weekKey(): string {
   return currentWeekKeys()[0]
 }
@@ -47,6 +47,47 @@ export function weekKey(): string {
 export function daysLeftInWeek(): number {
   const dow = (now().getDay() + 6) % 7 // Mon = 0 … Sun = 6
   return 7 - dow
+}
+
+/* --------------------------- monthly league period ------------------------- */
+// BACKEND: standings reset on the FIRST MONDAY of every month (monthly, not
+// weekly). Users are also granted 2 freezes at each monthly reset. See
+// functions/src/community.ts (rolloverLeagues / grantStreakFreezes).
+
+/** Date of the first Monday of a given month (local time). */
+function firstMondayOf(year: number, monthIndex0: number): Date {
+  const first = new Date(year, monthIndex0, 1)
+  const date = 1 + ((8 - first.getDay()) % 7) // getDay: Sun=0…Sat=6
+  return new Date(year, monthIndex0, date)
+}
+
+/** The reset boundary of the current monthly league period — the next first-Monday
+ *  strictly after today (this month's, or next month's if we're already past it). */
+function nextMonthlyReset(from = now()): Date {
+  const today = new Date(from.getFullYear(), from.getMonth(), from.getDate())
+  const thisMonth = firstMondayOf(today.getFullYear(), today.getMonth())
+  if (thisMonth > today) return thisMonth
+  return firstMondayOf(today.getFullYear(), today.getMonth() + 1)
+}
+
+/** Stable id of the current monthly league period (its first-Monday date-key).
+ *  Used to grant the monthly freezes idempotently and partition standings. */
+export function monthlyResetKey(from = now()): string {
+  const today = new Date(from.getFullYear(), from.getMonth(), from.getDate())
+  const thisMonth = firstMondayOf(today.getFullYear(), today.getMonth())
+  // The period that started on the most recent first-Monday on or before today.
+  const start = today >= thisMonth ? thisMonth : firstMondayOf(today.getFullYear(), today.getMonth() - 1)
+  const y = start.getFullYear()
+  const m = String(start.getMonth() + 1).padStart(2, '0')
+  const d = String(start.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+/** Whole days left before the monthly reset (first Monday). Today counts as 1. */
+export function daysLeftInMonth(from = now()): number {
+  const today = new Date(from.getFullYear(), from.getMonth(), from.getDate())
+  const boundary = nextMonthlyReset(from)
+  return Math.max(1, Math.round((boundary.getTime() - today.getTime()) / 86400000))
 }
 
 export type Zone = 'promote' | 'safe' | 'demote'
@@ -66,10 +107,15 @@ function seedFrom(key: string): number {
 }
 
 /** Which zone a given rank falls in for a tier. Exported so the live backend
- *  path can label server-returned standings the same way the simulation does. */
+ *  path can label server-returned standings the same way the simulation does.
+ *  BACKEND: promotion zones are percentage-based for scale — the top 30% promote
+ *  and the bottom 30% relegate (computed from league size); the middle 40% hold.
+ *  Tier edges are respected: Bronze never demotes, Diamond never promotes. */
 export function zoneFor(rank: number, tier: Tier, cohortSize = tier.cohort): Zone {
-  if (rank <= tier.promote) return 'promote'
-  if (tier.demote > 0 && rank > cohortSize - tier.demote) return 'demote'
+  const promoteN = tier.promote > 0 ? Math.max(1, Math.round(cohortSize * 0.3)) : 0
+  const demoteN = tier.demote > 0 ? Math.max(1, Math.round(cohortSize * 0.3)) : 0
+  if (rank <= promoteN) return 'promote'
+  if (demoteN > 0 && rank > cohortSize - demoteN) return 'demote'
   return 'safe'
 }
 

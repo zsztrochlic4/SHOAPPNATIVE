@@ -96,14 +96,28 @@ test('joinGroupByPasscode: correct code joins, wrong code is denied', async () =
   assert.equal(member.exists(), true, 'joiner becomes a member')
 })
 
-test('cheerGroupActivity: toggles the count up then back down', async () => {
-  const g = await B.call('createGroup', { name: 'Cheer Test', icon: 'target', color: '#EC4899' })
-  const up = await B.call('cheerGroupActivity', { groupId: g.groupId, activityId: 'a-streak' })
-  assert.deepEqual({ mine: up.mine, count: up.count }, { mine: true, count: 1 })
-  const down = await B.call('cheerGroupActivity', { groupId: g.groupId, activityId: 'a-streak' })
+test('reactGroupActivity: toggles an emoji count up then back down', async () => {
+  const g = await B.call('createGroup', { name: 'React Test', icon: 'target', color: '#EC4899' })
+  const up = await B.call('reactGroupActivity', { groupId: g.groupId, activityId: 'a-streak', emoji: '🔥' })
+  assert.deepEqual({ mine: up.mine, count: up.count, emoji: up.emoji }, { mine: true, count: 1, emoji: '🔥' })
+  const down = await B.call('reactGroupActivity', { groupId: g.groupId, activityId: 'a-streak', emoji: '🔥' })
   assert.deepEqual({ mine: down.mine, count: down.count }, { mine: false, count: 0 })
-  // A non-member cannot cheer.
-  await rejectsCode(C.call('cheerGroupActivity', { groupId: g.groupId, activityId: 'a-streak' }), 'permission-denied')
+  // An unsupported emoji is rejected.
+  await rejectsCode(B.call('reactGroupActivity', { groupId: g.groupId, activityId: 'a-streak', emoji: '🍕' }), 'invalid-argument')
+  // A non-member cannot react.
+  await rejectsCode(C.call('reactGroupActivity', { groupId: g.groupId, activityId: 'a-streak', emoji: '🔥' }), 'permission-denied')
+})
+
+test('transferGroupOwnership: owner hands the group to a member', async () => {
+  const g = await B.call('createGroup', { name: 'Transfer Test', icon: 'flame', color: '#F5A524' })
+  await C.call('claimUsername', { username: 'charlie_owner' }).catch(() => {})
+  await C.call('joinGroupByPasscode', { groupId: g.groupId, passcode: g.passcode })
+  // A non-owner cannot transfer.
+  await rejectsCode(C.call('transferGroupOwnership', { groupId: g.groupId, newOwnerUid: C.uid }), 'permission-denied')
+  const res = await B.call('transferGroupOwnership', { groupId: g.groupId, newOwnerUid: C.uid })
+  assert.equal(res.ok, true)
+  const group = await getDoc(doc(C.db, 'groups', g.groupId))
+  assert.equal(group.get('ownerUid'), C.uid, 'ownership moved to the chosen member')
 })
 
 test('syncCommunityStats: recomputes from RAW inputs, ignores client-claimed points (F-003)', async () => {
@@ -125,7 +139,7 @@ test('syncCommunityStats: recomputes from RAW inputs, ignores client-claimed poi
     clientTz: 'Australia/Sydney',
   })
   assert.equal(res.ok, true)
-  assert.equal(res.calcVersion, 'v1')
+  assert.equal(res.calcVersion, 'v2') // odometer window widened 7 → 14 days
   assert.equal(res.status, 'ok') // one honest day → clean
 
   // The standing carries a SERVER-recomputed score, never the injected 999.
@@ -134,7 +148,7 @@ test('syncCommunityStats: recomputes from RAW inputs, ignores client-claimed poi
   assert.notEqual(points, 999)
   assert.ok(typeof points === 'number' && points > 0 && points <= 100)
   assert.equal(standing.get('status'), 'ok')
-  assert.equal(standing.get('calcVersion'), 'v1')
+  assert.equal(standing.get('calcVersion'), 'v2')
 
   // Group fan-out reflects the recomputed values (volume is a deterministic sum).
   const member = await getDoc(doc(B.db, `groups/${g.groupId}/members/${B.uid}`))

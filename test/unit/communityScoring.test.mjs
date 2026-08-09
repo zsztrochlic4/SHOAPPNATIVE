@@ -62,12 +62,16 @@ test('computeCompetitionMetrics: known scenario yields the hand-computed metrics
   const sessions = [0, 1, 2, 3].map((n) => ({ dateKey: dayKey(n), completed: true, volumeKg: 1000, exercises: [] }))
   const records = buildDayRecords(stateWith({ habits, sessions }))
   const m = computeCompetitionMetrics({ records, targets: TARGETS, ctx })
-  assert.equal(m.odometer, 50)
+  // Odometer is now a 14-day window. Habits are at target (steps/sleep/water/nutrition
+  // ratios = 1.0), but the 4 workouts fall against an 8-workout fortnight target
+  // (daysPerWeek 4 × 2 weeks), so the workout dimension is 0.5:
+  //   (0.5·0.3 + 1·0.2 + 1·0.2 + 1·0.15 + 1·0.15) × 50 = 42.5 → 43.
+  assert.equal(m.odometer, 43)
   assert.equal(m.streakCurrent, 7)
   assert.equal(m.streakBest, 7)
   assert.equal(m.volume7, 4000)
   assert.equal(m.volume30, 4000)
-  assert.equal(m.sessions7, 4)
+  assert.equal(m.sessions7, 4) // sessions7 stays a 7-day count (the group-goal unit)
 })
 
 test('PARITY: server recompute from the serialized day-log == live client selectors', () => {

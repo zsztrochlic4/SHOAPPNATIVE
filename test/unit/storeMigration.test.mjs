@@ -58,3 +58,27 @@ test('malformed collection containers fall back safely', () => {
   if (!result.ok) return
   assert.ok(Array.isArray(result.state.meals))
 })
+
+test('v14 migration drops legacy group cheers and keeps emoji reactions', () => {
+  const state = legacyState()
+  state.community = {
+    username: 'legacy_user',
+    groups: [
+      // A legacy group carrying the removed `cheers` field alongside new reactions.
+      {
+        id: 'grp-legacy', name: 'Legacy Crew', passcode: 'ABC123', ownerUsername: 'legacy_user',
+        createdAtKey: '2026-01-01', members: [],
+        cheers: { 'a-streak': { count: 3, mine: true } },
+        reactions: { 'a-vol': { '💪': { count: 2, mine: false } } },
+      },
+    ],
+    restDays: [], frozenDays: [],
+  }
+  const result = migrateAppState(state)
+  assert.equal(result.ok, true)
+  if (!result.ok) return
+  const g = result.state.community.groups[0]
+  assert.equal(g.cheers, undefined, 'the removed cheers field is dropped')
+  assert.deepEqual(g.reactions, { 'a-vol': { '💪': { count: 2, mine: false } } }, 'emoji reactions are preserved')
+  assert.equal(result.state.community.username, 'legacy_user', 'the claimed username survives')
+})

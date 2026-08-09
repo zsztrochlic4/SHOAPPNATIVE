@@ -12,6 +12,7 @@ import {
   computeStreak,
   computeCompetitionMetrics,
   dayMeetsGoals,
+  ODOMETER_WINDOW_DAYS,
   type ScoringTargets,
   type DayRecord,
   type TimeContext,
@@ -352,18 +353,19 @@ export type WeeklyIndex = {
   parts: { label: string; pct: number }[]
 }
 
-/** Reviews the last 7 days of activity vs the user's targets into a single
+/** Reviews the last 14 days of activity vs the user's targets into a single
  *  needle position. 1.0x of targets = the middle ("on track"). */
 export function weeklyIndex(s: AppState): WeeklyIndex {
   const byKey = new Map(s.habits.map((h) => [h.dateKey, h]))
-  const last7 = Array.from({ length: 7 }, (_, d) => dayKey(d))
-  const days = last7.map((k) => byKey.get(k)).filter(Boolean) as HabitDay[]
+  const window = Array.from({ length: ODOMETER_WINDOW_DAYS }, (_, d) => dayKey(d))
+  const days = window.map((k) => byKey.get(k)).filter(Boolean) as HabitDay[]
   // Count prescribed sessions and self-logged activities. All fitness counts.
-  const workouts = workoutsInRange(s, 7) + activitiesInRange(s, 7).length
+  const workouts = workoutsInRange(s, ODOMETER_WINDOW_DAYS) + activitiesInRange(s, ODOMETER_WINDOW_DAYS).length
 
   // Score + per-dimension ratios come from the shared scoring core so the
-  // dashboard odometer and the server-recomputed league points can never drift.
-  const { score, ratios: r } = weeklyIndexCore(days, workouts, targetsFrom(s.profile))
+  // dashboard odometer and the server-recomputed league points can never drift —
+  // same 14-day window on both sides.
+  const { score, ratios: r } = weeklyIndexCore(days, workouts, targetsFrom(s.profile), ODOMETER_WINDOW_DAYS)
 
   const band: WeeklyIndex['band'] =
     score >= 80 ? 'crushing' : score >= 62 ? 'ahead' : score >= 44 ? 'ontrack' : score >= 28 ? 'behind' : 'off'

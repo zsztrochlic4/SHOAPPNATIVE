@@ -48,4 +48,4 @@ export { createCheckoutSession, createBillingPortalSession, stripeWebhook } from
 export { claimUsername, syncCommunityStats, rolloverLeagues, grantStreakFreezes, reprocessStandings, pruneScoreLog, appealStanding, resolveStandingReview } from './community'
 // Private friend groups (create / join / leave / delete / goal / cheer). Also
 // feature-flagged OFF client-side.
-export { createGroup, joinGroupByPasscode, leaveGroup, deleteGroup, setGroupGoal, cheerGroupActivity } from './communityGroups'
+export { createGroup, joinGroupByPasscode, leaveGroup, deleteGroup, setGroupGoal, transferGroupOwnership, reactGroupActivity } from './communityGroups'

@@ -19,7 +19,7 @@ import {
 } from './service'
 import { COMMUNITY_BACKEND } from './backendConfig'
 
-type FieldState =
+export type FieldState =
   | { kind: 'idle' }
   | { kind: 'invalid'; message: string }
   | { kind: 'checking' }
@@ -27,7 +27,7 @@ type FieldState =
   | { kind: 'taken'; message: string }
   | { kind: 'error'; message: string }
 
-function useUsernameField(initial: string, ownHandle: string | null) {
+export function useUsernameField(initial: string, ownHandle: string | null) {
   const [value, setValue] = useState(initial)
   const [field, setField] = useState<FieldState>({ kind: 'idle' })
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -69,7 +69,7 @@ function useUsernameField(initial: string, ownHandle: string | null) {
 }
 
 /** The validated text field + inline status, shared by the gate and the sheet. */
-function UsernameField({
+export function UsernameField({
   value,
   field,
   onChange,

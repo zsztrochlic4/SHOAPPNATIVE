@@ -7,6 +7,12 @@ import { View, Text } from 'react-native'
 import { Flame } from 'lucide-react-native'
 import { useColors } from '../theme'
 
+/* -------------------------------- reactions -------------------------------- */
+
+/** The fixed set of emoji reactions offered on group activity events. Order is
+ *  the order they appear in the picker and as count pills. */
+export const REACTION_EMOJIS = ['💪', '🔥', '👏', '🙌', '⚡', '🏆'] as const
+
 /* --------------------------------- numbers --------------------------------- */
 
 /** "18,400" — thousands-separated integer. */

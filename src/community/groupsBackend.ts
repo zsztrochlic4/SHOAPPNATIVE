@@ -34,9 +34,15 @@ export const leaveGroupRemote = (groupId: string) => call<{ groupId: string }, {
 export const deleteGroupRemote = (groupId: string) => call<{ groupId: string }, { ok: true }>('deleteGroup')({ groupId }).then(() => {})
 export const setGroupGoalRemote = (groupId: string, goal: number) => call<{ groupId: string; goal: number }, { ok: true; goal: number }>('setGroupGoal')({ groupId, goal }).then((r) => r.data.goal)
 
-export async function cheerRemote(groupId: string, activityId: string): Promise<{ mine: boolean; count: number }> {
-  const res = await call<{ groupId: string; activityId: string }, { ok: true; mine: boolean; count: number }>('cheerGroupActivity')({ groupId, activityId })
-  return { mine: res.data.mine, count: res.data.count }
+/** Hand ownership of a group to another member. `newOwnerUid` is the member's uid
+ *  (the members-subcollection doc id — GroupMember.id on a server-loaded group). */
+export const transferOwnershipRemote = (groupId: string, newOwnerUid: string) =>
+  call<{ groupId: string; newOwnerUid: string }, { ok: true }>('transferGroupOwnership')({ groupId, newOwnerUid }).then(() => {})
+
+/** Add/remove one of the caller's emoji reactions on an activity event (toggle). */
+export async function reactRemote(groupId: string, activityId: string, emoji: string): Promise<{ emoji: string; mine: boolean; count: number }> {
+  const res = await call<{ groupId: string; activityId: string; emoji: string }, { ok: true; emoji: string; mine: boolean; count: number }>('reactGroupActivity')({ groupId, activityId, emoji })
+  return { emoji: res.data.emoji, mine: res.data.mine, count: res.data.count }
 }
 
 /* ---------------------------------- reads ---------------------------------- */

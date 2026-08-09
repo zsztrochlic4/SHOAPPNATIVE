@@ -16,7 +16,8 @@
  *                                                          targetBelowFloor, updatedAt }
  *   communityProfiles/{uid}/scoreDays/{dayKey}         → server-owned current per-day inputs
  *   communityProfiles/{uid}/scoreEvents/{autoId}       → append-only immutable change log
- *   leagueStandings/{weekKey}/tiers/{tier}/members/{uid} → { username, points, status, calcVersion }
+ *   leagueStandings/{periodKey}/tiers/{tier}/members/{uid} → { username, points, status, calcVersion }
+ *     (periodKey = the monthly reset period's first-Monday date; standings reset monthly)
  *   communityReviews/{uid}                             → moderation queue for held standings
  *                                                          (flags, state, override) — owner-claim read only
  *
@@ -88,6 +89,35 @@ function mondayKey(d: Date): string {
   const dow = WEEKDAY_INDEX[get('weekday')] ?? 0
   const monday = new Date(Date.UTC(y, m - 1, day - dow))
   return monday.toISOString().slice(0, 10)
+}
+
+/** Day-of-month (1-31) of instant `d` in the app tz — used to detect the FIRST
+ *  Monday of the month (a Monday with day-of-month <= 7) for the monthly reset. */
+function sydneyDayOfMonth(d: Date): number {
+  const parts = APP_TZ_PARTS.formatToParts(d)
+  return Number(parts.find((p) => p.type === 'day')?.value ?? '1')
+}
+
+/** The current monthly league PERIOD key: the first-Monday date-key of the period
+ *  `d` falls in (the standings partition). Standings reset on the first Monday of
+ *  each month, so a period runs first-Monday → next first-Monday. Mirrors the
+ *  client's league.ts monthlyResetKey. The day-of-week of the 1st is timezone-
+ *  independent for a civil calendar date, so UTC math on the app-tz (y,m,day) is
+ *  exact. */
+function monthlyPeriodKey(d: Date): string {
+  const parts = APP_TZ_PARTS.formatToParts(d)
+  const get = (t: string): string => parts.find((p) => p.type === t)?.value ?? ''
+  const y = Number(get('year')), m = Number(get('month')), day = Number(get('day'))
+  const firstMonday = (yy: number, mm1: number): { y: number; m: number; date: number } => {
+    const dowFirst = (new Date(Date.UTC(yy, mm1 - 1, 1)).getUTCDay() + 6) % 7 // Mon=0 … Sun=6
+    return { y: yy, m: mm1, date: 1 + ((7 - dowFirst) % 7) }
+  }
+  let p = firstMonday(y, m)
+  if (day < p.date) {
+    // Before this month's first Monday → the period started last month.
+    p = m === 1 ? firstMonday(y - 1, 12) : firstMonday(y, m - 1)
+  }
+  return `${p.y}-${String(p.m).padStart(2, '0')}-${String(p.date).padStart(2, '0')}`
 }
 
 /** The civil date (YYYY-MM-DD) of instant `d` in the app's home timezone. This is
@@ -339,7 +369,7 @@ async function finalizeStanding(
   db: FirebaseFirestore.Firestore,
   prof: FirebaseFirestore.DocumentSnapshot,
   ctx: TimeContext,
-  weekKey: string,
+  periodKey: string,
   targets: ScoringTargets,
   extras: { backfilledDayCount: number; targetBelowFloor: boolean },
 ): Promise<{ status: string; flags: string[] }> {
@@ -347,6 +377,9 @@ async function finalizeStanding(
   const profRef = prof.ref
   const username = prof.get('username') as string
   const tier = clampTier(typeof prof.get('tier') === 'number' ? prof.get('tier') : 0)
+  // `periodKey` is the MONTHLY standings partition. The per-WEEK anomaly signal +
+  // the profile/review metadata keep a weekly reference (unchanged semantics).
+  const weekKey = mondayOfCivil(ctx.todayKey)
 
   // The review record holds any moderator OVERRIDE + the queue state. Read once,
   // up front: an override can force the final status regardless of the anomaly
@@ -363,6 +396,10 @@ async function finalizeStanding(
   const windowFloor = ctx.offsetKey(MAX_HISTORY_DAYS)
   const histSnap = await profRef.collection('scoreDays').where(FieldPath.documentId(), '>=', windowFloor).get()
   const records: DayRecord[] = histSnap.docs.map((doc) => toDayRecord(doc.id, doc))
+  // BACKEND: `points` === `odometer` — a 0-100 score measuring progress toward the
+  // user's goals (consistency, not load), computed over their last 14 days of
+  // training. computeCompetitionMetrics owns the scoring window; keep it aligned to
+  // the 14-day rule (shared with the client via the prebuild sync).
   const metrics = computeCompetitionMetrics({ records, targets, ctx })
 
   // Days that carry ANY real activity — not just stored docs — so a run of empty
@@ -421,7 +458,7 @@ async function finalizeStanding(
     },
     { merge: true },
   )
-  await db.doc(`leagueStandings/${weekKey}/tiers/${tier}/members/${uid}`).set(
+  await db.doc(`leagueStandings/${periodKey}/tiers/${tier}/members/${uid}`).set(
     // `uid` is stored (in addition to being the doc id) so account deletion can find
     // every one of a user's historical standing rows via a collection-group query
     // (functions/src/account.ts). It's the doc id anyway, so it leaks nothing new.
@@ -489,7 +526,8 @@ export const syncCommunityStats = onCall<SyncInput>(
     await enforceDailyLimit('community_sync', uid, 500)
     const now = new Date()
     const ctx = serverCtx(now)
-    const weekKey = mondayKey(now)
+    const weekKey = mondayKey(now) // weekly ref for the audit event trail
+    const periodKey = monthlyPeriodKey(now) // MONTHLY standings partition
     const clientTz = sanitizeTz(req.data?.clientTz)
 
     const { targets, targetBelowFloor } = clampTargets(req.data?.targets)
@@ -529,48 +567,61 @@ export const syncCommunityStats = onCall<SyncInput>(
     }
 
     // Recompute from the durable log, evaluate anomalies, and write the standing.
-    const { status, flags } = await finalizeStanding(db, prof, ctx, weekKey, targets, { backfilledDayCount, targetBelowFloor })
+    const { status, flags } = await finalizeStanding(db, prof, ctx, periodKey, targets, { backfilledDayCount, targetBelowFloor })
 
     if (status !== 'ok') logger.info('community.syncCommunityStats.flagged', { status, flags, backfilledDayCount })
-    return { ok: true, tier, weekKey, calcVersion: CALC_VERSION, status }
+    // `weekKey` here IS the standings partition the client reads — the monthly
+    // period key (kept the field name for the client contract).
+    return { ok: true, tier, weekKey: periodKey, calcVersion: CALC_VERSION, status }
   },
 )
 
 /* -------------------------------- rolloverLeagues -------------------------- */
 
-/** Weekly promotion/demotion. Runs every Monday: for the just-ended week it moves
- *  each tier's top cohort up and its bottom cohort down, then resets everyone's
- *  points. ONLY `status == 'ok'` standings are eligible to move — a held/provisional
- *  standing has withheld points (0) and must neither be promoted (it would rise on a
- *  fake score in a sparse/all-zero cohort — F-003 finding) nor demoted (it holds
- *  until review clears it). Movers come from one bounded, ordered read of the ok
- *  cohort (small by design); promotion wins ties with demotion. The points reset
- *  streams the whole cohort in pages so memory stays flat as the user base grows. */
+/** Monthly promotion/demotion. Runs every Monday but ACTS only on the first Monday
+ *  of the month (the monthly reset): for the just-ended period it promotes each
+ *  tier's top 30% and relegates its bottom 30% (percentage-based for scale), then
+ *  resets everyone's points. ONLY `status == 'ok'` standings are eligible to move —
+ *  a held/provisional standing has withheld points (0) and must neither be promoted
+ *  (it would rise on a fake score in a sparse/all-zero cohort — F-003 finding) nor
+ *  demoted (it holds until review clears it). Movers come from one bounded, ordered
+ *  read of the ok cohort; promotion wins ties with demotion. The points reset streams
+ *  the whole cohort in pages so memory stays flat as the user base grows.
+ *  Standings are partitioned by the MONTHLY period key (first-Monday date); the
+ *  just-ended period is the one that contained yesterday. */
 export const rolloverLeagues = onSchedule(
   { schedule: '5 0 * * 1', timeZone: 'Australia/Sydney', region: 'australia-southeast1', timeoutSeconds: 540, memory: '512MiB' },
   async () => {
-    const db = getFirestore()
-    // The week that just ended = the Monday 7 days before today (in the app tz).
     const now = new Date()
-    const prevWeek = mondayKey(new Date(now.getTime() - 7 * 86400000))
+    // Monthly cadence: skip every Monday that isn't the FIRST Monday of the month.
+    if (sydneyDayOfMonth(now) > 7) { logger.info('community.rolloverLeagues.skip', { reason: 'not first Monday' }); return }
+
+    const db = getFirestore()
+    // The period that just ended = the monthly period containing yesterday (today is
+    // the first day of the new period).
+    const prevPeriod = monthlyPeriodKey(new Date(now.getTime() - 86400000))
 
     let promoted = 0
     let demoted = 0
     for (let tier = 0; tier < TIERS.length; tier++) {
       const cfg = TIERS[tier]
-      const members = db.collection(`leagueStandings/${prevWeek}/tiers/${tier}/members`)
+      const members = db.collection(`leagueStandings/${prevPeriod}/tiers/${tier}/members`)
 
       // Movers: only the `ok` cohort is eligible to move, read once ordered by
       // points desc (needs the members(status,points) composite index —
-      // firestore.indexes.json). The top `promote` rise; the bottom `demote` of the
-      // SAME ok list fall; promotion wins a tie in a cohort smaller than promote +
-      // demote. Held/provisional rows are absent here, so they hold their tier.
+      // firestore.indexes.json). Percentage-based zones: the top 30% rise, the
+      // bottom 30% of the SAME ok list fall; promotion wins a tie in a small cohort.
+      // Tier edges are respected (Bronze never demotes, Diamond never promotes).
+      // Held/provisional rows are absent here, so they hold their tier.
       const moves = new Map<string, number>() // uid → new tier
       if (cfg.promote > 0 || cfg.demote > 0) {
         const okDocs = (await members.where('status', '==', 'ok').orderBy('points', 'desc').get()).docs
-        for (let i = 0; i < cfg.promote && i < okDocs.length; i++) moves.set(okDocs[i].id, clampTier(tier + 1))
-        for (let i = 0; i < cfg.demote && i < okDocs.length; i++) {
-          const d = okDocs[okDocs.length - 1 - i]
+        const size = okDocs.length
+        const promoteN = cfg.promote > 0 ? Math.max(1, Math.round(size * 0.3)) : 0
+        const demoteN = cfg.demote > 0 ? Math.max(1, Math.round(size * 0.3)) : 0
+        for (let i = 0; i < promoteN && i < size; i++) moves.set(okDocs[i].id, clampTier(tier + 1))
+        for (let i = 0; i < demoteN && i < size; i++) {
+          const d = okDocs[size - 1 - i]
           if (!moves.has(d.id)) moves.set(d.id, clampTier(tier - 1))
         }
       }
@@ -597,27 +648,35 @@ export const rolloverLeagues = onSchedule(
       })
       if (ops > 0) await batch.commit()
     }
-    logger.info('community.rolloverLeagues', { prevWeek, promoted, demoted })
+    logger.info('community.rolloverLeagues', { prevPeriod, promoted, demoted })
   },
 )
 
 /* ------------------------------ grantStreakFreezes ------------------------- */
 
-/** Weekly freeze grant — tops every community member up by one freeze token, to a
- *  cap. A field-transform can't itself clamp, so a min() would need a read; for a
- *  weekly grant we simply set the cap when already at/over it and otherwise
- *  increment. The cohort scan is paginated so memory stays flat as it grows. */
+/** Monthly freeze grant — runs every Monday but ACTS only on the first Monday of
+ *  the month, granting each community member their fresh 2 freezes for the new
+ *  period (set to the cap, not incremented). The cohort scan is paginated so memory
+ *  stays flat as it grows.
+ *  BACKEND (timing): a freeze is only actually SPENT once a day rolls over with no
+ *  workout logged; if the user later back-dates a workout from the dashboard for
+ *  that passed day, the freeze is credited back (spend/credit lives in the daily
+ *  reprocess / sync path, not here — this function only issues the monthly grant). */
 export const grantStreakFreezes = onSchedule(
   { schedule: '10 0 * * 1', timeZone: 'Australia/Sydney', region: 'australia-southeast1', timeoutSeconds: 540, memory: '512MiB' },
   async () => {
+    const now = new Date()
+    if (sydneyDayOfMonth(now) > 7) { logger.info('community.grantStreakFreezes.skip', { reason: 'not first Monday' }); return }
+
     const db = getFirestore()
     let granted = 0
     let batch = db.batch()
     let ops = 0
     await forEachPaged(db.collection('communityProfiles'), 400, async (doc) => {
       const cur = typeof doc.get('freezeTokens') === 'number' ? doc.get('freezeTokens') : 0
-      if (cur >= FREEZE_CAP) return
-      batch.set(doc.ref, { freezeTokens: Math.min(FREEZE_CAP, cur + 1) }, { merge: true })
+      // Fresh grant at each monthly reset: everyone starts the month with FREEZE_CAP.
+      if (cur === FREEZE_CAP) return
+      batch.set(doc.ref, { freezeTokens: FREEZE_CAP }, { merge: true })
       granted++
       if (++ops >= 400) { await batch.commit(); batch = db.batch(); ops = 0 }
     })
@@ -645,7 +704,7 @@ export const reprocessStandings = onSchedule(
     const db = getFirestore()
     const now = new Date()
     const ctx = serverCtx(now)
-    const weekKey = mondayKey(now)
+    const periodKey = monthlyPeriodKey(now)
     let processed = 0
     let held = 0
     let provisional = 0
@@ -655,12 +714,12 @@ export const reprocessStandings = onSchedule(
       if (!stored || typeof stored !== 'object') return // never synced under F-003 — nothing to recompute
       const targets = clampTargets(stored as Partial<ScoringTargets>).targets // re-clamp defensively
       const targetBelowFloor = doc.get('targetBelowFloor') === true
-      const { status } = await finalizeStanding(db, doc, ctx, weekKey, targets, { backfilledDayCount: 0, targetBelowFloor })
+      const { status } = await finalizeStanding(db, doc, ctx, periodKey, targets, { backfilledDayCount: 0, targetBelowFloor })
       processed++
       if (status === 'held') held++
       else if (status === 'provisional') provisional++
     })
-    logger.info('community.reprocessStandings', { weekKey, processed, held, provisional })
+    logger.info('community.reprocessStandings', { periodKey, processed, held, provisional })
   },
 )
 
@@ -713,7 +772,7 @@ async function recomputeForUid(db: FirebaseFirestore.Firestore, uid: string): Pr
   const now = new Date()
   const targets = clampTargets((prof.get('scoringTargets') as Partial<ScoringTargets> | undefined) ?? {}).targets
   const targetBelowFloor = prof.get('targetBelowFloor') === true
-  return finalizeStanding(db, prof, serverCtx(now), mondayKey(now), targets, { backfilledDayCount: 0, targetBelowFloor })
+  return finalizeStanding(db, prof, serverCtx(now), monthlyPeriodKey(now), targets, { backfilledDayCount: 0, targetBelowFloor })
 }
 
 interface AppealInput { note?: string }

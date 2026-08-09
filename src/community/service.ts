@@ -32,6 +32,12 @@ const wait = (ms: number) => new Promise<void>((res) => setTimeout(res, ms))
 export const USERNAME_MIN = 3
 export const USERNAME_MAX = 20
 
+/** Handles that impersonate the app or staff — blocked at claim time. The server
+ *  is the ultimate authority; this gives instant feedback in the claim field. */
+const RESERVED_NAMES = new Set([
+  'admin', 'support', 'coach', 'moderator', 'staff', 'help', 'shoapp', 'sho',
+])
+
 export type UsernameValidation =
   | { ok: true; canonical: string }
   | { ok: false; message: string }
@@ -59,6 +65,7 @@ export type UsernameAvailability =
 export async function checkUsernameAvailable(raw: string, ownHandle?: string | null): Promise<UsernameAvailability> {
   const v = validateUsername(raw)
   if (!v.ok) return { status: 'invalid', message: v.message }
+  if (RESERVED_NAMES.has(v.canonical)) return { status: 'taken', message: 'That username is reserved' }
   try {
     if (COMMUNITY_BACKEND) {
       // Live: read the server-side uniqueness map (firebase loaded on demand).
@@ -123,8 +130,8 @@ export async function createGroup(
       members: [youMember(me)],
       icon: appearance?.icon,
       color: appearance?.color,
-      // A friendly starting target; the owner can adjust it as friends join.
-      weeklyGoal: 12,
+      // New groups start with NO weekly goal — the owner sets one when ready.
+      weeklyGoal: 0,
     }
     return { ok: true, group }
   } catch {

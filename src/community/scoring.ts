@@ -20,8 +20,14 @@
  */
 
 /** Bump on ANY change to the definitions below. Stamped onto every standing so
- *  stale rows are detectable and a reprocessing sweep can re-score them. */
-export const CALC_VERSION = 'v1'
+ *  stale rows are detectable and a reprocessing sweep can re-score them.
+ *  v2: the odometer window widened 7 → 14 days (see ODOMETER_WINDOW_DAYS). */
+export const CALC_VERSION = 'v2'
+
+/** The odometer / league-points window: a 0-100 consistency score over the user's
+ *  last 14 days of training (progress toward their goals, not load). Used app-wide
+ *  — the dashboard gauge and the league points are the SAME number. */
+export const ODOMETER_WINDOW_DAYS = 14
 
 /** The user's goal targets, applied uniformly across history (exactly as the app
  *  applies current `profile` targets to all days). Self-reported, so the server
@@ -66,7 +72,7 @@ interface HabitLike {
 }
 
 export interface CompetitionMetrics {
-  /** 0..100 weekly consistency ("odometer"). */
+  /** 0..100 consistency over the last 14 days ("odometer" / league points). */
   odometer: number
   streakCurrent: number
   streakBest: number
@@ -108,18 +114,21 @@ export interface OdometerResult {
 }
 
 /**
- * The dashboard odometer (weeklyIndex). `habitDays` are the logged habit entries
- * in the last 7 days; `workouts7` is completed sessions + activities in the
- * trailing window. Verbatim from selectors.weeklyIndex (lines computing r/weighted
- * /score). Returned separately from the UI band/label so the server can score
- * without dragging copy into its bundle.
+ * The odometer core (dashboard gauge + league points). `habitDays` are the logged
+ * habit entries in the trailing window; `workouts` is completed sessions +
+ * activities over that same window; `windowDays` scales the workout target so the
+ * score reads the same whether measured over 7 or 14 days. Returned separately from
+ * the UI band/label so the server can score without dragging copy into its bundle.
  */
-export function weeklyIndexCore(habitDays: HabitLike[], workouts7: number, t: ScoringTargets): OdometerResult {
+export function weeklyIndexCore(habitDays: HabitLike[], workouts: number, t: ScoringTargets, windowDays = 7): OdometerResult {
   const n = Math.max(1, habitDays.length)
   const avg = (sel: (h: HabitLike) => number) => habitDays.reduce((a, h) => a + sel(h), 0) / n
 
+  // The habit ratios are per-day AVERAGES (window-independent); only the workout
+  // ratio is a COUNT, so its target scales with the window (daysPerWeek per week).
+  const workoutTarget = Math.max(1, t.daysPerWeek * (windowDays / 7))
   const ratios = {
-    workouts: workouts7 / Math.max(1, t.daysPerWeek),
+    workouts: workouts / workoutTarget,
     steps: t.stepTarget ? avg((h) => h.steps) / t.stepTarget : 0,
     sleep: t.sleepTargetH ? avg((h) => h.sleepH) / t.sleepTargetH : 0,
     water: t.waterTargetL ? avg((h) => h.waterL) / t.waterTargetL : 0,
@@ -208,14 +217,15 @@ export interface RecomputeInput {
  * over AppState — same function, same numbers (the F-003 parity guarantee).
  */
 export function computeCompetitionMetrics({ records, targets, ctx }: RecomputeInput): CompetitionMetrics {
-  // Odometer: habit entries in the last 7 calendar days (offsetKey 0..6).
-  const last7 = new Set(Array.from({ length: 7 }, (_, d) => ctx.offsetKey(d)))
-  const habitDays: HabitLike[] = records.filter((r) => r.hasHabit && last7.has(r.dayKey))
+  // Odometer: habit entries + workouts over the last ODOMETER_WINDOW_DAYS (14).
+  const window = new Set(Array.from({ length: ODOMETER_WINDOW_DAYS }, (_, d) => ctx.offsetKey(d)))
+  const habitDays: HabitLike[] = records.filter((r) => r.hasHabit && window.has(r.dayKey))
+  const workouts = sumInWindow(records, ctx, ODOMETER_WINDOW_DAYS, (r) => r.sessions + r.activities)
+  const { score } = weeklyIndexCore(habitDays, workouts, targets, ODOMETER_WINDOW_DAYS)
 
-  // "Workouts" over the trailing window: completed sessions + activities with
-  // dayKey ≥ offsetKey(7) — the same 8-day cutoff selectors.workoutsInRange uses.
+  // sessions7 stays a 7-day count — it's the group team-goal unit ("this week"),
+  // NOT part of the odometer window.
   const sessions7 = sumInWindow(records, ctx, 7, (r) => r.sessions + r.activities)
-  const { score } = weeklyIndexCore(habitDays, sessions7, targets)
 
   const habitByDay = new Map<string, HabitLike>()
   const protectedDays = new Set<string>()

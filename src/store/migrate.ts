@@ -91,20 +91,27 @@ export function migrateAppState(value: unknown): MigrationResult {
     next.integrations = base.integrations
   }
 
-  // v13 community slice: default it when absent (pre-v13 saves) or malformed, and
+  // v13+ community slice: default it when absent (pre-v13 saves) or malformed, and
   // repair the key containers so the hub never crashes on a bad blob. Newer
-  // optional fields (freezeTokens, restDays, frozenDays, league, cheers…) are
+  // optional fields (freezeTokens, restDays, frozenDays, league, reactions…) are
   // carried through from the persisted copy, defaulted from base when absent.
+  // v14: the single "cheers" tally was replaced by emoji "reactions" — legacy
+  // groups drop the stale `cheers` field (it starts fresh, no data to preserve).
   if (!isRecord(value.community)) {
     next.community = base.community
   } else {
     const c = value.community
+    const groups = (Array.isArray(c.groups) ? c.groups : []).map((g) => {
+      if (!isRecord(g)) return g
+      const { cheers: _drop, reactions, ...rest } = g as Record<string, unknown>
+      return { ...rest, reactions: isRecord(reactions) ? reactions : undefined }
+    })
     next.community = {
       ...base.community,
       ...c,
       username: typeof c.username === 'string' ? c.username : null,
       usernameSetAtKey: typeof c.usernameSetAtKey === 'string' ? c.usernameSetAtKey : undefined,
-      groups: Array.isArray(c.groups) ? c.groups : [],
+      groups,
       restDays: Array.isArray(c.restDays) ? c.restDays : [],
       frozenDays: Array.isArray(c.frozenDays) ? c.frozenDays : [],
     } as CommunityState

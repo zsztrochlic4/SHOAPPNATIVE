@@ -131,8 +131,12 @@ export type Action =
   | { type: 'LEAVE_GROUP'; id: string }
   | { type: 'DELETE_GROUP'; id: string }
   | { type: 'SET_GROUP_GOAL'; id: string; goal: number }
-  // Cheers (reaction-only), forgiving streaks, and weekly leagues.
-  | { type: 'CHEER_ACTIVITY'; groupId: string; activityId: string }
+  // Owner hands the group to a member (stays in the group).
+  | { type: 'TRANSFER_OWNERSHIP'; groupId: string; newOwnerUsername: string }
+  // Owner hands over to a successor and leaves in one step.
+  | { type: 'HAND_OVER_AND_LEAVE'; groupId: string; newOwnerUsername: string }
+  // Emoji reactions, forgiving streaks, and weekly leagues.
+  | { type: 'REACT_ACTIVITY'; groupId: string; activityId: string; emoji: string }
   | { type: 'USE_STREAK_FREEZE'; dateKey: string }
   | { type: 'TOGGLE_REST_DAY'; dateKey: string }
   | { type: 'GRANT_WEEKLY_FREEZE'; weekKey: string }
@@ -761,14 +765,56 @@ function reducer(state: AppState, action: Action): AppState {
       }
     }
 
-    // Cheer / un-cheer a group activity event (reaction-only, positive-only).
-    case 'CHEER_ACTIVITY': {
+    // Owner hands the group to another member and stays. Owner-only, and the new
+    // owner must be a current member — enforced structurally so a stray dispatch
+    // can never reassign someone else's group.
+    case 'TRANSFER_OWNERSHIP': {
+      const target = state.community.groups.find((g) => g.id === action.groupId)
+      if (!target || target.ownerUsername !== state.community.username) return state
+      if (!target.members.some((m) => m.username === action.newOwnerUsername)) return state
+      return {
+        ...state,
+        community: {
+          ...state.community,
+          groups: state.community.groups.map((g) =>
+            g.id === action.groupId ? { ...g, ownerUsername: action.newOwnerUsername } : g,
+          ),
+        },
+      }
+    }
+
+    // Owner hands over to a successor and leaves in one step: ownership passes to
+    // the chosen member (handled server-side) and the group leaves the local cache.
+    case 'HAND_OVER_AND_LEAVE': {
+      const target = state.community.groups.find((g) => g.id === action.groupId)
+      if (!target || target.ownerUsername !== state.community.username) return state
+      if (!target.members.some((m) => m.username === action.newOwnerUsername)) return state
+      return {
+        ...state,
+        community: {
+          ...state.community,
+          groups: state.community.groups.filter((g) => g.id !== action.groupId),
+        },
+      }
+    }
+
+    // Add / remove one of the current user's emoji reactions on a group activity
+    // event (positive-only, attached to the action never to a person).
+    case 'REACT_ACTIVITY': {
       const groups = state.community.groups.map((g) => {
         if (g.id !== action.groupId) return g
-        const cheers = { ...(g.cheers ?? {}) }
-        const cur = cheers[action.activityId] ?? { count: 0, mine: false }
-        cheers[action.activityId] = { count: Math.max(0, cur.count + (cur.mine ? -1 : 1)), mine: !cur.mine }
-        return { ...g, cheers }
+        const reactions = { ...(g.reactions ?? {}) }
+        const forActivity = { ...(reactions[action.activityId] ?? {}) }
+        const cur = forActivity[action.emoji] ?? { count: 0, mine: false }
+        if (cur.mine) {
+          const nextCount = cur.count - 1
+          if (nextCount <= 0) delete forActivity[action.emoji]
+          else forActivity[action.emoji] = { count: nextCount, mine: false }
+        } else {
+          forActivity[action.emoji] = { count: cur.count + 1, mine: true }
+        }
+        reactions[action.activityId] = forActivity
+        return { ...g, reactions }
       })
       return { ...state, community: { ...state.community, groups } }
     }
@@ -791,12 +837,12 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, community: { ...state.community, restDays: next } }
     }
 
-    // Weekly freeze grant — idempotent per week, capped so tokens can't stockpile.
+    // Monthly freeze grant — idempotent per period (keyed by the first-Monday date).
+    // Each monthly reset grants the fresh 2 freezes (set to the cap, not +1).
     case 'GRANT_WEEKLY_FREEZE': {
       if (state.community.freezeGrantWeek === action.weekKey) return state
       const FREEZE_CAP = 2
-      const tokens = Math.min(FREEZE_CAP, (state.community.freezeTokens ?? 0) + 1)
-      return { ...state, community: { ...state.community, freezeTokens: tokens, freezeGrantWeek: action.weekKey } }
+      return { ...state, community: { ...state.community, freezeTokens: FREEZE_CAP, freezeGrantWeek: action.weekKey } }
     }
 
     // Backend hydration: replace the local group cache with the server's copy.

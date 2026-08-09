@@ -1,15 +1,15 @@
 /**
  * Private friend groups — server-authoritative backend (create / join / leave /
- * delete / goal / cheer). Groups are the second half of the community hub; like
- * leagues, every mutation goes through these authenticated functions and clients
- * only READ (membership-gated) — see firestore.rules.
+ * delete / goal / transfer / react). Groups are the second half of the community
+ * hub; like leagues, every mutation goes through these authenticated functions and
+ * clients only READ (membership-gated) — see firestore.rules.
  *
  * Data model:
  *   groupDirectory/{groupId}                  → { name, nameLower, icon, color, memberCount }  (searchable, secret-free)
  *   groups/{groupId}                          → { name, nameLower, passcode, ownerUid, ownerUsername, icon, color, weeklyGoal, memberCount, createdAt }
  *   groups/{groupId}/members/{uid}            → { username, joinedAt, odometer, streak, bestStreak, volume7, volume30, sessionsThisWeek }
- *   groups/{groupId}/cheers/{activityId}      → { count }
- *   groups/{groupId}/cheers/{activityId}/users/{uid} → {}
+ *   groups/{groupId}/reactions/{activityId}/emojis/{emoji}            → { count }
+ *   groups/{groupId}/reactions/{activityId}/emojis/{emoji}/users/{uid} → {}
  *
  * Member stats are denormalised snapshots of the user's communityProfiles doc,
  * kept fresh by syncCommunityStats' fan-out. Nothing sensitive is stored — a
@@ -85,7 +85,7 @@ export const createGroup = onCall<CreateInput>({ region: REGION, enforceAppCheck
   const batch = db.batch()
   batch.set(groupRef, {
     name, nameLower: name.toLowerCase(), passcode, ownerUid: uid,
-    ownerUsername: prof.get('username'), icon, color, weeklyGoal: 12, memberCount: 1, createdAt: now,
+    ownerUsername: prof.get('username'), icon, color, weeklyGoal: 0, memberCount: 1, createdAt: now,
   })
   batch.set(db.collection('groupDirectory').doc(groupId), {
     name, nameLower: name.toLowerCase(), icon, color, memberCount: 1,
@@ -203,36 +203,77 @@ export const setGroupGoal = onCall<{ groupId?: string; goal?: number }>({ region
   return { ok: true, goal }
 })
 
-/* ---------------------------------- cheer ---------------------------------- */
+/* -------------------------- transfer ownership ----------------------------- */
 
-interface CheerInput { groupId?: string; activityId?: string }
+interface TransferInput { groupId?: string; newOwnerUid?: string }
 
-export const cheerGroupActivity = onCall<CheerInput>({ region: REGION, enforceAppCheck: APP_CHECK_ENFORCED }, async (req) => {
+/** Hand ownership of a group to another current member. Owner-only. The previous
+ *  owner STAYS in the group — this is the "Make group owner" action, and also the
+ *  first half of an owner-leaves-with-successor flow (the client then calls
+ *  leaveGroup). Updates the group doc + the directory-visible ownerUsername. */
+export const transferGroupOwnership = onCall<TransferInput>({ region: REGION, enforceAppCheck: APP_CHECK_ENFORCED }, async (req) => {
   const uid = requireVerifiedUser(req, 'communityGroups')
   const groupId = (req.data?.groupId ?? '').trim()
-  const activityId = (req.data?.activityId ?? '').trim()
-  if (!groupId || !activityId) throw new HttpsError('invalid-argument', 'A group and activity are required.')
+  const newOwnerUid = (req.data?.newOwnerUid ?? '').trim()
+  if (!groupId || !newOwnerUid) throw new HttpsError('invalid-argument', 'A group and new owner are required.')
 
   const db = getFirestore()
   const groupRef = db.collection('groups').doc(groupId)
-  // Membership check — only members may cheer.
-  if (!(await groupRef.collection('members').doc(uid).get()).exists) {
-    throw new HttpsError('permission-denied', 'Join the group to cheer.')
+  const [group, newMember] = await Promise.all([
+    groupRef.get(),
+    groupRef.collection('members').doc(newOwnerUid).get(),
+  ])
+  if (!group.exists) throw new HttpsError('not-found', 'That group no longer exists.')
+  // Owner-only — checked BEFORE the self-transfer no-op so a non-owner can never
+  // get a silent ok by naming themselves.
+  if (group.get('ownerUid') !== uid) {
+    throw new HttpsError('permission-denied', 'Only the group owner can hand it over.')
+  }
+  if (newOwnerUid === uid) return { ok: true, already: true } // owner → self is a no-op
+  if (!newMember.exists) {
+    throw new HttpsError('failed-precondition', 'The new owner must be a member of the group.')
   }
 
-  const cheerRef = groupRef.collection('cheers').doc(activityId)
-  const userRef = cheerRef.collection('users').doc(uid)
+  await groupRef.set({ ownerUid: newOwnerUid, ownerUsername: newMember.get('username') ?? '' }, { merge: true })
+  return { ok: true }
+})
+
+/* --------------------------------- react ----------------------------------- */
+
+// The fixed set of emoji reactions (mirrors REACTION_EMOJIS on the client). Kept
+// server-side so a forged emoji can't create an arbitrary reaction bucket.
+const REACTION_EMOJIS = new Set(['💪', '🔥', '👏', '🙌', '⚡', '🏆'])
+
+interface ReactInput { groupId?: string; activityId?: string; emoji?: string }
+
+export const reactGroupActivity = onCall<ReactInput>({ region: REGION, enforceAppCheck: APP_CHECK_ENFORCED }, async (req) => {
+  const uid = requireVerifiedUser(req, 'communityGroups')
+  const groupId = (req.data?.groupId ?? '').trim()
+  const activityId = (req.data?.activityId ?? '').trim()
+  const emoji = (req.data?.emoji ?? '').trim()
+  if (!groupId || !activityId) throw new HttpsError('invalid-argument', 'A group and activity are required.')
+  if (!REACTION_EMOJIS.has(emoji)) throw new HttpsError('invalid-argument', 'Unsupported reaction.')
+
+  const db = getFirestore()
+  const groupRef = db.collection('groups').doc(groupId)
+  // Membership check — only members may react.
+  if (!(await groupRef.collection('members').doc(uid).get()).exists) {
+    throw new HttpsError('permission-denied', 'Join the group to react.')
+  }
+
+  const emojiRef = groupRef.collection('reactions').doc(activityId).collection('emojis').doc(emoji)
+  const userRef = emojiRef.collection('users').doc(uid)
   const result = await db.runTransaction(async (tx) => {
-    const [cheerSnap, userSnap] = await Promise.all([tx.get(cheerRef), tx.get(userRef)])
-    const current = typeof cheerSnap.get('count') === 'number' ? (cheerSnap.get('count') as number) : 0
+    const [emojiSnap, userSnap] = await Promise.all([tx.get(emojiRef), tx.get(userRef)])
+    const current = typeof emojiSnap.get('count') === 'number' ? (emojiSnap.get('count') as number) : 0
     if (userSnap.exists) {
       tx.delete(userRef)
-      tx.set(cheerRef, { count: Math.max(0, current - 1) }, { merge: true })
+      tx.set(emojiRef, { count: Math.max(0, current - 1) }, { merge: true })
       return { mine: false, count: Math.max(0, current - 1) }
     }
     tx.set(userRef, { at: FieldValue.serverTimestamp() })
-    tx.set(cheerRef, { count: current + 1 }, { merge: true })
+    tx.set(emojiRef, { count: current + 1 }, { merge: true })
     return { mine: true, count: current + 1 }
   })
-  return { ok: true, ...result }
+  return { ok: true, emoji, ...result }
 })

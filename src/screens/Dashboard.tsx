@@ -221,7 +221,7 @@ export default function Dashboard() {
         <Card className="mt-3 p-4">
           <Text className="text-[13px] font-bold text-white">How your readiness works</Text>
           <Text className="mt-1 text-[12px] leading-snug text-secondary">
-            It blends your last 7 days across five habits versus your targets. <Text className="font-semibold text-white/75">50 means on track</Text>. Higher means you're beating your goals. Hit your targets and each bar fills toward 100%.
+            It blends your last 14 days across five habits versus your targets. <Text className="font-semibold text-white/75">50 means on track</Text>. Higher means you're beating your goals. Hit your targets and each bar fills toward 100%.
           </Text>
           <View className="mt-3 gap-2.5">
             {idx.parts.map((p) => {

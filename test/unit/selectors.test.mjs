@@ -128,13 +128,12 @@ test('weeklyIndex: an empty week is off track, a strong week scores high', () =>
   assert.equal(empty.band, 'off')
   assert.equal(empty.score, 0)
 
-  const strongWeek = Array.from({ length: 7 }, (_, d) => goodDay(dayKey(d)))
-  const strong = weeklyIndex(st({ habits: strongWeek, sessions: [
-    { id: 'a', dateKey: dayKey(1), completed: true, volumeKg: 1, exercises: [] },
-    { id: 'b', dateKey: dayKey(3), completed: true, volumeKg: 1, exercises: [] },
-    { id: 'c', dateKey: dayKey(5), completed: true, volumeKg: 1, exercises: [] },
-    { id: 'd', dateKey: dayKey(6), completed: true, volumeKg: 1, exercises: [] },
-  ] }))
+  // The odometer is a 14-day window, so a genuinely strong PERIOD is a strong
+  // fortnight (14 good days + workouts spread across it to meet the 14-day target).
+  const strongPeriod = Array.from({ length: 14 }, (_, d) => goodDay(dayKey(d)))
+  const strong = weeklyIndex(st({ habits: strongPeriod, sessions: [1, 3, 5, 6, 8, 10, 11, 13].map(
+    (d, i) => ({ id: `s${i}`, dateKey: dayKey(d), completed: true, volumeKg: 1, exercises: [] }),
+  ) }))
   assert.ok(strong.score >= 44, `expected on-track+, got ${strong.score}`)
   assert.ok(['ontrack', 'ahead', 'crushing'].includes(strong.band))
   assert.equal(strong.parts.length, 5)
