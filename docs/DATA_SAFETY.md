@@ -55,14 +55,19 @@ you across apps and websites owned by other companies?" → **No.**
 | User Content → **Photos or Videos** | Yes | App Functionality | Meal photos. **Linked to user = Yes** (sent via an authenticated, per-user request even though the image is not stored). See ⚠️ below |
 | Purchases → **Purchase History** | Yes | App Functionality (+ Account) | Subscription plan / status / trial & renewal dates (via Stripe). We never receive the full card number. |
 | Identifiers → **Device ID** | Yes | App Functionality | Push-notification token |
+| Identifiers → **User ID** | Yes | App Functionality (+ Account) | The authenticated per-user account UID. Declare this even with community disabled — the app uses it on every authenticated request (audit re-review #9). |
+| Sensitive Info → **Sensitive Info** | Yes | App Functionality | Pregnancy / postpartum screening answers (and other sensitive health responses). Apple's Sensitive Info type includes pregnancy/childbirth; declare it because these answers are transmitted off-device to our backend (audit re-review #8). |
 
-**Date of birth:** Apple has no discrete DOB data type. We collect it only to
-confirm 18+. If you want to disclose it, use **"Other Data Types"** →
-*App Functionality*; otherwise it is covered by the age-gating purpose.
+**Date of birth (must be declared — not optional).** Apple has no discrete DOB
+data type, but DOB is **required** for the core 18+ gate, so it does not meet
+Apple's optional-disclosure test. Declare it under **"Other Data Types"** →
+*App Functionality* and verify the category in the live App Store Connect form
+(audit re-review #10).
 
 **Mark everything else "Data Not Collected"**, including: Location, Financial
 Info (card numbers — handled by Stripe, we never receive them), Contacts,
-Browsing History, Search History, Usage Data, Sensitive Info, Audio.
+Browsing History, Search History, Usage Data, Audio. **Do NOT** blanket-exclude
+Sensitive Info — pregnancy/postpartum answers are declared above.
 
 **Diagnostics — verify against the shipping binary before answering.** The Privacy
 Policy discloses that we collect general diagnostic / error information. If the
@@ -74,9 +79,12 @@ inventory the SDKs in the signed binary and confirm.
 
 > **IP address / security telemetry:** Firebase and our hosting/security
 > providers process your IP and request logs to operate and secure the Service.
-> Apple exempts data collected only for **security/fraud-prevention/operation**
-> by you or your service provider and used transiently — so it is not separately
-> declared. Do not use it for anything else without updating this.
+> Apple's optional-disclosure test is **narrow and cumulative** — data may be left
+> undeclared only if used **solely** for security/fraud-prevention/operation AND not
+> retained beyond the real-time request. Routine core-function collection, or logs
+> retained beyond that window, generally **must** be declared. Do not treat this as a
+> blanket exemption: inventory the signed binary and provider practices and answer
+> from Apple's live definitions (audit re-review #11).
 
 ---
 

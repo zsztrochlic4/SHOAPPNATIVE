@@ -205,7 +205,7 @@ const PRIVACY: LegalDoc = {
     { p: `Some of this is health information or other sensitive information. Where required, we ask for consent before collecting it. You do not have to provide optional information, but the Service may be unable to personalise guidance or safely provide a feature without it.` },
     { p: `**Workout, nutrition and activity records**` },
     { p: `We collect workouts, sessions, sets, repetitions, loads, exercise substitutions, activities, meals, recipes, habits, goals and progress entries you log or import.` },
-    { p: `Progress photos are intended to remain on your device unless you deliberately use a sharing or upload feature. Meal photos submitted for AI analysis are processed transiently and are not stored by us as account photos; the resulting nutrition estimate is stored only if you choose to log it.` },
+    { p: `Progress photos are intended to remain on your device unless you deliberately use a sharing or upload feature. Meal photos submitted for AI analysis are not retained in your StrengthHub account; how Google processes and temporarily retains the content you submit is described in the AI and automated processing section. The resulting nutrition estimate is stored only if you choose to log it.` },
     { p: `**AI-feature information**` },
     { p: `If you use an AI feature, we may process:` },
     { ul: [
@@ -301,6 +301,7 @@ const PRIVACY: LegalDoc = {
     { p: `When you delete your account, we delete the active Firebase authentication account and user data we control, subject to:` },
     { ul: [
       `a limited period for deletion to propagate through backups and caches;`,
+      `health information that a law such as the Health Records Act 2001 (Vic) requires us to retain for a minimum period, which may be longer than you request; where this applies we restrict access to that information and delete it when the required period ends;`,
       `financial, transaction, fraud-prevention or legal records that must or may reasonably be retained;`,
       `information held independently by a payment, app-store or connected-service provider; and`,
       `a minimal deletion audit record containing an account identifier and timestamp, retained only for security, compliance and evidence that the request was completed.`,
