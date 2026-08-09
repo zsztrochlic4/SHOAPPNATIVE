@@ -250,7 +250,7 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
     try {
       await deleteAccount()
       dispatch({ type: 'RESET_EMPTY' }) // clear local state; auth listener routes to login
-      toast('Your account has been deleted')
+      toast('Your account has been deleted. If you had a subscription and did not cancel it, email info@strengthhubonline.com and we will cancel it.')
       onDone?.()
     } catch (e: unknown) {
       // Truthful failure copy (audit SA-002). The callable is AUTH-FIRST and
@@ -557,7 +557,7 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
             <Trash2 size={18} color="#f87171" />
             <View className="flex-1">
               <Text className="font-bold text-red-300">{deleting ? 'Deleting…' : confirmingDelete ? 'Tap again to permanently delete' : 'Delete account'}</Text>
-              <Text className="text-[12px] text-secondary">{confirmingDelete ? 'Erases your account and all data — this cannot be undone. Cancel your subscription first; deleting your account does not stop billing' : 'Permanently delete your account and data (cancel your subscription first — this does not stop billing)'}</Text>
+              <Text className="text-[12px] text-secondary">{confirmingDelete ? 'Erases your account and all data — this cannot be undone. Cancel your subscription first — deleting your account does not stop billing. If you delete without cancelling, email info@strengthhubonline.com and we will cancel it for you.' : 'Permanently delete your account and data (cancel your subscription first — this does not stop billing)'}</Text>
             </View>
           </Pressable>
         )}

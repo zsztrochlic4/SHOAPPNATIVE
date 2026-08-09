@@ -135,6 +135,14 @@ review decision, the note you write is kept with your community profile (and is 
 your data download); the anti-cheat and moderation details behind a review are not
 shown to you.
 
+If you choose to claim a username and join the global streak leaderboard, your
+username, current and best streak, and ranking become visible to all users of the
+Service. Participation is optional — you only appear after you claim a username,
+and you can change your username at any time. We do not display your real name,
+location, or health measurements on the leaderboard; only your chosen username and
+streak figures are shown. Reactions you add to a friend group's activity are
+visible only to members of that group.
+
 **Connected-service information**
 
 If you connect a compatible on-device health service such as Apple Health (iOS)
@@ -307,6 +315,11 @@ account and user data we control, subject to:
 - a minimal deletion audit record containing an account identifier and
   timestamp, retained only for security, compliance and evidence that the
   request was completed.
+
+Deleting your account does not cancel a paid subscription. Cancel it first from
+Settings ("Manage or cancel subscription"); if you have already deleted your
+account and can no longer sign in, contact us at info@strengthhubonline.com and
+we will cancel your subscription for you.
 
 Where deletion is not required or reasonably possible, we may de-identify
 information. We periodically review retained information and delete or

@@ -156,7 +156,10 @@ features and payment channel.
   in the app, which opens our payment provider's secure billing portal, or
   through the app store or payment channel you used to subscribe. Cancellation
   stops future renewals. Unless the law or checkout terms provide otherwise,
-  access continues until the end of the paid period.
+  access continues until the end of the paid period. Deleting your account does
+  not cancel a subscription; if you have deleted your account and can no longer
+  reach the billing portal, contact us at info@strengthhubonline.com and we will
+  cancel it for you.
 - **Price changes.** We will give reasonable advance notice of an increase. The
   new price applies from a later renewal, and you may cancel before it takes
   effect.
@@ -185,6 +188,12 @@ publish in a community, leaderboard, challenge or partner feature may be visible
 to the audience identified in the feature. Do not post confidential information
 or content you do not want that audience to see. Other users may copy or share
 what they can view despite our rules.
+
+Some leaderboards are global. If you claim a username and join the global streak
+leaderboard, your username, streak and ranking are visible to all users of the
+Service. Joining is optional — you appear only after you claim a username, and you
+may change your username or stop taking part at any time. Choose a username that
+does not reveal information you would prefer to keep private.
 
 Community content is provided by users, not verified by StrengthHub, and must not
 be treated as professional advice. We may remove or restrict content where we
@@ -262,7 +271,13 @@ disable the feature.
 
 You may stop using the Service, cancel a subscription and request account
 deletion at any time. Deleting the app does not cancel a subscription or delete
-your account.
+your account, and deleting your account does not cancel your subscription. To
+stop billing, cancel first using "Manage or cancel subscription" in Settings,
+which opens our payment provider's secure billing portal. If you delete your
+account before cancelling, you will no longer be able to sign in to reach the
+billing portal — contact us at info@strengthhubonline.com and we will cancel your
+subscription for you. Your payment provider may retain transaction, invoice and
+tax records as required by law.
 
 We may restrict or suspend access where we reasonably believe this is necessary
 to address a material breach, unlawful conduct, fraud, non-payment, safety or
