@@ -925,10 +925,10 @@ export function CoachChatSheet({ open, onClose }: Props) {
   const handleProposalConfirmed = useCallback((proposal: CoachActionProposal, actionId?: string) => {
     if (proposal.kind === 'navigation') {
       const overlay = proposal.payload.overlay
-      const allowed = ['activeWorkout', 'workout', 'nutrition', 'progress', 'logHabit', 'logWeight', 'logActivity', 'budgetEats', 'beginner']
+      const allowed = ['activeWorkout', 'workout', 'nutrition', 'progress', 'logProgress', 'logWeight', 'logActivity', 'budgetEats', 'beginner']
       if (typeof overlay !== 'string' || !allowed.includes(overlay)) return
       if (overlay === 'workout' || overlay === 'nutrition' || overlay === 'progress') nav.goTab(overlay)
-      else nav.open(overlay as 'activeWorkout' | 'logHabit' | 'logWeight' | 'logActivity' | 'budgetEats' | 'beginner')
+      else nav.open(overlay as 'activeWorkout' | 'logProgress' | 'logWeight' | 'logActivity' | 'budgetEats' | 'beginner')
       return
     }
 
@@ -957,7 +957,7 @@ export function CoachChatSheet({ open, onClose }: Props) {
         return
       }
       if (outcome.apply === 'nudge') {
-        nav.open(outcome.kind === 'weight' ? 'logWeight' : 'logHabit')
+        nav.open(outcome.kind === 'weight' ? 'logWeight' : 'logProgress')
         toast(outcome.message)
         if (actionId) void recordCoachActionOutcome(actionId, 'applied')
         return

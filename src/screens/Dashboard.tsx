@@ -106,7 +106,6 @@ export default function Dashboard() {
   // The week strip selects which day's data fills the progress section below.
   const [selDate, setSelDate] = useState(todayKey)
   const isToday = selDate === todayKey
-  const selHabit = habitForDay(state, selDate)
   const selSession = sessionForDay(state, selDate)
   const selActivities = activitiesForDay(state, selDate)
   const selTags = nutritionTagsForDay(state, selDate)
@@ -115,12 +114,8 @@ export default function Dashboard() {
 
   // The five rings and the old "To-do today" list were two views of the same day,
   // stacked. They're now one checklist, built for whichever day the week strip has
-  // selected. Today's is live (rows open the update sheet); past days render the
-  // same rows read-only, since there's nothing left to log against them.
-  // The nutrition check-in and the workout are "auto": they tick themselves off
-  // when the user logs elsewhere in the app, so the row can't be ticked here.
-  const selFoodReview = foodReviewForDay(state, selDate)
-  const selCheckedIn = selTags.length > 0 || !!selFoodReview
+  // selected. The goal list itself is built by useDayGoals (shared with the
+  // standalone log-progress overlay).
   const isRestDay = !selSession
   const selWorkoutDone = isRestDay || workoutStartedForDay(state, selDate) || (selSession?.completed ?? false)
 
@@ -131,15 +126,7 @@ export default function Dashboard() {
     : selProg && selProg.done > 0 ? 'Continue Workout'
     : 'Start Workout'
 
-  // Fixed order, matching the design — done rows stay in place, struck through.
-  const goals: Goal[] = [
-    { id: 'steps', kind: 'measure', icon: 'footprints', tile: colors.brand400, label: 'Steps', done: selHabit.steps >= t.steps, value: selHabit.steps, target: t.steps, step: 500, fmt: (v) => Math.round(v).toLocaleString(), patch: (v) => dispatch({ type: 'PATCH_HABIT', dateKey: selDate, patch: { steps: v } }) },
-    { id: 'sleep', kind: 'measure', icon: 'moon', tile: colors.accentPurple, label: 'Sleep', done: selHabit.sleepH >= t.sleepH, value: selHabit.sleepH, target: t.sleepH, step: 0.5, fmt: (v) => `${Math.round(v * 10) / 10} hrs`, patch: (v) => dispatch({ type: 'PATCH_HABIT', dateKey: selDate, patch: { sleepH: v } }) },
-    { id: 'water', kind: 'measure', icon: 'droplet', tile: colors.accentBlue, label: 'Water', done: selHabit.waterL >= t.waterL, value: selHabit.waterL, target: t.waterL, step: 0.2, fmt: (v) => fmtFluid(v, units), patch: (v) => dispatch({ type: 'PATCH_HABIT', dateKey: selDate, patch: { waterL: v } }) },
-    { id: 'nutrition', kind: 'auto', icon: 'leaf', tile: colors.accentOrange, label: isToday ? "Today's nutrition choices" : 'Nutrition choices', done: selCheckedIn, sub: selCheckedIn ? 'Checked in · auto' : isToday ? 'Not checked in yet' : 'No check-in', sheetValue: selCheckedIn ? 'Checked in' : 'Not checked in yet', cta: 'Log', onOpen: () => nav.goTab('nutrition') },
-    { id: 'workout', kind: 'auto', icon: 'dumbbell', tile: colors.brand400, label: 'Workout', done: selWorkoutDone, sub: isRestDay ? 'Rest day · auto' : `${selSession.name} · ${selWorkoutDone ? 'auto' : 'not started'}`, sheetValue: isRestDay ? 'Rest day' : selWorkoutDone ? 'Completed' : 'Not yet', cta: 'Start', onOpen: () => (selSession ? nav.open('activeWorkout') : nav.goTab('workout')) },
-  ]
-  const goalsDone = goals.filter((g) => g.done).length
+  const { goals, goalsDone } = useDayGoals(selDate)
 
   const [sheetOpen, setSheetOpen] = useState(false)
   const openSheet = () => setSheetOpen(true)
@@ -176,12 +163,13 @@ export default function Dashboard() {
           <Text className="text-[20px] font-extrabold tracking-tight text-white">{greeting}, {state.profile.name}</Text>
           <Text className="mt-0.5 text-[13px] text-secondary">{longDate(todayKey)}</Text>
         </View>
-        {streak.current > 0 && <StreakChip days={streak.current} atRisk={streakAtRisk} onPress={() => nav.open('logHabit')} />}
+        {streak.current > 0 && <StreakChip days={streak.current} atRisk={streakAtRisk} onPress={() => nav.open('logProgress')} />}
       </View>
 
-      {/* Keep-the-streak nudge — only when today isn't logged yet. */}
+      {/* Keep-the-streak nudge — only when today isn't logged yet. Opens the
+          shared log-progress editor (the same overlay the coach routes to). */}
       {streakAtRisk && (
-        <Pressable onPress={() => nav.open('logHabit')} className="mt-3 flex-row items-center gap-2 rounded-2xl border border-accent-orange/25 bg-accent-orange/10 px-3.5 py-2.5 active:opacity-80">
+        <Pressable onPress={() => nav.open('logProgress')} className="mt-3 flex-row items-center gap-2 rounded-2xl border border-accent-orange/25 bg-accent-orange/10 px-3.5 py-2.5 active:opacity-80">
           <Flame size={16} color={accent.orange} />
           <Text className="flex-1 text-[13px] font-semibold text-white/80">Log anything today to keep your {streak.current}-day streak alive.</Text>
           <ChevronRight size={16} color={accent.orange} />
@@ -773,6 +761,66 @@ function DayEditorSheet({ open, onClose, dateKey, dayLabel, goals, tags, workout
         </Animated.View>
       </View>
     </AppModal>
+  )
+}
+
+/* ---- Shared day view-model ------------------------------------------------
+   The goal checklist for a given day, built once here so the dashboard AND the
+   standalone "log progress" overlay (LogProgressSheet, below) render the exact
+   same rows. Every write targets `dateKey`. -------------------------------- */
+export function useDayGoals(dateKey: string): {
+  goals: Goal[]
+  goalsDone: number
+  tags: string[]
+  workoutDone: boolean
+  isRestDay: boolean
+  dayLabel: string
+} {
+  const { state, dispatch } = useStore()
+  const nav = useNav()
+  const colors = useColors()
+  const units = state.settings.units
+  const t = dailyTargets(state)
+  const isToday = dateKey === todayKey
+  const habit = habitForDay(state, dateKey)
+  const session = sessionForDay(state, dateKey)
+  const tags = nutritionTagsForDay(state, dateKey)
+  const foodReview = foodReviewForDay(state, dateKey)
+  const checkedIn = tags.length > 0 || !!foodReview
+  const isRestDay = !session
+  const workoutDone = isRestDay || workoutStartedForDay(state, dateKey) || (session?.completed ?? false)
+  const dayLabel = FULL_WD[fromKey(dateKey).getDay()]
+
+  const goals: Goal[] = [
+    { id: 'steps', kind: 'measure', icon: 'footprints', tile: colors.brand400, label: 'Steps', done: habit.steps >= t.steps, value: habit.steps, target: t.steps, step: 500, fmt: (v) => Math.round(v).toLocaleString(), patch: (v) => dispatch({ type: 'PATCH_HABIT', dateKey, patch: { steps: v } }) },
+    { id: 'sleep', kind: 'measure', icon: 'moon', tile: colors.accentPurple, label: 'Sleep', done: habit.sleepH >= t.sleepH, value: habit.sleepH, target: t.sleepH, step: 0.5, fmt: (v) => `${Math.round(v * 10) / 10} hrs`, patch: (v) => dispatch({ type: 'PATCH_HABIT', dateKey, patch: { sleepH: v } }) },
+    { id: 'water', kind: 'measure', icon: 'droplet', tile: colors.accentBlue, label: 'Water', done: habit.waterL >= t.waterL, value: habit.waterL, target: t.waterL, step: 0.2, fmt: (v) => fmtFluid(v, units), patch: (v) => dispatch({ type: 'PATCH_HABIT', dateKey, patch: { waterL: v } }) },
+    { id: 'nutrition', kind: 'auto', icon: 'leaf', tile: colors.accentOrange, label: isToday ? "Today's nutrition choices" : 'Nutrition choices', done: checkedIn, sub: checkedIn ? 'Checked in · auto' : isToday ? 'Not checked in yet' : 'No check-in', sheetValue: checkedIn ? 'Checked in' : 'Not checked in yet', cta: 'Log', onOpen: () => nav.goTab('nutrition') },
+    { id: 'workout', kind: 'auto', icon: 'dumbbell', tile: colors.brand400, label: 'Workout', done: workoutDone, sub: isRestDay ? 'Rest day · auto' : `${session!.name} · ${workoutDone ? 'auto' : 'not started'}`, sheetValue: isRestDay ? 'Rest day' : workoutDone ? 'Completed' : 'Not yet', cta: 'Start', onOpen: () => (session ? nav.open('activeWorkout') : nav.goTab('workout')) },
+  ]
+  const goalsDone = goals.filter((g) => g.done).length
+  return { goals, goalsDone, tags, workoutDone, isRestDay, dayLabel }
+}
+
+/** The "log progress" day editor as a standalone overlay (nav 'logProgress') so
+ *  the coach and the streak nudge can open it from anywhere — always today. */
+export function LogProgressSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { dispatch } = useStore()
+  const colors = useColors()
+  const { goals, tags, workoutDone, isRestDay, dayLabel } = useDayGoals(todayKey)
+  return (
+    <DayEditorSheet
+      open={open}
+      onClose={onClose}
+      dateKey={todayKey}
+      dayLabel={dayLabel}
+      goals={goals}
+      tags={tags}
+      workoutDone={workoutDone}
+      isRestDay={isRestDay}
+      colors={colors}
+      dispatch={dispatch}
+    />
   )
 }
 

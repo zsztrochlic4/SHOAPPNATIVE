@@ -10,7 +10,7 @@ export type Overlay =
   | 'createSession'
   | 'customize'
   | 'logWeight'
-  | 'logHabit'
+  | 'logProgress'
   | 'logActivity'
   | 'quick'
   | 'badges'

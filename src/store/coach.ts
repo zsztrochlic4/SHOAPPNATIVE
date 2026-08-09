@@ -138,7 +138,7 @@ export function coachDaily(s: AppState): CoachMessage {
     return msg('checkin', 'Sleep has been solid', 'Your sleep this week has been on point, and that is a big reason the weights are moving. Keep protecting it.')
   }
   if (habit.waterL < s.profile.waterTargetL * 0.6) {
-    return msg('checkin', 'Easy win today', 'Water has been a little low. Fill a bottle now and you will train and focus better this afternoon.', { label: 'Log water', overlay: 'logHabit' })
+    return msg('checkin', 'Easy win today', 'Water has been a little low. Fill a bottle now and you will train and focus better this afternoon.', { label: 'Log water', overlay: 'logProgress' })
   }
   return msg(
     'checkin',

@@ -203,7 +203,7 @@ export function buildCoachSystemPrompt(opts: { allowWorkoutActions?: boolean } =
     opts.allowWorkoutActions
       ? 'Proposal kind must be none unless it is a bounded navigation, memory confirmation, or workout_action proposal.'
       : 'Proposal kind must be none unless it is a bounded navigation or memory confirmation proposal.',
-    'A navigation proposal may only use payload.overlay with one of: activeWorkout, workout, nutrition, progress, logHabit, logWeight, logActivity, budgetEats, beginner. The app will require an explicit user confirmation before navigation.',
+    'A navigation proposal may only use payload.overlay with one of: activeWorkout, workout, nutrition, progress, logProgress, logWeight, logActivity, budgetEats, beginner. The app will require an explicit user confirmation before navigation.',
     ...(opts.allowWorkoutActions
       ? ['', 'WORKOUT ACTIONS (you may propose a workout_action — the engine performs & re-clamps it):', ...WORKOUT_ACTION_ALLOWLIST.map((r) => `- ${r}`)]
       : ['Never propose an automatic health, training, nutrition, account, purchase, or social action.']),

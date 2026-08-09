@@ -32,7 +32,7 @@ import { Skeleton, SkeletonLines } from './components/Skeleton'
 import { installGlobalErrorHooks } from './lib/reportError'
 import { installRemoteErrorReporter } from './lib/remoteErrorReporter'
 import { OfflineBanner } from './components/OfflineBanner'
-import Dashboard from './screens/Dashboard'
+import Dashboard, { LogProgressSheet } from './screens/Dashboard'
 import Workout from './screens/Workout'
 import Nutrition from './screens/Nutrition'
 import Progress from './screens/Progress'
@@ -46,7 +46,6 @@ import {
   SettingsSheet,
   MenuDrawer,
   LogWeightSheet,
-  LogHabitSheet,
   QuickWorkoutsSheet,
   BadgesSheet,
   CoachSheet,
@@ -236,7 +235,7 @@ function Shell() {
       case 'profile': return <ProfileSheet open onClose={nav.close} />
       case 'trainingProfile': return <TrainingProfileSheet open onClose={nav.close} />
       case 'logWeight': return <LogWeightSheet open onClose={nav.close} />
-      case 'logHabit': return <LogHabitSheet open onClose={nav.close} params={params} />
+      case 'logProgress': return <LogProgressSheet open onClose={nav.close} />
       case 'quick': return <QuickWorkoutsSheet open onClose={nav.close} />
       case 'badges': return <BadgesSheet open onClose={nav.close} />
       case 'examMode': return <PlanAroundLifeSheet open onClose={nav.close} />
