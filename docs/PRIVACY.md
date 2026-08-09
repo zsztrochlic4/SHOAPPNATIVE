@@ -9,9 +9,11 @@ This Privacy Policy explains how we handle personal information through our
 mobile and web application, website, AI-powered Coach and related services
 (together, the "Service").
 
-We aim to handle personal information in accordance with the Privacy Act 1988
-(Cth) and the Australian Privacy Principles (APPs) where they apply, and use
-those principles as our privacy baseline.
+We handle personal information in accordance with the Privacy Act 1988 (Cth) and
+the Australian Privacy Principles (APPs), and we treat these as binding
+commitments rather than aspirations. Because we handle health information from
+Victoria, we also apply the Health Records Act 2001 (Vic) and the Health Privacy
+Principles (HPPs).
 
 **Contact: info@strengthhubonline.com**
 
@@ -223,6 +225,14 @@ Google to classify safety risk, generate a response or estimate meal nutrition.
 AI systems may infer information from the content you submit and can produce
 inaccurate results.
 
+The AI Coach is currently disabled. While it is off, the Coach does not operate
+and no Coach conversations or Coach memories are collected; the AI processing
+described in this section then applies only to the meal-photo scan.
+
+We do not retain your meal photo in your StrengthHub account. Content you submit
+to Google is processed under Google's applicable terms, and how Google processes
+or temporarily retains that content is governed by those terms rather than by us.
+
 Automated safety systems may block or redirect a request, limit feature use or
 display support information. These controls are designed to reduce risk; they do
 not make clinical diagnoses or decisions that have legal or similarly
@@ -359,8 +369,10 @@ timeframe.
 
 If you are not satisfied after giving us a reasonable opportunity to respond, you
 may complain to the Office of the Australian Information Commissioner at
-www.oaic.gov.au or by calling 1300 363 992. Other complaint rights may also
-apply.
+www.oaic.gov.au or by calling 1300 363 992. For a complaint about health
+information handled in Victoria, you may also contact the Victorian Health
+Complaints Commissioner at hcc.vic.gov.au or on 1300 582 113. Other complaint
+rights may also apply.
 
 ## 12. Direct communications
 

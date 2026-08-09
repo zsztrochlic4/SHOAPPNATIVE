@@ -177,7 +177,7 @@ const PRIVACY: LegalDoc = {
   lastUpdated: '2 August 2026 · Version 1.0',
   blocks: [
     { p: `StrengthHub Online ("StrengthHub", "we", "us" or "our") is a fitness, training, nutrition and wellbeing service operated from Melbourne, Victoria, Australia. This Privacy Policy explains how we handle personal information through our mobile and web application, website, AI-powered Coach and related services (together, the "Service").` },
-    { p: `We aim to handle personal information in accordance with the Privacy Act 1988 (Cth) and the Australian Privacy Principles (APPs) where they apply, and use those principles as our privacy baseline.` },
+    { p: `We handle personal information in accordance with the Privacy Act 1988 (Cth) and the Australian Privacy Principles (APPs), and we treat these as binding commitments rather than aspirations. Because we handle health information from Victoria, we also apply the Health Records Act 2001 (Vic) and the Health Privacy Principles (HPPs).` },
     { p: `Contact: **${CONTACT}**` },
 
     { h: '1. Scope and age requirement' },
@@ -264,6 +264,8 @@ const PRIVACY: LegalDoc = {
 
     { h: '5. AI and automated processing' },
     { p: `The Coach and meal-photo scan use Google's Gemini AI. Relevant content is sent to Google to classify safety risk, generate a response or estimate meal nutrition. AI systems may infer information from the content you submit and can produce inaccurate results.` },
+    { p: `The AI Coach is currently disabled. While it is off, the Coach does not operate and no Coach conversations or Coach memories are collected; the AI processing described in this section then applies only to the meal-photo scan.` },
+    { p: `We do not retain your meal photo in your StrengthHub account. Content you submit to Google is processed under Google's applicable terms, and how Google processes or temporarily retains that content is governed by those terms rather than by us.` },
     { p: `Automated safety systems may block or redirect a request, limit feature use or display support information. These controls are designed to reduce risk; they do not make clinical diagnoses or decisions that have legal or similarly significant effects. A person is not monitoring each interaction in real time.` },
     { p: `Long-term Coach memory is optional. Where available, you can pause it, inspect and delete individual memories, or clear them. You can withdraw Coach consent and delete the Coach workspace without deleting the rest of your account, subject to minimal records we must retain for security or law.` },
     { p: `Google processes AI inputs and outputs under the terms and privacy commitments applicable to the service configuration we use. Do not submit information that is unnecessary for the feature.` },
@@ -323,7 +325,7 @@ const PRIVACY: LegalDoc = {
     { h: '11. Privacy questions and complaints' },
     { p: `To ask a question, make a request or complain about privacy, email **${CONTACT}** with enough detail for us to understand the issue. Do not send unnecessary health information or account passwords.` },
     { p: `We will acknowledge and investigate a complaint and aim to respond within 30 days. We may ask you to verify your identity or provide further information. If more time is reasonably needed, we will tell you why and provide an updated timeframe.` },
-    { p: `If you are not satisfied after giving us a reasonable opportunity to respond, you may complain to the Office of the Australian Information Commissioner at www.oaic.gov.au or by calling 1300 363 992. Other complaint rights may also apply.` },
+    { p: `If you are not satisfied after giving us a reasonable opportunity to respond, you may complain to the Office of the Australian Information Commissioner at www.oaic.gov.au or by calling 1300 363 992. For a complaint about health information handled in Victoria, you may also contact the Victorian Health Complaints Commissioner at hcc.vic.gov.au or on 1300 582 113. Other complaint rights may also apply.` },
 
     { h: '12. Direct communications' },
     { p: `We may send service, billing, safety and security messages needed to operate your account. If we send optional marketing communications, we will provide a way to unsubscribe. You may still receive essential non-marketing messages while your account is active.` },

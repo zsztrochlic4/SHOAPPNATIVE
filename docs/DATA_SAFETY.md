@@ -62,8 +62,15 @@ confirm 18+. If you want to disclose it, use **"Other Data Types"** →
 
 **Mark everything else "Data Not Collected"**, including: Location, Financial
 Info (card numbers — handled by Stripe, we never receive them), Contacts,
-Browsing History, Search History, Usage Data, Diagnostics (beyond the exempt
-security/operation use below), Sensitive Info, Audio.
+Browsing History, Search History, Usage Data, Sensitive Info, Audio.
+
+**Diagnostics — verify against the shipping binary before answering.** The Privacy
+Policy discloses that we collect general diagnostic / error information. If the
+release build includes ANY crash-reporting or diagnostics SDK that collects crash
+logs or diagnostics, you must **declare Diagnostics** here. Only mark it *Not
+Collected* if such data is used solely for the exempt security / operation /
+fraud-prevention purpose described below. Do not answer this from the prose alone —
+inventory the SDKs in the signed binary and confirm.
 
 > **IP address / security telemetry:** Firebase and our hosting/security
 > providers process your IP and request logs to operate and secure the Service.
@@ -96,7 +103,7 @@ App functionality / Account management* unless noted):
 | Health and fitness → **Health info** | Optional | Weight, screening answers, nutrition logs |
 | Health and fitness → **Fitness info** | Optional | Workouts, activity; on-device Health Connect reads (steps/sleep/workouts) once the native build ships |
 | Messages → **Other in-app messages** | **Only when the AI Coach is enabled (currently OFF)** | AI Coach conversations & saved coach memories — do **not** declare while `COACH_ENABLED = false` |
-| Photos and videos → **Photos** | Optional | Meal photos — mark **"processed ephemerally"** if offered (not stored). See ⚠️ below |
+| Photos and videos → **Photos** | Optional | Meal photos — **not stored** on our servers. Do **not** select "processed ephemerally" unless Gemini-side retention is verified (see ⚠️); "not retained in the user's account" is the safer position. |
 | Financial info → **Purchase history** | Optional | Subscription plan / status (via Stripe). Card details handled by Stripe; we never receive them. |
 | Device or other IDs → **Device or other IDs** | — | Push-notification token, for notifications |
 
@@ -122,10 +129,19 @@ info → Payment info** is not collected by us.)
    the account. Under Apple's rules, data is "Linked to the user" when connected to
    an account/identity **unless identifiers are stripped before collection and
    re-linking is prevented**, which is not the case here. Declare **Linked = Yes**.
-   On Google, you may still note ephemeral processing (not stored), but do not claim
-   the image is unlinked. To *legitimately* claim unlinked, you would need a
-   documented de-identification design (no UID in the request path, no re-linking)
-   and reviewer approval — not currently implemented.
+   To *legitimately* claim unlinked, you would need a documented de-identification
+   design (no UID in the request path, no re-linking) and reviewer approval — not
+   currently implemented.
+   **Ephemeral / provider retention (audit accuracy review #5):** "not stored on
+   our servers" is verified. It does **not** establish ephemeral processing by
+   Gemini. Google Play's *ephemeral* option requires the data be held only in
+   memory and no longer than the real-time request; Gemini may log prompts/responses
+   for abuse monitoring unless the account/features meet Google's zero-data-retention
+   terms. So do **not** select Google Play "processed ephemerally" until you have
+   confirmed the exact Gemini surface (Developer API vs Vertex AI vs Firebase AI
+   Logic), paid/free status, region, logging, abuse-monitoring retention, DPA and
+   ZDR eligibility. Until verified, state only "not retained in the user's
+   StrengthHub account."
 
 2. **AI Coach messages.** The AI Coach is **currently DISABLED** (`COACH_ENABLED =
    false`; see [COACH_RELEASE_STATE.md](COACH_RELEASE_STATE.md)) — the server turn
