@@ -16,7 +16,7 @@ import type { PushCategory } from './lib/notify'
  * `owner` custom claim.
  *
  * App Check is NOT enforced here (native App Check isn't set up — same as
- * analyzeMeal/deleteAccount); the owner claim is the real gate.
+ * deleteAccount); the owner claim is the real gate.
  *
  * Deferred (see plan): Cloud Scheduler + Tasks sharding for very large / scheduled
  * sends, saved segments, Expo receipt polling, and an in-app admin portal. The

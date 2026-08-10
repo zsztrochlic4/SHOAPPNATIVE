@@ -91,16 +91,13 @@ substitutions, activities, meals, recipes, habits, goals and progress entries
 you log or import.
 
 Progress photos are intended to remain on your device unless you deliberately
-use a sharing or upload feature. Meal photos submitted for AI analysis are not
-retained in your StrengthHub account; how Google processes and temporarily
-retains the content you submit is described in §5. The resulting nutrition
-estimate is stored only if you choose to log it.
+use a sharing or upload feature.
 
 **AI-feature information**
 
 If you use an AI feature, we may process:
 
-- prompts, messages, meal photos and AI responses;
+- prompts, messages and AI responses;
 - selected profile, goal, screening, training-history, recovery, habit and
   nutrition context relevant to the request;
 - recent conversation context and any coach memories you choose to save;
@@ -221,18 +218,14 @@ evaluation and improvement where it is no longer reasonably identifiable.
 
 ## 5. AI and automated processing
 
-The Coach and meal-photo scan use Google's Gemini AI. Relevant content is sent to
-Google to classify safety risk, generate a response or estimate meal nutrition.
-AI systems may infer information from the content you submit and can produce
-inaccurate results.
+The app includes an AI Coach that, when enabled, uses Google's Gemini AI. AI
+systems can infer information from what you submit and can produce inaccurate
+results.
 
-The AI Coach is currently disabled. While it is off, the Coach does not operate
-and no Coach conversations or Coach memories are collected; the AI processing
-described in this section then applies only to the meal-photo scan.
-
-We do not retain your meal photo in your StrengthHub account. Content you submit
-to Google is processed under Google's applicable terms, and how Google processes
-or temporarily retains that content is governed by those terms rather than by us.
+The AI Coach is currently disabled and there is no other AI feature active. While
+this is the case, no content is sent to Google for AI processing and no AI
+conversations or memories are collected. If we enable the Coach in future, we will
+update this Policy and the relevant disclosures before doing so.
 
 Automated safety systems may block or redirect a request, limit feature use or
 display support information. These controls are designed to reduce risk; they do
@@ -254,7 +247,7 @@ We disclose personal information only as reasonably necessary to:
 
 - Google Firebase and Google Cloud, for authentication, database, hosting,
   storage, server functions and security;
-- Google's Gemini services, for the AI features described above;
+- Google's Gemini services, for the AI Coach (currently disabled);
 - Stripe or an applicable app store, for checkout, subscriptions, fraud
   prevention and payment support;
 - Expo or another notification-delivery provider, if you enable remote

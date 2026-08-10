@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { View, Text, Pressable, TextInput, Image, ScrollView, Animated, Easing, Platform } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import * as ImagePicker from 'expo-image-picker'
 import { LinearGradient } from 'expo-linear-gradient'
 import {
   Bell, Moon, Sun, GraduationCap, Wallet, RotateCcw, Trash2, Camera, Trophy,

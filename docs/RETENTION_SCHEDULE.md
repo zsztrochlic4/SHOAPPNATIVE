@@ -25,7 +25,7 @@ value. **Two cross-cutting rules apply and may override "deleted on account dele
 |---|---|---|---|---|
 | 1 | **Account & profile** (auth, DOB, sex, height/weight, goals, injuries, screening incl. pregnancy/postpartum) | Life of the account; **deleted on account deletion** (owner position: not a health service provider, so no HRA retention minimum — see cross-cutting rule), subject only to the general legal/financial-retention exceptions | Deleted on account deletion (server-authoritative) | `functions/src/account.ts` |
 | 2 | **Workout logs & app content** | Life of the account; **deleted on account deletion** | Deleted on account deletion | `functions/src/account.ts` (`RECURSIVE_DOCS`) |
-| 3 | **Meal photos** | **Not retained in the StrengthHub account.** Sent to Gemini for analysis, estimate returned, image not written to account storage. Provider-side (Gemini) processing/retention is **governed by Google's terms and is unverified** (see row 19) | Per-request; not stored by us | `functions/src/meal*` |
+| 3 | **Meal photos** | **N/A — feature removed.** The in-app meal-photo scanner has been removed; the app no longer collects any photos. | — | Removed |
 | 4 | **Community per-day scoring** (`scoreDays`, `scoreEvents`) | **490 days** (460-day scoring window + 30-day buffer), then auto-pruned daily | Scheduled prune below the cutoff | `functions/src/community.ts` (`MAX_HISTORY_DAYS=460`, `RETENTION_DAYS=490`) — **DORMANT** (`COMMUNITY_BACKEND=false`) |
 | 5 | **Community moderation / appeal notes** | Life of the account (kept with the community profile; in data export) | Deleted on account deletion | `functions/src/account.ts` (`communityReviews`) — dormant with community |
 | 6 | **Rate-limit / abuse buckets** | **2 days** (Firestore TTL), or immediately on deletion | TTL policy on `rateLimits.expiresAt` | `functions/src/lib/rateLimit.ts` (`ttlDays=2`) |
@@ -41,7 +41,7 @@ value. **Two cross-cutting rules apply and may override "deleted on account dele
 | 16 | **Privacy / support complaints & correspondence** | Retained for dispute-resolution and compliance evidence (proposed: 7 years for complaint records; owner/counsel to confirm) | Support mailbox / records | info@strengthhubonline.com — **owner/counsel to confirm** |
 | 17 | **App-store transaction / entitlement records** (Apple/Google, if store billing is adopted) | Store-controlled per Apple/Google; our entitlement mirror deleted on account deletion | Store retention + our entitlement record | Apple/Google + `entitlements` |
 | 18 | **Push-delivery logs & invalid-token handling** (Expo / provider) | Short retention (proposed: 30 days); invalid tokens pruned on delivery failure | Provider log rotation | Expo / push provider — **owner to confirm** |
-| 19 | **Provider-side Gemini retention** (prompts/responses that Google may log for abuse monitoring) | **Google-controlled** per the Gemini terms; depends on the surface (Developer API / Vertex AI / Firebase AI Logic), paid/free status, region and zero-data-retention eligibility — **unverified** | Google's retention | Gemini terms / DPA — **owner to verify** |
+| 19 | **Provider-side Gemini retention** | **N/A while no AI feature is active.** The meal scanner is removed and the AI Coach is disabled, so no content is sent to Gemini. If the Coach is enabled later, verify the Gemini surface, retention, DPA and ZDR eligibility before launch. | Google's retention | N/A (Coach disabled) |
 | 20 | **Legal-claim / incident records** | Retained as needed for the claim plus the applicable limitation period | Case-by-case legal hold | legal/records — **owner/counsel** |
 | 21 | **Generated data exports** ("Download my data") | Produced on request; not retained server-side beyond delivering the export | Per-request | `src/overlays` export path |
 
@@ -55,8 +55,9 @@ value. **Two cross-cutting rules apply and may override "deleted on account dele
 - **Row 7** deletion tombstone cap (proposed 24 months) — confirm and add a prune.
 - **Row 11** backups — record the actual PITR window + daily-backup retention from the console.
 - **Rows 14, 15, 16, 18** — confirm the actual log/consent/complaint/push-log retention periods.
-- **Row 19** — verify the Gemini surface, paid/free status, region, logging, abuse-monitoring
-  retention, DPA and ZDR eligibility.
+- **Row 19** — N/A while no AI feature is active (meal scanner removed, Coach disabled). Only
+  if the Coach is later enabled: verify the Gemini surface, paid/free status, region, logging,
+  abuse-monitoring retention, DPA and ZDR eligibility.
 - **Row 13** website leads — confirm a period before enabling the contact form.
 
 ## Consistency check against the Privacy Policy

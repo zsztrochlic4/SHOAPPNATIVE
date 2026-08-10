@@ -22,11 +22,10 @@ import { setGlobalOptions } from 'firebase-functions/v2'
 // TODO(scale): once the CPU quota is raised (retry the self-serve increase after the
 // billing account matures, or via Support/Sales), raise this back and add per-function
 // maxInstances overrides on the hot paths — syncCommunityStats, coachMessage,
-// analyzeMeal, stripeWebhook — before enabling COMMUNITY_BACKEND or onboarding many users.
+// stripeWebhook — before enabling COMMUNITY_BACKEND or onboarding many users.
 setGlobalOptions({ region: 'australia-southeast2', maxInstances: 3 })
 
 export { ping } from './ping'
-export { analyzeMeal } from './meal'
 export { coachMessage } from './coach'
 export {
   getCoachWorkspace,

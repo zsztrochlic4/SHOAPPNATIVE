@@ -135,9 +135,9 @@ rebuild gradually.
 
 ## 7. Nutrition and meal estimates
 
-Calorie, macro, portion and nutrient figures—including meal-photo estimates—are
-approximate and can be materially wrong. Do not treat them as food labels,
-laboratory measurements or personalised dietetic advice.
+Calorie, macro, portion and nutrient figures are approximate and can be
+materially wrong. Do not treat them as food labels, laboratory measurements or
+personalised dietetic advice.
 
 Check ingredients, allergens and food-safety requirements yourself. StrengthHub
 cannot reliably identify every ingredient or cross-contamination risk from a

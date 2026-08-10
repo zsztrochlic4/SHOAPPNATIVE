@@ -8,9 +8,10 @@ App Store Connect / Google Play.
 
 > **What the app actually does (as of 2 Aug 2026):** it is a networked app. It
 > uses **Firebase** (Auth, Firestore, Cloud Functions — Australian region
-> `australia-southeast2`), **Google Gemini** for the AI Coach and meal-photo
-> scan, **Stripe** for the subscription, and the **Expo push service** for
-> notifications. It also caches data locally (AsyncStorage). Any store privacy
+> `australia-southeast2`), **Google Gemini** for the AI Coach (currently disabled;
+> the meal-photo scanner has been removed), **Stripe** for the subscription, and
+> the **Expo push service** for notifications. It also caches data locally
+> (AsyncStorage). Any store privacy
 > answers must reflect this — see [DATA_SAFETY.md](DATA_SAFETY.md).
 
 ---
@@ -36,8 +37,8 @@ App Store Connect / Google Play.
 ### Should do before submission
 - [ ] **App Privacy / Data Safety** questionnaires filled per
       [DATA_SAFETY.md](DATA_SAFETY.md) (email, name, DOB, health/fitness, AI Coach
-      messages, meal photos [ephemeral], subscription/purchase, push token; no
-      tracking/ads; Share = No).
+      messages [only if enabled], subscription/purchase, push token; no photos;
+      no tracking/ads; Share = No).
 - [ ] **Age rating** — 18+ (health & fitness; general wellbeing guidance).
 - [ ] **Screenshots** for each required device size.
 - [ ] **App Check** — `APP_CHECK_ENFORCED = false` in
@@ -46,8 +47,9 @@ App Store Connect / Google Play.
       (see [APP_CHECK.md](APP_CHECK.md)).
 
 ### Already handled in the repo
-- [x] iOS camera + photo-library **purpose strings** (`app.json` →
-      `expo-image-picker` plugin config) for the meal scanner.
+- [x] `ITSAppUsesNonExemptEncryption = false` handled below. (The meal scanner and its
+      camera/photo-library usage have been removed — remove the now-unused
+      `expo-image-picker` purpose strings from `app.json` if nothing else uses them.)
 - [x] `ITSAppUsesNonExemptEncryption = false` set (standard HTTPS/TLS is exempt) —
       avoids the per-build export-compliance prompt.
 - [x] `eas.json` build profiles (`development`, `preview`, `production`) + submit.

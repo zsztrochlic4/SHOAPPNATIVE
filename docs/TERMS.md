@@ -64,7 +64,7 @@ the Service may provide:
 - onboarding and pre-exercise screening;
 - personalised training programs and exercise guidance;
 - workout, activity, nutrition, habit, recovery and progress logging;
-- calorie, macro and meal-photo estimates;
+- calorie and macro estimates;
 - AI-generated coaching and wellbeing information;
 - reminders and notifications;
 - community, challenge, leaderboard and training-partner features;
@@ -99,10 +99,9 @@ not delay or disregard professional care because of anything in the Service.
 
 ## 4. Artificial-intelligence features
 
-AI features, including the Coach and meal-photo analysis, use probabilistic
-systems. Outputs can be inaccurate, fabricated, incomplete, outdated,
-inconsistent or unsuitable, even when they sound confident. Similar inputs may
-produce different results.
+AI features, including the Coach, use probabilistic systems. Outputs can be
+inaccurate, fabricated, incomplete, outdated, inconsistent or unsuitable, even
+when they sound confident. Similar inputs may produce different results.
 
 AI outputs are general information and estimates. You must use independent
 judgment, check important information and obtain professional advice where a
@@ -113,10 +112,10 @@ for you, cannot continuously monitor your condition or location, and may fail to
 recognise an emergency or other risk. Never wait for an AI response in an urgent
 situation.
 
-Relevant prompts, photos and selected account context may be processed by
-third-party AI providers as described in the Privacy Policy. Only submit
-information necessary to use the feature, and do not submit another person's
-personal information unless you are authorised to do so.
+Relevant prompts and selected account context may be processed by third-party AI
+providers as described in the Privacy Policy. Only submit information necessary to
+use the feature, and do not submit another person's personal information unless
+you are authorised to do so.
 
 Additional Coach-specific terms or acknowledgements may apply before that feature
 is enabled.

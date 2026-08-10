@@ -54,7 +54,7 @@ const TERMS: LegalDoc = {
       `onboarding and pre-exercise screening;`,
       `personalised training programs and exercise guidance;`,
       `workout, activity, nutrition, habit, recovery and progress logging;`,
-      `calorie, macro and meal-photo estimates;`,
+      `calorie and macro estimates;`,
       `AI-generated coaching and wellbeing information;`,
       `reminders and notifications;`,
       `community, challenge, leaderboard and training-partner features;`,
@@ -70,7 +70,7 @@ const TERMS: LegalDoc = {
     { p: `You must read and follow the Health & Safety Information. Stop exercising and seek appropriate help if you feel unwell or develop pain or concerning symptoms. Do not delay or disregard professional care because of anything in the Service.` },
 
     { h: '4. Artificial-intelligence features' },
-    { p: `AI features, including the Coach and meal-photo analysis, use probabilistic systems. Outputs can be inaccurate, fabricated, incomplete, outdated, inconsistent or unsuitable, even when they sound confident. Similar inputs may produce different results.` },
+    { p: `AI features, including the Coach, use probabilistic systems. Outputs can be inaccurate, fabricated, incomplete, outdated, inconsistent or unsuitable, even when they sound confident. Similar inputs may produce different results.` },
     { p: `AI outputs are general information and estimates. You must use independent judgment, check important information and obtain professional advice where a decision could materially affect health, safety or wellbeing.` },
     { p: `The Coach is not monitored live by a person, cannot contact emergency services for you, cannot continuously monitor your condition or location, and may fail to recognise an emergency or other risk. Never wait for an AI response in an urgent situation.` },
     { p: `Relevant prompts, photos and selected account context may be processed by third-party AI providers as described in the Privacy Policy. Only submit information necessary to use the feature, and do not submit another person's personal information unless you are authorised to do so.` },
@@ -205,11 +205,11 @@ const PRIVACY: LegalDoc = {
     { p: `Some of this is health information or other sensitive information. Where required, we ask for consent before collecting it. You do not have to provide optional information, but the Service may be unable to personalise guidance or safely provide a feature without it.` },
     { p: `**Workout, nutrition and activity records**` },
     { p: `We collect workouts, sessions, sets, repetitions, loads, exercise substitutions, activities, meals, recipes, habits, goals and progress entries you log or import.` },
-    { p: `Progress photos are intended to remain on your device unless you deliberately use a sharing or upload feature. Meal photos submitted for AI analysis are not retained in your StrengthHub account; how Google processes and temporarily retains the content you submit is described in the AI and automated processing section. The resulting nutrition estimate is stored only if you choose to log it.` },
+    { p: `Progress photos are intended to remain on your device unless you deliberately use a sharing or upload feature.` },
     { p: `**AI-feature information**` },
     { p: `If you use an AI feature, we may process:` },
     { ul: [
-      `prompts, messages, meal photos and AI responses;`,
+      `prompts, messages and AI responses;`,
       `selected profile, goal, screening, training-history, recovery, habit and nutrition context relevant to the request;`,
       `recent conversation context and any coach memories you choose to save;`,
       `your feature consent, preferences and proposed-action responses; and`,
@@ -263,9 +263,8 @@ const PRIVACY: LegalDoc = {
     { p: `We may use aggregated or de-identified information for analysis, planning, safety evaluation and improvement where it is no longer reasonably identifiable.` },
 
     { h: '5. AI and automated processing' },
-    { p: `The Coach and meal-photo scan use Google's Gemini AI. Relevant content is sent to Google to classify safety risk, generate a response or estimate meal nutrition. AI systems may infer information from the content you submit and can produce inaccurate results.` },
-    { p: `The AI Coach is currently disabled. While it is off, the Coach does not operate and no Coach conversations or Coach memories are collected; the AI processing described in this section then applies only to the meal-photo scan.` },
-    { p: `We do not retain your meal photo in your StrengthHub account. Content you submit to Google is processed under Google's applicable terms, and how Google processes or temporarily retains that content is governed by those terms rather than by us.` },
+    { p: `The app includes an AI Coach that, when enabled, uses Google's Gemini AI. AI systems can infer information from what you submit and can produce inaccurate results.` },
+    { p: `The AI Coach is currently disabled and there is no other AI feature active. While this is the case, no content is sent to Google for AI processing and no AI conversations or memories are collected. If we enable the Coach in future, we will update this Policy and the relevant disclosures before doing so.` },
     { p: `Automated safety systems may block or redirect a request, limit feature use or display support information. These controls are designed to reduce risk; they do not make clinical diagnoses or decisions that have legal or similarly significant effects. A person is not monitoring each interaction in real time.` },
     { p: `Long-term Coach memory is optional. Where available, you can pause it, inspect and delete individual memories, or clear them. You can withdraw Coach consent and delete the Coach workspace without deleting the rest of your account, subject to minimal records we must retain for security or law.` },
     { p: `Google processes AI inputs and outputs under the terms and privacy commitments applicable to the service configuration we use. Do not submit information that is unnecessary for the feature.` },
@@ -274,7 +273,7 @@ const PRIVACY: LegalDoc = {
     { p: `We disclose personal information only as reasonably necessary to:` },
     { ul: [
       `Google Firebase and Google Cloud, for authentication, database, hosting, storage, server functions and security;`,
-      `Google's Gemini services, for the AI features described above;`,
+      `Google's Gemini services, for the AI Coach (currently disabled);`,
       `Stripe or an applicable app store, for checkout, subscriptions, fraud prevention and payment support;`,
       `Expo or another notification-delivery provider, if you enable remote notifications;`,
       `the operating-system health platform you choose to connect on your device, such as Apple Health or Health Connect, to the extent needed to operate that connection;`,
@@ -406,7 +405,7 @@ const HEALTH_SAFETY: LegalDoc = {
     { p: `When returning after time away, illness or injury, reduce load and volume and rebuild gradually.` },
 
     { h: '7. Nutrition and meal estimates' },
-    { p: `Calorie, macro, portion and nutrient figures—including meal-photo estimates—are approximate and can be materially wrong. Do not treat them as food labels, laboratory measurements or personalised dietetic advice.` },
+    { p: `Calorie, macro, portion and nutrient figures are approximate and can be materially wrong. Do not treat them as food labels, laboratory measurements or personalised dietetic advice.` },
     { p: `Check ingredients, allergens and food-safety requirements yourself. StrengthHub cannot reliably identify every ingredient or cross-contamination risk from a photo.` },
     { p: `Do not use the Service to manage diabetes, an allergy, pregnancy nutrition, kidney disease, an eating disorder or another medical or therapeutic diet without advice from a qualified professional.` },
 

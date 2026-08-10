@@ -15,10 +15,10 @@ Keep it in sync with [PRIVACY.md](PRIVACY.md) — the two must say the same thin
 ## The short version (true for both stores)
 
 - **We collect:** email, optional name, date of birth (for 18+ age-gating), the
-  fitness/health data you enter, meal photos (photos only to analyse them —
-  **not stored**), subscription status (via Stripe), and a device push token for
-  notifications. (AI Coach messages too, but **only once the Coach is enabled** —
-  it is currently gated off, so nothing is collected there today.)
+  fitness/health data you enter, subscription status (via Stripe), and a device
+  push token for notifications. (AI Coach messages too, but **only once the Coach
+  is enabled** — it is currently gated off, so nothing is collected there today.
+  The meal-photo scanner has been removed, so no photos are collected.)
 - **We do NOT:** track you, show ads, use third-party analytics, or sell/"share"
   data for others' independent use.
 - **Encryption in transit:** Yes (HTTPS/TLS via Firebase and our providers).
@@ -29,8 +29,8 @@ Keep it in sync with [PRIVACY.md](PRIVACY.md) — the two must say the same thin
 
 > ⚠️ These answers assume **no analytics/ads SDKs** (correct today) and that the
 > **community/social feed is a preview** (no user-to-user sharing yet, so
-> "Share = No"). If you ship live social features, add analytics/ads, or start
-> storing meal photos, update BOTH forms and [PRIVACY.md](PRIVACY.md).
+> "Share = No"). If you ship live social features, add analytics/ads, or add any
+> feature that collects photos, update BOTH forms and [PRIVACY.md](PRIVACY.md).
 
 ---
 
@@ -52,7 +52,6 @@ you across apps and websites owned by other companies?" → **No.**
 | Health & Fitness → **Fitness** | Yes | App Functionality | Workouts, activity, streaks; on-device Apple Health reads (steps/sleep/workouts) once the native build ships |
 | Health & Fitness → **Health** | Yes | App Functionality | Weight/body metrics, screening answers, nutrition you log |
 | User Content → **Other User Content** | **Only when the AI Coach is enabled (currently OFF)** | App Functionality | AI Coach messages & saved coach memories. Do **not** declare while `COACH_ENABLED = false`. |
-| User Content → **Photos or Videos** | Yes | App Functionality | Meal photos. **Linked to user = Yes** (sent via an authenticated, per-user request even though the image is not stored). See ⚠️ below |
 | Purchases → **Purchase History** | Yes | App Functionality (+ Account) | Subscription plan / status / trial & renewal dates (via Stripe). We never receive the full card number. |
 | Identifiers → **Device ID** | Yes | App Functionality | Push-notification token |
 | Identifiers → **User ID** | Yes | App Functionality (+ Account) | The authenticated per-user account UID. Declare this even with community disabled — the app uses it on every authenticated request (audit re-review #9). |
@@ -111,7 +110,6 @@ App functionality / Account management* unless noted):
 | Health and fitness → **Health info** | Optional | Weight, screening answers, nutrition logs |
 | Health and fitness → **Fitness info** | Optional | Workouts, activity; on-device Health Connect reads (steps/sleep/workouts) once the native build ships |
 | Messages → **Other in-app messages** | **Only when the AI Coach is enabled (currently OFF)** | AI Coach conversations & saved coach memories — do **not** declare while `COACH_ENABLED = false` |
-| Photos and videos → **Photos** | Optional | Meal photos — **not stored** on our servers. Do **not** select "processed ephemerally" unless Gemini-side retention is verified (see ⚠️); "not retained in the user's account" is the safer position. |
 | Financial info → **Purchase history** | Optional | Subscription plan / status (via Stripe). Card details handled by Stripe; we never receive them. |
 | Device or other IDs → **Device or other IDs** | — | Push-notification token, for notifications |
 
@@ -129,27 +127,10 @@ info → Payment info** is not collected by us.)
 
 ## ⚠️ Judgment calls — read before you submit
 
-1. **Meal photos — Linked = Yes (corrected, audit #8).** The photo is sent to
-   Google's Gemini AI to estimate nutrition and is **not stored** on our servers
-   (only the estimate is saved, and only if you log it). BUT it is uploaded through
-   an **authenticated Firebase callable that resolves the user's UID and applies a
-   per-user rate limit** before calling Gemini — so the request is associated with
-   the account. Under Apple's rules, data is "Linked to the user" when connected to
-   an account/identity **unless identifiers are stripped before collection and
-   re-linking is prevented**, which is not the case here. Declare **Linked = Yes**.
-   To *legitimately* claim unlinked, you would need a documented de-identification
-   design (no UID in the request path, no re-linking) and reviewer approval — not
-   currently implemented.
-   **Ephemeral / provider retention (audit accuracy review #5):** "not stored on
-   our servers" is verified. It does **not** establish ephemeral processing by
-   Gemini. Google Play's *ephemeral* option requires the data be held only in
-   memory and no longer than the real-time request; Gemini may log prompts/responses
-   for abuse monitoring unless the account/features meet Google's zero-data-retention
-   terms. So do **not** select Google Play "processed ephemerally" until you have
-   confirmed the exact Gemini surface (Developer API vs Vertex AI vs Firebase AI
-   Logic), paid/free status, region, logging, abuse-monitoring retention, DPA and
-   ZDR eligibility. Until verified, state only "not retained in the user's
-   StrengthHub account."
+1. **Meal photos — REMOVED.** The in-app meal-photo scanner has been removed, so the
+   app no longer collects any photos and no image is sent to Google. Do **not**
+   declare a Photos/Videos data type. (Historically this was declared Linked = Yes;
+   that declaration no longer applies.)
 
 2. **AI Coach messages.** The AI Coach is **currently DISABLED** (`COACH_ENABLED =
    false`; see [COACH_RELEASE_STATE.md](COACH_RELEASE_STATE.md)) — the server turn
