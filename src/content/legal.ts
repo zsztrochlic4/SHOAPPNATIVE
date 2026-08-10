@@ -301,8 +301,7 @@ const PRIVACY: LegalDoc = {
     { p: `When you delete your account, we delete the active Firebase authentication account and user data we control, subject to:` },
     { ul: [
       `a limited period for deletion to propagate through backups and caches;`,
-      `health information that a law such as the Health Records Act 2001 (Vic) requires us to retain for a minimum period, which may be longer than you request; where this applies we restrict access to that information and delete it when the required period ends;`,
-      `financial, transaction, fraud-prevention or legal records that must or may reasonably be retained;`,
+      `financial, transaction, fraud-prevention or other records that a law requires or reasonably allows us to retain (we restrict access to any such records and delete them when the required period ends);`,
       `information held independently by a payment, app-store or connected-service provider; and`,
       `a minimal deletion audit record containing an account identifier and timestamp, retained only for security, compliance and evidence that the request was completed.`,
     ] },

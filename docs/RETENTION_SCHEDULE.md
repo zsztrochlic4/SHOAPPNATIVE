@@ -9,19 +9,22 @@ general "as long as reasonably needed" language is backed by a recorded, reviewa
 duration. Where a category is governed by code, the code reference is the authoritative
 value. **Two cross-cutting rules apply and may override "deleted on account deletion" below:**
 
-- **Victorian health records (Health Records Act 2001 / HPPs).** If StrengthHub is a
-  "health service provider" and a category is "health information," the HRA generally
-  requires retention until **7 years after the health service was last provided** (a
-  different age-based minimum applies to records collected about a person under 18).
-  This is **unresolved pending counsel's classification** (see below) and, if it applies,
-  overrides the immediate-deletion promise for rows 1–2.
+- **Victorian health records (Health Records Act 2001 / HPPs).** **OWNER POSITION
+  (Aug 2026): StrengthHub is NOT a health service provider**, so the HRA's minimum-
+  retention rule (which would otherwise require keeping health information until ~7 years
+  after a health service was last provided) does **not** apply; health information is
+  deleted on account close (rows 1–2). The HPPs may still apply to health information we
+  hold, but they do not impose that retention minimum on a non-provider. **Counsel to
+  confirm this classification** — a prior review thought health-service coverage was
+  "strongly likely"; if counsel deems StrengthHub a health service provider, rows 1–2 and
+  the deletion/erasure language must be revisited.
 - **Legal/financial retention.** Records that must be retained for tax, dispute, fraud or
   legal-claim reasons are kept for the required period even after account deletion.
 
 | # | Data category | Retention | Trigger / mechanism | Source of truth |
 |---|---|---|---|---|
-| 1 | **Account & profile** (auth, DOB, sex, height/weight, goals, injuries, screening incl. pregnancy/postpartum) | Life of the account; deleted on account deletion — **EXCEPT** health information subject to an HRA minimum period where that Act applies (see cross-cutting rule) | Deleted on account deletion (server-authoritative), subject to legal-retention exceptions | `functions/src/account.ts` |
-| 2 | **Workout logs & app content** | Life of the account; deleted on account deletion — health-related records may be subject to the HRA minimum where it applies | Deleted on account deletion | `functions/src/account.ts` (`RECURSIVE_DOCS`) |
+| 1 | **Account & profile** (auth, DOB, sex, height/weight, goals, injuries, screening incl. pregnancy/postpartum) | Life of the account; **deleted on account deletion** (owner position: not a health service provider, so no HRA retention minimum — see cross-cutting rule), subject only to the general legal/financial-retention exceptions | Deleted on account deletion (server-authoritative) | `functions/src/account.ts` |
+| 2 | **Workout logs & app content** | Life of the account; **deleted on account deletion** | Deleted on account deletion | `functions/src/account.ts` (`RECURSIVE_DOCS`) |
 | 3 | **Meal photos** | **Not retained in the StrengthHub account.** Sent to Gemini for analysis, estimate returned, image not written to account storage. Provider-side (Gemini) processing/retention is **governed by Google's terms and is unverified** (see row 19) | Per-request; not stored by us | `functions/src/meal*` |
 | 4 | **Community per-day scoring** (`scoreDays`, `scoreEvents`) | **490 days** (460-day scoring window + 30-day buffer), then auto-pruned daily | Scheduled prune below the cutoff | `functions/src/community.ts` (`MAX_HISTORY_DAYS=460`, `RETENTION_DAYS=490`) — **DORMANT** (`COMMUNITY_BACKEND=false`) |
 | 5 | **Community moderation / appeal notes** | Life of the account (kept with the community profile; in data export) | Deleted on account deletion | `functions/src/account.ts` (`communityReviews`) — dormant with community |
@@ -44,11 +47,11 @@ value. **Two cross-cutting rules apply and may override "deleted on account dele
 
 ## Owner / counsel determinations still required (before sign-off)
 
-- **Victorian health-record classification (rows 1–2).** Have counsel decide whether StrengthHub
-  is a "health service provider" and which categories are "health information." If the HRA applies,
-  **the immediate-deletion and "right-to-erasure" language in the Privacy Policy must be reconciled**
-  with the HRA minimum, and the deletion UI + Google Play deletion disclosure updated. Do NOT simply
-  retain everything for 7 years without this analysis.
+- **Victorian health-record classification (rows 1–2).** Owner position: **not a health service
+  provider**, so rows 1–2 delete on account close and no 7-year minimum applies. **Counsel to CONFIRM**
+  this classification (a prior review thought coverage "strongly likely"). If counsel disagrees, the
+  immediate-deletion / erasure language and rows 1–2 must be reconciled with the HRA minimum and the
+  deletion UI + Google Play deletion disclosure updated.
 - **Row 7** deletion tombstone cap (proposed 24 months) — confirm and add a prune.
 - **Row 11** backups — record the actual PITR window + daily-backup retention from the console.
 - **Rows 14, 15, 16, 18** — confirm the actual log/consent/complaint/push-log retention periods.
@@ -62,6 +65,7 @@ value. **Two cross-cutting rules apply and may override "deleted on account dele
   does **not** cancel the Stripe subscription (no server-side auto-cancel; the earlier
   `purgeStripeForUser` design was reverted). Cancellation is user-initiated via the billing portal
   or by contacting support.
-- **Immediate deletion vs Victorian health law (open).** The Privacy Policy now states the HRA
-  applies. Rows 1–2 promise deletion on account close; if the HRA minimum applies, that promise and
-  the erasure language conflict and must be reconciled by counsel before sign-off.
+- **Immediate deletion vs Victorian health law (owner-resolved, counsel to confirm).** On the owner's
+  position that StrengthHub is not a health service provider, the HRA retention minimum does not apply,
+  so rows 1–2 delete on account close with no conflict. This rests on the classification in L9 — counsel
+  must confirm it before sign-off.
