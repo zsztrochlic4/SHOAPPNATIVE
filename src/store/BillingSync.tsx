@@ -3,6 +3,7 @@ import { doc, onSnapshot } from 'firebase/firestore'
 import { db, firebaseEnabled } from '../lib/firebase'
 import { useAuth } from '../auth/AuthProvider'
 import { useStore } from './store'
+import { initIap } from '../lib/iap'
 import type { Subscription, SubscriptionStatus } from './types'
 
 /**
@@ -47,6 +48,8 @@ export function BillingSync() {
 
   useEffect(() => {
     if (!firebaseEnabled || !db || !user) return
+    // Configure RevenueCat for this user (no-op unless native store billing is enabled).
+    void initIap(user.uid).catch(() => { /* IAP unavailable / not configured — Stripe path stays */ })
     const ref = doc(db, 'entitlements', user.uid)
     const unsub = onSnapshot(
       ref,

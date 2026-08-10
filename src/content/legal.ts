@@ -115,7 +115,7 @@ const TERMS: LegalDoc = {
     { p: `You may report safety or conduct concerns to **${CONTACT}**. If there is immediate danger, contact emergency services rather than relying on a report to us.` },
 
     { h: '9. Connected and third-party services' },
-    { p: `The Service relies on third parties such as Google Firebase, Google Gemini, Stripe, notification providers, app stores and any on-device health platform you choose to connect, such as Apple Health or Health Connect. Third-party services have their own terms, availability and privacy practices.` },
+    { p: `The Service relies on third parties such as Google Firebase, Google Gemini, Stripe, RevenueCat, notification providers, app stores and any on-device health platform you choose to connect, such as Apple Health or Health Connect. Third-party services have their own terms, availability and privacy practices.` },
     { p: `If you connect a service, you authorise us to receive and use the permitted data to provide the integration until you disconnect it. Disconnecting stops new collection through that connection but does not automatically delete data already imported into StrengthHub or held by the third party. You can delete imported StrengthHub data using the controls described in the Privacy Policy.` },
     { p: `We are not responsible for a third-party service to the extent allowed by law, but this does not affect responsibility we have for our own conduct or non-excludable consumer rights.` },
 
@@ -274,7 +274,7 @@ const PRIVACY: LegalDoc = {
     { ul: [
       `Google Firebase and Google Cloud, for authentication, database, hosting, storage, server functions and security;`,
       `Google's Gemini services, for the AI Coach (currently disabled);`,
-      `Stripe or an applicable app store, for checkout, subscriptions, fraud prevention and payment support;`,
+      `Stripe (web checkout), RevenueCat (native app-store subscription management) or an applicable app store, for checkout, subscriptions, fraud prevention and payment support;`,
       `Expo or another notification-delivery provider, if you enable remote notifications;`,
       `the operating-system health platform you choose to connect on your device, such as Apple Health or Health Connect, to the extent needed to operate that connection;`,
       `professional advisers, insurers, auditors or contractors bound by appropriate confidentiality obligations;`,
@@ -287,7 +287,7 @@ const PRIVACY: LegalDoc = {
     { h: '7. Overseas processing and disclosure' },
     { p: `Our primary Firestore database and Cloud Functions are configured in an Australian region. Some providers are global companies and may process, support or store information outside Australia.` },
     { p: `Overseas recipients are likely to include providers in the United States. Depending on the provider, your location and its current infrastructure, information may also be processed in other countries described in that provider's published privacy or data-location materials.` },
-    { p: `Likely overseas processing includes Google AI and support systems, Stripe, Expo and app stores. On-device health connections such as Apple Health and Health Connect are read locally on your device and are not, by themselves, disclosed by us overseas. Before a cross-border disclosure, we take reasonable steps required by applicable Australian privacy law, and we assess providers and contractual or technical safeguards appropriate to the information and service.` },
+    { p: `Likely overseas processing includes Google AI and support systems, Stripe, RevenueCat, Expo and app stores. On-device health connections such as Apple Health and Health Connect are read locally on your device and are not, by themselves, disclosed by us overseas. Before a cross-border disclosure, we take reasonable steps required by applicable Australian privacy law, and we assess providers and contractual or technical safeguards appropriate to the information and service.` },
 
     { h: '8. How we store and protect information' },
     { p: `Cloud account and app data is primarily held using Firebase services. Some information is cached locally on your device to support performance and offline use.` },

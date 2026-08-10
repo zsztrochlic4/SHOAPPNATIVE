@@ -223,7 +223,7 @@ us.
 ## 9. Connected and third-party services
 
 The Service relies on third parties such as Google Firebase, Google Gemini,
-Stripe, notification providers, app stores and any on-device health platform you
+Stripe, RevenueCat, notification providers, app stores and any on-device health platform you
 choose to connect, such as Apple Health or Health Connect. Third-party services
 have their own terms, availability and privacy practices.
 

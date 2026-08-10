@@ -91,8 +91,8 @@ inventory the SDKs in the signed binary and confirm.
 
 Overarching questions:
 - **Does your app collect or share user data?** → **Collect: Yes.** **Share: No.**
-  (Firebase/Google, Stripe and Expo process data *on your behalf* as service
-  providers — Google's form does **not** count that as "sharing".)
+  (Firebase/Google, Stripe, RevenueCat and Expo process data *on your behalf* as
+  service providers — Google's form does **not** count that as "sharing".)
 - **Is all user data encrypted in transit?** → **Yes.**
 - **Do you provide a way to request that data be deleted?** → **Yes** — in-app
   (**Settings → Delete account**) and via **info@strengthhubonline.com**.
@@ -141,10 +141,12 @@ info → Payment info** is not collected by us.)
    *User Content* (Apple) / *Other in-app messages* (Google). Coach text may
    contain health free-text, also covered by the Health declaration.
 
-3. **Subscriptions.** Stripe processes checkout and card details; we store
-   subscription **status/plan/dates** (not the card number). Declare *Purchases /
-   Purchase history*. If you also sell through an app store's IAP, that store's
-   own purchase reporting applies too.
+3. **Subscriptions.** On the **native apps**, subscriptions use **Apple StoreKit /
+   Google Play Billing via RevenueCat** (see docs/IAP_SETUP.md); **Stripe** handles
+   the **web** checkout. In all cases we store subscription **status/plan/dates**
+   (not the card number). Declare *Purchases / Purchase history*. RevenueCat and the
+   app store process purchase data as service providers; the store's own purchase
+   reporting also applies.
 
 4. **Account deletion — built in-app. ✅** Both stores require an in-app way to
    delete your account: **Settings → Delete account** (two-tap confirm). It

@@ -248,7 +248,8 @@ We disclose personal information only as reasonably necessary to:
 - Google Firebase and Google Cloud, for authentication, database, hosting,
   storage, server functions and security;
 - Google's Gemini services, for the AI Coach (currently disabled);
-- Stripe or an applicable app store, for checkout, subscriptions, fraud
+- Stripe (web checkout), RevenueCat (native app-store subscription management)
+  or an applicable app store, for checkout, subscriptions, fraud
   prevention and payment support;
 - Expo or another notification-delivery provider, if you enable remote
   notifications;
@@ -277,8 +278,8 @@ Depending on the provider, your location and its current infrastructure,
 information may also be processed in other countries described in that provider's
 published privacy or data-location materials.
 
-Likely overseas processing includes Google AI and support systems, Stripe, Expo
-and app stores. On-device health connections such as Apple Health and Health
+Likely overseas processing includes Google AI and support systems, Stripe,
+RevenueCat, Expo and app stores. On-device health connections such as Apple Health and Health
 Connect are read locally on your device and are not, by themselves, disclosed by
 us overseas. Before a cross-border disclosure, we take reasonable steps required
 by applicable Australian privacy law, and we assess providers and contractual or

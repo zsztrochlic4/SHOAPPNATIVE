@@ -7,6 +7,7 @@ import { PressableScale } from '../components/PressableScale'
 import { cssVars, useThemeName } from '../theme'
 import { tick, thud } from '../lib/haptics'
 import { startCheckout, openBillingPortal } from '../lib/billing'
+import { iapActive, purchaseWeekly, restorePurchases } from '../lib/iap'
 import { LegalDocModal } from '../components/LegalDocModal'
 import { type LegalDocKey } from '../content/legal'
 import { useReducedMotion } from '../lib/a11y'
@@ -212,11 +213,18 @@ export function Paywall({ email, onBack }: { email?: string; onBack?: () => void
     setBusy(true)
     thud()
     try {
-      const outcome = await startCheckout(email)
-      // Web redirects away entirely ('opened'). Native returns here.
-      if (outcome === 'success') setConfirming(true)
-      else if (outcome === 'cancel' || outcome === 'dismiss') setBusy(false)
-      // 'opened' (web): leave busy true; the page is navigating away.
+      if (iapActive()) {
+        // Native store billing (Apple StoreKit / Google Play Billing) via RevenueCat.
+        const { ok, entitled, cancelled } = await purchaseWeekly()
+        if (cancelled || (!ok && !entitled)) setBusy(false)
+        else setConfirming(true) // wait for the RevenueCat webhook → entitlements to land (BillingSync)
+      } else {
+        // Web (and until IAP is enabled): the Stripe hosted checkout.
+        const outcome = await startCheckout(email)
+        if (outcome === 'success') setConfirming(true)
+        else if (outcome === 'cancel' || outcome === 'dismiss') setBusy(false)
+        // 'opened' (web): leave busy true; the page is navigating away.
+      }
     } catch (e) {
       setError((e as Error)?.message ?? 'Could not start checkout. Please try again.')
       setBusy(false)
@@ -227,7 +235,13 @@ export function Paywall({ email, onBack }: { email?: string; onBack?: () => void
     setError(null)
     tick()
     try {
-      await openBillingPortal()
+      if (iapActive()) {
+        const { entitled } = await restorePurchases()
+        if (entitled) setConfirming(true)
+        else setError('No existing subscription found to restore.')
+      } else {
+        await openBillingPortal()
+      }
     } catch (e) {
       setError('No existing subscription found to restore.')
     }
