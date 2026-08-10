@@ -10,7 +10,7 @@
  */
 
 import type { Equipment, Experience, Goal, Profile } from '../../store/types'
-import type { BackendExperience, BackendGoal, EquipmentTier, InjuryRegion, UserDoc } from '../schema'
+import type { BackendExperience, BackendGoal, EquipmentTier, InjuryRegion, Sex, UserDoc } from '../schema'
 
 /** Reverse of onboardingContract GOAL_MAP. */
 const GOAL_TO_STORE: Record<BackendGoal, Goal> = {
@@ -59,6 +59,17 @@ export function nutritionTargets(_goal: Goal): Pick<Profile, 'calorieTarget' | '
   return { calorieTarget: 0, proteinTarget: 0, carbTarget: 0, fatTarget: 0 }
 }
 
+/**
+ * Default daily sleep + water goals, pulled through from onboarding.
+ *
+ * Sleep: 8 hours for everyone. Water: 2.6 L for women, 3 L for men or other
+ * (a null/unknown sex falls back to the higher 3 L default). These are just the
+ * starting defaults — the user can override both later in Edit Goals.
+ */
+export function defaultHealthGoals(sex: Sex | null): Pick<Profile, 'sleepTargetH' | 'waterTargetL'> {
+  return { sleepTargetH: 8, waterTargetL: sex === 'female' ? 2.6 : 3 }
+}
+
 function injuriesString(user: UserDoc): string {
   const regions = user.affected_regions.map((r) => REGION_LABEL[r]).filter(Boolean)
   const parts = [regions.length ? regions.join(', ') : '', user.notes?.trim() ?? '']
@@ -90,6 +101,7 @@ export function deriveLocalProfile(user: UserDoc): Partial<Profile> {
     dietaryPrefs: user.diet,
     createdAtKey: (user.created_at || '').slice(0, 10),
     ...nutritionTargets(goal),
+    ...defaultHealthGoals(user.sex),
   }
   if (age !== null) profile.age = age
   if (user.sex) profile.sex = user.sex

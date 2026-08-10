@@ -50,6 +50,29 @@ test('future state is rejected so an older build cannot overwrite it', () => {
   })
 })
 
+test('v13->v14 moves a woman on the old 3 L default down to 2.6 L', () => {
+  const state = buildSeed()
+  state.v = 13
+  state.profile = { ...state.profile, sex: 'female', waterTargetL: 3 }
+  const result = migrateAppState(state)
+  assert.equal(result.ok, true)
+  if (!result.ok) return
+  assert.equal(result.state.profile.waterTargetL, 2.6)
+  assert.equal(result.state.profile.sleepTargetH, 8)
+})
+
+test('v13->v14 leaves men/other and customised water goals untouched', () => {
+  const male = buildSeed()
+  male.v = 13
+  male.profile = { ...male.profile, sex: 'male', waterTargetL: 3 }
+  assert.equal(migrateAppState(male).state.profile.waterTargetL, 3)
+
+  const customised = buildSeed()
+  customised.v = 13
+  customised.profile = { ...customised.profile, sex: 'female', waterTargetL: 3.5 }
+  assert.equal(migrateAppState(customised).state.profile.waterTargetL, 3.5)
+})
+
 test('malformed collection containers fall back safely', () => {
   const state = legacyState()
   state.meals = 'not-an-array'

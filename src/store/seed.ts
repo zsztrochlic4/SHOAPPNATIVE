@@ -39,7 +39,9 @@ import type {
 // v13: + AppState.community (competition hub — persistent username + friend groups).
 // The current user's leaderboard row is always live (selectors.myLeaderStats); other
 // members are simulated locally until the Firestore backend lands.
-export const SCHEMA_VERSION = 13
+// v14: sex-based default water goal (women 2.6 L; men/other 3 L). Migration moves
+// existing women still on the old universal 3 L default down to 2.6 L.
+export const SCHEMA_VERSION = 14
 const DAYS = 40 // 0..38 completed history, 39 = today (in progress)
 
 /* round to nearest 2.5 (plate increments) */

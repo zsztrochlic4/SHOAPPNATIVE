@@ -77,6 +77,14 @@ export function migrateAppState(value: unknown): MigrationResult {
     v: SCHEMA_VERSION,
   } as AppState
 
+  // v13 -> v14: the water goal used to be a flat 3 L for everyone; it is now
+  // sex-based (women 2.6 L). Move women who are still on that old universal
+  // default down to 2.6 L. We only touch profiles still sitting on exactly 3 L,
+  // so anyone who deliberately picked a value keeps it. Sleep stays 8 h for all.
+  if ((version as number) < 14 && next.profile.sex === 'female' && next.profile.waterTargetL === 3) {
+    next.profile = { ...next.profile, waterTargetL: 2.6 }
+  }
+
   for (const key of ARRAY_KEYS) {
     const candidate = value[key as string]
     if (candidate !== undefined && !Array.isArray(candidate)) {
