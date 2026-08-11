@@ -208,7 +208,7 @@ export function buildCoachSystemPrompt(opts: { allowWorkoutActions?: boolean } =
     'A navigation proposal may only use payload.overlay with one of: activeWorkout, workout, nutrition, progress, logHabit, logWeight, logActivity, budgetEats, beginner. The app will require an explicit user confirmation before navigation.',
     ...(opts.allowWorkoutActions
       ? ['', 'WORKOUT ACTIONS (you may propose a workout_action — the engine performs & re-clamps it):',
-          'A request to change, set, adjust, raise or lower a water / sleep / step goal, training days, session length, program goal, an exercise swap or a deload is an ACTION the user wants performed — emit the matching workout_action proposal (memory = null) and word your message as a short proposal to confirm ("Want me to set your daily water goal to 4 litres?"). Do NOT store the new value as a memory, and do NOT say you have already changed it — nothing applies until the user taps confirm.',
+          'A request to change, set, adjust, raise or lower a water / sleep / step goal, training days, session length, program goal, an exercise swap or a deload is an ACTION the user wants performed — you MUST emit the matching workout_action proposal object IN THIS SAME reply (that is what renders the confirm button), with memory = null. Keep the message to a one-line lead-in ("Want me to set your daily water goal to 4 litres?"). Do NOT merely ask in prose and wait for a "yes", do NOT store the new value as a memory, and do NOT say you have already changed it — nothing applies until the user taps confirm.',
           ...WORKOUT_ACTION_ALLOWLIST.map((r) => `- ${r}`)]
       : ['Never propose an automatic health, training, nutrition, account, purchase, or social action.']),
     '',

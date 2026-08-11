@@ -271,3 +271,64 @@ export function validateWorkoutActionPayload(payload: Record<string, string | nu
     }
   }
 }
+
+/* ------------------------------------------------------------------ */
+/*  Deterministic wellness-goal backstop (flash-lite reliability)      */
+/* ------------------------------------------------------------------ */
+
+export interface SynthWellnessGoalProposal {
+  title: string
+  summary: string
+  /** A clean proposal lead-in for the reply text, used when the model asked in prose / mis-emitted. */
+  message: string
+  payload: { action: 'set_wellness_goal'; metric: WellnessMetricLit; value: number }
+}
+
+const _WELLNESS_SET_INTENT = /\b(set|change|adjust|make|update|raise|lower|increase|decrease|bump|move|put|lift|drop)\b/i
+const _WELLNESS_GOAL_WORD = /\b(goal|target)\b/i
+
+function roundForMetric(metric: WellnessMetricLit, value: number): number {
+  return metric === 'steps' ? Math.round(value) : Math.round(value * 10) / 10
+}
+
+/**
+ * Deterministic fallback for "set my water/sleep/step goal to N". flash-lite frequently ASKS in prose
+ * ("Want me to set…?") instead of emitting the structured set_wellness_goal action, so no confirm card
+ * renders and a later "yes" applies nothing. When the user's intent is unambiguous — a set/change verb
+ * + a wellness metric + the word goal/target + an in-bounds ABSOLUTE number — we build the proposal
+ * ourselves so the card always appears (still confirm-gated + engine-clamped downstream). Returns null
+ * when it is not clearly an absolute goal-set request or the value is out of range, so the model reply
+ * stands (e.g. relative "by 1 litre" changes, or "what is my water goal").
+ */
+export function synthesizeWellnessGoalProposal(userMessage: string): SynthWellnessGoalProposal | null {
+  if (typeof userMessage !== 'string') return null
+  const m = userMessage.toLowerCase()
+  if (!_WELLNESS_SET_INTENT.test(m) || !_WELLNESS_GOAL_WORD.test(m)) return null
+  if (/\bby\s+\d/.test(m)) return null // relative change ("increase by 1") — needs the current value; let the model handle it
+  const metric: WellnessMetricLit | null =
+    /\b(water|hydration|fluid)\b/.test(m) ? 'water'
+      : /\bsleep\b/.test(m) ? 'sleep'
+        : /\bsteps?\b/.test(m) ? 'steps'
+          : null
+  if (!metric) return null
+  const num = m.match(/(\d+(?:\.\d+)?)(\s*k\b)?/)
+  if (!num) return null
+  let value = parseFloat(num[1])
+  if (!Number.isFinite(value)) return null
+  if (metric === 'steps' && num[2]) value = value * 1000 // "10k steps"
+  value = roundForMetric(metric, value)
+  const payload = { action: 'set_wellness_goal' as const, metric, value }
+  // Re-use the canonical bounds gate — never build an out-of-range proposal.
+  if (!validateWorkoutActionPayload(payload).ok) return null
+  const label =
+    metric === 'water' ? `${value} litre${value === 1 ? '' : 's'} a day`
+      : metric === 'sleep' ? `${value} hour${value === 1 ? '' : 's'} a night`
+        : `${value.toLocaleString('en-AU')} steps a day`
+  const noun = metric === 'water' ? 'water' : metric === 'sleep' ? 'sleep' : 'step'
+  return {
+    payload,
+    title: `Set ${noun} goal to ${label}`,
+    summary: `Updates your daily ${noun} goal to ${label}. Nothing changes until you confirm.`,
+    message: `Want me to set your ${noun} goal to ${label}? Tap confirm and I'll update it.`,
+  }
+}

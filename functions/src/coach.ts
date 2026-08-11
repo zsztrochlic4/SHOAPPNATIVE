@@ -34,6 +34,7 @@ import {
   STRUCTURED_COACH_RESPONSE_SCHEMA,
   validateStructuredCoachReply,
 } from './_shared/backend/coach/structuredResponse'
+import { synthesizeWellnessGoalProposal } from './_shared/backend/coach/workoutActions'
 import type {
   CoachActionProposal,
   CoachAnswerMode,
@@ -269,26 +270,47 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
   const structured = validated.ok
     ? validated.reply
     : { mode: 'general' as const, message: validated.fallback, citations: [], memory: null, proposal: { kind: 'none' as const } }
+  // Deterministic wellness-goal backstop: flash-lite frequently ASKS in prose ("Want me to set…?")
+  // instead of emitting the structured set_wellness_goal action, so no confirm card renders and a later
+  // "yes" applies nothing. When the user unambiguously asked to set a water/sleep/step goal to an
+  // in-range number and the model did NOT already emit a valid set_wellness_goal, synthesise the
+  // proposal ourselves so the card always appears. Still confirm-gated on the client and engine-clamped
+  // by the resolver; only ever done when server-authoritative actioning is on.
+  let replyMessage = structured.message
+  let replyProposal = structured.proposal
+  let suppressMemory = false
+  if (allowActions) {
+    const alreadyWellness = replyProposal.kind === 'workout_action' && replyProposal.payload?.action === 'set_wellness_goal'
+    if (!alreadyWellness) {
+      const synth = synthesizeWellnessGoalProposal(message)
+      if (synth) {
+        replyProposal = { kind: 'workout_action', title: synth.title, summary: synth.summary, payload: synth.payload }
+        replyMessage = synth.message
+        suppressMemory = true // never also store the requested value as a memory
+      }
+    }
+  }
+
   const approved = new Map<string, string>(APPROVED_KNOWLEDGE_SOURCES.map((s) => [s.key, s.title]))
   const citations = structured.citations
     .filter((c) => approved.get(c.sourceKey) === c.title)
     .slice(0, 5)
-  const safe = guardOutgoing(structured.message, pre.decision, ctx, session)
+  const safe = guardOutgoing(replyMessage, pre.decision, ctx, session)
 
   let memory: CoachMemory | null = null
-  if (turnData.memoryEnabled && structured.memory && deps.saveMemory) {
+  if (!suppressMemory && turnData.memoryEnabled && structured.memory && deps.saveMemory) {
     memory = await deps.saveMemory(uid, message, structured.memory)
   }
   let proposal: CoachActionProposal | null = null
   // Defence in depth: a workout_action is only ever surfaced when the client opted into
   // actioning. If the model emits one with the flag off, drop it rather than persist it.
-  const proposalAllowed = structured.proposal.kind !== 'workout_action' || allowActions
-  if (proposalAllowed && structured.proposal.kind !== 'none' && structured.proposal.title && structured.proposal.summary && deps.saveProposal) {
+  const proposalAllowed = replyProposal.kind !== 'workout_action' || allowActions
+  if (proposalAllowed && replyProposal.kind !== 'none' && replyProposal.title && replyProposal.summary && deps.saveProposal) {
     proposal = await deps.saveProposal(uid, {
-      kind: structured.proposal.kind,
-      title: structured.proposal.title,
-      summary: structured.proposal.summary,
-      payload: structured.proposal.payload ?? {},
+      kind: replyProposal.kind,
+      title: replyProposal.title,
+      summary: replyProposal.summary,
+      payload: replyProposal.payload ?? {},
     })
   }
   if (deps.saveTurn) await deps.saveTurn(uid, 'coach', safe, {
