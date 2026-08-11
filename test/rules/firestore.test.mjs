@@ -97,6 +97,21 @@ test('backendUser merge write (only that field) is accepted', async () => {
   await assertSucceeds(setDoc(doc(db, 'users', ALICE), { backendUser: { uid: ALICE, notes: 'ok' } }, { merge: true }))
 })
 
+test('onboarding root write carrying programDoc + backendUser is accepted (regression)', async () => {
+  // A freshly-onboarded user's root doc carries `programDoc` alongside
+  // generatedProgram / programStatus / backendUser. `programDoc` was missing from
+  // rootAllowedKeys(), so keys().hasOnly() rejected the ENTIRE write — silently
+  // blocking backendUser (incl. date_of_birth) from ever reaching Firestore and
+  // breaking the server-side coach age gate (`age_unverified`). Locks in the fix.
+  await assertSucceeds(setDoc(doc(aliceDb(), 'users', ALICE), rootDoc({
+    backendUser: { uid: ALICE, date_of_birth: '2000-01-01' },
+    generatedProgram: { weeks: [] },
+    programStatus: { ok: true },
+    programDoc: { program_id: 'p1', uid: ALICE, version: 1 },
+    workoutInstances: [],
+  })))
+})
+
 test('root get is allowed but a collection-wide list of users is denied', async () => {
   await seed((db) => setDoc(doc(db, 'users', ALICE), rootDoc()))
   await assertSucceeds(getDoc(doc(aliceDb(), 'users', ALICE)))

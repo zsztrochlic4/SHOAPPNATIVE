@@ -55,7 +55,7 @@ service cloud.firestore {
           'events', 'groups', 'partners', 'myMeals', 'templates',
           'workoutStartedKeys', 'nutritionAskedKeys', 'beginnerProgress',
           'coachUsage', 'integrations', 'plannedPeriods', 'backendUser',
-          'generatedProgram', 'workoutInstances', 'programStatus',
+          'generatedProgram', 'workoutInstances', 'programStatus', 'programDoc',
           'workoutSummaryComplete', 'demo', 'v',
           'updatedAt'
         ];
