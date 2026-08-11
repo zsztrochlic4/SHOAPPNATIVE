@@ -7,6 +7,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { resolveExerciseRef, EXERCISE_BY_ID } from '../../.sweep-out/backend/data/index.js'
+import { synthesizeExerciseDetailNav } from '../../.sweep-out/backend/coach/workoutActions.js'
 
 test('resolves an exact exercise id unchanged', () => {
   assert.equal(resolveExerciseRef('CH01'), 'CH01')
@@ -30,4 +31,26 @@ test('returns null for an unknown or too-short reference (opens nothing)', () =>
   assert.equal(resolveExerciseRef('ab'), null) // < 3 chars, avoids spurious matches
   assert.equal(resolveExerciseRef(undefined), null)
   assert.equal(resolveExerciseRef(42), null)
+})
+
+test('resolves an exercise named inside a whole how-to sentence', () => {
+  assert.equal(resolveExerciseRef('show me how to do the bench press'), 'CH01')
+  assert.match(EXERCISE_BY_ID[resolveExerciseRef('how do i perform a bench press with good form')].name.toLowerCase(), /bench press/)
+  // a non-exercise how-to resolves to nothing → the card is suppressed
+  assert.equal(resolveExerciseRef('how do i lose weight'), null)
+  assert.equal(resolveExerciseRef('what should i eat after training'), null)
+  assert.equal(resolveExerciseRef('how do i log a workout'), null)
+})
+
+test('synthesizeExerciseDetailNav fires only on a how-to / form / technique intent', () => {
+  const nav = synthesizeExerciseDetailNav('show me how to do the bench press')
+  assert.ok(nav)
+  assert.equal(nav.overlay, 'exerciseDetail')
+  assert.equal(nav.exercise, 'show me how to do the bench press') // passthrough; client resolves it
+  assert.ok(synthesizeExerciseDetailNav('what is the form for a squat'))
+  assert.ok(synthesizeExerciseDetailNav('how do i deadlift'))
+  // no how-to intent → no nav (the model's normal reply stands)
+  assert.equal(synthesizeExerciseDetailNav('what should i eat today'), null)
+  assert.equal(synthesizeExerciseDetailNav('am i on track for my goal'), null)
+  assert.equal(synthesizeExerciseDetailNav('hello'), null)
 })

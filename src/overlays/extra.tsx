@@ -54,6 +54,35 @@ import type { ReactNode } from 'react'
 import type { CoachKind, TemplateExercise, ChatMessage, ProgramSnapshot, PlannedPeriod, CommunityScope, Profile } from '../store/types'
 import type { CoachActionProposal } from '../backend/coach/contracts'
 
+/** Resolve a coach navigation proposal's exercise reference to a real, renderable exercise id (or null).
+ *  Shared by the render gate (suppress an unmatched card) and the confirm handler (open the sheet). */
+function resolveNavExerciseId(payload: Record<string, string | number | boolean> | undefined): string | null {
+  const raw = String(payload?.exercise ?? payload?.defId ?? '')
+  if (!raw) return null
+  const direct = exerciseView(raw) ? raw : null
+  const id = direct ?? resolveExerciseRef(raw)
+  return id && exerciseView(id) ? id : null
+}
+
+/** A proposal renders unless it's an exerciseDetail nav whose exercise can't be resolved to a real lift
+ *  (so a non-exercise how-to shows no card and the coach's text answer stands). */
+function isProposalRenderable(p: CoachActionProposal): boolean {
+  if (p.kind === 'navigation' && String((p.payload as Record<string, unknown>)?.overlay) === 'exerciseDetail') {
+    return resolveNavExerciseId(p.payload) != null
+  }
+  return true
+}
+
+/** Title shown on the proposal card — names the resolved lift for an exerciseDetail nav. */
+function proposalDisplayTitle(p: CoachActionProposal): string {
+  if (p.kind === 'navigation' && String((p.payload as Record<string, unknown>)?.overlay) === 'exerciseDetail') {
+    const id = resolveNavExerciseId(p.payload)
+    const name = id ? exerciseView(id)?.name : null
+    if (name) return `Open the ${name} guide`
+  }
+  return p.title
+}
+
 type Props = { open: boolean; onClose: () => void; params?: Record<string, unknown> }
 
 /* ============================ Your Coach ============================ */
@@ -576,14 +605,14 @@ function CoachMessageRow({ m, revealX, colors, onReply, onProposalConfirmed, und
         {/* The memory save stays consent-gated and silent — the "I'll keep that in mind" chip was
             removed at the owner's request (it read as clutter, and misfired on goal-change turns that
             should be proposals). Memory management still lives in the coach memory view. */}
-        {m.role === 'coach' && m.proposal && (
+        {m.role === 'coach' && m.proposal && isProposalRenderable(m.proposal) && (
           <View style={{ marginTop: 10, borderRadius: 14, borderWidth: 1, borderColor: withAlpha(colors.brand400, 0.2), padding: 11 }}>
-            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.fg }}>{m.proposal.title}</Text>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.fg }}>{proposalDisplayTitle(m.proposal)}</Text>
             <Text style={{ marginTop: 3, fontSize: 12, lineHeight: 17, color: withAlpha(colors.fg, 0.55) }}>{m.proposal.summary}</Text>
             {proposalStatus === 'pending' ? (
               <>
               <View style={{ marginTop: 9, flexDirection: 'row', gap: 8 }}>
-                <Pressable disabled={resolvingProposal} onPress={() => void resolveProposal('confirm')} accessibilityRole="button" accessibilityLabel={`Confirm: ${m.proposal.title}`} accessibilityHint="Applies this change to your plan" accessibilityState={{ disabled: resolvingProposal, busy: resolvingProposal }} style={({ pressed }) => ({ minHeight: 44, flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: colors.brand400, opacity: resolvingProposal ? 0.5 : pressed ? 0.75 : 1 })}>
+                <Pressable disabled={resolvingProposal} onPress={() => void resolveProposal('confirm')} accessibilityRole="button" accessibilityLabel={`Confirm: ${proposalDisplayTitle(m.proposal)}`} accessibilityHint="Applies this change to your plan" accessibilityState={{ disabled: resolvingProposal, busy: resolvingProposal }} style={({ pressed }) => ({ minHeight: 44, flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: colors.brand400, opacity: resolvingProposal ? 0.5 : pressed ? 0.75 : 1 })}>
                   <Text style={{ fontSize: 12, fontWeight: '700', color: '#0a0a0b' }}>{resolvingProposal ? 'Saving…' : 'Confirm'}</Text>
                 </Pressable>
                 <Pressable disabled={resolvingProposal} onPress={() => void resolveProposal('reject')} accessibilityRole="button" accessibilityLabel="Not now" accessibilityHint="Dismisses the suggestion without changing your plan" accessibilityState={{ disabled: resolvingProposal }} style={({ pressed }) => ({ minHeight: 44, flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: withAlpha(colors.fg, 0.07), opacity: pressed ? 0.65 : 1 })}>
@@ -916,11 +945,10 @@ export function CoachChatSheet({ open, onClose }: Props) {
       const allowed = ['activeWorkout', 'workout', 'nutrition', 'progress', 'logHabit', 'logWeight', 'logActivity', 'budgetEats', 'beginner', 'exerciseDetail']
       if (typeof overlay !== 'string' || !allowed.includes(overlay)) return
       if (overlay === 'exerciseDetail') {
-        // Never trust the model's exercise string: resolve it to a REAL exercise id (by id or name)
-        // and confirm it renders, so a bad reference opens nothing rather than a blank sheet.
-        const raw = String(proposal.payload.exercise ?? proposal.payload.defId ?? '')
-        const defId = (raw && exerciseView(raw) ? raw : null) ?? resolveExerciseRef(raw)
-        if (defId && exerciseView(defId)) nav.open('exerciseDetail', { defId })
+        // Never trust the model's exercise string: resolve it to a REAL exercise id (by id or name).
+        // The card is only shown when this resolves (isProposalRenderable), so a match is expected here.
+        const defId = resolveNavExerciseId(proposal.payload)
+        if (defId) nav.open('exerciseDetail', { defId })
         else toast("I couldn't find that exercise to open — try naming the lift as it appears in your program.")
         return
       }

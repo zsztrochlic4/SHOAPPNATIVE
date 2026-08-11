@@ -32,12 +32,22 @@ export function getExercise(id: string): Exercise | undefined {
 
 const normalizeName = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 
+// Filler words that carry no exercise identity, so "how do i do the bench press" reduces to {bench,press}.
+const STOP_TOKENS = new Set([
+  'the', 'a', 'an', 'my', 'do', 'does', 'how', 'to', 'for', 'of', 'on', 'in', 'with', 'and', 'i', 'me',
+  'show', 'teach', 'perform', 'please', 'can', 'you', 'what', 'is', 'right', 'proper', 'properly',
+  'correct', 'correctly', 'form', 'technique', 'cue', 'cues', 'demonstrate', 'guide', 'help', 'about',
+])
+const sigTokens = (s: string): string[] =>
+  normalizeName(s).split(' ').filter((w) => w.length >= 2 && !STOP_TOKENS.has(w))
+
 /**
- * Resolve a loose exercise reference — an exact id OR a human name — to a canonical exercise id, or
- * null when nothing matches. Used to safely turn a coach-supplied exercise reference into a real id
- * before opening its detail sheet: never trust an arbitrary model string, and a non-match must open
- * nothing rather than a blank sheet. Exact id and exact normalised-name matches win; a word-overlap
- * (e.g. "bench" → "Barbell Bench Press") is the last resort.
+ * Resolve a loose exercise reference — an exact id, a human name, or a whole sentence that mentions a
+ * lift ("show me how to do the bench press") — to a canonical exercise id, or null when nothing clearly
+ * matches. Used to safely turn a coach-supplied reference into a real id before opening its detail
+ * sheet: never trust an arbitrary model string, and a non-match must open nothing rather than a blank
+ * sheet. Exact id/name win outright; otherwise the exercise whose name is most-covered by the input
+ * (≥ half its significant tokens present) wins, so a nutrition/goal question resolves to nothing.
  */
 export function resolveExerciseRef(raw: string): string | null {
   if (typeof raw !== 'string') return null
@@ -46,13 +56,24 @@ export function resolveExerciseRef(raw: string): string | null {
   if (EXERCISE_BY_ID[trimmed]) return trimmed // already a valid id
   const target = normalizeName(trimmed)
   if (target.length < 3) return null
-  let partial: string | null = null
+  for (const ex of EXERCISES) if (normalizeName(ex.name) === target) return ex.id // exact name wins
+  const input = new Set(sigTokens(trimmed))
+  if (input.size === 0) return null
+  let best: string | null = null
+  let bestScore = 0
   for (const ex of EXERCISES) {
-    const n = normalizeName(ex.name)
-    if (n === target) return ex.id // exact name match wins outright
-    if (!partial && (n.includes(target) || target.includes(n))) partial = ex.id
+    const nameToks = sigTokens(ex.name)
+    if (nameToks.length === 0) continue
+    const shared = nameToks.filter((t) => input.has(t)).length
+    if (shared === 0) continue
+    const nameCoverage = shared / nameToks.length      // how much of THIS lift's name the input contains
+    const inputCoverage = shared / input.size          // how much of the input this lift explains
+    // Accept when the input names most of the lift, OR the input's words are entirely this lift's name.
+    if (nameCoverage < 0.5 && inputCoverage < 1) continue
+    const score = shared + nameCoverage + inputCoverage
+    if (score > bestScore) { bestScore = score; best = ex.id }
   }
-  return partial
+  return best
 }
 
 /** Substitutes for each exercise, best-first (priority ascending). */

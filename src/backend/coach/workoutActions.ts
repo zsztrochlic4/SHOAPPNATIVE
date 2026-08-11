@@ -382,3 +382,37 @@ export function synthesizeGoalWeightProposal(userMessage: string): SynthProfileG
     message: `Want me to set your goal weight to ${label}? Tap confirm and I'll update it.`,
   }
 }
+
+export interface SynthExerciseNavProposal {
+  overlay: 'exerciseDetail'
+  /** The user's raw phrasing, passed through — the CLIENT resolves it to a real exercise id (it owns the
+   *  exercise DB) and suppresses the card if it doesn't match, so nothing here needs the DB. */
+  exercise: string
+  title: string
+  summary: string
+  message: string
+}
+
+const _EXERCISE_HELP_INTENT =
+  /\b(how (?:do (?:i|you)|to|should i)|show me|teach me|demonstrate|walk me through|what(?:'s| is) the (?:form|technique)|form for|technique for|cues? for)\b/i
+
+/**
+ * Deterministic backstop for "show me how to do the bench press" (Capability Plan §7 — open the
+ * exercise detail). flash-lite tends to ANSWER in prose without emitting the navigation proposal, so
+ * the form‑guide card never appears. When the message is a clear how‑to / form / technique request we
+ * synthesise a navigation proposal, passing the message through as `exercise`; the client resolves it
+ * to a real lift (`resolveExerciseRef`) and only renders the card if it matches — so a non‑exercise
+ * how‑to ("how do i log a workout") simply shows no card. Returns null when there's no how‑to intent.
+ */
+export function synthesizeExerciseDetailNav(userMessage: string): SynthExerciseNavProposal | null {
+  if (typeof userMessage !== 'string') return null
+  const m = userMessage.trim()
+  if (!m || !_EXERCISE_HELP_INTENT.test(m)) return null
+  return {
+    overlay: 'exerciseDetail',
+    exercise: m.slice(0, 120),
+    title: 'Open the technique guide',
+    summary: 'Opens the step-by-step cues, the common mistake to avoid and a form clip for this lift.',
+    message: "Here's the technique guide — open it for the step-by-step cues and a form clip.",
+  }
+}

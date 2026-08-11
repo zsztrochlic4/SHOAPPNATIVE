@@ -34,7 +34,7 @@ import {
   STRUCTURED_COACH_RESPONSE_SCHEMA,
   validateStructuredCoachReply,
 } from './_shared/backend/coach/structuredResponse'
-import { synthesizeWellnessGoalProposal, synthesizeGoalWeightProposal } from './_shared/backend/coach/workoutActions'
+import { synthesizeWellnessGoalProposal, synthesizeGoalWeightProposal, synthesizeExerciseDetailNav } from './_shared/backend/coach/workoutActions'
 import type {
   CoachActionProposal,
   CoachAnswerMode,
@@ -289,6 +289,16 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
         replyMessage = synth.message
         suppressMemory = true // never also store the requested value as a memory
       }
+    }
+  }
+  // Exercise-detail navigation backstop (not action-gated): when the user asks how to do a lift and the
+  // model under-emitted, synthesise the form-guide nav. The client resolves the exercise and suppresses
+  // the card if it doesn't match a real lift, so a non-exercise how-to shows no card.
+  if (replyProposal.kind === 'none') {
+    const navSynth = synthesizeExerciseDetailNav(message)
+    if (navSynth) {
+      replyProposal = { kind: 'navigation', title: navSynth.title, summary: navSynth.summary, payload: { overlay: navSynth.overlay, exercise: navSynth.exercise } }
+      replyMessage = navSynth.message
     }
   }
 
