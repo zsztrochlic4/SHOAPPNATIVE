@@ -98,11 +98,22 @@ export function CoachSheet({ open, onClose }: Props) {
   const { state } = useStore()
   const nav = useNav()
   const thread = coachThreadView(state)
+  // Coach profile & memory (formerly the brain icon in the chat header) now lives here, under
+  // Menu → Your coach — the chat itself carries no settings.
+  const [showSettings, setShowSettings] = useState(false)
 
   if (!coachOperational() && !COACH_PREVIEW) {
     return (
       <Sheet open={open} onClose={onClose} title="Your coach">
         <CoachComingSoon />
+      </Sheet>
+    )
+  }
+
+  if (showSettings) {
+    return (
+      <Sheet open={open} onClose={onClose} title="Coach profile" full bare>
+        <CoachMemoryView onClose={() => setShowSettings(false)} />
       </Sheet>
     )
   }
@@ -116,6 +127,15 @@ export function CoachSheet({ open, onClose }: Props) {
           <Text className="text-[12px] text-secondary">Reads your logs. Checks in, not chats.</Text>
         </View>
       </View>
+
+      <Pressable onPress={() => setShowSettings(true)} accessibilityRole="button" accessibilityLabel="Coach profile and memory" className="mb-4 flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-3.5 active:opacity-90">
+        <View className="h-11 w-11 items-center justify-center rounded-full bg-white/5"><Brain size={19} color={brand[400]} strokeWidth={2} /></View>
+        <View className="flex-1">
+          <Text className="font-bold leading-tight text-white">Coach profile &amp; memory</Text>
+          <Text className="text-[12px] text-secondary">What the coach remembers, and its style</Text>
+        </View>
+        <ChevronRight size={18} color="rgba(255,255,255,0.3)" />
+      </Pressable>
 
       <View className="gap-3">
         {thread.map((m, i) => (
@@ -716,7 +736,6 @@ export function CoachChatSheet({ open, onClose }: Props) {
   const [focused, setFocused] = useState(false)
   const [replyingTo, setReplyingTo] = useState<{ role: 'user' | 'coach'; text: string } | null>(null)
   const [coachConsented, setCoachConsented] = useState<boolean | null>(null)
-  const [showMemory, setShowMemory] = useState(false)
   // Failed-turn recovery (audit F-028): the message that failed, for one-tap
   // retry, and a send sequence so Cancel/supersede drops a stale response.
   const [retryMsg, setRetryMsg] = useState<string | null>(null)
@@ -1165,13 +1184,12 @@ export function CoachChatSheet({ open, onClose }: Props) {
     )
   }
 
-  if (!COACH_PREVIEW && (showMemory || coachConsented !== true)) {
+  // First-run consent gate only — a not-yet-consented user sees the coach-profile/consent screen
+  // before the chat. Managing memory & style afterwards lives under Menu → Your coach, not here.
+  if (!COACH_PREVIEW && coachConsented !== true) {
     return (
       <Sheet open={open} onClose={onClose} title="Coach profile" full bare>
-        <CoachMemoryView
-          onClose={() => coachConsented ? setShowMemory(false) : onClose()}
-          onConsentChanged={setCoachConsented}
-        />
+        <CoachMemoryView onClose={onClose} onConsentChanged={setCoachConsented} />
       </Sheet>
     )
   }
@@ -1185,11 +1203,7 @@ export function CoachChatSheet({ open, onClose }: Props) {
             <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Close chat" style={{ position: 'absolute', left: 16, top: 4, width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }} className="active:opacity-60">
               <ChevronLeft size={22} color={colors.fg} strokeWidth={2.2} />
             </Pressable>
-            {!COACH_PREVIEW && (
-              <Pressable onPress={() => setShowMemory(true)} hitSlop={8} accessibilityLabel="Open coach memory" style={{ position: 'absolute', right: 16, top: 4, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }} className="active:opacity-60">
-                <Brain size={20} color={colors.fg} strokeWidth={2} />
-              </Pressable>
-            )}
+            {/* No settings in the chat itself: coach profile & memory live under Menu → Your coach. */}
             <View style={{ alignItems: 'center', gap: 6 }}>
               <View style={{ width: 40, height: 40 }}>
                 <View className="h-10 w-10 items-center justify-center rounded-full bg-brand-400">
