@@ -2221,14 +2221,38 @@ function Login({ onBack }: { onBack: () => void }) {
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const formRef = useRef<View>(null)
+  // On web, browser / password-manager autofill can populate the inputs WITHOUT
+  // firing onChangeText, so the controlled `email`/`pw` state stays empty. That
+  // previously left the "Log In" button disabled and made a tap do nothing. Read
+  // the live DOM values as a fallback so an autofilled login still works. No-op on
+  // native, where onChangeText is authoritative.
+  const resolveCreds = (): { email: string; pw: string } => {
+    let e = email
+    let p = pw
+    if (Platform.OS === 'web' && (!e || !p)) {
+      const root = formRef.current as unknown as { querySelectorAll?: (s: string) => ArrayLike<{ type?: string; value?: string }> } | null
+      const inputs = root?.querySelectorAll ? Array.from(root.querySelectorAll('input')) : []
+      const pwEl = inputs.find((i) => i.type === 'password')
+      const emailEl = inputs.find((i) => i !== pwEl)
+      if (!e && emailEl?.value) e = emailEl.value
+      if (!p && pwEl?.value) p = pwEl.value
+    }
+    return { email: e, pw: p }
+  }
   const submit = async () => {
-    setError(null); setNotice(null); setBusy(true)
+    setError(null); setNotice(null)
+    const { email: e, pw: p } = resolveCreds()
+    if (!e || !p) { setError('Enter your email and password to log in.'); return }
+    if (e !== email) setEmail(e) // keep state in sync with what we actually submit
+    if (p !== pw) setPw(p)
+    setBusy(true)
     try {
-      await signIn(email, pw)
+      await signIn(e, p)
       // On success the auth listener swaps this screen out automatically.
-    } catch (e: unknown) {
-      const code = (e as { code?: string })?.code ?? ''
-      setError(friendlyError(code) || (e as Error)?.message || 'Couldn’t log you in.')
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code ?? ''
+      setError(friendlyError(code) || (err as Error)?.message || 'Couldn’t log you in.')
     } finally { setBusy(false) }
   }
   const google = async () => {
@@ -2266,19 +2290,21 @@ function Login({ onBack }: { onBack: () => void }) {
             <View style={{ flex: 1, height: 1, backgroundColor: tok.rgb('--fg', 0.1) }} /><Text style={{ fontSize: 12.5, fontWeight: '600', color: tok.rgb('--fg', 0.4) }}>or</Text><View style={{ flex: 1, height: 1, backgroundColor: tok.rgb('--fg', 0.1) }} />
           </View>
         </Reveal>
-        <Reveal delay={260}>
-          <Text style={{ fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', color: tok.rgb('--fg', 0.4), marginBottom: 8 }}>Email</Text>
-          <View style={{ marginBottom: 14 }}><FocusInput value={email} onChangeText={setEmail} placeholder="you@university.ac.uk" keyboardType="email-address" autoCapitalize="none" label="Email address" /></View>
-        </Reveal>
-        <Reveal delay={300}>
-          <Text style={{ fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', color: tok.rgb('--fg', 0.4), marginBottom: 8 }}>Password</Text>
-          <PasswordInput value={pw} onChangeText={setPw} />
-        </Reveal>
+        <View ref={formRef}>
+          <Reveal delay={260}>
+            <Text style={{ fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', color: tok.rgb('--fg', 0.4), marginBottom: 8 }}>Email</Text>
+            <View style={{ marginBottom: 14 }}><FocusInput value={email} onChangeText={setEmail} placeholder="you@university.ac.uk" keyboardType="email-address" autoCapitalize="none" label="Email address" /></View>
+          </Reveal>
+          <Reveal delay={300}>
+            <Text style={{ fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', color: tok.rgb('--fg', 0.4), marginBottom: 8 }}>Password</Text>
+            <PasswordInput value={pw} onChangeText={setPw} />
+          </Reveal>
+        </View>
         <Reveal delay={340}><Pressable style={{ marginTop: 12 }} onPress={forgot} hitSlop={6}><Text style={{ color: tok.rgb('--brand-300'), fontSize: 14, fontWeight: '600' }}>Forgot password?</Text></Pressable></Reveal>
         {error && <Text style={{ marginTop: 10, fontSize: 13, lineHeight: 18, color: 'rgb(252,165,165)' }}>{error}</Text>}
         {notice && <Text style={{ marginTop: 10, fontSize: 13, lineHeight: 18, color: tok.rgb('--fg', 0.6) }}>{notice}</Text>}
       </ScrollView>
-      <ActionBar label={busy ? 'Logging in…' : 'Log In'} disabled={!(email && pw) || busy} onPress={submit} />
+      <ActionBar label={busy ? 'Logging in…' : 'Log In'} disabled={busy} onPress={submit} />
     </View>
   )
 }
