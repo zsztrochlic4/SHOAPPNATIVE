@@ -65,6 +65,10 @@ export type CoachActionOutcome =
   /** OUTWARD: draft a PR post — the UI grounds it in a real logged PR and requires a
    *  SECOND explicit confirm before anything is published. */
   | { ok: true; apply: 'share_pr'; message: string }
+  /** Adjust a wellness/lifestyle daily goal (water/sleep/steps) — a local Profile patch, no engine
+   *  regen and no safety clamp (these targets carry no training-safety invariants). The UI dispatches
+   *  SET_PROFILE with the patch. */
+  | { ok: true; apply: 'profile_patch'; patch: Record<string, number>; message: string }
 
 const dedupe = (ids: string[]): string[] => Array.from(new Set(ids))
 
@@ -227,6 +231,14 @@ export function resolveCoachAction(
   const action = v.action
 
   switch (action.action) {
+    case 'set_wellness_goal': {
+      // A daily wellness target lives in the local Profile (waterTargetL / sleepTargetH / stepTarget),
+      // not the program or backend user — no engine regen, no safety clamp. Just a bounded patch.
+      const field = action.metric === 'water' ? 'waterTargetL' : action.metric === 'sleep' ? 'sleepTargetH' : 'stepTarget'
+      const value = action.metric === 'steps' ? Math.round(action.value) : Math.round(action.value * 10) / 10
+      const unit = action.metric === 'water' ? ` litre${value === 1 ? '' : 's'} a day` : action.metric === 'sleep' ? ` hours a night` : ` steps a day`
+      return { ok: true, apply: 'profile_patch', patch: { [field]: value }, message: `Done — your ${action.metric} goal is now ${value}${unit}.` }
+    }
     case 'swap': {
       if (!state.program) return { ok: false, reason: 'no_program', message: "You don't have an active program to change yet." }
       if (!programContains(state.program, action.fromExerciseId)) {

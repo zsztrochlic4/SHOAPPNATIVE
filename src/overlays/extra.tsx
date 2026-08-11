@@ -51,7 +51,7 @@ import { brand, useColors, accentFor, type AccentKey } from '../theme'
 import { AppModal, IS_WEB, WEB_SCREEN } from '../components/WebFrame'
 import { thud } from '../lib/haptics'
 import type { ReactNode } from 'react'
-import type { CoachKind, TemplateExercise, ChatMessage, ProgramSnapshot, PlannedPeriod, CommunityScope } from '../store/types'
+import type { CoachKind, TemplateExercise, ChatMessage, ProgramSnapshot, PlannedPeriod, CommunityScope, Profile } from '../store/types'
 import type { CoachActionProposal } from '../backend/coach/contracts'
 
 type Props = { open: boolean; onClose: () => void; params?: Record<string, unknown> }
@@ -953,6 +953,17 @@ export function CoachChatSheet({ open, onClose }: Props) {
       }
       if (outcome.apply === 'nudge') {
         nav.open(outcome.kind === 'weight' ? 'logWeight' : 'logHabit')
+        toast(outcome.message)
+        if (actionId) void recordCoachActionOutcome(actionId, 'applied')
+        return
+      }
+      // Adjust a wellness/lifestyle daily goal (water/sleep/steps) — a local Profile patch. The user
+      // already confirmed on the card; CloudSync persists the profile. Easily reversible ("set it back"),
+      // so no separate one-tap undo.
+      if (outcome.apply === 'profile_patch') {
+        dispatch({ type: 'SET_PROFILE', patch: outcome.patch as Partial<Profile> })
+        thud()
+        setSwapChoice(null)
         toast(outcome.message)
         if (actionId) void recordCoachActionOutcome(actionId, 'applied')
         return

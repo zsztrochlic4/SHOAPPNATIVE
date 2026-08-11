@@ -53,6 +53,16 @@ export type NudgeKindLit = (typeof NUDGE_KINDS)[number]
 export const START_VARIANTS = ['full', 'quick15'] as const
 export type StartVariantLit = (typeof START_VARIANTS)[number]
 
+/** Wellness/lifestyle goals the coach may adjust (the daily targets on the dashboard), with sane
+ *  bounds mirroring the Goals editor. NOT calorie/macro targets — nutrition is qualitative app-wide. */
+export const WELLNESS_METRICS = ['water', 'sleep', 'steps'] as const
+export type WellnessMetricLit = (typeof WELLNESS_METRICS)[number]
+export const WELLNESS_BOUNDS: Record<WellnessMetricLit, { min: number; max: number }> = {
+  water: { min: 0.5, max: 6 }, // litres per day
+  sleep: { min: 4, max: 12 }, // hours per night
+  steps: { min: 1000, max: 40000 },
+}
+
 /* ------------------------------------------------------------------ */
 /*  The parsed, validated action (what the resolver consumes)          */
 /* ------------------------------------------------------------------ */
@@ -71,6 +81,7 @@ export type WorkoutAction =
   | { action: 'open_budget_eats'; recipeId?: string }
   | { action: 'nudge_log'; kind: NudgeKindLit }
   | { action: 'share_pr'; prExerciseId: string; prValue: number }
+  | { action: 'set_wellness_goal'; metric: WellnessMetricLit; value: number }
 
 export type WorkoutActionName = WorkoutAction['action']
 
@@ -78,7 +89,7 @@ export type WorkoutActionName = WorkoutAction['action']
 export const WORKOUT_ACTION_NAMES: readonly WorkoutActionName[] = [
   'swap', 'change_goal', 'set_training_days', 'set_session_length', 'deload',
   'catch_up', 'reschedule_days', 'planned_absence', 'exam_mode', 'start_session',
-  'open_budget_eats', 'nudge_log', 'share_pr',
+  'open_budget_eats', 'nudge_log', 'share_pr', 'set_wellness_goal',
 ] as const
 
 export type WorkoutActionValidation =
@@ -248,6 +259,15 @@ export function validateWorkoutActionPayload(payload: Record<string, string | nu
       const prValue = typeof payload.prValue === 'number' ? payload.prValue : Number(payload.prValue)
       if (!Number.isFinite(prValue) || prValue <= 0 || prValue > 100000) return fail('pr_bad_value')
       return { ok: true, action: { action, prExerciseId, prValue } }
+    }
+    case 'set_wellness_goal': {
+      if (!onlyKeys(payload, ['action', 'metric', 'value'])) return fail('wellness_extra_keys')
+      const metric = inSet(payload.metric, WELLNESS_METRICS)
+      if (!metric) return fail('wellness_bad_metric')
+      const value = typeof payload.value === 'number' ? payload.value : Number(payload.value)
+      const b = WELLNESS_BOUNDS[metric]
+      if (!Number.isFinite(value) || value < b.min || value > b.max) return fail('wellness_out_of_range')
+      return { ok: true, action: { action, metric, value } }
     }
   }
 }
