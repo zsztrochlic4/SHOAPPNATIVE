@@ -7,8 +7,9 @@
  * users. This module is that hard gate: it opens only when `signed` is true AND an
  * accountable reviewer (name + accreditation) is on file and every required sheet is
  * reviewed (see `platformCleared`). It is now signed with the owner-provided reviewer
- * on record, so real-user program generation is cleared. (The AI coach remains a
- * SEPARATE gate — `COACH_ENABLED` in coachGate.ts — and stays off pending its holdout.)
+ * on record, so real-user program generation is cleared. (The AI coach is a SEPARATE
+ * gate — `COACH_ENABLED` in coachGate.ts — enabled 2026-08-11 for INTERNAL, NON-RELEASED
+ * testing only; its clinical holdout/§23 review remain outstanding before any real release.)
  *
  * Do not blank this to "just test" — use the demo/seed path for previews instead.
  */

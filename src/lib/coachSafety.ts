@@ -5,7 +5,9 @@
  * coach surface (the 1:1 chat, the reducer chat path, and the nutrition food coach) enforces the
  * SAME guardrails from one shared source (spec §2/§7). This file only READS AppState.
  *
- * The coach ships DISABLED (coachGate.COACH_ENABLED === false); this bridge does not change that.
+ * Availability is governed by coachGate.COACH_ENABLED (enabled 2026-08-11 for INTERNAL,
+ * NON-RELEASED testing only — see coachGate.ts for the still-outstanding release gates); this
+ * bridge does not change that value, it only reads it.
  * `coachOperational()` additionally honours the server-side kill switch (spec §20).
  */
 
