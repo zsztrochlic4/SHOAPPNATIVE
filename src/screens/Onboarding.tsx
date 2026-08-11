@@ -1809,6 +1809,23 @@ function AccountCreate({ name, onComplete, onBack, onLogin }: { name: string; on
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const formRef = useRef<View>(null)
+  // Web autofill can populate the inputs WITHOUT firing onChangeText, leaving the
+  // controlled state empty (same issue as the Login screen). Read the live DOM
+  // values as a fallback so an autofilled signup still works. No-op on native.
+  const resolveCreds = (): { email: string; pw: string } => {
+    let e = email
+    let p = password
+    if (Platform.OS === 'web' && (!e || !p)) {
+      const root = formRef.current as unknown as { querySelectorAll?: (s: string) => ArrayLike<{ type?: string; value?: string }> } | null
+      const inputs = root?.querySelectorAll ? Array.from(root.querySelectorAll('input')) : []
+      const pwEl = inputs.find((i) => i.type === 'password')
+      const emailEl = inputs.find((i) => i !== pwEl)
+      if (!e && emailEl?.value) e = emailEl.value
+      if (!p && pwEl?.value) p = pwEl.value
+    }
+    return { email: e, pw: p }
+  }
 
   // Create Account. Demo mode: straight through (mock). Real mode: create the
   // Firebase account, then complete onboarding.
@@ -1816,16 +1833,19 @@ function AccountCreate({ name, onComplete, onBack, onLogin }: { name: string; on
     if (!enabled) { thud(); onComplete(); return }
     if (busy) return
     setError(null)
-    if (!email.trim()) { setError('Please enter your email.'); return }
-    if (!password) { setError('Please choose a password (at least 6 characters).'); return }
+    const { email: e, pw: p } = resolveCreds()
+    if (!e.trim()) { setError('Please enter your email.'); return }
+    if (!p) { setError('Please choose a password (at least 6 characters).'); return }
+    if (e !== email) setEmail(e) // keep state in sync with what we actually submit
+    if (p !== password) setPassword(p)
     setBusy(true)
     try {
-      await signUp(email, password, name?.trim() || undefined)
+      await signUp(e, p, name?.trim() || undefined)
       thud()
       onComplete()
-    } catch (e: unknown) {
-      const code = (e as { code?: string })?.code ?? ''
-      setError(friendlyError(code) || (e as Error)?.message || 'Couldn’t create your account.')
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code ?? ''
+      setError(friendlyError(code) || (err as Error)?.message || 'Couldn’t create your account.')
       setBusy(false)
     }
   }
@@ -1861,13 +1881,15 @@ function AccountCreate({ name, onComplete, onBack, onLogin }: { name: string; on
         <Reveal delay={220}><Text style={{ marginTop: 12, marginBottom: 22, fontSize: 15, lineHeight: 22.5, color: tok.rgb('--fg', 0.55) }}>Create your account to save your answers, access your personalised training and track your progress.</Text></Reveal>
         <Reveal delay={300}>
           <Text style={{ fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', color: tok.rgb('--fg', 0.4), marginBottom: 8 }}>Email</Text>
-          <View style={{ marginBottom: 12 }}><FocusInput value={email} onChangeText={setEmail} placeholder="you@university.ac.uk" keyboardType="email-address" autoCapitalize="none" label="Email address" /></View>
-          {enabled ? (
-            <>
-              <Text style={{ fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', color: tok.rgb('--fg', 0.4), marginBottom: 8 }}>Password</Text>
-              <View style={{ marginBottom: 12 }}><PasswordInput value={password} onChangeText={setPassword} /></View>
-            </>
-          ) : null}
+          <View ref={formRef}>
+            <View style={{ marginBottom: 12 }}><FocusInput value={email} onChangeText={setEmail} placeholder="you@university.ac.uk" keyboardType="email-address" autoCapitalize="none" label="Email address" /></View>
+            {enabled ? (
+              <>
+                <Text style={{ fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', color: tok.rgb('--fg', 0.4), marginBottom: 8 }}>Password</Text>
+                <View style={{ marginBottom: 12 }}><PasswordInput value={password} onChangeText={setPassword} /></View>
+              </>
+            ) : null}
+          </View>
           {error ? <Text style={{ marginBottom: 12, fontSize: 13, lineHeight: 18, color: 'rgb(252,165,165)' }}>{error}</Text> : null}
           <Pressable onPress={createAccount} disabled={busy} style={{ height: 54, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: tok.rgb('--brand-400'), opacity: busy ? 0.7 : 1 }}>
             {busy ? <ActivityIndicator color="#08140a" /> : <Text style={{ fontSize: 16, fontWeight: '700', color: '#08140a' }}>Create Account</Text>}
