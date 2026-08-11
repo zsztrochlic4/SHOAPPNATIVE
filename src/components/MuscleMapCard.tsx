@@ -2,8 +2,8 @@ import { useMemo } from 'react'
 import { View, Text, Pressable, StyleSheet } from 'react-native'
 import Svg, { Path, Ellipse, Rect, Line, G, Defs, RadialGradient, Stop, Circle } from 'react-native-svg'
 import { LinearGradient } from 'expo-linear-gradient'
-import { Play } from 'lucide-react-native'
-import { useColors, type Palette } from '../theme'
+import { Play, Clock } from 'lucide-react-native'
+import { useColors, brand, type Palette } from '../theme'
 import { exerciseView } from '../store/programSession'
 import { fromKey, todayKey } from '../lib/date'
 import type { WorkoutSession } from '../store/types'
@@ -307,6 +307,39 @@ export function MuscleFigures({ session, sex, c }: { session?: WorkoutSession; s
     <View style={{ flexDirection: 'row', alignItems: 'stretch', width: '100%', height: '100%' }} pointerEvents="none">
       <View style={{ flex: 1, height: '100%' }}><Front active={active} secondary={secondary} c={c} /></View>
       <View style={{ flex: 1, height: '100%' }}><Back active={active} secondary={secondary} c={c} /></View>
+    </View>
+  )
+}
+
+/**
+ * Rest-day hero — the same muscle-map card shape as a training day, but with the
+ * figures un-highlighted and "Rest day · Recovery and mobility" copy. Shared by the
+ * Dashboard and the Workout screen so a rest day reads consistently everywhere
+ * (no separate "Quick mobility" empty state).
+ */
+export function RestDayCard({ sex }: { sex: 'male' | 'female' | 'other' }) {
+  const c = useColors()
+  return (
+    <View style={{ position: 'relative', overflow: 'hidden', borderRadius: 16, borderWidth: 1, borderColor: withA(c.fg, 0.05), backgroundColor: c.ink800 }}>
+      <View style={{ position: 'absolute', top: 6, bottom: 6, right: 4, width: 150 }} pointerEvents="none">
+        <MuscleFigures sex={sex} c={c} />
+      </View>
+      <LinearGradient
+        colors={[c.ink800, withA(c.ink800, 0.6), withA(c.ink800, 0)]}
+        locations={[0.25, 0.47, 0.74]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      />
+      <View style={{ padding: 20 }}>
+        <Text style={{ fontSize: 14, fontWeight: '600', color: brand[400] }}>Today's plan</Text>
+        <Text style={{ marginTop: 4, fontSize: 24, fontWeight: '800', letterSpacing: -0.5, color: c.fg }}>Rest day</Text>
+        <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Clock size={15} color={withA(c.fg, 0.6)} />
+          <Text style={{ fontSize: 14, color: withA(c.fg, 0.6) }}>Recovery and mobility</Text>
+        </View>
+      </View>
     </View>
   )
 }

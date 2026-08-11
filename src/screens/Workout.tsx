@@ -9,7 +9,7 @@ import {
 import { Icon } from '../components/Icon'
 import { ActivityIcon } from '../components/ActivityIcon'
 import { ProgressBar, SegmentedTabs, ScreenHeader, Chip } from '../components/ui'
-import { MuscleMapCard } from '../components/MuscleMapCard'
+import { MuscleMapCard, RestDayCard } from '../components/MuscleMapCard'
 import { useStore } from '../store/store'
 import { useNav } from '../nav'
 import { ACTIVE_EXERCISES } from '../backend/data'
@@ -190,14 +190,7 @@ function TodayTab() {
           </View>
         </>
       ) : (
-        <View className="items-center rounded-[20px] border border-white/5 bg-ink-800 p-8">
-          <Text className="text-2xl">😌</Text>
-          <Text className="mt-2 font-bold text-white">Rest Day</Text>
-          <Text className="mt-1 text-center text-[13px] text-secondary">Recovery is where you grow. Try a mobility flow, a walk, or log whatever you got up to below.</Text>
-          <Pressable onPress={() => nav.open('quick')} className="btn-primary mt-4 active:opacity-90">
-            <Text className="font-semibold text-black">Quick mobility</Text>
-          </Pressable>
-        </View>
+        <RestDayCard sex={state.profile.sex} />
       )}
 
       <MyWorkouts />
