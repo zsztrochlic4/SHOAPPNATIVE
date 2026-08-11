@@ -41,8 +41,14 @@ function stripeClient(): Stripe {
  * caller can't turn Checkout into an open redirect. Falls back to the scheme.
  */
 function safeReturnUrl(raw: unknown, fallback: string): string {
-  if (typeof raw === 'string' && (raw.startsWith('https://') || raw.startsWith('strengthhub://'))) {
-    return raw
+  if (typeof raw === 'string') {
+    if (raw.startsWith('https://') || raw.startsWith('strengthhub://')) return raw
+    // Dev / preview: the web app is served over http from a loopback origin
+    // (e.g. http://localhost:8081). Allow loopback http too — otherwise the web
+    // return URL is rejected and checkout falls back to the native strengthhub://
+    // scheme, which a browser can't follow, so the Stripe page hangs after payment.
+    // Restricted to localhost / 127.0.0.1 so this is not an open redirect.
+    if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$|\?)/.test(raw)) return raw
   }
   return fallback
 }
