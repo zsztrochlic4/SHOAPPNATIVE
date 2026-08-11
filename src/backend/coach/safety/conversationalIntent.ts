@@ -89,7 +89,15 @@ function isWellbeingAmbiguous(n: Norm): boolean {
     'feeling low', 'feel low', 'a bit low', 'bit low', 'feeling down', 'feel down', 'feeling blah',
     'out of it', 'not 100', 'not one hundred percent', 'feeling unsure', 'i dunno whats wrong',
     'something feels off', 'somethings off', 'not feeling it', 'just not feeling it', 'a bit flat',
-    'bit flat', 'not feeling great', 'kind of off', 'kinda off')
+    'bit flat', 'not feeling great', 'kind of off', 'kinda off',
+    // In-remit motivation / stress / low-energy check-ins. These are squarely a coach's job
+    // (motivation, stress, recovery) and reach here only when the safety floor already cleared
+    // the turn, so engage with a gentle question instead of a cold off-topic deflection.
+    'no motivation', 'lost motivation', 'lost my motivation', 'unmotivated', 'demotivated',
+    'cant be bothered', 'cant get motivated', 'cant get going', 'no energy', 'zero energy',
+    'so tired lately', 'always tired', 'feeling lazy', 'being lazy', 'in a rut', 'in a slump',
+    'no discipline', 'keep procrastinating', 'cant focus', 'stressed', 'stressed out', 'so stressed',
+    'overwhelmed', 'burnt out', 'burned out', 'feeling burnt out', 'exam stress', 'exams are stressing')
 }
 
 /**
