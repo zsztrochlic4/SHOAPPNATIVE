@@ -39,6 +39,21 @@ type AuthState = {
 const AuthContext = createContext<AuthState | null>(null)
 
 /**
+ * Reject a hung auth call so the UI surfaces an error and re-enables its button
+ * instead of sitting on a spinner forever (e.g. when the network is blocked in a
+ * sandboxed preview). A real Firebase error still rejects first and is handled by
+ * the caller's `friendlyError`; the timeout only fires when the call never settles.
+ */
+function withAuthTimeout<T>(p: Promise<T>, ms = 20_000): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error('The connection timed out. Check your internet and try again.')), ms),
+    ),
+  ])
+}
+
+/**
  * Wraps the app and exposes auth state. When Firebase isn't configured
  * (`firebaseEnabled === false`) this is inert: `user` stays null and the app
  * runs in local demo mode, so nothing here can break the preview.
@@ -80,13 +95,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signUp(email: string, password: string, name?: string) {
     if (!auth) throw new Error('Accounts are not available yet.')
-    const cred = await createUserWithEmailAndPassword(auth, email.trim(), password)
-    if (name?.trim()) await updateProfile(cred.user, { displayName: name.trim() })
+    const cred = await withAuthTimeout(createUserWithEmailAndPassword(auth, email.trim(), password))
+    // Display name is non-critical — never let it hang or fail the whole sign-up.
+    if (name?.trim()) await updateProfile(cred.user, { displayName: name.trim() }).catch(() => {})
   }
 
   async function signIn(email: string, password: string) {
     if (!auth) throw new Error('Accounts are not available yet.')
-    await signInWithEmailAndPassword(auth, email.trim(), password)
+    await withAuthTimeout(signInWithEmailAndPassword(auth, email.trim(), password))
   }
 
   async function signInWithGoogle() {

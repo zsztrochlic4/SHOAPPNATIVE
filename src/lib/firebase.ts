@@ -74,8 +74,11 @@ if (firebaseEnabled) {
   // reCAPTCHA site key is set AND App Check is enabled in the Firebase console (ops step).
   void initAppCheck(app)
 
-  // Native needs AsyncStorage-backed persistence so a login survives app
-  // restarts; on web the SDK uses IndexedDB/local storage by default.
+  // Native needs AsyncStorage-backed persistence so a login survives app restarts;
+  // on web getAuth() uses durable IndexedDB/localStorage by default (verified: the
+  // `firebaseLocalStorageDb` store is created), and it is idempotent — important
+  // because the firebase↔coachClassifier require cycle can re-enter this module,
+  // and initializeAuth() would throw `auth/already-initialized` on the second pass.
   if (Platform.OS === 'web') {
     auth = getAuth(app)
   } else {

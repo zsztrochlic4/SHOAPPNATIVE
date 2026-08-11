@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { View, Text, Pressable, ScrollView, ActivityIndicator } from 'react-native'
+import { View, Text, Pressable, ScrollView, ActivityIndicator, Platform } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Path, Rect, Line, Circle, Defs, Stop, LinearGradient as SvgLinearGradient } from 'react-native-svg'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -208,6 +208,22 @@ export function Paywall({ email, onBack }: { email?: string; onBack?: () => void
   const [error, setError] = useState<string | null>(null)
   const [legalDoc, setLegalDoc] = useState<LegalDocKey | null>(null)
 
+  // Web checkout opens in a separate tab and this screen stays mounted. On a
+  // successful payment BillingSync flips `isEntitled`, which unmounts this screen
+  // before the timer below fires. If the user instead returns WITHOUT completing
+  // payment (entitlement never lands), release the confirming state a few seconds
+  // after they refocus this tab so the paywall is usable again rather than stuck.
+  useEffect(() => {
+    if (!confirming || Platform.OS !== 'web' || typeof window === 'undefined') return
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const onFocus = () => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => { setConfirming(false); setBusy(false) }, 8000)
+    }
+    window.addEventListener('focus', onFocus)
+    return () => { window.removeEventListener('focus', onFocus); if (timer) clearTimeout(timer) }
+  }, [confirming])
+
   async function start() {
     setError(null)
     setBusy(true)
@@ -221,9 +237,11 @@ export function Paywall({ email, onBack }: { email?: string; onBack?: () => void
       } else {
         // Web (and until IAP is enabled): the Stripe hosted checkout.
         const outcome = await startCheckout(email)
-        if (outcome === 'success') setConfirming(true)
+        // 'opened' on web now means Stripe opened in a SEPARATE tab and this app is
+        // still mounted — wait in the confirming state for BillingSync to flip the
+        // gate (see the focus-recovery effect for the cancel path).
+        if (outcome === 'success' || outcome === 'opened') setConfirming(true)
         else if (outcome === 'cancel' || outcome === 'dismiss') setBusy(false)
-        // 'opened' (web): leave busy true; the page is navigating away.
       }
     } catch (e) {
       setError((e as Error)?.message ?? 'Could not start checkout. Please try again.')

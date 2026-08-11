@@ -34,21 +34,41 @@ export type CheckoutOutcome = 'opened' | 'success' | 'cancel' | 'dismiss'
 export async function startCheckout(email?: string): Promise<CheckoutOutcome> {
   if (!firebaseEnabled || !functions) throw new Error('Billing is not configured')
   const { successUrl, cancelUrl } = returnUrls()
-  const call = httpsCallable<
-    { email?: string; successUrl: string; cancelUrl: string },
-    { url: string }
-  >(functions, 'createCheckoutSession', { timeout: 30_000 })
-  const { data } = await call({ email, successUrl, cancelUrl })
+  const isWeb = Platform.OS === 'web' && typeof window !== 'undefined'
 
-  if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    window.location.assign(data.url)
-    return 'opened' // page navigates away; entitlement re-checks on return
+  // On web, open the checkout tab SYNCHRONOUSLY inside the tap handler (before the
+  // async round-trip) so it isn't popup-blocked, then point it at Stripe once the
+  // session URL is ready. Crucially this keeps THIS app mounted — so auth + local
+  // state survive and BillingSync flips the gate when the entitlement lands, instead
+  // of a full-page redirect that destroys the app and can strand the user on the
+  // Welcome screen when the reload doesn't cleanly restore the session.
+  const win = isWeb ? window.open('about:blank', '_blank') : null
+
+  try {
+    const call = httpsCallable<
+      { email?: string; successUrl: string; cancelUrl: string },
+      { url: string }
+    >(functions, 'createCheckoutSession', { timeout: 30_000 })
+    const { data } = await call({ email, successUrl, cancelUrl })
+
+    if (isWeb) {
+      if (win && !win.closed) {
+        win.location.href = data.url
+        return 'opened' // app stays mounted; entitlement arrives via BillingSync
+      }
+      // Popup blocked → fall back to the previous full-page redirect.
+      window.location.assign(data.url)
+      return 'opened'
+    }
+    const res = await WebBrowser.openAuthSessionAsync(data.url, NATIVE_RETURN)
+    if (res.type === 'success') {
+      return res.url.includes('status=cancel') ? 'cancel' : 'success'
+    }
+    return 'dismiss'
+  } catch (e) {
+    if (win && !win.closed) win.close() // don't leave a blank tab on failure
+    throw e
   }
-  const res = await WebBrowser.openAuthSessionAsync(data.url, NATIVE_RETURN)
-  if (res.type === 'success') {
-    return res.url.includes('status=cancel') ? 'cancel' : 'success'
-  }
-  return 'dismiss'
 }
 
 export async function openBillingPortal(): Promise<void> {
