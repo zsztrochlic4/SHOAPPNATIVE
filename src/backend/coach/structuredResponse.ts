@@ -53,6 +53,39 @@ export function assertsCompletedWorkoutAction(message: string): boolean {
   return _APPLIED_PERFECT.test(message) || _APPLIED_PAST.test(message) || _APPLIED_DONE.test(message)
 }
 
+// A completion claim is only truthful when a workout_action proposal is attached to actually apply the
+// change after the user confirms. To catch the specific false-success where the model claims a
+// program/goal change is DONE but ships NO actionable proposal (e.g. flash-lite filed the new value as a
+// memory instead — the reported "your water goal has been updated" with no confirm card), we require the
+// completion to sit alongside a concrete change OBJECT. Requiring the object keeps this off ordinary
+// chatty replies ("I've updated my earlier answer") that carry no proposal and apply nothing.
+const _OBJ = '(?:water|hydration|sleep|steps?|training days?|rest days?|session (?:length|time|duration)|deload|(?:daily |weekly |new )?goals?|program(?:me)?|routine|split|schedule|workout)'
+const _CHANGE_OBJECT = new RegExp(`\\b${_OBJ}\\b`, 'i')
+// The reported failure was PASSIVE/STATIVE, not first-person: "your water goal HAS BEEN updated",
+// "your sleep goal IS NOW 8 hours" — which assertsCompletedWorkoutAction (first-person / "done" only)
+// never sees. Match a change object next to a passive completion, or to a "now set to / is now <number>"
+// target statement. The stative branch requires "set to" or a digit so an OBSERVATION ("your water
+// intake is now trending up") is NOT mistaken for a goal change.
+const _DONE_VERB = '(?:updated|changed|set|adjusted|raised|lowered|increased|decreased|reduced|switched|swapped|rescheduled|moved|applied|deloaded|reprogrammed|regenerated)'
+const _COMPLETED_OBJECT_STATE = new RegExp(
+  `\\b${_OBJ}\\b[^.!?\\n]{0,40}?\\b(?:(?:has|have|had) been ${_DONE_VERB}|(?:is|are) now set to|now set to|(?:is|are) now \\d)`,
+  'i',
+)
+
+export function assertsCompletedChangeWithObject(message: string): boolean {
+  if (typeof message !== 'string' || !message) return false
+  // first-person completion ("I've updated your water goal") — reuse the calibrated base detector, but
+  // still require a concrete change object so ordinary chatter ("I've updated my earlier answer") is safe
+  if (assertsCompletedWorkoutAction(message) && _CHANGE_OBJECT.test(message)) return true
+  // passive / stative completion ("your water goal has been updated / is now 4 litres")
+  return _COMPLETED_OBJECT_STATE.test(message)
+}
+
+// Honest, actionable replacement when a completion claim ships without an action to back it (rather than
+// the generic fallback): tell the user nothing changed and how to actually trigger the change.
+export const FALSE_CHANGE_CLAIM_FALLBACK =
+  "I can't make that change from here without a confirm step, and one didn't come up just now. Tell me the exact goal you'd like — for example \"set my water goal to 4 litres\" — and I'll bring up a confirm button to apply it."
+
 function cleanShort(value: unknown, max: number): string | null {
   if (typeof value !== 'string') return null
   const clean = sanitizeMultiline(value, max)
@@ -158,6 +191,19 @@ export function validateStructuredCoachReply(raw: unknown): StructuredReplyValid
     // "swap the bench" request, which validates as bad_workout_action:unknown_action.)
     const parsedProposal = parseProposal(parsed.proposal)
     if (parsedProposal.ok) {
+      // Backstop for the reported failure: the model claims a program/goal change is DONE but attaches no
+      // workout_action to apply it (it filed the value as memory, or emitted kind 'none'). Nothing will
+      // apply, so the claim is a guaranteed false success — neutralise the text to an honest, actionable
+      // line and drop the misfiled memory. A real workout_action is exempt: its confirm card gates the
+      // apply, so the message + card are allowed to stand together.
+      if (parsedProposal.proposal.kind !== 'workout_action' && assertsCompletedChangeWithObject(message)) {
+        return {
+          ok: true,
+          reply: { mode: mode as CoachAnswerMode, message: FALSE_CHANGE_CLAIM_FALLBACK, citations: [], memory: null, proposal: { kind: 'none' } },
+          messageNeutralized: true,
+          droppedReason: 'completed_claim_without_action',
+        }
+      }
       return { ok: true, reply: { mode: mode as CoachAnswerMode, message, citations, memory, proposal: parsedProposal.proposal } }
     }
     // The proposal is dropped, so NOTHING will apply this turn. If the model's kept text ALSO claims

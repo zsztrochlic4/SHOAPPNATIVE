@@ -5,7 +5,7 @@
 //   npm run test:unit
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { validateStructuredCoachReply, STRUCTURED_COACH_RESPONSE_SCHEMA, STRUCTURED_COACH_FALLBACK, assertsCompletedWorkoutAction } from '../../.sweep-out/backend/coach/structuredResponse.js'
+import { validateStructuredCoachReply, STRUCTURED_COACH_RESPONSE_SCHEMA, STRUCTURED_COACH_FALLBACK, assertsCompletedWorkoutAction, assertsCompletedChangeWithObject, FALSE_CHANGE_CLAIM_FALLBACK } from '../../.sweep-out/backend/coach/structuredResponse.js'
 import { validateWorkoutActionPayload, WORKOUT_ACTION_NAMES } from '../../.sweep-out/backend/coach/workoutActions.js'
 import { buildCoachSystemPrompt, HARD_NEVERS } from '../../.sweep-out/backend/coach/operatingRules.js'
 
@@ -193,5 +193,54 @@ test('a VALID proposal keeps the model text (runtime neutralisation is degraded-
   }))
   assert.equal(r.ok, true)
   assert.equal(r.reply.proposal.kind, 'workout_action')
+  assert.notEqual(r.messageNeutralized, true)
+})
+
+// --- no-proposal false success: the reported "your water goal has been updated" with no confirm card.
+// The model claimed a goal change is DONE but filed the value as MEMORY (or emitted kind 'none'), so
+// nothing applies. That claim must be neutralised and the misfiled memory dropped. ---
+
+test('assertsCompletedChangeWithObject flags a completed GOAL claim, not a bare completion verb', () => {
+  assert.equal(assertsCompletedChangeWithObject('Your water goal has been updated to 4 litres per day.'), true)
+  assert.equal(assertsCompletedChangeWithObject("I've set your sleep goal to 8 hours."), true)
+  assert.equal(assertsCompletedChangeWithObject("I've updated your program."), true)
+  // completion verb but NO change object → not flagged here (kept, so ordinary chatty replies survive)
+  assert.equal(assertsCompletedChangeWithObject("I've updated my earlier answer about protein timing."), false)
+  assert.equal(assertsCompletedChangeWithObject('Want me to set your water goal to 4 litres?'), false)
+})
+
+test('a completed GOAL claim with a MEMORY and no workout_action is neutralised (the reported bug)', () => {
+  const r = validateStructuredCoachReply({
+    mode: 'personalised',
+    message: 'Your water goal has been updated to 4 litres per day.',
+    citations: [],
+    memory: { category: 'water goal', value: '4', evidenceQuote: 'set my water goal to 4 litres', scope: 'stable', sensitivity: 'ordinary' },
+    proposal: { kind: 'none' },
+  })
+  assert.equal(r.ok, true)
+  assert.equal(r.reply.message, FALSE_CHANGE_CLAIM_FALLBACK) // the false "updated" is not surfaced
+  assert.equal(r.reply.memory, null)                          // the misfiled "4" memory is dropped
+  assert.equal(r.reply.proposal.kind, 'none')
+  assert.equal(r.messageNeutralized, true)
+})
+
+test('an ordinary reply with a completion verb but no change object survives (low false-positive)', () => {
+  const r = validateStructuredCoachReply({
+    mode: 'general', message: "I've updated my earlier answer — protein needs are per kg of bodyweight.",
+    citations: [], memory: null, proposal: { kind: 'none' },
+  })
+  assert.equal(r.ok, true)
+  assert.notEqual(r.messageNeutralized, true)
+  assert.match(r.reply.message, /protein needs/)
+})
+
+test('a real set_wellness_goal proposal is EXEMPT even if the summary mentions the goal', () => {
+  const r = validateStructuredCoachReply({
+    mode: 'personalised', message: 'Want me to set your daily water goal to 4 litres?', citations: [], memory: null,
+    proposal: { kind: 'workout_action', title: 'Set water goal to 4 L', summary: 'Updates your daily water goal.', payload: { action: 'set_wellness_goal', metric: 'water', value: 4 } },
+  })
+  assert.equal(r.ok, true)
+  assert.equal(r.reply.proposal.kind, 'workout_action')
+  assert.equal(r.reply.proposal.payload.action, 'set_wellness_goal')
   assert.notEqual(r.messageNeutralized, true)
 })

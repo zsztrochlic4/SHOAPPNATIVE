@@ -201,13 +201,15 @@ export function buildCoachSystemPrompt(opts: { allowWorkoutActions?: boolean } =
     'APPROVED GENERAL-KNOWLEDGE SOURCES (cite a source only when the claim is supported by its reviewed note; never invent what a source says. Low-stakes established explanations may be uncited. Refer higher-stakes or current claims that are not covered by these notes):',
     knowledge,
     '',
-    'STRUCTURED OUTPUT: Return JSON only with mode, message, citations, memory and proposal. Memory is null unless the user explicitly supplied a stable coach-relevant fact in the current message. evidenceQuote must be an exact quote from that current message.',
+    'STRUCTURED OUTPUT: Return JSON only with mode, message, citations, memory and proposal. Memory is null unless the user explicitly supplied a stable coach-relevant fact (an ongoing preference, constraint or circumstance) in the current message. A request to CHANGE, SET, ADJUST, RAISE or LOWER a setting, goal or the program is an ACTION to propose, not a fact to store — memory stays null for it, and you must never store the requested new number/value as a memory. evidenceQuote must be an exact quote from that current message.',
     opts.allowWorkoutActions
       ? 'Proposal kind must be none unless it is a bounded navigation, memory confirmation, or workout_action proposal.'
       : 'Proposal kind must be none unless it is a bounded navigation or memory confirmation proposal.',
     'A navigation proposal may only use payload.overlay with one of: activeWorkout, workout, nutrition, progress, logHabit, logWeight, logActivity, budgetEats, beginner. The app will require an explicit user confirmation before navigation.',
     ...(opts.allowWorkoutActions
-      ? ['', 'WORKOUT ACTIONS (you may propose a workout_action — the engine performs & re-clamps it):', ...WORKOUT_ACTION_ALLOWLIST.map((r) => `- ${r}`)]
+      ? ['', 'WORKOUT ACTIONS (you may propose a workout_action — the engine performs & re-clamps it):',
+          'A request to change, set, adjust, raise or lower a water / sleep / step goal, training days, session length, program goal, an exercise swap or a deload is an ACTION the user wants performed — emit the matching workout_action proposal (memory = null) and word your message as a short proposal to confirm ("Want me to set your daily water goal to 4 litres?"). Do NOT store the new value as a memory, and do NOT say you have already changed it — nothing applies until the user taps confirm.',
+          ...WORKOUT_ACTION_ALLOWLIST.map((r) => `- ${r}`)]
       : ['Never propose an automatic health, training, nutrition, account, purchase, or social action.']),
     '',
     `TONE & BOUNDARIES: ${TONE}`,

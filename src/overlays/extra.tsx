@@ -573,16 +573,9 @@ function CoachMessageRow({ m, revealX, colors, onReply, onProposalConfirmed, und
             Source: {m.citations.map((citation) => citation.title).join(' · ')}
           </Text>
         )}
-        {/* Memory: a quiet, natural confirmation, not a loud badge (Phase 5). Manage/remove lives in
-            the coach memory view. */}
-        {m.role === 'coach' && m.learnedMemory && (
-          <View style={{ marginTop: 7, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Check size={12} color={withAlpha(colors.fg, 0.4)} strokeWidth={2.4} />
-            <Text style={{ flex: 1, fontSize: 11.5, lineHeight: 16, color: withAlpha(colors.fg, 0.5) }}>
-              I'll keep that in mind{m.learnedMemory.value ? ` — ${m.learnedMemory.value}` : ''}.
-            </Text>
-          </View>
-        )}
+        {/* The memory save stays consent-gated and silent — the "I'll keep that in mind" chip was
+            removed at the owner's request (it read as clutter, and misfired on goal-change turns that
+            should be proposals). Memory management still lives in the coach memory view. */}
         {m.role === 'coach' && m.proposal && (
           <View style={{ marginTop: 10, borderRadius: 14, borderWidth: 1, borderColor: withAlpha(colors.brand400, 0.2), padding: 11 }}>
             <Text style={{ fontSize: 13, fontWeight: '700', color: colors.fg }}>{m.proposal.title}</Text>
