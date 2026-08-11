@@ -616,13 +616,15 @@ function historicalResolved(n: Norm): boolean {
   const past = has(n, 'years ago', 'a year ago', 'last year', 'a decade ago', 'decade ago', 'used to', 'back then',
     'in the past', 'previously', 'when i was', 'as a teenager', 'as a kid', 'growing up', 'a while ago', 'long ago',
     'five years ago', 'two years ago', 'ago and', 'at school', 'in school', 'back in school', 'in high school',
-    'in my teens', 'in my twenties', 'in my thirties', 'when younger', 'when i was younger', 'as a student', 'years back')
+    'in my teens', 'in my twenties', 'in my thirties', 'when younger', 'when i was younger', 'as a student', 'years back',
+    'early twenties', 'late teens', 'my early twenties', 'my late teens', 'back at uni', 'when i was at uni')
   const resolved = has(n, 'recovered', 'fully recovered', 'have recovered', 'am better', 'im better', 'no longer',
     'dont anymore', 'don t anymore', 'not anymore', 'medically cleared', 'was cleared', 'been cleared', 'am safe now',
     'im safe now', 'safe now', 'im fine now', 'am fine now', 'do not use them now', 'dont use them now', 'no longer take',
     'but do not use', 'and have recovered', 'and was medically cleared', 'resolved', 'all good now', 'all clear',
     'no problems since', 'no issues since', 'no issue since', 'no trouble since', 'have stopped', 'stopped',
-    'quit', 'off it now', 'off them now', 'cleared up', 'went away', 'sorted now', 'fine since', 'fine ever since')
+    'quit', 'off it now', 'off them now', 'cleared up', 'went away', 'sorted now', 'fine since', 'fine ever since',
+    'natural ever since', 'natural since', 'clean since', 'clean ever since', 'off it since', 'off them since', 'been natural')
   const presentSignal = has(n, 'still', 'currently', 'right now', 'these days', 'nowadays', 'again now', 'now i') ||
     has(n, ...PRESENT_SYMPTOM) || hasFirstPersonDistress(n) || wantsToDie(n)
   return past && resolved && !presentSignal
