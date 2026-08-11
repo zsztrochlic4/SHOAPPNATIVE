@@ -114,6 +114,30 @@ const WINDOWED_KEYS = SUB_KEYS.filter((k) => LOAD_POLICY[k] === 'window')
 // and be rejected by the rules' root allowlist.
 const LOCAL_ONLY: (keyof AppState)[] = ['subscription', 'community']
 
+/**
+ * POSITIVE allowlist of the top-level fields written to the `users/{uid}` root
+ * doc. This MUST stay in lockstep with `rootAllowedKeys()` in firestore.rules
+ * (minus `updatedAt`, which the server stamps at write time).
+ *
+ * Why a positive allowlist and not "everything except SUB/LOCAL": the rules use
+ * `keys().hasOnly(...)`, so a SINGLE un-allowlisted field makes Firestore reject
+ * the ENTIRE root write — silently, since the write error is only surfaced as a
+ * generic sync error. That is exactly how a newly-added AppState field once broke
+ * all cloud sync (an unlisted `programDoc` blocked `backendUser`/DOB from ever
+ * syncing, which in turn broke the server-side coach age gate). Emitting only
+ * known-allowed keys makes the failure mode "a new field simply isn't synced
+ * until it's added here + in the rules" instead of "all sync silently dies".
+ */
+const ROOT_KEYS: (keyof AppState)[] = [
+  'profile', 'settings', 'mealPlan', 'postComments', 'nutritionTags',
+  'foods', 'program', 'posts', 'leaderboard', 'challenges', 'badges',
+  'events', 'groups', 'partners', 'myMeals', 'templates',
+  'workoutStartedKeys', 'nutritionAskedKeys', 'beginnerProgress',
+  'coachUsage', 'integrations', 'plannedPeriods', 'backendUser',
+  'generatedProgram', 'workoutInstances', 'programStatus', 'programDoc',
+  'workoutSummaryComplete', 'demo', 'v',
+]
+
 /** Firestore allows 500 writes per batch; stay safely under it. */
 const BATCH_LIMIT = 400
 
@@ -363,10 +387,22 @@ export async function loadRemainingHistory(
  */
 function rootFieldsOf(source: Partial<AppState>): Record<string, unknown> {
   const out: Record<string, unknown> = {}
-  for (const key of Object.keys(source) as (keyof AppState)[]) {
-    if ((SUB_KEYS as string[]).includes(key as string)) continue
-    if (LOCAL_ONLY.includes(key)) continue
-    out[key] = source[key]
+  for (const key of ROOT_KEYS) {
+    const value = source[key]
+    if (value !== undefined) out[key] = value // preserve null; Firestore rejects undefined
+  }
+  // Dev safety net: warn if a persisted top-level field is neither synced to the
+  // root, split into a subcollection, nor explicitly local-only — i.e. it will
+  // silently not sync. Nudges whoever added it to update ROOT_KEYS + firestore.rules
+  // (or SUB/LOCAL). Prod stays quiet; the allowlist above is the real guard.
+  if (typeof __DEV__ !== 'undefined' && __DEV__) {
+    for (const key of Object.keys(source) as (keyof AppState)[]) {
+      if (ROOT_KEYS.includes(key) || (SUB_KEYS as string[]).includes(key as string) || LOCAL_ONLY.includes(key)) continue
+      console.warn(
+        `[cloudRepo] AppState field "${String(key)}" is not synced to the cloud. ` +
+        `Add it to ROOT_KEYS (+ firestore.rules rootAllowedKeys), SUBCOLLECTIONS, or LOCAL_ONLY.`,
+      )
+    }
   }
   return out
 }

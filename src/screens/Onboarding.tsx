@@ -29,6 +29,7 @@ import { clearOnboardingDraft, loadOnboardingDraft, saveOnboardingDraft } from '
 import { useAuth } from '../auth/AuthProvider'
 import { friendlyError } from '../auth/authErrors'
 import { auth } from '../lib/firebase'
+import { reportError } from '../lib/reportError'
 import { cssVars, useThemeName } from '../theme'
 import { tick, thud } from '../lib/haptics'
 import { todayKey } from '../lib/date'
@@ -951,10 +952,12 @@ export default function Onboarding() {
     // Persist the canonical docs to Firestore immediately (no-op in demo mode, where the
     // store's AsyncStorage persistence covers it). The debounced CloudSync also writes them.
     if (uid !== 'local') {
-      void writeBackendUser(uid, userDoc).catch(() => { /* retried by CloudSync */ })
+      void writeBackendUser(uid, userDoc).catch((e) =>
+        reportError(e, { source: 'onboarding.writeBackendUser', tag: 'onboarding.writeBackendUser' }),
+      ) // CloudSync also retries the full root write; report so a rejection isn't silent
       if (activation.programDoc) {
         void writeActiveProgram(uid, activation.programDoc, activation.instances)
-          .catch(() => { /* retried by CloudSync */ })
+          .catch((e) => reportError(e, { source: 'onboarding.writeActiveProgram', tag: 'onboarding.writeActiveProgram' }))
       }
     }
   }

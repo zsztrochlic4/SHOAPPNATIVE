@@ -11,6 +11,7 @@ import { registerEnsureFullHistory } from './historySync'
 import { registerCloudFlush } from './cloudFlush'
 import { publishSyncStatus } from './syncStatus'
 import { migrateAppState } from './migrate'
+import { reportError } from '../lib/reportError'
 import type { AppState } from './types'
 
 /**
@@ -235,12 +236,18 @@ export function CloudSync() {
         clearRetry()
         publishSyncStatus({ pending: false, error: false, lastSavedAt: Date.now() })
       })
-      .catch(() => {
-        // The last edit may be the final one — without a retry a transient failure
-        // would silently lose it. Retry with capped backoff (reset by the next edit),
-        // and surface the failure so Settings can show it with a manual retry (F-039).
+      .catch((err) => {
+        // Surface the failure instead of swallowing it. A `permission-denied` means
+        // the write VIOLATES the security rules (e.g. an un-allowlisted root field) —
+        // it is DETERMINISTIC, so retrying is pointless and would just spam; report it
+        // and stop retrying. Transient failures (network) still retry with capped
+        // backoff (reset by the next edit) so a final edit is never lost. Either way
+        // Settings can show the error with a manual retry (F-039).
+        const code = (err as { code?: string } | null)?.code
+        const permanent = code === 'permission-denied'
+        reportError(err, { source: 'cloudSync.save', tag: 'cloudSync.save', code, permanent })
         publishSyncStatus({ pending: false, error: true })
-        if (!retryTimerRef.current && retryAttemptRef.current < MAX_SAVE_RETRIES) {
+        if (!permanent && !retryTimerRef.current && retryAttemptRef.current < MAX_SAVE_RETRIES) {
           const delay = saveBackoffMs(retryAttemptRef.current)
           retryAttemptRef.current += 1
           retryTimerRef.current = setTimeout(() => {
