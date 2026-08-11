@@ -106,13 +106,22 @@ service cloud.firestore {
       }
 
       // --- free-text caps for the known bounded fields (plan §4.5).
+      // NULL-SAFE: onboarding legitimately stores some of these as null (e.g. no
+      // notes/motivation given). `map.get(k, '')` returns the default ONLY when the
+      // key is ABSENT — a key present with value null returns null, and null.size()
+      // is a rules EVALUATION ERROR that denies the whole write. The `== null` guard
+      // short-circuits before .size() so a null (or absent) value passes.
+      function textLenOk(v, max) {
+        return v == null || (v is string && v.size() <= max);
+      }
       function rootFreeTextValid() {
-        let d = request.resource.data;
-        return d.get('profile', {}).get('motivation', '').size() <= 2000
-          && d.get('profile', {}).get('injuries', '').size() <= 2000
-          && d.get('profile', {}).get('name', '').size() <= 200
-          && d.get('backendUser', {}).get('notes', '').size() <= 4000
-          && d.get('backendUser', {}).get('motivation', '').size() <= 2000;
+        let profile = request.resource.data.get('profile', {});
+        let backendUser = request.resource.data.get('backendUser', {});
+        return textLenOk(profile.get('motivation', null), 2000)
+          && textLenOk(profile.get('injuries', null), 2000)
+          && textLenOk(profile.get('name', null), 200)
+          && textLenOk(backendUser.get('notes', null), 4000)
+          && textLenOk(backendUser.get('motivation', null), 2000);
       }
 
       function rootValid() {

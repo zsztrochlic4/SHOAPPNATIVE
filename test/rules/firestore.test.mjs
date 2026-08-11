@@ -104,11 +104,21 @@ test('onboarding root write carrying programDoc + backendUser is accepted (regre
   // blocking backendUser (incl. date_of_birth) from ever reaching Firestore and
   // breaking the server-side coach age gate (`age_unverified`). Locks in the fix.
   await assertSucceeds(setDoc(doc(aliceDb(), 'users', ALICE), rootDoc({
-    backendUser: { uid: ALICE, date_of_birth: '2000-01-01' },
+    // notes/motivation are NULL — onboarding leaves them null when blank. A present
+    // null makes get(k,'').size() throw in the rule, which denied every onboarding
+    // write with permission-denied (the coach/login root cause). Must be accepted.
+    backendUser: { uid: ALICE, date_of_birth: '2000-01-01', notes: null, motivation: null },
+    profile: { premium: false, name: 'Alex', motivation: null, injuries: null },
     generatedProgram: { weeks: [] },
     programStatus: { ok: true },
     programDoc: { program_id: 'p1', uid: ALICE, version: 1 },
     workoutInstances: [],
+  })))
+})
+
+test('oversized backendUser free-text is still denied (null-safe cap still enforced)', async () => {
+  await assertFails(setDoc(doc(aliceDb(), 'users', ALICE), rootDoc({
+    backendUser: { uid: ALICE, notes: 'x'.repeat(4001) },
   })))
 })
 
