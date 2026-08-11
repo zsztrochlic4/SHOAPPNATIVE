@@ -763,6 +763,43 @@ function scope(n: Norm, raw: DetectorHit[], opts: ScopeOpts = {}): RulesResult {
   return { hits, suppressions }
 }
 
+/**
+ * DETERMINISTIC MULTILINGUAL CRISIS BACKSTOP.
+ *
+ * The English detectors run on normalize(), which strips every non-ASCII character —
+ * so a crisis expressed in Chinese/Hindi/Arabic/Vietnamese/Spanish produces ZERO
+ * deterministic hits and depends entirely on the (unvalidated) LLM classifier. This
+ * adds a small, HIGH-PRECISION floor of the most explicit "I want to die / kill myself"
+ * phrases in the app's non-English audience languages, matched on the RAW (non-stripped)
+ * lowercased text. It only ever ADDS a crisis_concern hit (Lifeline floor); the classifier
+ * still escalates to immediate_danger/000 when it fires alongside. It never suppresses.
+ *
+ * ⚠️ FIRST PASS — NEEDS NATIVE-SPEAKER + CLINICAL REVIEW before it is relied on as the
+ * validated multilingual floor. Coverage is intentionally narrow (only unambiguous,
+ * direct suicide/self-harm statements) to keep false-positives near zero; euphemism and
+ * indirect distress in these languages still rely on the classifier.
+ */
+const MULTILINGUAL_CRISIS_PHRASES: string[] = [
+  // Chinese (simplified + traditional)
+  '我想死', '想死了', '我不想活', '不想活了', '不想活着', '我想自杀', '想自杀', '自杀', '自殺', '结束生命', '結束生命', '了结自己', '活不下去',
+  // Hindi
+  'मरना चाहता', 'मरना चाहती', 'मैं मरना चाहता', 'आत्महत्या', 'खुदकुशी', 'जीना नहीं चाहता', 'जीना नहीं चाहती', 'मर जाना चाहता',
+  // Arabic
+  'أريد أن أموت', 'أريد الموت', 'اريد ان اموت', 'الانتحار', 'أنتحر', 'سأنتحر', 'انتحر', 'لا أريد أن أعيش', 'لا اريد العيش',
+  // Vietnamese
+  'muốn chết', 'muon chet', 'tự tử', 'tu tu', 'tự sát', 'tu sat', 'không muốn sống', 'khong muon song', 'kết thúc cuộc đời',
+  // Spanish
+  'quiero morir', 'me quiero morir', 'quiero suicidarme', 'me quiero suicidar', 'suicidarme', 'quitarme la vida',
+  'acabar con mi vida', 'no quiero vivir', 'no quiero seguir viviendo', 'me quiero matar',
+]
+export function detectMultilingualCrisis(text: string): DetectorHit[] {
+  const raw = (text || '').toLowerCase()
+  for (const phrase of MULTILINGUAL_CRISIS_PHRASES) {
+    if (raw.includes(phrase)) return [{ category: 'crisis_concern', source: 'rules', reason: 'multilingual_crisis_lexicon' }]
+  }
+  return []
+}
+
 export function runRules(text: string, ctx: CoachContext): RulesResult {
   const n = normalize(text)
   const detectors = [
@@ -778,7 +815,11 @@ export function runRules(text: string, ctx: CoachContext): RulesResult {
   // "eighteenth birthday next month") — those must NEVER be DOB-suppressed, so scope() here runs
   // WITHOUT the adult flag. The server-DOB suppression applies ONLY to CLASSIFIER hits
   // (scopeClassifierHits), which is where the benign over-flagging comes from (audit SA-010).
-  return scope(n, raw)
+  const scoped = scope(n, raw)
+  // Multilingual crisis backstop runs on the RAW text (scoping/normalize strip non-ASCII), and is
+  // appended AFTER scope() so the English scoping can never suppress a non-English crisis hit.
+  scoped.hits.push(...detectMultilingualCrisis(text))
+  return scoped
 }
 
 /**

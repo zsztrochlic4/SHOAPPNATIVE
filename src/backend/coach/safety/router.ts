@@ -84,6 +84,16 @@ function failSafe(): SafetyDecision {
  * The intent is content-free metadata; it only ever relaxes the off-topic bounce for benign turns and
  * never turns a refer/block into an allow.
  */
+/** Substantially non-Latin-script text (CJK / Arabic / Devanagari / accented Vietnamese) — the point
+ *  at which the English-only refer-by-default heuristic can no longer judge on-topic-ness. */
+function isSubstantiallyNonLatin(text: string): boolean {
+  const chars = (text || '').replace(/\s/g, '')
+  if (chars.length < 2) return false
+  let nonAscii = 0
+  for (const ch of chars) if (ch.charCodeAt(0) > 127) nonAscii++
+  return nonAscii / chars.length >= 0.2
+}
+
 function applyConversationalLayer(decision: SafetyDecision, text: string): SafetyDecision {
   if (decision.action !== 'allow') return decision
   if (isOnTopicFitness(text)) {
@@ -93,6 +103,16 @@ function applyConversationalLayer(decision: SafetyDecision, text: string): Safet
   const intent = classifyConversationalIntent(text)
   if (intent !== 'none') {
     decision.intent = intent
+    return decision
+  }
+  // Non-English: normalize() strips non-ASCII, so isOnTopicFitness / classifyConversationalIntent
+  // (English phrase lists) can't judge a Chinese/Hindi/Arabic/Vietnamese message — they would bounce a
+  // benign non-English FITNESS question to off_topic. But we only reach here on `allow`: the
+  // multilingual classifier already returned safe AND did not route it to off_topic. So engage rather
+  // than deflect via an English-only heuristic; genuinely off-topic non-English is caught by the
+  // classifier's own off_topic route (never reaching here), and the model still enforces scope.
+  if (isSubstantiallyNonLatin(text)) {
+    decision.intent = 'coaching'
     return decision
   }
   // Not fitness, not a recognised conversational turn → refer by default (unchanged behaviour).
