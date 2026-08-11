@@ -63,6 +63,10 @@ export const WELLNESS_BOUNDS: Record<WellnessMetricLit, { min: number; max: numb
   steps: { min: 1000, max: 40000 },
 }
 
+/** Goal (target) body weight, stored on the Profile as `goalWeightKg` and reflected in the weight
+ *  projections. A body target, NOT a nutrition/calorie target (which stays qualitative app-wide). */
+export const GOAL_WEIGHT_BOUNDS_KG = { min: 30, max: 250 } as const
+
 /* ------------------------------------------------------------------ */
 /*  The parsed, validated action (what the resolver consumes)          */
 /* ------------------------------------------------------------------ */
@@ -82,6 +86,7 @@ export type WorkoutAction =
   | { action: 'nudge_log'; kind: NudgeKindLit }
   | { action: 'share_pr'; prExerciseId: string; prValue: number }
   | { action: 'set_wellness_goal'; metric: WellnessMetricLit; value: number }
+  | { action: 'set_goal_weight'; valueKg: number }
 
 export type WorkoutActionName = WorkoutAction['action']
 
@@ -89,7 +94,7 @@ export type WorkoutActionName = WorkoutAction['action']
 export const WORKOUT_ACTION_NAMES: readonly WorkoutActionName[] = [
   'swap', 'change_goal', 'set_training_days', 'set_session_length', 'deload',
   'catch_up', 'reschedule_days', 'planned_absence', 'exam_mode', 'start_session',
-  'open_budget_eats', 'nudge_log', 'share_pr', 'set_wellness_goal',
+  'open_budget_eats', 'nudge_log', 'share_pr', 'set_wellness_goal', 'set_goal_weight',
 ] as const
 
 export type WorkoutActionValidation =
@@ -269,6 +274,12 @@ export function validateWorkoutActionPayload(payload: Record<string, string | nu
       if (!Number.isFinite(value) || value < b.min || value > b.max) return fail('wellness_out_of_range')
       return { ok: true, action: { action, metric, value } }
     }
+    case 'set_goal_weight': {
+      if (!onlyKeys(payload, ['action', 'valueKg'])) return fail('goal_weight_extra_keys')
+      const valueKg = typeof payload.valueKg === 'number' ? payload.valueKg : Number(payload.valueKg)
+      if (!Number.isFinite(valueKg) || valueKg < GOAL_WEIGHT_BOUNDS_KG.min || valueKg > GOAL_WEIGHT_BOUNDS_KG.max) return fail('goal_weight_out_of_range')
+      return { ok: true, action: { action, valueKg } }
+    }
   }
 }
 
@@ -276,13 +287,17 @@ export function validateWorkoutActionPayload(payload: Record<string, string | nu
 /*  Deterministic wellness-goal backstop (flash-lite reliability)      */
 /* ------------------------------------------------------------------ */
 
-export interface SynthWellnessGoalProposal {
+export interface SynthProfileGoalProposal {
   title: string
   summary: string
   /** A clean proposal lead-in for the reply text, used when the model asked in prose / mis-emitted. */
   message: string
-  payload: { action: 'set_wellness_goal'; metric: WellnessMetricLit; value: number }
+  payload:
+    | { action: 'set_wellness_goal'; metric: WellnessMetricLit; value: number }
+    | { action: 'set_goal_weight'; valueKg: number }
 }
+/** @deprecated Use SynthProfileGoalProposal. */
+export type SynthWellnessGoalProposal = SynthProfileGoalProposal
 
 const _WELLNESS_SET_INTENT = /\b(set|change|adjust|make|update|raise|lower|increase|decrease|bump|move|put|lift|drop)\b/i
 const _WELLNESS_GOAL_WORD = /\b(goal|target)\b/i
@@ -330,5 +345,40 @@ export function synthesizeWellnessGoalProposal(userMessage: string): SynthWellne
     title: `Set ${noun} goal to ${label}`,
     summary: `Updates your daily ${noun} goal to ${label}. Nothing changes until you confirm.`,
     message: `Want me to set your ${noun} goal to ${label}? Tap confirm and I'll update it.`,
+  }
+}
+
+const _GOAL_WEIGHT_PHRASE = /\b(goal|target|aim(?:ing)?(?:\s+for)?)\s+(?:body\s+)?weight\b|\bweight\s+(?:goal|target)\b/i
+const _WEIGHT_NUM = /(\d+(?:\.\d+)?)\s*(kg|kgs|kilo(?:gram)?s?|lb|lbs|pound(?:s)?)?/i
+
+/**
+ * Deterministic fallback for "set my goal weight to N kg/lb" (Capability Plan §2 — update goal/body
+ * target). Same rationale as synthesizeWellnessGoalProposal: guarantee the confirm card even when
+ * flash-lite asks in prose. Prefers the number after "to " (weight sentences often also name the
+ * CURRENT weight), converts lb→kg, and refuses relative ("by 2 kg") or out-of-range values.
+ */
+export function synthesizeGoalWeightProposal(userMessage: string): SynthProfileGoalProposal | null {
+  if (typeof userMessage !== 'string') return null
+  const m = userMessage.toLowerCase()
+  if (!_WELLNESS_SET_INTENT.test(m) || !_GOAL_WEIGHT_PHRASE.test(m)) return null
+  if (/\bby\s+\d/.test(m)) return null // relative change — needs the current value; let the model handle it
+  const phraseAt = m.search(_GOAL_WEIGHT_PHRASE)
+  const afterPhrase = phraseAt >= 0 ? m.slice(phraseAt) : m
+  // Prefer "…to <n>"; else the first weight-like number appearing after the goal-weight phrase.
+  const num = m.match(new RegExp(`\\bto\\s+${_WEIGHT_NUM.source}`, 'i')) || afterPhrase.match(_WEIGHT_NUM)
+  if (!num) return null
+  let kg = parseFloat(num[1])
+  if (!Number.isFinite(kg)) return null
+  const unit = (num[2] || '').toLowerCase()
+  if (/^(lb|pound)/.test(unit)) kg = kg / 2.2046226218 // pounds → kg
+  kg = Math.round(kg * 10) / 10
+  const payload = { action: 'set_goal_weight' as const, valueKg: kg }
+  if (!validateWorkoutActionPayload(payload).ok) return null
+  const label = `${kg} kg`
+  return {
+    payload,
+    title: `Set goal weight to ${label}`,
+    summary: `Updates your goal weight to ${label} and reflects it in your weight projections. Nothing changes until you confirm.`,
+    message: `Want me to set your goal weight to ${label}? Tap confirm and I'll update it.`,
   }
 }

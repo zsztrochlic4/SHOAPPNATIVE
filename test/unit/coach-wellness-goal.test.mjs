@@ -7,7 +7,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { resolveCoachAction } from '../../.sweep-out/backend/runtime/coachActionResolver.js'
-import { validateWorkoutActionPayload, WORKOUT_ACTION_NAMES, synthesizeWellnessGoalProposal } from '../../.sweep-out/backend/coach/workoutActions.js'
+import { validateWorkoutActionPayload, WORKOUT_ACTION_NAMES, synthesizeWellnessGoalProposal, synthesizeGoalWeightProposal } from '../../.sweep-out/backend/coach/workoutActions.js'
 
 const state = { backendUser: { uid: 'u' }, program: null, instances: [], programDoc: null }
 
@@ -60,4 +60,34 @@ test('synthesizeWellnessGoalProposal returns null when it is not an absolute set
   assert.equal(synthesizeWellnessGoalProposal('increase my water goal by 1 litre'), null) // relative — needs current value
   assert.equal(synthesizeWellnessGoalProposal('set my water goal to 99 litres'), null)     // out of range → let the model caution
   assert.equal(synthesizeWellnessGoalProposal('set my calorie goal to 2000'), null)        // not a wellness metric (nutrition is qualitative)
+})
+
+// --- goal / target body weight (Capability Plan §2 "update goal weight / body targets") ---
+
+test('set_goal_weight validates its bounded kg payload', () => {
+  assert.equal(validateWorkoutActionPayload({ action: 'set_goal_weight', valueKg: 80 }).ok, true)
+  assert.equal(validateWorkoutActionPayload({ action: 'set_goal_weight', valueKg: 20 }).ok, false)   // below floor
+  assert.equal(validateWorkoutActionPayload({ action: 'set_goal_weight', valueKg: 300 }).ok, false)  // above ceiling
+  assert.equal(validateWorkoutActionPayload({ action: 'set_goal_weight', valueKg: 80, calories: 1 }).ok, false) // extra key
+  assert.ok(WORKOUT_ACTION_NAMES.includes('set_goal_weight'))
+})
+
+test('set_goal_weight resolves to a goalWeightKg profile patch (no engine regen)', () => {
+  const w = resolveCoachAction(state, { action: 'set_goal_weight', valueKg: 80 })
+  assert.equal(w.ok, true)
+  assert.equal(w.apply, 'profile_patch')
+  assert.deepEqual(w.patch, { goalWeightKg: 80 })
+  assert.notEqual(w.apply, 'regen')
+})
+
+test('synthesizeGoalWeightProposal parses kg and pounds, and refuses relative/out-of-range', () => {
+  assert.deepEqual(synthesizeGoalWeightProposal('set my goal weight to 80kg').payload, { action: 'set_goal_weight', valueKg: 80 })
+  assert.deepEqual(synthesizeGoalWeightProposal('change my target weight to 82.5 kg').payload, { action: 'set_goal_weight', valueKg: 82.5 })
+  assert.deepEqual(synthesizeGoalWeightProposal('make my goal weight 176 lb').payload, { action: 'set_goal_weight', valueKg: 79.8 }) // 176/2.2046 ≈ 79.8
+  // picks the number after "to", not a current-weight mention earlier in the sentence
+  assert.deepEqual(synthesizeGoalWeightProposal('i weigh 95 now, set my goal weight to 85 kg').payload, { action: 'set_goal_weight', valueKg: 85 })
+  assert.equal(synthesizeGoalWeightProposal('what is my goal weight'), null)                 // a question
+  assert.equal(synthesizeGoalWeightProposal('i weigh 80 kg today'), null)                    // logging weight, no goal/target word
+  assert.equal(synthesizeGoalWeightProposal('lower my goal weight by 2 kg'), null)           // relative
+  assert.equal(synthesizeGoalWeightProposal('set my goal weight to 500 kg'), null)           // out of range
 })

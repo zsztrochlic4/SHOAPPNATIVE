@@ -239,6 +239,13 @@ export function resolveCoachAction(
       const unit = action.metric === 'water' ? ` litre${value === 1 ? '' : 's'} a day` : action.metric === 'sleep' ? ` hours a night` : ` steps a day`
       return { ok: true, apply: 'profile_patch', patch: { [field]: value }, message: `Done — your ${action.metric} goal is now ${value}${unit}.` }
     }
+    case 'set_goal_weight': {
+      // Goal weight is a body TARGET on the local Profile (goalWeightKg), reflected in the weight
+      // projections — not a program change, so it takes the same bounded profile_patch as a wellness
+      // goal (no engine regen, no safety clamp). Nutrition/calorie targets remain out of scope.
+      const value = Math.round(action.valueKg * 10) / 10
+      return { ok: true, apply: 'profile_patch', patch: { goalWeightKg: value }, message: `Done — your goal weight is now ${value} kg.` }
+    }
     case 'swap': {
       if (!state.program) return { ok: false, reason: 'no_program', message: "You don't have an active program to change yet." }
       if (!programContains(state.program, action.fromExerciseId)) {
