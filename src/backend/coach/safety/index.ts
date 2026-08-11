@@ -19,6 +19,20 @@ import { route, routeAsync } from './router'
 import { validateOutgoing } from './validator'
 import { indicatesNonAustralia } from './rules'
 import { localizedResponse, localizedServiceUnavailable } from './responses'
+import { detectResponseLanguage, localizedResponseAU } from './responsesLocalized'
+
+/**
+ * Response lookup that prefers a localised crisis/safety body in the user's language (detected from
+ * the message script) before the English/locale default. AU-context only for the localised path: for
+ * AU users we can attach the AU numbers/buttons; non-AU (or English) falls back to localizedResponse.
+ */
+function localizedResponseFor(key: string | null, au: boolean, text: string): FixedResponse {
+  if (au) {
+    const loc = localizedResponseAU(key, detectResponseLanguage(text))
+    if (loc) return loc
+  }
+  return localizedResponse(key, au)
+}
 
 /**
  * Effective locale for the RESPONSE (Jack §3). Device timezone (`ctx.isAustralia`) can be wrong when
@@ -52,7 +66,7 @@ export function guardIncoming(text: string, ctx: CoachContext, session: SafetySe
     if (decision.action === 'service_unavailable') {
       return { outcome: 'block', decision, response: localizedServiceUnavailable(au) }
     }
-    return { outcome: 'block', decision, response: localizedResponse(decision.responseKey, au) }
+    return { outcome: 'block', decision, response: localizedResponseFor(decision.responseKey, au, text) }
   } catch {
     // Classification unavailable → neutral service-unavailable + crisis options. Never the menu.
     const decision: SafetyDecision = {
@@ -79,7 +93,7 @@ export async function guardIncomingAsync(
     if (decision.action === 'service_unavailable') {
       return { outcome: 'block', decision, response: localizedServiceUnavailable(au) }
     }
-    return { outcome: 'block', decision, response: localizedResponse(decision.responseKey, au) }
+    return { outcome: 'block', decision, response: localizedResponseFor(decision.responseKey, au, text) }
   } catch {
     const decision: SafetyDecision = {
       category: 'none', tier: -1, action: 'service_unavailable', responseKey: null,
