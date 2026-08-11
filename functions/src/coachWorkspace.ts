@@ -299,7 +299,17 @@ export async function loadCoachTurnData(
     experience: ordinary(backend.experience_level || profile.experience, 40),
     units,
     constraints,
-    profile: compact({ name: profile.name, goal: profile.goal, experience: profile.experience, daysPerWeek: profile.daysPerWeek, sessionMinutes: profile.sessionMinutes, equipment: profile.equipment, dietaryPrefs: profile.dietaryPrefs, motivation: profile.motivation }),
+    // The user's full profile + goals/targets, so the coach can answer "what is my X" (sleep/step/
+    // water goal, goal weight, training days, etc.) directly instead of deflecting to Settings. This
+    // is always attached (see selectCoachContext) so any turn can ground a data question. NOTE: no
+    // calorie/macro targets — nutrition is qualitative app-wide (they are zeroed at source).
+    profile: compact({
+      name: profile.name, goal: profile.goal, experience: profile.experience,
+      goalWeightKg: profile.goalWeightKg, startWeightKg: profile.startWeightKg, heightCm: profile.heightCm,
+      daysPerWeek: profile.daysPerWeek, sessionMinutes: profile.sessionMinutes, equipment: profile.equipment,
+      sleepGoalHours: profile.sleepTargetH, stepGoal: profile.stepTarget, waterGoalLitres: profile.waterTargetL,
+      dietaryPrefs: profile.dietaryPrefs, budgetMode: profile.budgetMode, motivation: profile.motivation,
+    }),
     canonicalProfile: compact({ goal: backend.goal, experience: backend.experience_level, daysPerWeek: backend.days_per_week, sessionLength: backend.session_length_min, equipment: backend.equipment, trainsAlone: backend.trains_alone }),
     program: compact(user.generatedProgram ?? user.program, 1800),
     recentTraining: `${completed.length}/${sessions.length} recent sessions completed. ${lastSessionText(sessions)} Latest ${compact(sessions.slice(0, 4), 1500)}`,

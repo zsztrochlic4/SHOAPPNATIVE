@@ -567,11 +567,6 @@ function CoachMessageRow({ m, revealX, colors, onReply, onProposalConfirmed, und
       <View style={{ maxWidth: '82%', paddingHorizontal: 15, paddingVertical: 12, borderRadius: 18, backgroundColor: user ? colors.brand400 : colors.ink800 }}>
         <Text style={{ fontSize: 15, lineHeight: 22, color: user ? '#0a0a0b' : colors.fg, fontWeight: user ? '500' : '400' }}>{m.text}</Text>
         {m.role === 'coach' && m.buttons && <SafetyContactButtons buttons={m.buttons} />}
-        {m.role === 'coach' && m.mode && m.mode !== 'safety' && (
-          <Text style={{ marginTop: 8, fontSize: 10.5, fontWeight: '700', color: withAlpha(colors.fg, 0.38) }}>
-            {m.mode === 'personalised' ? 'BASED ON YOUR STRENGTHHUB DATA' : m.mode === 'app_help' ? 'STRENGTHHUB HELP' : 'GENERAL GUIDANCE'}
-          </Text>
-        )}
         {/* Citations: quiet, and only worth surfacing for evidence-dependent claims (Phase 5). */}
         {m.role === 'coach' && !!m.citations?.length && (
           <Text style={{ marginTop: 5, fontSize: 10.5, lineHeight: 15, color: withAlpha(colors.fg, 0.38) }}>
