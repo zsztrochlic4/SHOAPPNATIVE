@@ -30,6 +30,31 @@ export function getExercise(id: string): Exercise | undefined {
   return EXERCISE_BY_ID[id]
 }
 
+const normalizeName = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+
+/**
+ * Resolve a loose exercise reference — an exact id OR a human name — to a canonical exercise id, or
+ * null when nothing matches. Used to safely turn a coach-supplied exercise reference into a real id
+ * before opening its detail sheet: never trust an arbitrary model string, and a non-match must open
+ * nothing rather than a blank sheet. Exact id and exact normalised-name matches win; a word-overlap
+ * (e.g. "bench" → "Barbell Bench Press") is the last resort.
+ */
+export function resolveExerciseRef(raw: string): string | null {
+  if (typeof raw !== 'string') return null
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+  if (EXERCISE_BY_ID[trimmed]) return trimmed // already a valid id
+  const target = normalizeName(trimmed)
+  if (target.length < 3) return null
+  let partial: string | null = null
+  for (const ex of EXERCISES) {
+    const n = normalizeName(ex.name)
+    if (n === target) return ex.id // exact name match wins outright
+    if (!partial && (n.includes(target) || target.includes(n))) partial = ex.id
+  }
+  return partial
+}
+
 /** Substitutes for each exercise, best-first (priority ascending). */
 export const SUBSTITUTIONS_BY_EXERCISE: Readonly<Record<string, Substitution[]>> = Object.freeze(
   SUBSTITUTIONS.reduce<Record<string, Substitution[]>>((acc, s) => {

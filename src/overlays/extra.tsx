@@ -25,7 +25,7 @@ import { useExerciseInfo } from '../data/exerciseInfo'
 import { fmtWeight } from '../lib/format'
 import { ActivityIcon } from '../components/ActivityIcon'
 import { exerciseView, imageForMuscle, buildCustomSession } from '../store/programSession'
-import { ACTIVE_EXERCISES, type Exercise } from '../backend/data'
+import { ACTIVE_EXERCISES, resolveExerciseRef, type Exercise } from '../backend/data'
 import { nextSetRecommendation } from '../store/training'
 import { coachThreadView, recentPR } from '../store/coach'
 import { coachReply } from '../lib/coachChat'
@@ -913,8 +913,17 @@ export function CoachChatSheet({ open, onClose }: Props) {
   const handleProposalConfirmed = useCallback((proposal: CoachActionProposal, actionId?: string) => {
     if (proposal.kind === 'navigation') {
       const overlay = proposal.payload.overlay
-      const allowed = ['activeWorkout', 'workout', 'nutrition', 'progress', 'logHabit', 'logWeight', 'logActivity', 'budgetEats', 'beginner']
+      const allowed = ['activeWorkout', 'workout', 'nutrition', 'progress', 'logHabit', 'logWeight', 'logActivity', 'budgetEats', 'beginner', 'exerciseDetail']
       if (typeof overlay !== 'string' || !allowed.includes(overlay)) return
+      if (overlay === 'exerciseDetail') {
+        // Never trust the model's exercise string: resolve it to a REAL exercise id (by id or name)
+        // and confirm it renders, so a bad reference opens nothing rather than a blank sheet.
+        const raw = String(proposal.payload.exercise ?? proposal.payload.defId ?? '')
+        const defId = (raw && exerciseView(raw) ? raw : null) ?? resolveExerciseRef(raw)
+        if (defId && exerciseView(defId)) nav.open('exerciseDetail', { defId })
+        else toast("I couldn't find that exercise to open — try naming the lift as it appears in your program.")
+        return
+      }
       if (overlay === 'workout' || overlay === 'nutrition' || overlay === 'progress') nav.goTab(overlay)
       else nav.open(overlay as 'activeWorkout' | 'logHabit' | 'logWeight' | 'logActivity' | 'budgetEats' | 'beginner')
       return
