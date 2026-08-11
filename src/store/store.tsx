@@ -243,17 +243,34 @@ function reducer(state: AppState, action: Action): AppState {
       // persisted to the cloud root (see cloudRepo LOCAL_ONLY).
       return { ...state, subscription: action.subscription }
 
-    case 'COMPLETE_ONBOARDING':
+    case 'COMPLETE_ONBOARDING': {
+      // Start from a CLEAN account base, NOT the demo seed the app boots into for
+      // the signed-out preview. Spreading `...state` here previously carried the
+      // fabricated seed slices — the "Hi Alex" coach thread, fake weight/habit/meal/
+      // session history, demo community posts — into a real onboarded account.
+      // emptyState() keeps reference data (foods/exercise catalog) but clears all
+      // personal history; we apply the onboarding-derived fields explicitly and keep
+      // this session's app settings (e.g. language / captured timezone).
+      const base = emptyState()
       return {
-        ...state,
+        ...base,
+        settings: state.settings,
         demo: false,
-        profile: { ...state.profile, ...action.profile, onboarded: true },
-        backendUser: action.backendUser ?? state.backendUser,
+        profile: {
+          ...base.profile,
+          // deriveLocalProfile doesn't set these demo showcase fields, so clear them
+          // explicitly — otherwise the seed's "State University / West Hall" leak in.
+          university: '', cohort: '', dorm: '', society: '',
+          ...action.profile,
+          onboarded: true,
+        },
+        backendUser: action.backendUser ?? base.backendUser,
         generatedProgram: action.generatedProgram ?? null,
         programStatus: action.programStatus ?? null,
         programDoc: action.programDoc ?? null,
         workoutInstances: action.workoutInstances ?? undefined,
       }
+    }
 
     // Post-onboarding edit of the core training inputs (audit settings matrix:
     // goal / experience / availability / session length / equipment). The new
