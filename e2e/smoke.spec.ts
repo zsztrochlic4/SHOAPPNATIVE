@@ -39,7 +39,7 @@ test('bottom-nav tabs switch the active screen', async ({ page }) => {
   // still in the DOM. Assert a control UNIQUE to each tab is VISIBLE after the
   // switch (toBeVisible respects display:none on the hidden siblings).
   await page.getByRole('tab', { name: 'Nutrition' }).click()
-  await expect(page.getByText('Snap your meal')).toBeVisible()
+  await expect(page.getByText(/Today.s food log/i)).toBeVisible()
 
   await page.getByRole('tab', { name: 'Workout' }).click()
   await expect(page.getByRole('tab', { name: 'History' })).toBeVisible() // Workout's inner segmented tab
@@ -48,7 +48,7 @@ test('bottom-nav tabs switch the active screen', async ({ page }) => {
   await expect(page.getByRole('tab', { name: 'League' })).toBeVisible() // Community's inner segmented tab
 
   await page.getByRole('tab', { name: 'Nutrition' }).click()
-  await expect(page.getByText('Snap your meal')).toBeVisible()
+  await expect(page.getByText(/Today.s food log/i)).toBeVisible()
 })
 
 test('no unexpected console errors on boot + navigation', async ({ page }) => {
