@@ -1,14 +1,16 @@
 import { View, Text, Pressable } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { LayoutGrid, Dumbbell, Apple, ChartBar as BarChart3, Users, type LucideIcon } from 'lucide-react-native'
+import { LayoutGrid, Dumbbell, Apple, MessageCircle, Users, type LucideIcon } from 'lucide-react-native'
 import type { TabKey } from '../App'
 import { useColors } from '../theme'
 
+// The 'progress' tab now hosts the coach — kept the internal key for routing, but
+// it reads "Coach" and sits before Nutrition.
 const items: { key: TabKey; label: string; Icon: LucideIcon }[] = [
   { key: 'dashboard', label: 'Dashboard', Icon: LayoutGrid },
   { key: 'workout', label: 'Workout', Icon: Dumbbell },
+  { key: 'progress', label: 'Coach', Icon: MessageCircle },
   { key: 'nutrition', label: 'Nutrition', Icon: Apple },
-  { key: 'progress', label: 'Progress', Icon: BarChart3 },
   { key: 'community', label: 'Community', Icon: Users },
 ]
 
