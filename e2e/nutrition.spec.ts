@@ -12,7 +12,9 @@ async function gotoNutrition(page: Page) {
   await page.goto('/')
   await expect(page.getByRole('tab', { name: 'Nutrition' })).toBeVisible({ timeout: 30_000 })
   await page.getByRole('tab', { name: 'Nutrition' }).click()
-  await expect(page.getByText('Snap your meal')).toBeVisible()
+  // The nutrition overview leads with the Today's-food-log surface (the old "Snap
+  // your meal" scan card was removed in the F-008 rebuild).
+  await expect(page.getByText(/Today.s food log/i)).toBeVisible()
 }
 
 test('the Today’s food log surface exists on the nutrition overview', async ({ page }) => {

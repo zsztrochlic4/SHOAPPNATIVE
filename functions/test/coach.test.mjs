@@ -57,7 +57,11 @@ test('a crisis message is blocked by the safety floor and NEVER reaches the mode
 
 test('an allowed turn calls the model once and returns the validated reply', async () => {
   const { deps, replyCalls } = baseDeps()
-  const out = await coachTurnCore('u1', { message: 'how do I improve my squat depth?' }, deps)
+  // NB: a "how do I …" phrasing naming a lift now trips the deterministic exercise-detail backstop
+  // (synthesizeExerciseDetailNav), which replaces the model text with a technique-guide nav reply.
+  // This test verifies the plain passthrough of a validated model reply, so it asks a question that
+  // isn't an exercise how-to; the backstop's own behaviour is covered in coach-exercise-nav.test.
+  const out = await coachTurnCore('u1', { message: 'why does squat depth matter for progress?' }, deps)
   assert.equal(out.blocked, false)
   assert.equal(replyCalls(), 1)
   assert.match(out.text, /depth/i)
