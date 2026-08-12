@@ -304,7 +304,7 @@ export async function loadCoachTurnData(
     // is always attached (see selectCoachContext) so any turn can ground a data question. NOTE: no
     // calorie/macro targets — nutrition is qualitative app-wide (they are zeroed at source).
     profile: compact({
-      name: profile.name, goal: profile.goal, experience: profile.experience,
+      name: profile.name, coachName: profile.coachName, goal: profile.goal, experience: profile.experience,
       goalWeightKg: profile.goalWeightKg, startWeightKg: profile.startWeightKg, heightCm: profile.heightCm,
       daysPerWeek: profile.daysPerWeek, sessionMinutes: profile.sessionMinutes, equipment: profile.equipment,
       sleepGoalHours: profile.sleepTargetH, stepGoal: profile.stepTarget, waterGoalLitres: profile.waterTargetL,

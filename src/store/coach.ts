@@ -151,3 +151,9 @@ export function coachDaily(s: AppState): CoachMessage {
 export function coachThreadView(s: AppState): CoachMessage[] {
   return [coachDaily(s), ...s.coachThread]
 }
+
+/** What to call the coach in the UI — the user's chosen name (profile.coachName), or "Coach" by
+ *  default. Single source of truth so the name pulls through everywhere the coach is shown. */
+export function coachDisplayName(coachName?: string | null): string {
+  return (coachName ?? '').trim() || 'Coach'
+}

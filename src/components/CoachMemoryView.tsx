@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
-import { FlatList, Pressable, Switch, Text, View } from 'react-native'
+import { FlatList, Pressable, Switch, Text, TextInput, View } from 'react-native'
 import { Brain, ChevronLeft, Database, RefreshCw, ShieldCheck, Trash2, WifiOff } from 'lucide-react-native'
 import Animated, { Easing, FadeIn, FadeOut, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated'
 import { useNetInfo } from '@react-native-community/netinfo'
@@ -14,7 +14,7 @@ import {
   updateCoachPreferences,
 } from '../lib/coachWorkspace'
 import { thud } from '../lib/haptics'
-import { useDispatch } from '../store/store'
+import { useDispatch, useStore } from '../store/store'
 import { useColors } from '../theme'
 
 type Props = { onClose: () => void; onConsentChanged?: (consented: boolean) => void }
@@ -68,6 +68,40 @@ function MemorySkeleton() {
       {[0, 1, 2].map((id) => (
         <Animated.View key={id} style={style} className="h-[92px] rounded-2xl bg-ink-700" />
       ))}
+    </View>
+  )
+}
+
+/** Name-your-coach setting. The name is a local, per-user Profile field (synced with the rest of the
+ *  profile) so it pulls through everywhere the coach is shown. Commits on blur/submit, bounded length. */
+function CoachNameCard() {
+  const { state } = useStore()
+  const dispatch = useDispatch()
+  const saved = (state.profile.coachName ?? '').trim()
+  const [draft, setDraft] = useState(saved)
+  useEffect(() => { setDraft((state.profile.coachName ?? '').trim()) }, [state.profile.coachName])
+  const commit = useCallback(() => {
+    const next = draft.trim().slice(0, 30)
+    if (next === saved) return
+    dispatch({ type: 'SET_PROFILE', patch: { coachName: next } })
+    thud()
+  }, [draft, saved, dispatch])
+  return (
+    <View className="mx-[18px] mt-4 rounded-2xl border border-white/5 bg-ink-800 p-4">
+      <Text className="font-bold text-white">Coach name</Text>
+      <Text className="mt-0.5 text-[12px] leading-4 text-secondary">Give your coach a name — it shows across the app. Leave blank to just call it “Coach”.</Text>
+      <TextInput
+        value={draft}
+        onChangeText={setDraft}
+        onBlur={commit}
+        onSubmitEditing={commit}
+        returnKeyType="done"
+        placeholder="Coach"
+        placeholderTextColor="rgba(255,255,255,0.35)"
+        maxLength={30}
+        accessibilityLabel="Coach name"
+        className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] px-3.5 py-3 text-[15px] text-white"
+      />
     </View>
   )
 }
@@ -190,7 +224,8 @@ export function CoachMemoryView({ onClose, onConsentChanged }: Props) {
           <Text className="flex-1 text-[12px] text-white/65">Offline · showing your last saved coach profile</Text>
         </View>
       )}
-      <View className="mx-[18px] mt-4 rounded-2xl border border-white/5 bg-ink-800 p-4">
+      <CoachNameCard />
+      <View className="mx-[18px] mt-3 rounded-2xl border border-white/5 bg-ink-800 p-4">
         <View className="flex-row items-center gap-3">
           <View className="h-10 w-10 items-center justify-center rounded-full bg-brand-400/10"><Database size={19} color={colors.brand400} /></View>
           <View className="flex-1">

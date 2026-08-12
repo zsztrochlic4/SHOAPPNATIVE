@@ -120,6 +120,7 @@ service cloud.firestore {
         return textLenOk(profile.get('motivation', null), 2000)
           && textLenOk(profile.get('injuries', null), 2000)
           && textLenOk(profile.get('name', null), 200)
+          && textLenOk(profile.get('coachName', null), 60)
           && textLenOk(backendUser.get('notes', null), 4000)
           && textLenOk(backendUser.get('motivation', null), 2000);
       }

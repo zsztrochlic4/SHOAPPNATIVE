@@ -27,7 +27,7 @@ import { ActivityIcon } from '../components/ActivityIcon'
 import { exerciseView, imageForMuscle, buildCustomSession } from '../store/programSession'
 import { ACTIVE_EXERCISES, resolveExerciseRef, type Exercise } from '../backend/data'
 import { nextSetRecommendation } from '../store/training'
-import { coachThreadView, recentPR } from '../store/coach'
+import { coachThreadView, coachDisplayName, recentPR } from '../store/coach'
 import { coachReply } from '../lib/coachChat'
 import { askCoachServer } from '../lib/coachServer'
 import { newCoachRequestKey } from '../lib/coachRequestKey'
@@ -123,7 +123,7 @@ export function CoachSheet({ open, onClose }: Props) {
       <View className="mb-4 flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-3.5">
         <View className="h-11 w-11 items-center justify-center rounded-full bg-brand-400"><Sparkles size={20} color="#000" /></View>
         <View>
-          <Text className="font-bold leading-tight text-white">Coach</Text>
+          <Text className="font-bold leading-tight text-white">{coachDisplayName(state.profile.coachName)}</Text>
           <Text className="text-[12px] text-secondary">Reads your logs. Checks in, not chats.</Text>
         </View>
       </View>
@@ -484,8 +484,9 @@ function TypingDots() {
  *   • drag RIGHT → reply to this message (a reply glyph fades in; past the
  *     threshold it arms the reply banner). Vertical scroll still passes through.
  */
-function CoachMessageRow({ m, revealX, colors, onReply, onProposalConfirmed, undoActive, onUndo, swapOptions, onChooseSwap, shareText, onPublishShare, onCancelShare, applying, applyFailed, onRetryApply }: {
+function CoachMessageRow({ m, coachName, revealX, colors, onReply, onProposalConfirmed, undoActive, onUndo, swapOptions, onChooseSwap, shareText, onPublishShare, onCancelShare, applying, applyFailed, onRetryApply }: {
   m: ChatMessage
+  coachName: string
   revealX: Animated.Value
   colors: ReturnType<typeof useColors>
   onReply: (m: ChatMessage) => void
@@ -607,7 +608,7 @@ function CoachMessageRow({ m, revealX, colors, onReply, onProposalConfirmed, und
       {/* Quoted message this one replies to. */}
       {m.replyTo && (
         <View style={{ maxWidth: '72%', backgroundColor: withAlpha(colors.fg, 0.06), borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 4 }}>
-          <Text style={{ fontSize: 10.5, fontWeight: '700', color: withAlpha(colors.fg, 0.5), marginBottom: 1 }}>{m.replyTo.role === 'user' ? 'You' : 'Coach'}</Text>
+          <Text style={{ fontSize: 10.5, fontWeight: '700', color: withAlpha(colors.fg, 0.5), marginBottom: 1 }}>{m.replyTo.role === 'user' ? 'You' : coachName}</Text>
           <Text numberOfLines={2} style={{ fontSize: 12, lineHeight: 16, color: withAlpha(colors.fg, 0.55) }}>{m.replyTo.text}</Text>
         </View>
       )}
@@ -1139,6 +1140,9 @@ export function CoachChatSheet({ open, onClose }: Props) {
     toast('Reverted — your plan is back to how it was.')
   }, [dispatch, user, toast, state])
 
+  // The user's chosen coach name (or "Coach"), shown wherever the coach is identified in the chat.
+  const coachName = coachDisplayName(state.profile.coachName)
+
   const renderMessage = useCallback(({ item, index }: { item: ChatMessage; index: number }) => {
     const showDay = index === 0 || messages[index - 1]?.dateKey !== item.dateKey
     const rowUndo = undoTarget && item.proposal && undoTarget.proposalId === item.proposal.id ? undoTarget : null
@@ -1157,6 +1161,7 @@ export function CoachChatSheet({ open, onClose }: Props) {
         )}
         <CoachMessageRow
           m={item}
+          coachName={coachName}
           revealX={revealX}
           colors={colors}
           onReply={(message) => setReplyingTo({ role: message.role, text: message.text })}
@@ -1174,7 +1179,7 @@ export function CoachChatSheet({ open, onClose }: Props) {
         />
       </View>
     )
-  }, [colors, handleProposalConfirmed, handleUndo, handleChooseSwap, handlePublishShare, toast, messages, revealX, undoTarget, swapChoice, shareDraft, applyingProposalId, failedApply])
+  }, [coachName, colors, handleProposalConfirmed, handleUndo, handleChooseSwap, handlePublishShare, toast, messages, revealX, undoTarget, swapChoice, shareDraft, applyingProposalId, failedApply])
 
   if (!coachOperational() && !COACH_PREVIEW) {
     return (
@@ -1212,7 +1217,7 @@ export function CoachChatSheet({ open, onClose }: Props) {
                 <View style={{ position: 'absolute', right: -1, bottom: -1, width: 12, height: 12, borderRadius: 6, backgroundColor: colors.brand400, borderWidth: 2.5, borderColor: colors.ink900 }} />
               </View>
               <View style={{ alignItems: 'center' }}>
-                <Text style={{ fontSize: 15, fontWeight: '700', color: colors.fg }}>Coach</Text>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: colors.fg }}>{coachName}</Text>
                 <Text style={{ fontSize: 11.5, color: withAlpha(colors.fg, 0.45) }}>Active now</Text>
               </View>
             </View>
@@ -1283,7 +1288,7 @@ export function CoachChatSheet({ open, onClose }: Props) {
             {replyingTo && (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10, paddingVertical: 8, paddingLeft: 10, paddingRight: 8, backgroundColor: colors.ink800, borderRadius: 12, borderLeftWidth: 3, borderLeftColor: colors.brand400 }}>
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: colors.brand400, marginBottom: 1 }}>Replying to {replyingTo.role === 'user' ? 'You' : 'Coach'}</Text>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: colors.brand400, marginBottom: 1 }}>Replying to {replyingTo.role === 'user' ? 'You' : coachName}</Text>
                   <Text numberOfLines={1} style={{ fontSize: 12.5, color: withAlpha(colors.fg, 0.6) }}>{replyingTo.text}</Text>
                 </View>
                 <Pressable onPress={() => setReplyingTo(null)} hitSlop={6} style={{ width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: withAlpha(colors.fg, 0.08) }} className="active:opacity-70">

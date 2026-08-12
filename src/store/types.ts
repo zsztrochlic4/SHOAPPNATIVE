@@ -28,6 +28,9 @@ export type MealName = 'Breakfast' | 'Lunch' | 'Snack' | 'Dinner'
 
 export interface Profile {
   name: string
+  /** What the user calls their AI coach. Falls back to "Coach" everywhere it's shown (see
+   *  coachDisplayName). Per-user, synced across devices with the rest of the profile. */
+  coachName?: string
   age: number
   /** contact phone number, free-form (optional) */
   phone?: string

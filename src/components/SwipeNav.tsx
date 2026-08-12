@@ -21,10 +21,13 @@ export function SwipeNav({
   children,
   onOpenMenu,
   onOpenCoach,
+  coachLabel = 'Coach',
 }: {
   children: ReactNode
   onOpenMenu: () => void
   onOpenCoach: () => void
+  /** The user's chosen coach name (or "Coach"), shown on the swipe-to-coach affordance. */
+  coachLabel?: string
 }) {
   const colors = useColors()
   const [width, setWidth] = useState(IS_WEB ? WEB_SCREEN.width : 0)
@@ -67,7 +70,7 @@ export function SwipeNav({
           style={[styles.pill, { right: 14, backgroundColor: colors.ink700 }, rightStyle]}
         >
           <MessageCircle size={18} color={colors.brand400} />
-          <Text style={[styles.pillText, { color: colors.fg }]}>Coach</Text>
+          <Text style={[styles.pillText, { color: colors.fg }]} numberOfLines={1}>{coachLabel}</Text>
         </Animated.View>
       </View>
 
