@@ -182,6 +182,13 @@ export interface Settings {
   /** IANA timezone captured from the device (audit R4-010), e.g. 'Australia/Perth'. Persisted so
    *  the server coach context names the correct LOCAL day instead of falling back to a default. */
   timezone?: string
+  /** Local mirror of the server coach preference `proactiveEnabled` (source of truth is the coach
+   *  workspace). Cached in settings so the client can gate the on-device proactive check-in surface
+   *  without a network round-trip; refreshed whenever the workspace is fetched. */
+  coachProactiveEnabled?: boolean
+  /** Day-key of the most recent proactive coach check-in the user dismissed, so a check-in shows at
+   *  most once per day and never reappears after being dismissed for that day. */
+  coachCheckinDismissedKey?: string
   /** Connected third-party integrations, e.g. { strava: true }. */
   connections?: Record<string, boolean>
   /** Which metric the main Progress chart shows (default 'weight'). */

@@ -435,6 +435,9 @@ export function buildSeed(): AppState {
       notificationConsent: 'unknown',
       soundEnabled: true,
       language: 'en',
+      // The demo showcases the coach reaching out proactively on the dashboard. Real accounts start
+      // with this off; it's mirrored from the server preference once a user enables it in the coach.
+      coachProactiveEnabled: true,
       connections: {},
     },
     weights,
