@@ -199,6 +199,7 @@ export async function cancelAllReminders(): Promise<void> {
 export const DEFAULT_NOTIF_PREFS: NotificationPrefs = {
   workoutReminder: true,
   streakReminder: true,
+  coachCheckin: true,
   reminderHour: 17, // 5pm — a common "head to the gym" time
   quiet: true,
   quietStartHour: 22, // 10pm–7am
@@ -207,6 +208,8 @@ export const DEFAULT_NOTIF_PREFS: NotificationPrefs = {
 
 /** The evening streak nudge is fixed at 8pm (outside the default quiet window). */
 const STREAK_HOUR = 20
+/** The coach check-in nudge is fixed at 6pm (early evening, before the streak nudge). */
+const COACH_HOUR = 18
 
 /** Merge stored prefs over the defaults so older saves always resolve fully. */
 export function resolveNotifPrefs(prefs?: Partial<NotificationPrefs>): NotificationPrefs {
@@ -220,7 +223,11 @@ export function resolveNotifPrefs(prefs?: Partial<NotificationPrefs>): Notificat
  * than being dropped); the fixed evening streak nudge is skipped when quiet covers it.
  * Safe no-op on web / Expo Go. Call on launch and whenever prefs change.
  */
-export async function syncReminders(enabled: boolean, prefs?: Partial<NotificationPrefs>): Promise<void> {
+export async function syncReminders(
+  enabled: boolean,
+  prefs?: Partial<NotificationPrefs>,
+  coach?: { proactiveEnabled: boolean; name?: string },
+): Promise<void> {
   if (!NATIVE) return
   await cancelAllReminders()
   if (!enabled) return
@@ -231,6 +238,12 @@ export async function syncReminders(enabled: boolean, prefs?: Partial<Notificati
     // A preferred time inside quiet hours is deferred to the next valid hour, not dropped.
     const hour = nextAllowedHour(p.reminderHour, p.quiet, p.quietStartHour, p.quietEndHour)
     jobs.push({ id: 'workout-reminder', title: 'Time to train 💪', body: "Your session's ready when you are — 45 minutes and it's done.", hour })
+  }
+  // The coach check-in nudge only exists while the user has proactive check-ins on; the app's own
+  // coach screen always has today's note waiting, so this daily prompt is never empty.
+  if (coach?.proactiveEnabled && p.coachCheckin !== false && !quiet(COACH_HOUR)) {
+    const who = (coach.name ?? '').trim() || 'Your coach'
+    jobs.push({ id: 'coach-checkin', title: `${who} checked in 👋`, body: 'Open the app for today’s note and to keep your week on track.', hour: COACH_HOUR })
   }
   if (p.streakReminder && !quiet(STREAK_HOUR)) {
     jobs.push({ id: 'streak-reminder', title: 'Keep your streak alive 🔥', body: 'Log today to keep the run going. Even a quick check-in counts.', hour: STREAK_HOUR })
