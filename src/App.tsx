@@ -19,6 +19,7 @@ import { Paywall } from './screens/Paywall'
 import { IntegrationsAutoSync } from './components/Integrations'
 import { PushRegistration, NotificationsSync } from './components/PushRegistration'
 import { CompletionQueueSync } from './components/CompletionQueueSync'
+import { CoachWorkspaceSync } from './components/CoachWorkspaceSync'
 import { DeepLinkHandler } from './components/DeepLinkHandler'
 import { ToastProvider } from './components/Toast'
 import { NavProvider, type Overlay } from './nav'
@@ -399,6 +400,7 @@ function AuthGate() {
       <NotificationsSync />
       <BillingSync />
       <CompletionQueueSync />
+      <CoachWorkspaceSync />
     </>
   ) : null
 

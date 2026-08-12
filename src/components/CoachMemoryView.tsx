@@ -122,17 +122,19 @@ export function CoachMemoryView({ onClose, onConsentChanged }: Props) {
     setError(false)
     setLoading(true)
     const cached = await readCachedCoachWorkspace()
-    if (cached) { setWorkspace(cached); setLoading(false) }
+    if (cached) { setWorkspace(cached); dispatch({ type: 'SET_SETTINGS', patch: { coachProactiveEnabled: cached.proactiveEnabled } }); setLoading(false) }
     try {
       const fresh = await fetchCoachWorkspace()
       setWorkspace(fresh)
+      // Keep the local mirror the dashboard reads in step with the server preference.
+      dispatch({ type: 'SET_SETTINGS', patch: { coachProactiveEnabled: fresh.proactiveEnabled } })
       onConsentChanged?.(fresh.consentVersion === 1)
     } catch {
       if (!cached) setError(true)
     } finally {
       setLoading(false)
     }
-  }, [onConsentChanged])
+  }, [dispatch, onConsentChanged])
 
   useEffect(() => { void load() }, [load])
 
@@ -143,11 +145,12 @@ export function CoachMemoryView({ onClose, onConsentChanged }: Props) {
       const next = await grantCoachConsent(memoryChoice)
       thud()
       setWorkspace(next)
+      dispatch({ type: 'SET_SETTINGS', patch: { coachProactiveEnabled: next.proactiveEnabled } })
       onConsentChanged?.(true)
     } catch {
       setError(true)
     } finally { setSaving(false) }
-  }, [memoryChoice, onConsentChanged, saving])
+  }, [dispatch, memoryChoice, onConsentChanged, saving])
 
   const changeMemory = useCallback(async (enabled: boolean) => {
     if (!workspace || saving) return
@@ -164,10 +167,16 @@ export function CoachMemoryView({ onClose, onConsentChanged }: Props) {
     const previous = workspace
     setWorkspace({ ...workspace, proactiveEnabled: enabled })
     setSaving(true)
-    try { setWorkspace(await updateCoachPreferences({ proactiveEnabled: enabled })); thud() }
+    try {
+      const next = await updateCoachPreferences({ proactiveEnabled: enabled })
+      setWorkspace(next)
+      // Mirror the new preference locally so the dashboard proactive card reacts immediately.
+      dispatch({ type: 'SET_SETTINGS', patch: { coachProactiveEnabled: next.proactiveEnabled } })
+      thud()
+    }
     catch { setWorkspace(previous); setError(true) }
     finally { setSaving(false) }
-  }, [saving, workspace])
+  }, [dispatch, saving, workspace])
 
   const changeStyle = useCallback(async (coachingStyle: CoachWorkspaceSummary['coachingStyle']) => {
     if (!workspace || saving || workspace.coachingStyle === coachingStyle) return
@@ -208,6 +217,8 @@ export function CoachMemoryView({ onClose, onConsentChanged }: Props) {
       // everywhere the data lived (audit F-015 / J-11).
       const next = await revokeCoachConsent()
       dispatch({ type: 'CLEAR_COACH_CHAT' })
+      // Coach is off: clear the mirror so the dashboard proactive card disappears immediately.
+      dispatch({ type: 'SET_SETTINGS', patch: { coachProactiveEnabled: false } })
       thud()
       setWorkspace(next)
       setConfirmDisable(false)
