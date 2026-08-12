@@ -153,6 +153,9 @@ export interface NotificationPrefs {
   workoutReminder: boolean
   /** An evening reminder to log the day and keep the streak. */
   streakReminder: boolean
+  /** A daily nudge to open the coach for its check-in. Only fires while proactive check-ins are
+   *  enabled (gated by `settings.coachProactiveEnabled` at schedule time). Defaults on. */
+  coachCheckin?: boolean
   /** Preferred hour (0–23, device local) for the workout reminder. */
   reminderHour: number
   /** Suppress notifications overnight. */

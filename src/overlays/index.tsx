@@ -1392,6 +1392,12 @@ function NotificationPrefsPanel({ t }: { t: (k: string) => string }) {
       <Row icon={<Flame size={18} color={brand[400]} />} title={t('notif.streak')} sub={t('notif.streakSub')}>
         <Toggle on={prefs.streakReminder} onPress={() => set({ streakReminder: !prefs.streakReminder })} label="Streak reminder" />
       </Row>
+      {/* Only offered once the user has proactive check-ins on — the notification delivers that feature. */}
+      {state.settings.coachProactiveEnabled === true && (
+        <Row icon={<Sparkles size={18} color={brand[400]} />} title={t('notif.coach')} sub={t('notif.coachSub')}>
+          <Toggle on={prefs.coachCheckin !== false} onPress={() => set({ coachCheckin: !(prefs.coachCheckin !== false) })} label="Coach check-in reminder" />
+        </Row>
+      )}
 
       <Text className="mt-1 text-[11px] font-bold uppercase tracking-wide text-tertiary">{t('notif.time')}</Text>
       <View className="flex-row gap-2">

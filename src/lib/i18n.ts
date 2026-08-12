@@ -53,6 +53,8 @@ const en: Dict = {
   'notif.workoutSub': 'A daily nudge to train',
   'notif.streak': 'Streak reminders',
   'notif.streakSub': 'An evening reminder to log your day',
+  'notif.coach': 'Coach check-ins',
+  'notif.coachSub': 'A daily nudge to open your coach',
   'notif.time': 'Reminder time',
   'notif.quiet': 'Quiet hours',
   'notif.quietSub': 'Mute notifications overnight',
