@@ -9,7 +9,6 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { BottomNav } from './components/BottomNav'
 import { SwipeNav } from './components/SwipeNav'
 import { StoreProvider, useStore, useStoreMeta, useStoreSelector } from './store/store'
-import { coachDisplayName } from './store/coach'
 import type { AppState } from './store/types'
 import { AuthProvider, useAuth } from './auth/AuthProvider'
 import { isEntitled } from './store/selectors'
@@ -77,7 +76,6 @@ const selectSoundEnabled = (state: AppState) => state.settings.soundEnabled ?? t
 const selectHapticsEnabled = (state: AppState) => state.settings.hapticsEnabled ?? true
 const selectReducedMotion = (state: AppState) => state.settings.reducedMotion ?? 'system'
 const selectOnboarded = (state: AppState) => state.profile.onboarded
-const selectCoachLabel = (state: AppState) => coachDisplayName(state.profile.coachName)
 
 /**
  * Fades + slides each screen up by 10px when the active tab changes, mirroring
@@ -111,7 +109,6 @@ function ScreenFade({ tabKey, children }: { tabKey: string; children: React.Reac
 function Shell() {
   const { hydrated, persistenceError } = useStoreMeta()
   const onboarded = useStoreSelector(selectOnboarded)
-  const coachLabel = useStoreSelector(selectCoachLabel)
   const insets = useSafeAreaInsets()
   const [tab, setTab] = useState<TabKey>('dashboard')
   const [visitedTabs, setVisitedTabs] = useState<Set<TabKey>>(() => new Set(['dashboard']))
@@ -223,11 +220,18 @@ function Shell() {
       </ScrollView>
     )
     return tabKey === 'dashboard' ? (
-      <SwipeNav onOpenMenu={nav.openMenu} onOpenCoach={() => nav.open('coachChat')} coachLabel={coachLabel}>
+      <SwipeNav onOpenMenu={nav.openMenu}>
         {content}
       </SwipeNav>
     ) : content
   }
+
+  // The "Coach" tab (internal key 'progress') opens the coach chat instead of
+  // navigating to a screen — it's the single entry point to the coach now.
+  const onTabChange = useCallback((next: TabKey) => {
+    if (next === 'progress') { nav.open('coachChat'); return }
+    selectTab(next)
+  }, [nav, selectTab])
 
   // ActiveWorkout remains mounted so an in-progress timer survives temporarily
   // closing its sheet. Every other overlay is instantiated only while active.
@@ -278,7 +282,7 @@ function Shell() {
             </Activity>
           ))}
         </View>
-        <BottomNav active={tab} onChange={selectTab} />
+        <BottomNav active={tab} onChange={onTabChange} />
       </View>
 
       {/* Overlays */}

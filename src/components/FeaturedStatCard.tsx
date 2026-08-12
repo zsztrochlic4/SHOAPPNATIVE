@@ -58,7 +58,7 @@ export function FeaturedStatCard() {
   if (metricId === 'none') return null
 
   return (
-    <View className="rounded-3xl border border-white/5 bg-ink-800 p-4">
+    <View className="rounded-3xl border border-white/5 bg-ink-800 px-4 py-3.5">
       <View className="flex-row items-start justify-between gap-2.5">
         <View className="min-w-0 flex-1">
           <Text className="text-[13px] font-semibold text-secondary">{feat.title}</Text>
@@ -86,7 +86,7 @@ export function FeaturedStatCard() {
       <CompositionBar key={`${metricId}|${tf}`} segments={feat.segments} colors={colors} />
 
       {/* Segment legend */}
-      <View className="mt-3 gap-2.5">
+      <View className="mt-2.5 gap-2">
         {feat.segments.map((sgm, i) => (
           <View key={i} className="flex-row items-center gap-2.5">
             <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: sgm.dim ? `${colors.fg}38` : progColor(sgm.color, colors) }} />
@@ -97,7 +97,7 @@ export function FeaturedStatCard() {
       </View>
 
       {/* Stats row */}
-      <View className="mt-4 flex-row justify-between border-t border-white/[0.06] pt-3.5">
+      <View className="mt-3 flex-row justify-between border-t border-white/[0.06] pt-3">
         {feat.stats.map((st, i) => (
           <View key={i} style={{ alignItems: st.align === 'left' ? 'flex-start' : st.align === 'right' ? 'flex-end' : 'center' }}>
             <Text className="text-[11px] text-tertiary">{st.label}</Text>
@@ -108,9 +108,9 @@ export function FeaturedStatCard() {
 
       {/* Mini 7-day bars (steps / water / sleep) */}
       {feat.mini7 && (
-        <View className="mt-4 border-t border-white/[0.06] pt-3.5">
-          <Text className="mb-2.5 text-[11px] text-tertiary">Last 7 days</Text>
-          <View className="h-16 flex-row items-end gap-[7px]">
+        <View className="mt-3 border-t border-white/[0.06] pt-3">
+          <Text className="mb-2 text-[11px] text-tertiary">Last 7 days</Text>
+          <View className="h-14 flex-row items-end gap-[7px]">
             {feat.mini7.map((b, i) => (
               <View key={i} className="h-full flex-1 flex-col items-center gap-1.5">
                 <View className="w-full max-w-[16px] flex-1 flex-row items-end overflow-hidden rounded-full bg-white/[0.06]">
@@ -144,7 +144,7 @@ function CompositionBar({ segments, colors }: { segments: ProgressFeatured['segm
   const shown = segments.filter((s) => s.pct > 0)
   return (
     <Animated.View
-      style={{ marginTop: 18, height: 16, borderRadius: 999, overflow: 'hidden', flexDirection: 'row', gap: 2, transform: [{ scaleX: grow }], opacity: grow.interpolate({ inputRange: [0, 1], outputRange: [0.35, 1] }) }}
+      style={{ marginTop: 14, height: 13, borderRadius: 999, overflow: 'hidden', flexDirection: 'row', gap: 2, transform: [{ scaleX: grow }], opacity: grow.interpolate({ inputRange: [0, 1], outputRange: [0.35, 1] }) }}
     >
       {shown.map((s, i) => (
         <View key={i} style={{ flex: s.pct, backgroundColor: s.dim ? `${colors.fg}24` : progColor(s.color, colors) }} />

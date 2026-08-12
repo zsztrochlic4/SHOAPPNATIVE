@@ -3,7 +3,7 @@ import { View, Text, Pressable, Image, Animated, Easing, Platform, ScrollView, S
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Circle, G, Defs, RadialGradient, Stop, Rect } from 'react-native-svg'
 import { LinearGradient } from 'expo-linear-gradient'
-import { Menu, MessageCircle, Clock, GraduationCap, ChevronRight, Leaf, Check, Flame, ChevronDown, Info, ArrowRight, X, SlidersHorizontal } from 'lucide-react-native'
+import { Menu, Clock, GraduationCap, ChevronRight, Leaf, Check, Flame, ChevronDown, Info, ArrowRight, X, SlidersHorizontal } from 'lucide-react-native'
 import { Icon } from '../components/Icon'
 import { ActivityIcon } from '../components/ActivityIcon'
 import { Card } from '../components/ui'
@@ -20,7 +20,7 @@ import { fmtFluid, fmtWeightNum, weightUnit, fmtVolume } from '../lib/format'
 import { prefersReducedMotion } from '../lib/a11y'
 import {
   todayHabit, habitForDay, todaySession, sessionForDay, activitiesForDay,
-  unreadChat, streakStats, foodReviewForDay, weeklyIndex, nutritionTagsForDay,
+  streakStats, foodReviewForDay, weeklyIndex, nutritionTagsForDay,
   workoutStartedForDay, sessionProgress,
 } from '../store/selectors'
 import { tagById, NUTRITION_TAGS, type TagTone } from '../data/nutrition'
@@ -91,7 +91,6 @@ export default function Dashboard() {
   const units = state.settings.units
   const habit = todayHabit(state)
   const session = todaySession(state)
-  const unread = unreadChat(state)
   const t = dailyTargets(state)
   const exam = examState(state)
   const streak = streakStats(state)
@@ -171,10 +170,8 @@ export default function Dashboard() {
           <Menu size={24} color={colors.fg} />
         </Pressable>
         <Wordmark size="sm" />
-        <Pressable onPress={() => nav.open('coachChat')} accessibilityRole="button" accessibilityLabel={unread > 0 ? `Open coach, ${unread} unread` : 'Open coach'} className="relative h-10 w-10 items-center justify-center rounded-xl active:opacity-70">
-          <MessageCircle size={23} color={colors.fg} />
-          {unread > 0 && <View className="absolute right-2 top-2 h-2 w-2 rounded-full bg-brand-400" style={{ borderWidth: 2, borderColor: colors.ink900 }} />}
-        </Pressable>
+        {/* Coach lives on the nav bar now — spacer keeps the wordmark centred. */}
+        <View className="h-10 w-10" />
       </View>
 
       {/* Weekly performance index */}
@@ -399,17 +396,21 @@ export default function Dashboard() {
           <Text className="text-[14px] font-bold" style={{ color: colors.brand400 }}>{timeframeLabel(timeframe)}</Text>
         </Pressable>
       </View>
+      {/* Featured stat — the big composition card sits above the small stat tiles
+       *  (metric chosen in Customise; own range filter, independent of Progress). */}
+      <FeaturedStatCard />
+
       {/* 1-3 stats: one full-width row (flex:1 cards fill it). 4 stats: a 2×2 grid.
        *  A lone card centres its content instead of stranding it on the left. */}
       {overviewStats.length > 0 && overviewStats.length !== 4 && (
-        <View className="flex-row" style={{ gap: 10 }}>
+        <View className="flex-row" style={{ gap: 10, marginTop: 10 }}>
           {overviewStats.map(({ id, metric, result }) => (
             <OverviewCard key={id} accent={accentFor(metric.accent, colors)} result={result} colors={colors} centered={overviewStats.length === 1} />
           ))}
         </View>
       )}
       {overviewStats.length === 4 && (
-        <View style={{ gap: 10 }}>
+        <View style={{ gap: 10, marginTop: 10 }}>
           {[0, 2].map((start) => (
             <View key={start} className="flex-row" style={{ gap: 10 }}>
               {overviewStats.slice(start, start + 2).map(({ id, metric, result }) => (
@@ -419,12 +420,6 @@ export default function Dashboard() {
           ))}
         </View>
       )}
-
-      {/* Featured stat — the Progress screen's composition card (metric chosen in
-       *  Customise), with its own range filter, independent of the Progress screen. */}
-      <View style={{ marginTop: 10 }}>
-        <FeaturedStatCard />
-      </View>
 
       {/* Training progress — the tracked lifts ranked by gain, a copy of the
        *  Progress screen's card (shares the same tracked-lift settings). */}
