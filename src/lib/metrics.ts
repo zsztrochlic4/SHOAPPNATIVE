@@ -205,18 +205,37 @@ export const STAT_METRICS: StatMetric[] = [
 
 export const DEFAULT_DASHBOARD_STATS = ['workouts', 'strength', 'weight']
 
-/** How many stats the overview grid can hold. */
-export const MAX_DASHBOARD_STATS = 3
+/** How many stats the overview grid can hold (4 shows as a 2×2 grid). */
+export const MAX_DASHBOARD_STATS = 4
 
 export function statById(id: string): StatMetric | undefined {
   return STAT_METRICS.find((m) => m.id === id)
 }
 
-/** The stat ids for the dashboard overview (1-3), falling back to defaults. */
+/** The stat ids for the dashboard overview (0-3). Undefined = never configured →
+ *  starter defaults. An explicit [] = the user cleared them all → stays empty. */
 export function dashboardStatIds(s: AppState): string[] {
   const ids = s.settings.dashboardStats
-  if (!ids || ids.length === 0) return DEFAULT_DASHBOARD_STATS
+  if (ids === undefined) return DEFAULT_DASHBOARD_STATS
   return ids.slice(0, MAX_DASHBOARD_STATS)
+}
+
+/** The stats that can be featured in the dashboard composition card (the big card
+ *  under "Progress overview"). Selectable from the dashboard Customise sheet. */
+export const DASHBOARD_FEATURED: { id: string; label: string; icon: string; accent: AccentKey }[] = [
+  { id: 'nutrition', label: 'Eating quality', icon: 'leaf', accent: 'brand' },
+  { id: 'weight', label: 'Body weight', icon: 'scale', accent: 'blue' },
+  { id: 'water', label: 'Water', icon: 'droplet', accent: 'blue' },
+  { id: 'steps', label: 'Daily steps', icon: 'footprints', accent: 'orange' },
+  { id: 'sleep', label: 'Sleep', icon: 'bed', accent: 'yellow' },
+]
+
+/** Which metric the dashboard featured card shows (default 'nutrition'). The
+ *  sentinel 'none' means the user hid the featured card entirely. */
+export function dashboardFeaturedId(s: AppState): string {
+  const id = s.settings.dashboardFeatured
+  if (id === 'none') return 'none'
+  return id && DASHBOARD_FEATURED.some((m) => m.id === id) ? id : 'nutrition'
 }
 
 /* ------------------------------------------------------------------ */
@@ -600,6 +619,21 @@ export function progressTrackedIds(s: AppState): string[] {
 
 export function progressLiftPeriod(s: AppState): ProgressLiftPeriod {
   const p = s.settings.progressLiftPeriod
+  return p && PROGRESS_LIFT_PERIODS.includes(p) ? p : '4 weeks'
+}
+
+/** Tracked lift ids for the dashboard "Training progress" card (independent of Progress).
+ *  Undefined = never configured → starter defaults. An explicit [] = the user cleared
+ *  them all → stays empty (the card hides). */
+export function dashboardTrackedIds(s: AppState): string[] {
+  const ids = s.settings.dashboardTrackedIds
+  if (ids === undefined) return DEFAULT_TRACKED_LIFTS.filter((id) => !!exById(id))
+  return ids.filter((id) => !!exById(id))
+}
+
+/** Trend window for the dashboard "Training progress" card (independent of Progress). */
+export function dashboardLiftPeriod(s: AppState): ProgressLiftPeriod {
+  const p = s.settings.dashboardLiftPeriod
   return p && PROGRESS_LIFT_PERIODS.includes(p) ? p : '4 weeks'
 }
 

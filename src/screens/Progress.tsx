@@ -5,15 +5,14 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
-  SlidersHorizontal, Plus, Minus, Search, X, Check, HelpCircle, MessageCircle,
-  GripVertical, Info, Star, LayoutGrid, TrendingUp,
+  SlidersHorizontal, Plus, Minus, Search, X, Check,
+  GripVertical, Star, LayoutGrid, TrendingUp,
 } from 'lucide-react-native'
 import { Icon } from '../components/Icon'
 import { SectionHeader } from '../components/ui'
 import { AppModal, IS_WEB, WEB_SCREEN } from '../components/WebFrame'
 import { useStore } from '../store/store'
 import { ensureFullHistory } from '../store/historySync'
-import { useNav } from '../nav'
 import { weightStats } from '../store/selectors'
 import { EXERCISES, exById } from '../data/catalog'
 import { weightUnit, weightVal, toKg } from '../lib/format'
@@ -21,7 +20,7 @@ import {
   progressMetricId, progressTimeframe, progressFeatured, progressQuickCards,
   progressQuickIds, PROGRESS_QUICK, MAX_PROGRESS_QUICK, featuredQuickId,
   progressTrackedIds, progressLiftPeriod, progressTrackedLifts, PROGRESS_LIFT_PERIODS,
-  bmiInfo, STAT_TIMEFRAMES,
+  STAT_TIMEFRAMES,
   type ProgressColor, type ProgressFeatured,
 } from '../lib/metrics'
 import type { StatTimeframe, ProgressLiftPeriod, Goal } from '../store/types'
@@ -61,7 +60,6 @@ function progColor(c: ProgressColor, colors: Palette): string {
 
 export default function Progress() {
   const { state, dispatch } = useStore()
-  const nav = useNav()
   const colors = useColors()
   const units = state.settings.units
   const p = state.profile
@@ -83,11 +81,9 @@ export default function Progress() {
   const liftPeriod = progressLiftPeriod(state)
   const lifts = useMemo(() => progressTrackedLifts(state, trackedIds, liftPeriod, units), [state, trackedIds, liftPeriod, units])
   const maxGain = Math.max(1, ...lifts.map((l) => l.gainPct))
-  const bmi = bmiInfo(state)
 
   const [customizeOpen, setCustomizeOpen] = useState(false)
   const [addWeightOpen, setAddWeightOpen] = useState(false)
-  const [bmiInfoOpen, setBmiInfoOpen] = useState(false)
   const [liftsExpanded, setLiftsExpanded] = useState(false)
 
   function cycleTf() {
@@ -235,80 +231,11 @@ export default function Progress() {
         </>
       )}
 
-      {/* ---------------- Body composition (BMI) ---------------- */}
-      {bmi && (
-        <>
-          <SectionHeader title="Body composition" />
-          <View className="rounded-3xl border border-white/5 bg-ink-800 p-[18px]">
-            <View className="flex-row items-start justify-between gap-2.5">
-              <Text className="text-[17px] font-extrabold text-white">Your BMI</Text>
-              <Pressable
-                onPress={() => setBmiInfoOpen(true)}
-                accessibilityLabel="What is BMI?"
-                className="h-[30px] w-[30px] items-center justify-center rounded-full border border-white/20 active:opacity-70"
-              >
-                <HelpCircle size={15} color={`${colors.fg}8c`} />
-              </Pressable>
-            </View>
-            <View className="mt-2.5 flex-row flex-wrap items-baseline gap-[11px]">
-              <Text className="text-[40px] font-extrabold leading-none text-white" style={{ letterSpacing: -1 }}>{bmi.bmi.toFixed(1)}</Text>
-              <View className="flex-row items-center gap-2">
-                <Text className="text-[14px] text-secondary">Your weight is</Text>
-                <View style={{ paddingHorizontal: 11, paddingVertical: 4, borderRadius: 999, backgroundColor: `${progColor(bmi.color, colors)}26` }}>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: progColor(bmi.color, colors) }}>{bmi.label}</Text>
-                </View>
-              </View>
-            </View>
-            {/* gradient bar + needle */}
-            <View className="relative mt-5">
-              <View className="h-2.5 flex-row gap-1">
-                <View style={{ flex: 3.5, borderRadius: 999, backgroundColor: `${colors.accentBlue}b8` }} />
-                <View style={{ flex: 6.4, borderRadius: 999, backgroundColor: `${colors.brand400}c7` }} />
-                <View style={{ flex: 5, borderRadius: 999, backgroundColor: `${colors.accentYellow}b8` }} />
-                <View style={{ flex: 3, borderRadius: 999, backgroundColor: `${colors.danger}b3` }} />
-              </View>
-              <View style={{ position: 'absolute', top: -5, bottom: -5, left: `${bmi.needlePct}%`, width: 3, borderRadius: 2, backgroundColor: `${colors.fg}d9`, shadowColor: colors.ink800, shadowOpacity: 1, shadowRadius: 0 }} />
-            </View>
-            {/* legend */}
-            <View className="mt-4 flex-row gap-2">
-              {[
-                { c: colors.accentBlue, label: 'Under', range: '<18.5' },
-                { c: colors.brand400, label: 'Healthy', range: '18.5–24.9' },
-                { c: colors.accentYellow, label: 'Over', range: '25.0–29.9' },
-                { c: colors.danger, label: 'Obese', range: '>30.0' },
-              ].map((b) => (
-                <View key={b.label} className="flex-1">
-                  <View className="flex-row items-center gap-1.5">
-                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: `${b.c}99` }} />
-                    <Text className="text-[11.5px] font-semibold text-white/75">{b.label}</Text>
-                  </View>
-                  <Text className="ml-3.5 mt-0.5 text-[11px] text-tertiary">{b.range}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        </>
-      )}
-
-      {/* ---------------- Coach CTA ---------------- */}
-      <Pressable
-        onPress={() => nav.open('coach')}
-        className="mt-3.5 flex-row items-center gap-3 rounded-2xl border border-brand-400/20 bg-brand-400/[0.08] px-3.5 py-3 active:opacity-80"
-      >
-        <View className="h-[34px] w-[34px] items-center justify-center rounded-full border border-brand-400/50">
-          <MessageCircle size={17} color={colors.brand400} />
-        </View>
-        <Text className="flex-1 text-[13.5px] font-semibold text-white/80">
-          Got a question about your progress? <Text className="font-bold text-brand-400">Ask your coach</Text>
-        </Text>
-      </Pressable>
-
       <View className="h-2" />
 
       {/* ---------------- Sheets ---------------- */}
       <CustomiseSheet open={customizeOpen} onClose={() => setCustomizeOpen(false)} colors={colors} />
       <AddWeightSheet open={addWeightOpen} onClose={() => setAddWeightOpen(false)} colors={colors} />
-      <BmiInfoSheet open={bmiInfoOpen} onClose={() => setBmiInfoOpen(false)} colors={colors} />
     </View>
   )
 }
@@ -753,43 +680,3 @@ function AddWeightSheet({ open, onClose, colors }: { open: boolean; onClose: () 
   )
 }
 
-/* ================================================================== */
-/*  BmiInfoSheet — the "What is BMI?" explainer                         */
-/* ================================================================== */
-function BmiInfoSheet({ open, onClose, colors }: { open: boolean; onClose: () => void; colors: Palette }) {
-  const rows = [
-    { c: colors.accentBlue, label: 'Underweight', range: 'Below 18.5' },
-    { c: colors.brand400, label: 'Healthy', range: '18.5 – 24.9' },
-    { c: colors.accentYellow, label: 'Overweight', range: '25.0 – 29.9' },
-    { c: colors.danger, label: 'Obese', range: '30.0 and above' },
-  ]
-  return (
-    <BottomSheet open={open} onClose={onClose} colors={colors} maxHeightFrac={0.7}>
-      <View style={{ paddingHorizontal: 22, paddingTop: 12, paddingBottom: 8 }}>
-        <View style={{ width: 40, height: 4, borderRadius: 999, backgroundColor: `${colors.fg}33`, alignSelf: 'center', marginBottom: 16 }} />
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Text style={{ fontSize: 19, fontWeight: '800', letterSpacing: -0.2, color: colors.fg }}>What is BMI?</Text>
-          <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" style={{ height: 32, width: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 999, backgroundColor: `${colors.fg}1a` }}><X size={16} color={colors.fg} /></Pressable>
-        </View>
-        <Text style={{ marginTop: 14, fontSize: 14, lineHeight: 22, color: `${colors.fg}b3` }}>
-          Body Mass Index estimates whether your weight sits in a healthy range for your height. It's your weight in kilograms divided by your height in metres squared.
-        </Text>
-        <View style={{ marginTop: 16, gap: 9 }}>
-          {rows.map((r) => (
-            <View key={r.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: r.c }} />
-              <Text style={{ flex: 1, fontSize: 13.5, fontWeight: '600', color: colors.fg }}>{r.label}</Text>
-              <Text style={{ fontSize: 13, color: `${colors.fg}80` }}>{r.range}</Text>
-            </View>
-          ))}
-        </View>
-        <View style={{ marginTop: 18, flexDirection: 'row', gap: 10, paddingHorizontal: 14, paddingVertical: 13, borderRadius: 14, backgroundColor: `${colors.accentBlue}1a`, borderWidth: 1, borderColor: `${colors.accentBlue}40` }}>
-          <Info size={18} color={colors.accentBlue} />
-          <Text style={{ flex: 1, fontSize: 12.5, lineHeight: 19, color: `${colors.fg}b3` }}>
-            BMI doesn't account for muscle mass, so it can read high for strength athletes. Treat it as one signal, not the whole picture.
-          </Text>
-        </View>
-      </View>
-    </BottomSheet>
-  )
-}
