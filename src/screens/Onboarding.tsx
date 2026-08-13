@@ -18,7 +18,7 @@ import type { ReactNode } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   View, Text, Pressable, ScrollView, TextInput, Animated, Easing, PanResponder,
-  Platform, useWindowDimensions, ActivityIndicator,
+  Platform, useWindowDimensions, ActivityIndicator, Image,
   type NativeSyntheticEvent, type NativeScrollEvent, type ViewStyle, type TextStyle,
 } from 'react-native'
 import Svg, { Path, Line, Rect, Circle, Polygon, G, Text as SvgText } from 'react-native-svg'
@@ -1711,14 +1711,6 @@ function Wordmark({ size = 26 }: { size?: number }) {
   )
 }
 
-function AppIcon({ size = 34 }: { size?: number }) {
-  return (
-    <View style={{ width: size, height: size, borderRadius: size * 0.28, backgroundColor: '#7ED957', alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ fontWeight: '800', fontSize: size * 0.48, color: '#0A0A0B', letterSpacing: -0.4 }}>S<Text style={{ fontStyle: 'italic' }}>H</Text></Text>
-    </View>
-  )
-}
-
 /* ───────────────────────────────── summary ───────────────────────────────── */
 
 function Summary({ answers, onEdit, onContinue, onBack }: { answers: Answers; onEdit: (id: string) => void; onContinue: () => void; onBack: () => void }) {
@@ -2201,6 +2193,7 @@ function LanguageSelect() {
 
 function Welcome({ onStart, onLogin }: { onStart: () => void; onLogin: () => void }) {
   const tok = useTok()
+  const themeName = useThemeName()
   const { height: winH } = useWindowDimensions()
   const insets = useSafeAreaInsets()
   // The prototype laid this out on a fixed 874px canvas. Real screens (and the
@@ -2214,7 +2207,20 @@ function Welcome({ onStart, onLogin }: { onStart: () => void; onLogin: () => voi
   return (
     <View style={{ flex: 1, paddingHorizontal: 24 }}>
       <View style={{ paddingTop: 30, paddingHorizontal: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 50 }}>
-        <Reveal delay={80}><AppIcon size={34} /></Reveal>
+        <Reveal delay={80}>
+          {/* The actual StrengthHub wordmark replaces the old code-drawn "SH" mark
+              here (landing header only). Theme-aware so it stays legible: the
+              white-text variant on dark, the dark-text variant on light. */}
+          <Image
+            source={themeName === 'light'
+              ? require('../../assets/brand/strengthhub-wordmark-light.png')
+              : require('../../assets/brand/strengthhub-wordmark-dark.png')}
+            style={{ height: 26, width: 138 }}
+            resizeMode="contain"
+            accessibilityRole="image"
+            accessibilityLabel="StrengthHub Online"
+          />
+        </Reveal>
         <Reveal delay={120}><LanguageSelect /></Reveal>
       </View>
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 16, paddingBottom: 16 }}>
