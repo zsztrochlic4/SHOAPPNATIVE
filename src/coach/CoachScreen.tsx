@@ -24,7 +24,6 @@ import { Send, ChevronLeft, X, MessageCircle } from 'lucide-react-native'
 import { PressableScale } from '../components/PressableScale'
 import { CoachComingSoon } from '../components/CoachComingSoon'
 import { CoachMemoryView } from '../components/CoachMemoryView'
-import { CoachSafetyStrip } from '../components/CoachSafetyStrip'
 import { NAV_CONTENT_HEIGHT, NAV_HOME_REGION } from '../components/BottomNav'
 import { useStore } from '../store/store'
 import { useNav } from '../nav'
@@ -33,7 +32,7 @@ import { withAlpha } from '../lib/color'
 import { tick } from '../lib/haptics'
 import { IS_WEB } from '../components/WebFrame'
 import { coachWelcome, CHAT_SUGGESTIONS } from '../lib/coachChat'
-import { coachContext, coachOperational } from '../lib/coachSafety'
+import { coachOperational } from '../lib/coachSafety'
 import { relativeLabel, todayKey } from '../lib/date'
 import { useCoachChat, COACH_SCRIPTED } from './useCoachChat'
 import { CoachMessageRow, TypingDots } from './CoachMessageRow'
@@ -179,8 +178,6 @@ export function CoachScreen({
 
   return (
     <Shell chrome={chrome} colors={c} coachName={coachName} onClose={onClose} insetsTop={insets.top}>
-      <CoachSafetyStrip isAustralia={coachContext(state).isAustralia} fg={colors.fg} brand={colors.brand400} />
-
       <FlatList
         ref={listRef}
         data={data}
