@@ -107,11 +107,10 @@ export function BottomNav({
   return (
     <Animated.View
       pointerEvents={hidden ? 'none' : 'auto'}
-      className="border-t border-white/[0.05] bg-ink-900"
-      // Absolute positioning MUST be inline, not a NativeWind className: className position/inset
-      // rules don't apply to Animated.View, so the bar was computing `position: relative` and sitting
-      // in the flow — pushing content up and leaving the Coach composer a gap above the bar. `overflow
-      // visible` lets the raised Coach orb hang above the bar's top edge.
+      // The black backing + top hairline MUST be inline, not a NativeWind className: className
+      // background/border rules (like position/inset) don't reliably apply to Animated.View on web,
+      // which left the bar transparent — the icons floated over the page content with no dark bar.
+      // `overflow: visible` lets the raised Coach orb hang above the bar's top edge.
       style={{
         position: 'absolute',
         left: 0,
@@ -119,6 +118,9 @@ export function BottomNav({
         bottom: 0,
         zIndex: 20,
         overflow: 'visible',
+        backgroundColor: c.ink900,
+        borderTopWidth: 1,
+        borderTopColor: withAlpha(c.fg, 0.05),
         opacity: shift.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
         transform: [{ translateY: shift.interpolate({ inputRange: [0, 1], outputRange: [0, travel] }) }],
       }}
