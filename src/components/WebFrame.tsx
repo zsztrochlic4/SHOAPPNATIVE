@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Modal, View, Text, Platform, type ViewStyle, type TextStyle } from 'react-native'
+import { Modal, View, Text, Platform, useWindowDimensions, type ViewStyle, type TextStyle } from 'react-native'
 import { Wifi, BatteryFull, SignalHigh } from 'lucide-react-native'
 
 export const IS_WEB = Platform.OS === 'web'
@@ -25,6 +25,22 @@ export const WEB_SCREEN = {
   height: DEVICE.height - DEVICE.border * 2,
 } as const
 
+/**
+ * How much to scale the phone mockup so it fits the browser window WITHOUT
+ * clipping. The device keeps its full internal size (so content never gets cut
+ * off by the frame's `overflow: hidden`); when the window is smaller than the
+ * phone + its desk margin, we shrink the whole phone uniformly instead. Both the
+ * base frame and every overlay call this so they scale by the SAME factor and
+ * stay perfectly aligned. Native always returns 1 (the app fills the device).
+ */
+const FRAME_MARGIN = 24
+export function useFrameScale() {
+  const { width, height } = useWindowDimensions()
+  if (!IS_WEB) return 1
+  const s = Math.min(1, (width - FRAME_MARGIN * 2) / DEVICE.width, (height - FRAME_MARGIN * 2) / DEVICE.height)
+  return Number.isFinite(s) && s > 0 ? s : 1
+}
+
 /** The iOS-style status bar the mockup expects: time on the left, radios right. */
 export function FauxStatusBar() {
   return (
@@ -45,10 +61,11 @@ export function FauxStatusBar() {
  * native this is a no-op — the app fills the device as usual.
  */
 export function WebPreviewFrame({ children }: { children: ReactNode }) {
+  const scale = useFrameScale()
   if (!IS_WEB) return <>{children}</>
   return (
     <View style={frameStyles.page}>
-      <View style={frameStyles.device}>
+      <View style={[frameStyles.device, { transform: [{ scale }] }]}>
         <FauxStatusBar />
         <View style={{ flex: 1 }}>{children}</View>
       </View>
@@ -73,6 +90,7 @@ type AppModalProps = {
  * keeping overlays aligned with the app instead of filling the browser window.
  */
 export function AppModal({ visible, onRequestClose, animationType = 'slide', transparent = false, children }: AppModalProps) {
+  const scale = useFrameScale()
   if (!IS_WEB) {
     return (
       <Modal visible={visible} transparent={transparent} animationType={animationType} onRequestClose={onRequestClose} statusBarTranslucent>
@@ -91,10 +109,10 @@ export function AppModal({ visible, onRequestClose, animationType = 'slide', tra
       <View style={[frameStyles.page, transparent && { backgroundColor: 'transparent' }]} pointerEvents="box-none">
         {transparent ? (
           // Clip the overlay's own dim/card to the rounded screen rectangle.
-          <View style={frameStyles.screenClip}>{children}</View>
+          <View style={[frameStyles.screenClip, { transform: [{ scale }] }]}>{children}</View>
         ) : (
           // Opaque overlays reproduce the full device chrome + status bar.
-          <View style={frameStyles.device}>
+          <View style={[frameStyles.device, { transform: [{ scale }] }]}>
             <FauxStatusBar />
             <View style={{ flex: 1 }}>{children}</View>
           </View>
@@ -117,13 +135,13 @@ const frameStyles: {
     backgroundColor: '#0a0a0b',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
+    // The device keeps its full layout size and is scaled down to fit (see
+    // useFrameScale); clip the unscaled footprint so it never spills scrollbars.
+    overflow: 'hidden',
   },
   device: {
     width: DEVICE.width,
     height: DEVICE.height,
-    maxWidth: '100%',
-    maxHeight: '100%',
     borderRadius: DEVICE.radius,
     overflow: 'hidden',
     backgroundColor: DEVICE.bg,
@@ -141,8 +159,6 @@ const frameStyles: {
   screenClip: {
     width: DEVICE.width,
     height: DEVICE.height,
-    maxWidth: '100%',
-    maxHeight: '100%',
     borderRadius: DEVICE.radius,
     borderWidth: DEVICE.border,
     borderColor: 'transparent',
