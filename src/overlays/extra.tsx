@@ -1,7 +1,12 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { View, Text, Pressable, Image, TextInput, Animated, Easing, ScrollView, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Sparkles, Check, ChevronRight, ChevronDown, Salad, Trophy, Flame, GraduationCap, Dumbbell, Lightbulb, ShieldQuestion, Share2, Plus, Repeat, X, Search, Minus, Play, Activity, Brain } from 'lucide-react-native'
+import {
+  Sparkles, Check, CheckCheck, ChevronRight, ChevronDown, ChevronLeft, Salad, Trophy, Flame,
+  GraduationCap, Dumbbell, Lightbulb, ShieldQuestion, Share2, Plus, MapPin, Phone,
+  Send, Video, Lock, Crown, Clock, Repeat, Heart, MessageCircle, Award, Swords, Users, X,
+  Search, Minus, Trash2, Play, Activity, Reply, Brain, Ban,
+} from 'lucide-react-native'
 import { Sheet } from '../components/Sheet'
 import { Icon } from '../components/Icon'
 import { Chip, ProgressBar } from '../components/ui'
@@ -22,9 +27,10 @@ import { coachThreadView, coachDisplayName } from '../store/coach'
 import { CoachMemoryView } from '../components/CoachMemoryView'
 import { coachOperational, COACH_PREVIEW } from '../lib/coachSafety'
 import { CoachComingSoon } from '../components/CoachComingSoon'
-import { todaySession } from '../store/selectors'
-import { relativeLabel, todayKey } from '../lib/date'
-import { MAX_DASHBOARD_STATS, STAT_METRICS, STAT_TIMEFRAMES, dashboardStatIds, dashboardTimeframe, progressMetricId } from '../lib/metrics'
+import { todaySession, leaderboardSorted, youRank } from '../store/selectors'
+import { relativeLabel, todayKey, deviceTimezone } from '../lib/date'
+import { CHART_METRICS, DASHBOARD_FEATURED, MAX_DASHBOARD_STATS, PROGRESS_LIFT_PERIODS, STAT_METRICS, STAT_TIMEFRAMES, dashboardFeaturedId, dashboardLiftPeriod, dashboardStatIds, dashboardTimeframe, dashboardTrackedIds, progressMetricId } from '../lib/metrics'
+import type { ProgressLiftPeriod } from '../store/types'
 import { brand, useColors, accentFor, type AccentKey } from '../theme'
 import { AppModal, IS_WEB, WEB_SCREEN } from '../components/WebFrame'
 import { CoachScreen } from '../coach/CoachScreen'
@@ -542,7 +548,31 @@ export function CustomizeSheet({ open, onClose, params }: Props) {
   const metric = progressMetricId(state)
   const stats = dashboardStatIds(state)
   const timeframe = dashboardTimeframe(state)
+  const featured = dashboardFeaturedId(state)
   const atMax = stats.length >= MAX_DASHBOARD_STATS
+
+  function pickFeatured(id: string) {
+    dispatch({ type: 'SET_SETTINGS', patch: { dashboardFeatured: id } })
+  }
+
+  // Dashboard "Training progress" card config (independent of the Progress screen).
+  const trackedIds = dashboardTrackedIds(state)
+  const liftPeriod = dashboardLiftPeriod(state)
+  const trackedRows = trackedIds.map((id) => ({ id, name: exById(id)?.name ?? id, muscle: exById(id)?.muscle ?? '' }))
+  const [liftQuery, setLiftQuery] = useState('')
+  const lq = liftQuery.trim().toLowerCase()
+  const liftResults = lq
+    ? EXERCISES.filter((e) => e.name.toLowerCase().includes(lq) || e.muscle.toLowerCase().includes(lq)).slice(0, 8)
+    : []
+  function setLiftPeriod(p: ProgressLiftPeriod) {
+    dispatch({ type: 'SET_SETTINGS', patch: { dashboardLiftPeriod: p } })
+  }
+  function toggleTracked(id: string) {
+    const has = trackedIds.includes(id)
+    // Removing the last lift is allowed — an empty list hides the card entirely.
+    if (has) dispatch({ type: 'SET_SETTINGS', patch: { dashboardTrackedIds: trackedIds.filter((x) => x !== id) } })
+    else dispatch({ type: 'SET_SETTINGS', patch: { dashboardTrackedIds: [...trackedIds, id] } })
+  }
 
   // Progress tab: the featured metric, and any exercise pinned via search.
   const [query, setQuery] = useState('')
@@ -555,11 +585,11 @@ export function CustomizeSheet({ open, onClose, params }: Props) {
   }
 
   // Design behaviour: enabling is blocked once three are on (the row dims);
-  // turn one off first. Disabling stops at one so the grid never goes empty.
+  // turn one off first. All stats can be turned off — an empty grid hides the
+  // overview cards entirely (the user's choice).
   function toggleStat(id: string) {
     const has = stats.includes(id)
     if (has) {
-      if (stats.length <= 1) return
       dispatch({ type: 'SET_SETTINGS', patch: { dashboardStats: stats.filter((x) => x !== id) } })
     } else {
       if (stats.length >= MAX_DASHBOARD_STATS) return
@@ -575,6 +605,7 @@ export function CustomizeSheet({ open, onClose, params }: Props) {
     if (open) {
       setRender(true)
       setQuery('')
+      setLiftQuery('')
       Animated.timing(progress, { toValue: 1, duration: 360, easing: CUST_EASE, useNativeDriver: !IS_WEB }).start()
     } else if (render) {
       Animated.timing(progress, { toValue: 0, duration: 260, easing: CUST_EASE, useNativeDriver: !IS_WEB }).start(({ finished }) => {
@@ -615,7 +646,7 @@ export function CustomizeSheet({ open, onClose, params }: Props) {
             </Pressable>
           </View>
           <Text style={{ marginTop: isProgress ? 4 : 3, fontSize: isProgress ? 13 : 12.5, color: `${colors.fg}80` }}>
-            {isProgress ? 'Choose the time window, then pick one stat to feature.' : 'Choose the time window, then pick up to three stats.'}
+            {isProgress ? 'Choose the time window, then pick one stat to feature.' : 'Choose the time window, then pick up to four stats.'}
           </Text>
 
           {/* Time window */}
@@ -711,8 +742,68 @@ export function CustomizeSheet({ open, onClose, params }: Props) {
               </>
             ) : (
               <>
+                {/* Featured stat — the big composition card under "Progress overview". */}
+                <Text style={{ marginTop: 20, marginBottom: 4, fontSize: 12, fontWeight: '700', letterSpacing: 0.72, textTransform: 'uppercase', color: `${colors.fg}73` }}>Featured stat</Text>
+                <Text style={{ marginBottom: 12, fontSize: 13, color: `${colors.fg}80` }}>The large card under Progress overview.</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 9 }}>
+                  {DASHBOARD_FEATURED.map((m) => {
+                    const on = featured === m.id
+                    const accent = accentFor(m.accent, colors)
+                    return (
+                      <Pressable
+                        key={m.id}
+                        onPress={() => pickFeatured(m.id)}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: on }}
+                        accessibilityLabel={`Feature ${m.label}`}
+                        style={{ width: '47.8%', flexGrow: 1, gap: 12, padding: 14, borderRadius: 16, backgroundColor: on ? `${colors.brand400}1a` : colors.ink700, borderWidth: 1, borderColor: on ? `${colors.brand400}73` : `${colors.fg}10` }}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 24 }}>
+                          <View style={{ width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: `${accent}26` }}>
+                            <Icon name={m.icon} size={18} color={accent} />
+                          </View>
+                          {on && (
+                            <View style={{ width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brand400 }}>
+                              <Check size={14} strokeWidth={3} color="#0a0a0b" />
+                            </View>
+                          )}
+                        </View>
+                        <Text style={{ fontWeight: '700', fontSize: 14.5, color: colors.fg }}>{m.label}</Text>
+                      </Pressable>
+                    )
+                  })}
+                  {/* None — hides the featured card entirely. */}
+                  {(() => {
+                    const on = featured === 'none'
+                    return (
+                      <Pressable
+                        key="none"
+                        onPress={() => pickFeatured('none')}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: on }}
+                        accessibilityLabel="No featured stat"
+                        style={{ width: '47.8%', flexGrow: 1, gap: 12, padding: 14, borderRadius: 16, backgroundColor: on ? `${colors.brand400}1a` : colors.ink700, borderWidth: 1, borderColor: on ? `${colors.brand400}73` : `${colors.fg}10` }}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 24 }}>
+                          <View style={{ width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: `${colors.fg}12` }}>
+                            <Ban size={18} color={`${colors.fg}8c`} />
+                          </View>
+                          {on && (
+                            <View style={{ width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brand400 }}>
+                              <Check size={14} strokeWidth={3} color="#0a0a0b" />
+                            </View>
+                          )}
+                        </View>
+                        <Text style={{ fontWeight: '700', fontSize: 14.5, color: colors.fg }}>None</Text>
+                      </Pressable>
+                    )
+                  })()}
+                </View>
+
+                <View style={{ height: 1, backgroundColor: `${colors.fg}0f`, marginTop: 22 }} />
+
                 {/* Your stats */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 20, marginBottom: 2 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 22, marginBottom: 2 }}>
                   <Text style={{ fontSize: 12, fontWeight: '700', letterSpacing: 0.72, textTransform: 'uppercase', color: `${colors.fg}73` }}>Your stats</Text>
                   <View style={{ paddingHorizontal: 10, paddingVertical: 2, borderRadius: 999, backgroundColor: atMax ? `${colors.brand400}26` : `${colors.fg}14` }}>
                     <Text style={{ fontSize: 12, fontWeight: '700', color: atMax ? colors.brand300 : `${colors.fg}80` }}>{stats.length} of {MAX_DASHBOARD_STATS}</Text>
@@ -738,6 +829,88 @@ export function CustomizeSheet({ open, onClose, params }: Props) {
                     </Pressable>
                   )
                 })}
+
+                <View style={{ height: 1, backgroundColor: `${colors.fg}0f`, marginTop: 22 }} />
+
+                {/* Training progress — configures the dashboard's ranked-lifts card,
+                    independently of the Progress screen's own tracked lifts. */}
+                <Text style={{ marginTop: 22, marginBottom: 4, fontSize: 12, fontWeight: '700', letterSpacing: 0.72, textTransform: 'uppercase', color: `${colors.fg}73` }}>Training progress</Text>
+                <Text style={{ marginBottom: 16, fontSize: 13, color: `${colors.fg}80` }}>The ranked lifts card under Progress overview.</Text>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 0.55, textTransform: 'uppercase', color: `${colors.fg}66` }}>Tracked lifts</Text>
+                  <View style={{ paddingHorizontal: 9, paddingVertical: 2, borderRadius: 999, backgroundColor: trackedIds.length ? `${colors.brand400}26` : `${colors.fg}14` }}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: trackedIds.length ? colors.brand300 : `${colors.fg}80` }}>{trackedIds.length}</Text>
+                  </View>
+                </View>
+
+                {trackedRows.length === 0 ? (
+                  <View style={{ alignItems: 'center', paddingVertical: 22, paddingHorizontal: 16, borderRadius: 16, borderWidth: 1, borderColor: `${colors.fg}1a`, borderStyle: 'dashed', backgroundColor: `${colors.fg}06` }}>
+                    <Text style={{ fontSize: 13.5, fontWeight: '700', color: `${colors.fg}99` }}>No lifts tracked</Text>
+                    <Text style={{ marginTop: 3, fontSize: 12.5, color: `${colors.fg}66`, textAlign: 'center' }}>The card is hidden. Search below to add one.</Text>
+                  </View>
+                ) : (
+                  <View style={{ gap: 8 }}>
+                    {trackedRows.map((t) => (
+                      <View key={t.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12, paddingVertical: 11, borderRadius: 14, backgroundColor: colors.ink700, borderWidth: 1, borderColor: `${colors.fg}10` }}>
+                        <View style={{ width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: `${colors.brand400}1f` }}>
+                          <Icon name="dumbbell" size={17} color={colors.brand400} />
+                        </View>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text numberOfLines={1} style={{ fontSize: 14.5, fontWeight: '700', color: colors.fg }}>{t.name}</Text>
+                          {!!t.muscle && <Text style={{ fontSize: 11.5, color: `${colors.fg}73`, marginTop: 1 }}>{t.muscle}</Text>}
+                        </View>
+                        <Pressable onPress={() => toggleTracked(t.id)} hitSlop={10} accessibilityRole="button" accessibilityLabel={`Remove ${t.name}`} style={{ width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: `${colors.fg}12` }}>
+                          <X size={14} color={`${colors.fg}8c`} strokeWidth={2.4} />
+                        </Pressable>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                <Text style={{ marginTop: 20, marginBottom: 9, fontSize: 11, fontWeight: '700', letterSpacing: 0.55, textTransform: 'uppercase', color: `${colors.fg}66` }}>Trend range</Text>
+                <View style={{ flexDirection: 'row', gap: 4, backgroundColor: colors.ink700, padding: 4, borderRadius: 13 }}>
+                  {PROGRESS_LIFT_PERIODS.map((pp) => {
+                    const on = liftPeriod === pp
+                    const label = pp === '4 weeks' ? '4 Weeks' : pp === '3 months' ? '3 Months' : '6 Months'
+                    return (
+                      <Pressable key={pp} onPress={() => setLiftPeriod(pp)} accessibilityRole="button" accessibilityState={{ selected: on }} style={tabStyle(on)}>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: on ? '#0a0a0b' : `${colors.fg}8c` }}>{label}</Text>
+                      </Pressable>
+                    )
+                  })}
+                </View>
+
+                <Text style={{ marginTop: 20, marginBottom: 9, fontSize: 11, fontWeight: '700', letterSpacing: 0.55, textTransform: 'uppercase', color: `${colors.fg}66` }}>Add a lift</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 14, backgroundColor: colors.ink700, borderWidth: 1, borderColor: `${colors.fg}14` }}>
+                  <Search size={18} color={`${colors.fg}66`} />
+                  <TextInput value={liftQuery} onChangeText={setLiftQuery} placeholder="Search exercises" placeholderTextColor={`${colors.fg}59`} style={{ flex: 1, minWidth: 0, fontSize: 15, color: colors.fg, paddingVertical: 0 }} />
+                  {liftQuery.length > 0 && <Pressable onPress={() => setLiftQuery('')} hitSlop={8} accessibilityRole="button" accessibilityLabel="Clear search"><X size={15} color={`${colors.fg}73`} /></Pressable>}
+                </View>
+                {lq.length > 0 && (
+                  <View style={{ marginTop: 10, borderRadius: 16, overflow: 'hidden', backgroundColor: colors.ink700, borderWidth: 1, borderColor: `${colors.fg}10` }}>
+                    {liftResults.map((e, i) => {
+                      const on = trackedIds.includes(e.id)
+                      return (
+                        <Pressable key={e.id} onPress={() => toggleTracked(e.id)} style={{ flexDirection: 'row', alignItems: 'center', gap: 11, paddingHorizontal: 13, paddingVertical: 11, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: `${colors.fg}10` }}>
+                          <View style={{ width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: `${colors.fg}0f` }}>
+                            <Icon name="dumbbell" size={16} color={on ? colors.brand400 : `${colors.fg}8c`} />
+                          </View>
+                          <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text style={{ fontSize: 15, fontWeight: '700', color: colors.fg }}>{e.name}</Text>
+                            <Text style={{ fontSize: 12, color: `${colors.fg}73`, marginTop: 1 }}>{e.muscle}</Text>
+                          </View>
+                          {on ? (
+                            <View style={{ width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brand400 }}><Check size={15} strokeWidth={3} color="#0a0a0b" /></View>
+                          ) : (
+                            <View style={{ width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: `${colors.fg}14`, borderWidth: 1, borderColor: `${colors.fg}26` }}><Plus size={15} color={`${colors.fg}73`} /></View>
+                          )}
+                        </Pressable>
+                      )
+                    })}
+                    {liftResults.length === 0 && <Text style={{ textAlign: 'center', fontSize: 13, color: `${colors.fg}73`, padding: 14 }}>No exercises match your search.</Text>}
+                  </View>
+                )}
               </>
             )}
           </ScrollView>

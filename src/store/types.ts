@@ -202,16 +202,12 @@ export interface Settings {
   dashboardStats?: string[]
   /** The window those stats are measured over. Defaults to '7 days'. */
   dashboardTimeframe?: StatTimeframe
-  /** Exercise id featured in the Progress "Strength progress" 4-week focus card. */
-  strengthFocusId?: string
-  /** Time window for the Progress featured card + quick stats. Defaults to '4 weeks'. */
-  progressTimeframe?: StatTimeframe
-  /** The (up to three) quick-stat ids under the Progress featured card. */
-  progressQuickStats?: string[]
-  /** The tracked lift ids shown in the Progress "Training progress" section. */
-  progressTrackedIds?: string[]
-  /** Trend window for the Progress "Training progress" ranked lifts. */
-  progressLiftPeriod?: ProgressLiftPeriod
+  /** Which metric the dashboard's featured composition card shows (default 'nutrition'). */
+  dashboardFeatured?: string
+  /** Tracked lift ids for the DASHBOARD's "Training progress" card (independent of Progress). */
+  dashboardTrackedIds?: string[]
+  /** Trend window for the dashboard's "Training progress" card (independent of Progress). */
+  dashboardLiftPeriod?: ProgressLiftPeriod
 }
 
 /** The Progress "Training progress" trend window. */

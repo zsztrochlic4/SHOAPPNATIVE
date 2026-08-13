@@ -10,7 +10,7 @@ import { IS_WEB, WEB_SCREEN } from './WebFrame'
 /**
  * Wraps the dashboard so a horizontal swipe reveals the adjacent surface:
  *   • drag left → right  → the side menu
- *   • drag right → left  → the coach chat
+ *   • drag right → left  → the coach chat (only when `onOpenCoach` is provided)
  *
  * The content tracks the finger (`dragX`) and an edge affordance grows in from
  * the revealed side, so the gesture is discoverable and reads as direct
@@ -25,7 +25,8 @@ export function SwipeNav({
 }: {
   children: ReactNode
   onOpenMenu: () => void
-  onOpenCoach: () => void
+  /** Optional: when omitted, the swipe-to-coach side is disabled and its affordance hidden. */
+  onOpenCoach?: () => void
   /** The user's chosen coach name (or "Coach"), shown on the swipe-to-coach affordance. */
   coachLabel?: string
 }) {
@@ -66,12 +67,14 @@ export function SwipeNav({
           <Menu size={18} color={colors.brand400} />
           <Text style={[styles.pillText, { color: colors.fg }]}>Menu</Text>
         </Animated.View>
-        <Animated.View
-          style={[styles.pill, { right: 14, backgroundColor: colors.ink700 }, rightStyle]}
-        >
-          <MessageCircle size={18} color={colors.brand400} />
-          <Text style={[styles.pillText, { color: colors.fg }]} numberOfLines={1}>{coachLabel}</Text>
-        </Animated.View>
+        {onOpenCoach && (
+          <Animated.View
+            style={[styles.pill, { right: 14, backgroundColor: colors.ink700 }, rightStyle]}
+          >
+            <MessageCircle size={18} color={colors.brand400} />
+            <Text style={[styles.pillText, { color: colors.fg }]} numberOfLines={1}>{coachLabel}</Text>
+          </Animated.View>
+        )}
       </View>
 
       <GestureDetector gesture={gesture}>

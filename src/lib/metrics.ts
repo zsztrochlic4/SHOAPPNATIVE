@@ -205,18 +205,37 @@ export const STAT_METRICS: StatMetric[] = [
 
 export const DEFAULT_DASHBOARD_STATS = ['workouts', 'strength', 'weight']
 
-/** How many stats the overview grid can hold. */
-export const MAX_DASHBOARD_STATS = 3
+/** How many stats the overview grid can hold (4 shows as a 2×2 grid). */
+export const MAX_DASHBOARD_STATS = 4
 
 export function statById(id: string): StatMetric | undefined {
   return STAT_METRICS.find((m) => m.id === id)
 }
 
-/** The stat ids for the dashboard overview (1-3), falling back to defaults. */
+/** The stat ids for the dashboard overview (0-3). Undefined = never configured →
+ *  starter defaults. An explicit [] = the user cleared them all → stays empty. */
 export function dashboardStatIds(s: AppState): string[] {
   const ids = s.settings.dashboardStats
-  if (!ids || ids.length === 0) return DEFAULT_DASHBOARD_STATS
+  if (ids === undefined) return DEFAULT_DASHBOARD_STATS
   return ids.slice(0, MAX_DASHBOARD_STATS)
+}
+
+/** The stats that can be featured in the dashboard composition card (the big card
+ *  under "Progress overview"). Selectable from the dashboard Customise sheet. */
+export const DASHBOARD_FEATURED: { id: string; label: string; icon: string; accent: AccentKey }[] = [
+  { id: 'nutrition', label: 'Eating quality', icon: 'leaf', accent: 'brand' },
+  { id: 'weight', label: 'Body weight', icon: 'scale', accent: 'blue' },
+  { id: 'water', label: 'Water', icon: 'droplet', accent: 'blue' },
+  { id: 'steps', label: 'Daily steps', icon: 'footprints', accent: 'orange' },
+  { id: 'sleep', label: 'Sleep', icon: 'bed', accent: 'yellow' },
+]
+
+/** Which metric the dashboard featured card shows (default 'nutrition'). The
+ *  sentinel 'none' means the user hid the featured card entirely. */
+export function dashboardFeaturedId(s: AppState): string {
+  const id = s.settings.dashboardFeatured
+  if (id === 'none') return 'none'
+  return id && DASHBOARD_FEATURED.some((m) => m.id === id) ? id : 'nutrition'
 }
 
 /* ------------------------------------------------------------------ */
@@ -385,13 +404,6 @@ export interface ProgressFeatured {
 
 const TF_DAYS: Record<StatTimeframe, number> = { '7 days': 7, '4 weeks': 28, '3 months': 90 }
 const TF_WORD: Record<StatTimeframe, string> = { '7 days': '7 days', '4 weeks': '4 weeks', '3 months': '3 months' }
-const TF_CAP: Record<StatTimeframe, string> = { '7 days': 'last 7 days', '4 weeks': 'last 4 weeks', '3 months': 'last 3 months' }
-
-/** The Progress featured/quick window (Settings, default '4 weeks'). */
-export function progressTimeframe(s: AppState): StatTimeframe {
-  const tf = s.settings.progressTimeframe
-  return tf && STAT_TIMEFRAMES.includes(tf) ? tf : '4 weeks'
-}
 
 const seg = (label: string, pct: number, color: ProgressColor, valueLabel: string, dim = false): ProgressSegment => ({ label, pct: Math.max(0, pct), color, valueLabel, dim })
 const stat = (label: string, value: string, align: ProgressStat['align'], accent = false): ProgressStat => ({ label, value, align, accent })
@@ -528,78 +540,23 @@ export function progressFeatured(s: AppState, metricId: string, tf: StatTimefram
   }
 }
 
-/* ----------------------------- Quick stats -------------------------------- */
-export interface ProgressQuick { id: string; label: string; icon: string }
-export const PROGRESS_QUICK: ProgressQuick[] = [
-  { id: 'strength', label: 'Strength', icon: 'trending' },
-  { id: 'workouts', label: 'Workouts', icon: 'dumbbell' },
-  { id: 'steps', label: 'Steps', icon: 'footprints' },
-  { id: 'sleep', label: 'Sleep', icon: 'bed' },
-  { id: 'water', label: 'Water', icon: 'droplet' },
-  { id: 'weight', label: 'Body weight', icon: 'scale' },
-  { id: 'nutrition', label: 'Eating quality', icon: 'leaf' },
-]
-const QUICK_ORDER = PROGRESS_QUICK.map((q) => q.id)
-export const DEFAULT_PROGRESS_QUICK = ['strength', 'workouts', 'sleep']
-export const MAX_PROGRESS_QUICK = 3
-
-export function progressQuickIds(s: AppState): string[] {
-  const ids = s.settings.progressQuickStats
-  return ids && ids.length ? ids : DEFAULT_PROGRESS_QUICK
-}
-
-/** The quick-stat id the featured card already represents (so it's dropped from the row). */
-export function featuredQuickId(metricId: string): string {
-  return metricId === 'steps' || metricId === 'water' || metricId === 'sleep' || metricId === 'weight' || metricId === 'nutrition' ? metricId : 'strength'
-}
-
-function avgEatingQuality(s: AppState, days: number): number {
-  const map = s.nutritionTags ?? {}
-  let sum = 0, cnt = 0
-  for (let d = days - 1; d >= 0; d--) { const t = map[dayKey(d)]; if (Array.isArray(t) && t.length) { sum += eatingScore(t); cnt++ } }
-  return cnt ? Math.round(sum / cnt) : 0
-}
-
-export function progressQuickValue(s: AppState, id: string, tf: StatTimeframe, units: Units): { value: string; cap: string } {
-  const days = TF_DAYS[tf]
-  switch (id) {
-    case 'strength': { const g = strengthGainPct(s, days - 1, 0); return { value: `${g < 0 ? '' : '+'}${Math.round(g)}%`, cap: TF_CAP[tf] } }
-    case 'workouts': return { value: String(regularWorkoutsInRange(s, days - 1, 0)), cap: TF_CAP[tf] }
-    case 'steps': { const v = habitAvg(s, (h) => h.steps, days - 1, 0); return { value: v ? Math.round(v).toLocaleString() : '--', cap: 'avg / day' } }
-    case 'sleep': { const v = habitAvg(s, (h) => h.sleepH, days - 1, 0); return { value: v ? `${round1(v).toFixed(1)}h` : '--', cap: 'avg / night' } }
-    case 'water': { const v = habitAvg(s, (h) => h.waterL, days - 1, 0); return { value: v ? fmtFluid(v, units) : '--', cap: 'avg / day' } }
-    case 'weight': { const w = weightStats(s); return { value: `${fmtWeightNum(w.current, units, 1)}${weightUnit(units)}`, cap: 'current' } }
-    case 'nutrition': { const v = avgEatingQuality(s, days); return { value: v ? String(v) : '--', cap: 'avg / 100' } }
-    default: return { value: '--', cap: '' }
-  }
-}
-
-/** The (≤3) quick cards to show: the user's picks minus the featured metric, filled from the pool. */
-export function progressQuickCards(s: AppState, metricId: string, tf: StatTimeframe, units: Units) {
-  const fq = featuredQuickId(metricId)
-  const chosen = progressQuickIds(s)
-  let disp = chosen.filter((id) => id !== fq)
-  for (const id of QUICK_ORDER) { if (disp.length >= MAX_PROGRESS_QUICK) break; if (id !== fq && !disp.includes(id)) disp.push(id) }
-  disp = disp.slice(0, MAX_PROGRESS_QUICK)
-  return disp.map((id) => {
-    const meta = PROGRESS_QUICK.find((q) => q.id === id)!
-    const { value, cap } = progressQuickValue(s, id, tf, units)
-    return { id, label: meta.label, icon: meta.icon, value, cap }
-  })
-}
-
 /* --------------------------- Tracked lifts -------------------------------- */
 const LIFT_PERIOD_DAYS: Record<ProgressLiftPeriod, number> = { '4 weeks': 28, '3 months': 90, '6 months': 182 }
 export const PROGRESS_LIFT_PERIODS: ProgressLiftPeriod[] = ['4 weeks', '3 months', '6 months']
 export const DEFAULT_TRACKED_LIFTS = ['bench', 'squat', 'deadlift', 'ohp']
 
-export function progressTrackedIds(s: AppState): string[] {
-  const ids = s.settings.progressTrackedIds
-  return (ids && ids.length ? ids : DEFAULT_TRACKED_LIFTS).filter((id) => !!exById(id))
+/** Tracked lift ids for the dashboard "Training progress" card (independent of Progress).
+ *  Undefined = never configured → starter defaults. An explicit [] = the user cleared
+ *  them all → stays empty (the card hides). */
+export function dashboardTrackedIds(s: AppState): string[] {
+  const ids = s.settings.dashboardTrackedIds
+  if (ids === undefined) return DEFAULT_TRACKED_LIFTS.filter((id) => !!exById(id))
+  return ids.filter((id) => !!exById(id))
 }
 
-export function progressLiftPeriod(s: AppState): ProgressLiftPeriod {
-  const p = s.settings.progressLiftPeriod
+/** Trend window for the dashboard "Training progress" card (independent of Progress). */
+export function dashboardLiftPeriod(s: AppState): ProgressLiftPeriod {
+  const p = s.settings.dashboardLiftPeriod
   return p && PROGRESS_LIFT_PERIODS.includes(p) ? p : '4 weeks'
 }
 

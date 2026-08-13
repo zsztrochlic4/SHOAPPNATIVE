@@ -9,6 +9,7 @@ import {
   Trash2, Pencil, Share2, MessageCircle, CalendarCheck, ChefHat, LayoutGrid,
 } from 'lucide-react-native'
 import { AppModal } from '../components/WebFrame'
+import { BodyCompositionCard } from '../components/BodyCompositionCard'
 import { useDispatch, useStore } from '../store/store'
 import { useToast } from '../components/Toast'
 import { useNav } from '../nav'
@@ -281,6 +282,10 @@ function OverviewTab() {
           <Text className="text-[11.5px] text-tertiary">These show on the Dashboard.</Text>
         </View>
       </View>
+
+      {/* Body composition (BMI) — moved here from the Progress screen so it sits
+          at the bottom of the nutrition overview. */}
+      <BodyCompositionCard />
     </ScrollView>
   )
 }

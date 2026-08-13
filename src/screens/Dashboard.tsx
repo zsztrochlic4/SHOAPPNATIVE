@@ -11,6 +11,8 @@ import { MuscleMapCard, MuscleFigures } from '../components/MuscleMapCard'
 import { AppModal, IS_WEB, WEB_SCREEN } from '../components/WebFrame'
 import { PressableScale } from '../components/PressableScale'
 import { IndexGauge } from '../components/IndexGauge'
+import { FeaturedStatCard } from '../components/FeaturedStatCard'
+import { TrainingProgressCard } from '../components/TrainingProgressCard'
 import { useStore } from '../store/store'
 import { useNav } from '../nav'
 import { currentWeekKeys, todayKey, longDate, shortDate, fromKey, currentHour } from '../lib/date'
@@ -34,6 +36,11 @@ import { brand, accent, accentFor, useColors, type AccentKey } from '../theme'
 
 const WD = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const FULL_WD = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+/** The training-profile goal (set in Menu → Your training) → a human label. */
+const GOAL_LABEL: Record<string, string> = {
+  'build-muscle': 'Build muscle', 'lose-fat': 'Lose fat', 'gain-strength': 'Gain strength', 'stay-healthy': 'Stay healthy',
+}
 
 function greetingFor(hour: number): string {
   if (hour < 12) return 'Good morning'
@@ -185,7 +192,7 @@ export default function Dashboard() {
           <Menu size={24} color={colors.fg} />
         </Pressable>
         <Wordmark size="sm" />
-        {/* Coach lives in the bottom nav now — no top-right shortcut. Spacer keeps the wordmark centred. */}
+        {/* Coach lives on the nav bar now — spacer keeps the wordmark centred. */}
         <View className="h-10 w-10" />
       </View>
 
@@ -410,18 +417,46 @@ export default function Dashboard() {
       <View className="mt-7 flex-row items-end justify-between" style={{ marginBottom: 12 }}>
         <View className="min-w-0 flex-1">
           <Text className="text-[19px] font-extrabold text-white" style={{ letterSpacing: -0.19 }}>Progress overview</Text>
-          <Text className="mt-[3px] text-[12px] font-semibold text-secondary">{timeframeLabel(timeframe)}</Text>
+          {!!GOAL_LABEL[state.profile.goal] && (
+            <Text numberOfLines={1} className="mt-[3px] text-[12px] font-semibold text-secondary">
+              Goal: {GOAL_LABEL[state.profile.goal]}
+            </Text>
+          )}
         </View>
-        <Pressable onPress={() => nav.open('customize')} hitSlop={8} className="ml-3 flex-row items-center gap-[5px] active:opacity-70">
+        {/* The window lives here now (tap to open Customise, where it's changed). */}
+        <Pressable onPress={() => nav.open('customize')} hitSlop={8} accessibilityLabel="Change window and customise stats" className="ml-3 flex-row items-center gap-[5px] active:opacity-70">
           <SlidersHorizontal size={16} color={colors.brand400} strokeWidth={1.8} />
-          <Text className="text-[14px] font-bold" style={{ color: colors.brand400 }}>Customise</Text>
+          <Text className="text-[14px] font-bold" style={{ color: colors.brand400 }}>{timeframeLabel(timeframe)}</Text>
         </Pressable>
       </View>
-      <View className="flex-row" style={{ gap: 10 }}>
-        {overviewStats.map(({ id, metric, result }) => (
-          <OverviewCard key={id} accent={accentFor(metric.accent, colors)} result={result} colors={colors} single={overviewStats.length === 1} />
-        ))}
-      </View>
+      {/* Featured stat — the big composition card sits above the small stat tiles
+       *  (metric chosen in Customise; own range filter, independent of Progress). */}
+      <FeaturedStatCard />
+
+      {/* 1-3 stats: one full-width row (flex:1 cards fill it). 4 stats: a 2×2 grid.
+       *  A lone card centres its content instead of stranding it on the left. */}
+      {overviewStats.length > 0 && overviewStats.length !== 4 && (
+        <View className="flex-row" style={{ gap: 10, marginTop: 10 }}>
+          {overviewStats.map(({ id, metric, result }) => (
+            <OverviewCard key={id} accent={accentFor(metric.accent, colors)} result={result} colors={colors} centered={overviewStats.length === 1} />
+          ))}
+        </View>
+      )}
+      {overviewStats.length === 4 && (
+        <View style={{ gap: 10, marginTop: 10 }}>
+          {[0, 2].map((start) => (
+            <View key={start} className="flex-row" style={{ gap: 10 }}>
+              {overviewStats.slice(start, start + 2).map(({ id, metric, result }) => (
+                <OverviewCard key={id} accent={accentFor(metric.accent, colors)} result={result} colors={colors} />
+              ))}
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Training progress — the tracked lifts ranked by gain, a copy of the
+       *  Progress screen's card (shares the same tracked-lift settings). */}
+      <TrainingProgressCard />
 
       {/* When is your busy period? — exams, travel, moving house. */}
       <Text className="text-[19px] font-extrabold text-white" style={{ marginTop: 26, marginBottom: 17 }}>When is your busy period?</Text>
@@ -1192,58 +1227,40 @@ function Section({ title, right, tight }: { title: string; right?: ReactNode; ti
  * the number moved the way this metric wants (which for body weight is *down*),
  * red when it moved against, and neutral grey when nothing changed.
  */
-function OverviewCard({ accent, result, colors, single = false }: { accent: string; result: StatResult; colors: ThemeColors; single?: boolean }) {
+function OverviewCard({ accent, result, colors, centered = false }: { accent: string; result: StatResult; colors: ThemeColors; centered?: boolean }) {
   const flat = result.dir === 'flat'
   const pillColor = flat ? `${colors.fg}66` : result.good ? colors.brand400 : colors.danger
   const pillBg = flat ? `${colors.fg}12` : `${result.good ? colors.brand400 : colors.danger}24`
   const arrow = result.dir === 'down' ? '↓' : '↑'
   const pill = (
     <View style={{ borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: pillBg }}>
-      <Text numberOfLines={1} style={{ fontSize: single ? 12 : 11, fontWeight: '700', color: pillColor }}>
+      <Text numberOfLines={1} style={{ fontSize: 11, fontWeight: '700', color: pillColor }}>
         {result.arrow ? `${arrow} ${result.delta}` : result.delta}
       </Text>
     </View>
   )
   const cardShadow = { shadowColor: '#000', shadowOpacity: 0.28, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 3 } as const
 
-  // A lone stat has the whole row to itself — centre it as a small hero rather
-  // than leaving the number stranded in the top-left of a wide, empty card.
-  if (single) {
-    return (
-      <LinearGradient
-        colors={[colors.ink700, colors.ink800]}
-        style={{ flex: 1, minWidth: 0, borderRadius: 18, paddingVertical: 22, paddingHorizontal: 16, alignItems: 'center', borderWidth: 1, borderColor: `${colors.fg}0f`, ...cardShadow }}
-      >
-        <View style={{ width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: `${accent}26` }}>
-          <Icon name={result.icon} size={20} color={accent} />
-        </View>
-        <Text numberOfLines={1} className="mt-3 text-[12.5px] font-semibold text-secondary" style={{ textAlign: 'center' }}>{result.label}</Text>
-        <View className="mt-1.5 flex-row items-baseline justify-center" style={{ gap: 3 }}>
-          <Text className="font-extrabold text-white" style={{ fontSize: 34, letterSpacing: -1 }}>{result.value}</Text>
-          {!!result.unit && <Text className="text-[14px] text-secondary">{result.unit}</Text>}
-        </View>
-        <View className="mt-2.5">{pill}</View>
-      </LinearGradient>
-    )
-  }
-
+  // Compact layout matching the Progress screen's quick cards: the icon sits
+  // inline with the label (one row) instead of on its own tile, so the card is
+  // a row shorter and lines up in height with those boxes.
   return (
     <LinearGradient
       colors={[colors.ink700, colors.ink800]}
       style={{
-        flex: 1, minWidth: 0, borderRadius: 18, paddingHorizontal: 13, paddingTop: 13, paddingBottom: 12,
-        borderWidth: 1, borderColor: `${colors.fg}0f`, ...cardShadow,
+        flex: 1, minWidth: 0, borderRadius: 18, paddingHorizontal: 13, paddingTop: 12, paddingBottom: 11,
+        borderWidth: 1, borderColor: `${colors.fg}0f`, ...(centered ? { alignItems: 'center' as const } : null), ...cardShadow,
       }}
     >
-      <View style={{ width: 28, height: 28, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: `${accent}26` }}>
+      <View className="flex-row items-center" style={{ gap: 6 }}>
         <Icon name={result.icon} size={15} color={accent} />
+        <Text numberOfLines={1} className={`${centered ? '' : 'flex-1 '}text-[11.5px] font-semibold text-secondary`}>{result.label}</Text>
       </View>
-      <Text numberOfLines={1} className="mt-2.5 text-[11.5px] font-semibold text-secondary">{result.label}</Text>
-      <View className="mt-[5px] flex-row items-baseline" style={{ gap: 2 }}>
-        <Text className="text-[24px] font-extrabold text-white" style={{ letterSpacing: -0.7 }}>{result.value}</Text>
-        {!!result.unit && <Text className="text-[12px] text-secondary">{result.unit}</Text>}
+      <View className="mt-2.5 flex-row items-baseline" style={{ gap: 2 }}>
+        <Text className="text-[21px] font-extrabold text-white" style={{ letterSpacing: -0.6 }}>{result.value}</Text>
+        {!!result.unit && <Text className="text-[11.5px] text-secondary">{result.unit}</Text>}
       </View>
-      <View className="mt-[9px] flex-row">{pill}</View>
+      <View className="mt-[7px] flex-row">{pill}</View>
     </LinearGradient>
   )
 }
