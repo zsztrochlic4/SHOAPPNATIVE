@@ -3,7 +3,7 @@ import { View, Text, Pressable, Image, Animated, Easing, Platform, ScrollView, S
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Circle, G, Defs, RadialGradient, Stop, Rect } from 'react-native-svg'
 import { LinearGradient } from 'expo-linear-gradient'
-import { Menu, Clock, GraduationCap, ChevronRight, Leaf, Check, Flame, ChevronDown, Info, ArrowRight, X, SlidersHorizontal } from 'lucide-react-native'
+import { Menu, Clock, GraduationCap, ChevronRight, Leaf, Check, Flame, ChevronDown, Info, ArrowRight, X, SlidersHorizontal, Sparkles } from 'lucide-react-native'
 import { Icon } from '../components/Icon'
 import { ActivityIcon } from '../components/ActivityIcon'
 import { Card } from '../components/ui'
@@ -27,6 +27,10 @@ import { tagById, NUTRITION_TAGS, type TagTone } from '../data/nutrition'
 import { dashboardStatIds, dashboardTimeframe, statById, timeframeLabel, type StatResult } from '../lib/metrics'
 import { dailyTargets, examState } from '../store/training'
 import { activePeriod, upcomingPeriods, daysLabel, daysUntil, fmtPeriodDate, nextDayKey } from '../store/periods'
+import { proactiveCheckin, coachDisplayName } from '../store/coach'
+import { coachOperational } from '../lib/coachSafety'
+import { thud } from '../lib/haptics'
+import type { CoachMessage } from '../store/types'
 import { Wordmark } from '../components/Logo'
 import { brand, accent, accentFor, useColors, type AccentKey } from '../theme'
 
@@ -101,6 +105,22 @@ export default function Dashboard() {
   const loggedSomethingToday =
     workoutStartedForDay(state, todayKey) || habit.steps > 0 || habit.waterL > 0 || habit.sleepH > 0 || weightLoggedToday
   const streakAtRisk = streak.current > 0 && !loggedSomethingToday
+
+  // Proactive coach check-in — the delivery behind the "Proactive check-ins" preference. The coach
+  // surfaces one genuinely relevant, unprompted card here (never the generic greeting), gated by the
+  // mirrored server preference and shown at most once per day until dismissed. `coachOperational()`
+  // couples it to the same master switch/kill-switch as the rest of the coach.
+  const coachName = coachDisplayName(state.profile.coachName)
+  const checkinDismissed = state.settings.coachCheckinDismissedKey === todayKey
+  const coachCheckin =
+    coachOperational() && state.settings.coachProactiveEnabled === true && !checkinDismissed
+      ? proactiveCheckin(state)
+      : null
+  const dismissCheckin = () => {
+    thud()
+    dispatch({ type: 'SET_SETTINGS', patch: { coachCheckinDismissedKey: todayKey } })
+  }
+  const openCheckin = (cta?: CoachMessage['cta']) => nav.open((cta?.overlay ?? 'coachChat') as Parameters<typeof nav.open>[0])
 
   const greeting = greetingFor(currentHour())
   const weekKeys = currentWeekKeys()
@@ -190,6 +210,17 @@ export default function Dashboard() {
           <Text className="flex-1 text-[13px] font-semibold text-white/80">Log anything today to keep your {streak.current}-day streak alive.</Text>
           <ChevronRight size={16} color={accent.orange} />
         </Pressable>
+      )}
+
+      {/* Proactive coach check-in — the coach reaching out first, unprompted. */}
+      {coachCheckin && (
+        <ProactiveCheckinCard
+          checkin={coachCheckin}
+          coachName={coachName}
+          colors={colors}
+          onOpen={() => openCheckin(coachCheckin.cta)}
+          onDismiss={dismissCheckin}
+        />
       )}
 
       <Pressable onPress={() => setShowWhy((v) => !v)} accessibilityRole="button" accessibilityLabel="Explain your readiness score" className="active:opacity-90">
@@ -463,6 +494,53 @@ export default function Dashboard() {
         />
       )}
     </View>
+  )
+}
+
+/* The proactive coach check-in card. The coach surfaces a single relevant, unprompted message on
+ * the dashboard (a PR, a return after a gap, a recovery nudge …). Tapping the card opens the coach
+ * (or the message's own CTA target); the corner X dismisses it for the day. Enters with a short
+ * fade + rise so it reads as arriving, not as always-there chrome. */
+function ProactiveCheckinCard({ checkin, coachName, colors, onOpen, onDismiss }: {
+  checkin: CoachMessage
+  coachName: string
+  colors: ThemeColors
+  onOpen: () => void
+  onDismiss: () => void
+}) {
+  const enter = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    if (prefersReducedMotion()) { enter.setValue(1); return }
+    Animated.timing(enter, { toValue: 1, duration: 420, easing: Easing.bezier(0.22, 1, 0.36, 1), useNativeDriver: Platform.OS !== 'web' }).start()
+  }, [enter])
+  const translateY = enter.interpolate({ inputRange: [0, 1], outputRange: [8, 0] })
+  return (
+    <Animated.View style={{ opacity: enter, transform: [{ translateY }], marginTop: 12 }}>
+      <Pressable
+        onPress={onOpen}
+        accessibilityRole="button"
+        accessibilityLabel={`${coachName} check-in: ${checkin.title}`}
+        className="flex-row items-start gap-3 rounded-2xl border border-brand-400/25 bg-brand-400/[0.06] p-3.5 active:opacity-90"
+      >
+        <View className="h-9 w-9 items-center justify-center rounded-full bg-brand-400">
+          <Sparkles size={17} color="#000" />
+        </View>
+        <View className="min-w-0 flex-1">
+          <Text numberOfLines={1} className="text-[11px] font-bold uppercase tracking-wide text-brand-400">{coachName}</Text>
+          <Text className="mt-0.5 text-[14px] font-bold leading-snug text-white">{checkin.title}</Text>
+          <Text numberOfLines={3} className="mt-0.5 text-[12.5px] leading-snug text-secondary">{checkin.body}</Text>
+          {checkin.cta && (
+            <View className="mt-2 flex-row items-center gap-1">
+              <Text className="text-[12.5px] font-bold" style={{ color: colors.brand400 }}>{checkin.cta.label}</Text>
+              <ArrowRight size={13} color={colors.brand400} />
+            </View>
+          )}
+        </View>
+        <Pressable onPress={onDismiss} hitSlop={10} accessibilityRole="button" accessibilityLabel="Dismiss check-in" className="h-7 w-7 items-center justify-center rounded-full bg-white/5 active:opacity-60">
+          <X size={13} color="rgba(255,255,255,0.5)" strokeWidth={2.5} />
+        </Pressable>
+      </Pressable>
+    </Animated.View>
   )
 }
 

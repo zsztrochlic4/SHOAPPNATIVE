@@ -1,12 +1,15 @@
 import { useEffect, useRef } from 'react'
 import { useAuth } from '../auth/AuthProvider'
 import { useStoreSelector } from '../store/store'
+import { coachDisplayName } from '../store/coach'
 import type { AppState } from '../store/types'
 import { getPushToken, getStoredPushRegistration, savePushToken, syncReminders, unregisterPush } from '../lib/notifications'
 
 const selectNotificationsEnabled = (state: AppState) => state.settings.notificationsEnabled
 const selectNotificationConsent = (state: AppState) => state.settings.notificationConsent ?? 'unknown'
 const selectNotificationPrefs = (state: AppState) => state.settings.notificationPrefs
+const selectCoachProactive = (state: AppState) => state.settings.coachProactiveEnabled === true
+const selectCoachName = (state: AppState) => coachDisplayName(state.profile.coachName)
 
 /**
  * Registers this device for notifications when a signed-in user has them enabled:
@@ -64,8 +67,10 @@ export function NotificationsSync() {
   const enabled = useStoreSelector(selectNotificationsEnabled)
   const consent = useStoreSelector(selectNotificationConsent)
   const prefs = useStoreSelector(selectNotificationPrefs)
+  const coachProactive = useStoreSelector(selectCoachProactive)
+  const coachName = useStoreSelector(selectCoachName)
   useEffect(() => {
-    void syncReminders(!!enabled && consent === 'granted', prefs)
-  }, [enabled, consent, prefs])
+    void syncReminders(!!enabled && consent === 'granted', prefs, { proactiveEnabled: coachProactive, name: coachName })
+  }, [enabled, consent, prefs, coachProactive, coachName])
   return null
 }
