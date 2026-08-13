@@ -8,7 +8,7 @@ import {
   getReactNativePersistence,
   type Auth,
 } from 'firebase/auth'
-import { getFirestore, type Firestore } from 'firebase/firestore'
+import { getFirestore, initializeFirestore, type Firestore } from 'firebase/firestore'
 import { getStorage, type FirebaseStorage } from 'firebase/storage'
 import { getFunctions, type Functions } from 'firebase/functions'
 import AsyncStorage from '@react-native-async-storage/async-storage'
@@ -85,7 +85,9 @@ if (firebaseEnabled) {
     auth = initializeAuth(app, { persistence: getReactNativePersistence(AsyncStorage) })
   }
 
-  db = getFirestore(app)
+  db = Platform.OS === 'web'
+    ? initializeFirestore(app, { experimentalAutoDetectLongPolling: true })
+    : getFirestore(app)
   // Coach kill-switch source (spec §20). Dormant while COACH_ENABLED is false — no listener.
   startCoachKillSwitch(db)
   // LLM safety-classifier transport (Gemini via AI Logic). Registered only; it fires solely when a

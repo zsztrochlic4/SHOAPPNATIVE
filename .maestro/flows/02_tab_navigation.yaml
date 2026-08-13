@@ -9,7 +9,12 @@ tags:
 - runFlow: ../subflows/boot.yaml
 
 - tapOn: "Nutrition"
-- assertVisible: "Snap your meal"
+- assertVisible: "Today's food log"
+
+- tapOn: "Coach"
+- assertVisible: "Meet your coach"
+- tapOn: "Continue with coach"
+- assertVisible: "Message your coach"
 
 - tapOn: "Workout"
 - assertVisible: "History"        # Workout's inner segmented tab
@@ -18,7 +23,7 @@ tags:
 - assertVisible: "League"         # Community's inner segmented tab
 
 - tapOn: "Nutrition"
-- assertVisible: "Snap your meal"
+- assertVisible: "Today's food log"
 
 - tapOn: "Dashboard"
 - assertVisible: "Dashboard"

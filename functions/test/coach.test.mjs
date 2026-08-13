@@ -1,10 +1,8 @@
-// Server-side coach orchestration. COACH_ENABLED is now ON (owner decision 2026-08-03, zero
-// critical holdout misses — see coachGate.ts), so runCoachTurn proceeds past the enable-gate and
-// the remote kill switch is the live off-switch. The guarded behaviour — a crisis never reaches
+// Server-side coach orchestration. Production is default-OFF; internal builds opt in explicitly.
+// The guarded behaviour — a crisis never reaches
 // the model, an allowed turn does + is validated, the daily cap is honoured, and the SERVER is
 // authoritative on action capability (audit C-006) — is verified via coachTurnCore with injected
-// fakes. (Audit C-009: the previous test asserted a stale coach_disabled rejection after the gate
-// had already been flipped; that assertion is corrected here to track the intended release state.)
+// fakes. The first test locks in the production fail-closed release state.
 //   npm --prefix functions run build && node --test functions/test/coach.test.mjs
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -33,17 +31,10 @@ const baseDeps = (over = {}) => {
   return { deps, replyCalls: () => replyCalls }
 }
 
-test('runCoachTurn proceeds past the enable-gate now that COACH_ENABLED is true (audit C-009)', async () => {
+test('runCoachTurn fails closed when the internal release channel is not explicitly enabled', async () => {
   const { deps, replyCalls } = baseDeps()
-  const out = await runCoachTurn('u1', { message: 'how do I squat?' }, deps)
-  assert.equal(out.blocked, false)
-  assert.equal(replyCalls(), 1) // the gate is open, so an allowed turn reaches the model exactly once
-})
-
-test('runCoachTurn returns coach_unavailable when the remote kill switch is engaged (live off-switch)', async () => {
-  const { deps, replyCalls } = baseDeps({ killSwitchEngaged: () => true })
-  await assert.rejects(() => runCoachTurn('u1', { message: 'how do I squat?' }, deps), /coach_unavailable/)
-  assert.equal(replyCalls(), 0) // the model is never consulted while the kill switch is engaged
+  await assert.rejects(() => runCoachTurn('u1', { message: 'how do I squat?' }, deps), /coach_disabled/)
+  assert.equal(replyCalls(), 0)
 })
 
 test('a crisis message is blocked by the safety floor and NEVER reaches the model', async () => {
@@ -131,6 +122,29 @@ test('C-006: a workout_action is SURFACED when the client opts in and the server
   const out = await coachTurnCore('u1', { message: 'can you set up a deload week for me?', allowActions: true }, deps)
   assert.ok(out.proposal && out.proposal.kind === 'workout_action', 'action should be surfaced when permitted')
 })
+
+for (const [message, action] of [
+  ['Start a quick workout for me now, I only have 15 minutes.', 'start_session'],
+  ['Change my training days to Tuesday, Thursday and Saturday.', 'set_training_days'],
+  ['Make my workouts fit into 30 minutes.', 'set_session_length'],
+  ['Open Budget Eats for me.', 'open_budget_eats'],
+  ['Change my goal to build muscle.', 'change_goal'],
+  ['Put me in exam mode for the next two weeks.', 'exam_mode'],
+  ['I missed today. Mark it as an exempt no-penalty rest day.', 'catch_up'],
+  ['Reschedule my training to Monday, Wednesday and Friday.', 'reschedule_days'],
+  ['I will be away from 20 August 2026 to 27 August 2026. Pause training completely for those dates.', 'planned_absence'],
+]) {
+  test(`deterministic action backstop surfaces ${action} when model emits prose only`, async () => {
+    const deps = baseDeps({
+      generateReply: async () => JSON.stringify({ mode: 'personalised', message: 'Want me to do that?', citations: [], memory: null, proposal: { kind: 'none' } }),
+      saveProposal: async (_uid, p) => ({ ...p, id: 'prop1', status: 'pending', createdAt: '', expiresAt: '' }),
+    }).deps
+    const out = await coachTurnCore('u1', { message, allowActions: true }, deps)
+    assert.equal(out.proposal?.kind, 'workout_action')
+    assert.equal(out.proposal?.payload?.action, action)
+    assert.match(out.text, /confirm/i)
+  })
+}
 
 test('C-006: the server DOWNGRADES a workout_action when actioning is disabled server-side, even if the client sent allowActions=true', async () => {
   const deps = actionReplyDeps({ actionsDisabled: () => true })

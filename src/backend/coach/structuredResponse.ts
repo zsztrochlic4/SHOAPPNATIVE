@@ -47,10 +47,17 @@ const _APPLIED_PERFECT = new RegExp(`\\bi(?:['’]ve| have)(?:\\s+(?:just|now|al
 const _APPLIED_PAST = /\bi (?:just |already |now )?(?:swapped|switched|changed|updated|applied|adjusted|rescheduled|replaced|removed|deloaded|scheduled|moved|reprogrammed|regenerated|rebuilt)\b/i
 // Bare completion phrases.
 const _APPLIED_DONE = /\b(?:all set|consider it done|that['’]s (?:done|sorted|applied|updated|changed|swapped))\b|\bdone[.!,—-]/i
+// Future/commitment claims are also dishonest when no proposal exists: “I'll start it now” tells
+// the user an action is underway even though the product has nothing to confirm or apply.
+const _ACTION_COMMITMENT = /\b(?:i\s*(?:['’]ll| will)|let me)\s+(?:now\s+)?(?:start|begin|open|change|update|set|schedule|reschedule|swap|replace|apply|adjust|move|pause|deload)\b/i
 
 export function assertsCompletedWorkoutAction(message: string): boolean {
   if (typeof message !== 'string' || !message) return false
   return _APPLIED_PERFECT.test(message) || _APPLIED_PAST.test(message) || _APPLIED_DONE.test(message)
+}
+
+export function assertsCommittedWorkoutAction(message: string): boolean {
+  return typeof message === 'string' && _ACTION_COMMITMENT.test(message)
 }
 
 // A completion claim is only truthful when a workout_action proposal is attached to actually apply the
@@ -196,7 +203,7 @@ export function validateStructuredCoachReply(raw: unknown): StructuredReplyValid
       // apply, so the claim is a guaranteed false success — neutralise the text to an honest, actionable
       // line and drop the misfiled memory. A real workout_action is exempt: its confirm card gates the
       // apply, so the message + card are allowed to stand together.
-      if (parsedProposal.proposal.kind !== 'workout_action' && assertsCompletedChangeWithObject(message)) {
+      if (parsedProposal.proposal.kind !== 'workout_action' && (assertsCompletedChangeWithObject(message) || assertsCommittedWorkoutAction(message))) {
         return {
           ok: true,
           reply: { mode: mode as CoachAnswerMode, message: FALSE_CHANGE_CLAIM_FALLBACK, citations: [], memory: null, proposal: { kind: 'none' } },

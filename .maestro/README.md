@@ -1,6 +1,6 @@
 # Native E2E + accessibility (Maestro) — Step 7 / R5-013
 
-**Status: DRAFTED, UNTESTED on a device.** These are ready-to-run scaffolds for the native
+**Status: CI-wired for Android emulator; physical iOS/Android accessibility review remains required.** These are native
 (iOS/Android) device-lab work. They have never been executed — selectors were derived from the
 codebase and the Playwright web e2e, so expect to refine a few labels on first run (each flow marks
 those spots with `TODO (on device)`). The existing `e2e/*.spec.ts` are **web** (Playwright); these
@@ -62,6 +62,7 @@ commit real credentials — pass them via `-e EMAIL=... -e PASSWORD=...` and ref
 
 ## CI
 
-`.github/workflows/native-e2e.yml` is a **manual (`workflow_dispatch`) stub** — it does not run on
-PRs because it needs macOS runners + emulators/simulators (or Maestro Cloud), which aren't wired yet.
-Fill in the build + device steps when the device lab / runners exist, then make it required on `main`.
+`.github/workflows/native-e2e.yml` builds a demo-mode Android debug APK, boots an emulator and runs
+the smoke-tagged Maestro suite on every pull request to `main`. Keep this job required in branch
+protection. Physical-device VoiceOver/TalkBack, large text and reduced-motion review remains a named
+release sign-off rather than something Maestro can prove.

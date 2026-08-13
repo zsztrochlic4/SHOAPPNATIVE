@@ -34,7 +34,7 @@ import {
   STRUCTURED_COACH_RESPONSE_SCHEMA,
   validateStructuredCoachReply,
 } from './_shared/backend/coach/structuredResponse'
-import { synthesizeWellnessGoalProposal, synthesizeGoalWeightProposal, synthesizeExerciseDetailNav } from './_shared/backend/coach/workoutActions'
+import { synthesizeBoundedActionProposal, synthesizeWellnessGoalProposal, synthesizeGoalWeightProposal, synthesizeExerciseDetailNav } from './_shared/backend/coach/workoutActions'
 import type {
   CoachActionProposal,
   CoachAnswerMode,
@@ -281,9 +281,9 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
   let suppressMemory = false
   if (allowActions) {
     const emittedAction = replyProposal.kind === 'workout_action' ? String(replyProposal.payload?.action ?? '') : ''
-    const alreadyProfileGoal = emittedAction === 'set_wellness_goal' || emittedAction === 'set_goal_weight'
-    if (!alreadyProfileGoal) {
-      const synth = synthesizeWellnessGoalProposal(message) ?? synthesizeGoalWeightProposal(message)
+    const alreadyAction = emittedAction.length > 0
+    if (!alreadyAction) {
+      const synth = synthesizeWellnessGoalProposal(message) ?? synthesizeGoalWeightProposal(message) ?? synthesizeBoundedActionProposal(message, new Date(`${deps.todayKey}T12:00:00`))
       if (synth) {
         replyProposal = { kind: 'workout_action', title: synth.title, summary: synth.summary, payload: synth.payload }
         replyMessage = synth.message

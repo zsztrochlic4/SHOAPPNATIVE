@@ -3,7 +3,9 @@
 Implements the architecture of **Coach Safety Guardrail Specification v12** as a new layer on top
 of the existing, reviewed workout engine.
 
-> **UPDATE 2026-08-09 — coach DISABLED for launch (owner decision).** `coachGate.COACH_ENABLED === false`.
+> **UPDATE 2026-08-13 — coach DISABLED for production.** The release channel defaults to
+> `disabled`; only an explicitly configured internal build can enable testing. The machine-readable
+> source is `config/coach-release.json` and production remains fail-closed.
 > The coach was briefly ENABLED on 2026-08-03 on the strength of a passing run against Jack Dov's
 > sealed reviewer set (`data/holdouts/JV.json`: **0/46 critical misses**, 0 emergency under-routes —
 > the zero-miss bar was MET; benign FP 3/20 = 15%, over-caution). On 2026-08-09 the owner reverted the

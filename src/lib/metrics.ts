@@ -206,18 +206,19 @@ export const STAT_METRICS: StatMetric[] = [
 export const DEFAULT_DASHBOARD_STATS = ['workouts', 'strength', 'weight']
 
 /** How many stats the overview grid can hold (4 shows as a 2×2 grid). */
-export const MAX_DASHBOARD_STATS = 4
+export const MAX_DASHBOARD_STATS = 3
 
 export function statById(id: string): StatMetric | undefined {
   return STAT_METRICS.find((m) => m.id === id)
 }
 
-/** The stat ids for the dashboard overview (0-3). Undefined = never configured →
- *  starter defaults. An explicit [] = the user cleared them all → stays empty. */
+/** The stat ids for the dashboard overview. Missing/empty/corrupt preferences recover to the
+ * starter set so the dashboard never renders an unexplained blank progress section. */
 export function dashboardStatIds(s: AppState): string[] {
   const ids = s.settings.dashboardStats
-  if (ids === undefined) return DEFAULT_DASHBOARD_STATS
-  return ids.slice(0, MAX_DASHBOARD_STATS)
+  if (!Array.isArray(ids) || ids.length === 0) return DEFAULT_DASHBOARD_STATS
+  const valid = [...new Set(ids.filter((id) => statById(id)))]
+  return (valid.length > 0 ? valid : DEFAULT_DASHBOARD_STATS).slice(0, MAX_DASHBOARD_STATS)
 }
 
 /** The stats that can be featured in the dashboard composition card (the big card

@@ -11,10 +11,9 @@
  * signOff.ts). Enabling the workout generator must never enable the coach; the coach
  * is not part of that launch and gets reviewed and switched on separately.
  *
- * ENABLED 2026-08-11 for INTERNAL, NON-RELEASED testing ONLY (owner decision, explicit and
- * final). The owner has confirmed this build is not being released to anyone. This flag being
- * true makes the coach (and its actioning layer, kill-switch listener and classifier precheck)
- * operational for on-device/dev testing.
+ * Internal, non-released builds may opt in with `COACH_RELEASE_CHANNEL=internal` (server) and
+ * `EXPO_PUBLIC_COACH_RELEASE_CHANNEL=internal` (client). Every unconfigured and shipping build
+ * defaults to disabled.
  *
  * ⚠️ THIS IS NOT A LAUNCH DECISION. The original release gates are STILL OUTSTANDING and MUST be
  * satisfied before this build is distributed to any real user:
@@ -49,7 +48,13 @@
  *  - reduce the benign FP rate toward the 5% quality target.
  */
 
-export const COACH_ENABLED = true
+/** Explicit internal channel; every unconfigured/shipping build fails closed to disabled. */
+export const COACH_RELEASE_CHANNEL =
+  process.env.COACH_RELEASE_CHANNEL === 'internal' || process.env.EXPO_PUBLIC_COACH_RELEASE_CHANNEL === 'internal'
+    ? 'internal'
+    : 'disabled'
+
+export const COACH_ENABLED = COACH_RELEASE_CHANNEL === 'internal'
 
 /** True only when the coach has been deliberately enabled post-review. */
 export function coachAvailable(): boolean {

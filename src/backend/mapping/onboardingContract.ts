@@ -20,7 +20,7 @@ import {
 import { ageFromDob, routeByAge } from '../safety/ageRouting'
 import { evaluateScreening } from '../safety/screening'
 import { platformCleared } from '../coach/signOff'
-import { DEFAULT_INVENTORY_BY_TIER } from '../data/equipmentInventory'
+import { BODYWEIGHT_BASE_TAGS, DEFAULT_INVENTORY_BY_TIER } from '../data/equipmentInventory'
 
 /* ------------------------------------------------------------------ */
 /*  Raw onboarding answer shape (the wizard's vocabulary)              */
@@ -165,10 +165,9 @@ export const EQUIPMENT_TAG_MAP: Record<string, string[]> = {
 }
 
 /**
- * Tier-implied base tags. Full Gym / Basic Gym expose their full exercise-tag union (a gym
- * stocks that equipment); Bodyweight is restricted to genuinely household-owned tags so a
- * no-equipment user is never pre-granted a band/rack/rings/pull-up-bar (audit R5-005). Owning
- * such items is opted into via the equipment chips below (EQUIPMENT_TAG_MAP).
+ * Tier-implied base tags for actual facilities. A HOME answer is different from a stocked Basic
+ * Gym even though the legacy schema stores the same coarse tier: home starts with household tags
+ * and explicit chips are the source of truth for owned equipment.
  */
 const TIER_BASE_TAGS: Record<EquipmentTier, string[]> = DEFAULT_INVENTORY_BY_TIER
 
@@ -223,7 +222,7 @@ export function mapDaysAvailable(days: string[]): Weekday[] {
 
 export function mapEquipmentTags(env: OnboardingInput['environment'], equipment: string[]): string[] {
   const tier = mapEquipmentTier(env)
-  const tags = new Set<string>(TIER_BASE_TAGS[tier])
+  const tags = new Set<string>(env === 'home' || env === 'bodyweight' ? BODYWEIGHT_BASE_TAGS : TIER_BASE_TAGS[tier])
   for (const chip of equipment) {
     for (const tag of EQUIPMENT_TAG_MAP[chip] ?? []) tags.add(tag)
   }

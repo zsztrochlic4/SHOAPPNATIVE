@@ -5,7 +5,7 @@
 //   npm run test:unit
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { validateStructuredCoachReply, STRUCTURED_COACH_RESPONSE_SCHEMA, STRUCTURED_COACH_FALLBACK, assertsCompletedWorkoutAction, assertsCompletedChangeWithObject, FALSE_CHANGE_CLAIM_FALLBACK } from '../../.sweep-out/backend/coach/structuredResponse.js'
+import { validateStructuredCoachReply, STRUCTURED_COACH_RESPONSE_SCHEMA, STRUCTURED_COACH_FALLBACK, assertsCompletedWorkoutAction, assertsCompletedChangeWithObject, assertsCommittedWorkoutAction, FALSE_CHANGE_CLAIM_FALLBACK } from '../../.sweep-out/backend/coach/structuredResponse.js'
 import { validateWorkoutActionPayload, WORKOUT_ACTION_NAMES } from '../../.sweep-out/backend/coach/workoutActions.js'
 import { buildCoachSystemPrompt, HARD_NEVERS } from '../../.sweep-out/backend/coach/operatingRules.js'
 
@@ -156,6 +156,19 @@ test('assertsCompletedWorkoutAction does NOT flag a PROPOSAL or an observation',
   assert.equal(assertsCompletedWorkoutAction("I've noticed your bench has stalled for three weeks."), false)
   assert.equal(assertsCompletedWorkoutAction('Should I change your training days to Tue/Thu?'), false)
   assert.equal(assertsCompletedWorkoutAction(''), false)
+})
+
+test('action commitment without a proposal is detected and neutralised', () => {
+  assert.equal(assertsCommittedWorkoutAction("I'll start a quick workout for you now."), true)
+  assert.equal(assertsCommittedWorkoutAction('I will update your schedule now.'), true)
+  assert.equal(assertsCommittedWorkoutAction('Want me to start your workout?'), false)
+  const r = validateStructuredCoachReply({
+    mode: 'personalised', message: "I'll start a quick workout for you now.", citations: [], memory: null, proposal: { kind: 'none' },
+  })
+  assert.equal(r.ok, true)
+  assert.equal(r.reply.proposal.kind, 'none')
+  assert.equal(r.reply.message, FALSE_CHANGE_CLAIM_FALLBACK)
+  assert.equal(r.messageNeutralized, true)
 })
 
 // A dropped proposal means NOTHING applies this turn; if the kept text still claims completion, that

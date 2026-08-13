@@ -71,7 +71,7 @@ export function isThirdParty(n: Norm): boolean {
 
 /** A bare denial of a crisis term (e.g. "I'm not suicidal") with no other crisis signal. */
 function negatedCrisisOnly(n: Norm): boolean {
-  const denied = hasRe(n, /\b(not|isn t|aren t|never|no)\s+(feeling\s+)?(suicidal|going to hurt|self harm)/)
+  const denied = hasRe(n, /\b(not|isn t|aren t|never|no)\s+(?:(?:feeling|depressed)\s+(?:or\s+)?)?(suicidal|going to hurt|self harm)/)
   const otherSignal = has(n, 'hopeless', 'no point', 'end my life', 'kill myself',
     'better off without', 'want to disappear', 'harm myself', 'hurt myself') || wantsToDie(n)
   return denied && !otherSignal
@@ -919,6 +919,8 @@ const FITNESS_TERMS = [
   'wellbeing', 'wellness', 'healthy', 'health', 'stress', 'stressed', 'habit', 'habits', 'routine',
   'energy', 'fatigue', 'focus', 'confidence', 'gym anxiety', 'mental wellbeing', 'physical activity',
   'anatomy', 'adaptation', 'detraining', 'heart health', 'bone health', 'posture', 'sedentary',
+  // First-class coach modes/actions. These are bounded by the deterministic action schema downstream.
+  'exam mode', 'budget eats', 'planned absence',
 ]
 
 /** Very short in-flow affirmations — allowed only when the whole message is a brief continuation. */

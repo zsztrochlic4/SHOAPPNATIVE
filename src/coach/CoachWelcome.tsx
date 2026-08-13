@@ -6,7 +6,7 @@
 import { View, Text, ScrollView } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import {
-  ShieldCheck, MessageCircle, SlidersHorizontal, Leaf, TrendingUp, CalendarCheck, ClipboardCheck, type LucideIcon,
+  ShieldCheck, MessageCircle, SlidersHorizontal, Leaf, TrendingUp, Utensils, ClipboardCheck, type LucideIcon,
 } from 'lucide-react-native'
 import { PressableScale } from '../components/PressableScale'
 import { useColors } from '../theme'
@@ -17,15 +17,15 @@ const FEATURES: { Icon: LucideIcon; label: string }[] = [
   { Icon: SlidersHorizontal, label: 'Adjusts your program & exercises' },
   { Icon: Leaf, label: 'Guides nutrition & recovery' },
   { Icon: TrendingUp, label: 'Tracks your progress' },
-  { Icon: CalendarCheck, label: 'Reviews your meal plan' },
+  { Icon: Utensils, label: 'Reviews your food choices' },
   { Icon: ClipboardCheck, label: 'Keeps you accountable' },
 ]
 
-export function CoachWelcome({ onContinue }: { onContinue: () => void }) {
+export function CoachWelcome({ onContinue, bottomInset = 0 }: { onContinue: () => void; bottomInset?: number }) {
   const c = useColors()
   return (
     <View style={{ flex: 1, backgroundColor: c.ink900 }}>
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 22, paddingTop: 22, paddingBottom: 16, alignItems: 'center' }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 22, paddingTop: 22, paddingBottom: 16, alignItems: 'center' }} showsVerticalScrollIndicator={false} contentInsetAdjustmentBehavior="automatic">
         <View
           style={{
             width: 64, height: 64, borderRadius: 999, alignItems: 'center', justifyContent: 'center',
@@ -36,7 +36,7 @@ export function CoachWelcome({ onContinue }: { onContinue: () => void }) {
           <ShieldCheck size={30} color={c.brand300} strokeWidth={1.8} />
         </View>
         <Text style={{ marginTop: 20, fontSize: 27, lineHeight: 31, fontWeight: '800', letterSpacing: -0.5, color: c.fg, textAlign: 'center' }}>Meet your coach</Text>
-        <Text style={{ marginTop: 11, maxWidth: 280, fontSize: 14, lineHeight: 21, color: withAlpha(c.fg, 0.6), textAlign: 'center' }}>Everything a strength coach does, in your pocket.</Text>
+        <Text style={{ marginTop: 11, maxWidth: 300, fontSize: 14, lineHeight: 21, color: withAlpha(c.fg, 0.6), textAlign: 'center' }}>Training guidance grounded in your StrengthHub program.</Text>
 
         <View style={{ marginTop: 26, flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
           {FEATURES.map(({ Icon, label }) => (
@@ -54,7 +54,7 @@ export function CoachWelcome({ onContinue }: { onContinue: () => void }) {
         </View>
       </ScrollView>
 
-      <LinearGradient colors={[withAlpha(c.ink900, 0), c.ink900]} style={{ paddingHorizontal: 22, paddingTop: 22, paddingBottom: 20 }}>
+      <LinearGradient colors={[withAlpha(c.ink900, 0), c.ink900]} style={{ paddingHorizontal: 22, paddingTop: 22, paddingBottom: 20 + bottomInset }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginBottom: 14 }}>
           <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: c.brand400 }} />
           <Text style={{ fontSize: 12, color: withAlpha(c.fg, 0.4) }}>Powered by Google Gemini</Text>
@@ -67,7 +67,7 @@ export function CoachWelcome({ onContinue }: { onContinue: () => void }) {
           containerStyle={{ width: '100%' }}
           style={{ minHeight: 52, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: c.brand400 }}
         >
-          <Text style={{ fontSize: 16, fontWeight: '800', letterSpacing: -0.2, color: '#07110b' }}>Continue with coach</Text>
+          <Text style={{ fontSize: 16, fontWeight: '800', letterSpacing: -0.2, color: c.ink900 }}>Continue with coach</Text>
         </PressableScale>
       </LinearGradient>
     </View>

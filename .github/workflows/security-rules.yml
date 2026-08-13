@@ -63,12 +63,10 @@ jobs:
           java-version: '21'
       - name: Install dependencies
         run: npm ci
-      - name: Install firebase-tools (emulator runner)
-        run: npm install --no-save firebase-tools
       - name: Input-sanitisation + AI-response unit tests
         run: npm run test:unit
       - name: Firestore & Storage rules tests (emulator)
-        run: npx firebase emulators:exec --only firestore,storage "node --test test/rules/*.test.mjs"
+        run: npm run test:rules
 
   deploy-rules:
     name: Deploy rules to production

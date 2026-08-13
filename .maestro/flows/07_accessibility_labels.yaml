@@ -12,8 +12,8 @@ tags:
 # Bottom-nav tabs expose accessibilityRole="tab" + accessibilityLabel (BottomNav.tsx).
 - assertVisible: "Dashboard"
 - assertVisible: "Workout"
+- assertVisible: "Coach"
 - assertVisible: "Nutrition"
-- assertVisible: "Progress"
 - assertVisible: "Community"
 
 # A labeled control deeper in the app (Community settings button, Community.tsx).

@@ -28,7 +28,7 @@ test('the shell exposes semantic tabs and labelled buttons', async ({ page }) =>
   expect(c.labelled).toBeGreaterThan(0)
 })
 
-for (const tab of ['Workout', 'Nutrition', 'Progress', 'Community'] as const) {
+for (const tab of ['Workout', 'Nutrition', 'Coach', 'Community'] as const) {
   test(`the ${tab} tab exposes semantic buttons with names`, async ({ page }) => {
     await page.goto('/')
     await waitForApp(page)

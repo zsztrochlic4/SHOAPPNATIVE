@@ -1,15 +1,15 @@
 # Coach release-state record — AUTHORITATIVE
 
-_Updated 2026-08-09 (launch reconciliation — owner decision to disable). This file supersedes
+_Updated 2026-08-13 (audit remediation — production remains fail-closed). This file supersedes
 the 2026-08-03 enablement record below (retained as history). Where any other document disagrees
 with this record or with `src/backend/coach/safety/STATUS.md`, those two lose only to each other
 in one direction: **STATUS.md is the safety record of truth; this file must always match it.**_
 
-## Current release state: DISABLED (owner decision, 2026-08-09)
+## Current release state: DISABLED (revalidated 2026-08-13)
 
 | Control | Value | Source |
 |---|---|---|
-| `COACH_ENABLED` | **`false`** (disabled for launch 2026-08-09) | `src/backend/coach/coachGate.ts` |
+| Release channel | **`disabled` by default**; `internal` requires an explicit internal-build environment value | `config/coach-release.json`, `src/backend/coach/coachGate.ts` |
 | Safety classifier | `activeClassifier` LLM path + deterministic rules floor | `src/backend/coach/safety/classifier.ts` |
 | App Check enforcement | `false` (monitor mode; env-driven `APPCHECK_ENFORCE`) | `functions/src/lib/guards.ts` → `APP_CHECK_ENFORCED` |
 | Remote kill switch | `config/coach.killSwitch` (Firestore); disables the coach WITHOUT a redeploy | `functions/src/killSwitchRemote.ts`, `src/backend/coach/safety/killSwitch.ts` |
@@ -95,7 +95,7 @@ elected to treat the §23 reviews as a hard gate._
    consistent with `docs/APP_CHECK.md` and native attestation.
 4. **Live rollback drill**: set `config/coach.killSwitch = true` in production, confirm
    the callable refuses without a redeploy, record the drill owner/date.
-5. Only then: one commit that flips `COACH_ENABLED = true`, updates this file and
+5. Only then: a reviewed production-manifest/channel change updates this file and
    `STATUS.md` in the same change, and names the deployed Functions revision + the
    passing run.
 

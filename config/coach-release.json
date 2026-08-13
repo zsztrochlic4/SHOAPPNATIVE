@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-08-13",
+  "production": {
+    "availability": "disabled",
+    "releaseChannel": "disabled",
+    "exactCommit": null,
+    "holdoutDigest": null,
+    "appCheckEnforced": false,
+    "clinicalSignoff": null,
+    "professionalSignoff": null,
+    "privacyDeclarationApproved": false,
+    "storeDeclarationApproved": false,
+    "killSwitchDrillAt": null
+  },
+  "internal": {
+    "availability": "opt-in",
+    "releaseChannel": "internal"
+  }
+}

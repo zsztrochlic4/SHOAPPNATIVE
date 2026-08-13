@@ -26,7 +26,7 @@ const IGNORED_CONSOLE = [
 test('app boots to the dashboard tabs in demo mode', async ({ page }) => {
   await page.goto('/')
   await waitForApp(page)
-  for (const name of ['Dashboard', 'Workout', 'Nutrition', 'Progress', 'Community']) {
+  for (const name of ['Dashboard', 'Workout', 'Nutrition', 'Coach', 'Community']) {
     await expect(page.getByRole('tab', { name })).toBeVisible()
   }
 })
@@ -64,7 +64,7 @@ test('no unexpected console errors on boot + navigation', async ({ page }) => {
   await page.goto('/')
   await waitForApp(page)
   await page.getByRole('tab', { name: 'Nutrition' }).click()
-  await page.getByRole('tab', { name: 'Progress' }).click()
+  await page.getByRole('tab', { name: 'Coach' }).click()
   await page.waitForTimeout(500)
 
   expect(errors, `unexpected console errors:\n${errors.join('\n')}`).toEqual([])

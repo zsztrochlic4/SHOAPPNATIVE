@@ -284,8 +284,140 @@ export function validateWorkoutActionPayload(payload: Record<string, string | nu
 }
 
 /* ------------------------------------------------------------------ */
-/*  Deterministic wellness-goal backstop (flash-lite reliability)      */
+/*  Deterministic action backstops (model-independent reliability)     */
 /* ------------------------------------------------------------------ */
+
+export interface SynthActionProposal {
+  title: string
+  summary: string
+  /** Honest confirm-gated lead-in; never implies the action has already happened. */
+  message: string
+  payload: Record<string, string | number | boolean>
+}
+
+const ACTION_VERB = /\b(set|change|adjust|make|update|switch|move|reschedule|schedule|start|begin|open|show|give|put|pause|take|add|swap|replace|deload|fit|mark)\b/i
+const DAY_ALIASES: Record<string, WeekdayLit> = {
+  monday: 'Monday', mon: 'Monday', tuesday: 'Tuesday', tue: 'Tuesday', tues: 'Tuesday',
+  wednesday: 'Wednesday', wed: 'Wednesday', thursday: 'Thursday', thu: 'Thursday', thurs: 'Thursday',
+  friday: 'Friday', fri: 'Friday', saturday: 'Saturday', sat: 'Saturday', sunday: 'Sunday', sun: 'Sunday',
+}
+
+function actionProposal(payload: Record<string, string | number | boolean>, title: string, summary: string, message: string): SynthActionProposal | null {
+  if (!validateWorkoutActionPayload(payload).ok) return null
+  return { payload, title, summary, message }
+}
+
+function mentionedDays(message: string): WeekdayLit[] {
+  const found = new Set<WeekdayLit>()
+  for (const token of message.toLowerCase().match(/[a-z]+/g) ?? []) {
+    const day = DAY_ALIASES[token]
+    if (day) found.add(day)
+  }
+  return WEEKDAY_LITS.filter((day) => found.has(day))
+}
+
+function dateKeyLocal(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+function addDays(date: Date, days: number): Date {
+  const copy = new Date(date.getTime())
+  copy.setDate(copy.getDate() + days)
+  return copy
+}
+
+const MONTHS: Record<string, number> = {
+  january: 0, february: 1, march: 2, april: 3, may: 4, june: 5,
+  july: 6, august: 7, september: 8, october: 9, november: 10, december: 11,
+}
+
+function explicitDateKeys(message: string): string[] {
+  const out: string[] = []
+  const re = /\b(\d{1,2})\s+(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{4})\b/g
+  for (const match of message.toLowerCase().matchAll(re)) {
+    const date = new Date(Number(match[3]), MONTHS[match[2]], Number(match[1]))
+    if (date.getFullYear() === Number(match[3]) && date.getMonth() === MONTHS[match[2]] && date.getDate() === Number(match[1])) out.push(dateKeyLocal(date))
+  }
+  return out
+}
+
+/**
+ * Deterministic proposal synthesis for bounded, high-confidence action intents. The model may phrase
+ * the answer, but is never trusted to decide whether a real product action exists. Ambiguous or
+ * parameter-incomplete requests return null so the reply can ask for the missing detail.
+ */
+export function synthesizeBoundedActionProposal(userMessage: string, now = new Date()): SynthActionProposal | null {
+  if (typeof userMessage !== 'string') return null
+  const m = userMessage.trim().toLowerCase()
+  if (!m || !ACTION_VERB.test(m)) return null
+
+  if (/\bbudget eats\b/.test(m) && /\b(open|show|take me|go to)\b/.test(m)) {
+    return actionProposal({ action: 'open_budget_eats' }, 'Open Budget Eats', 'Opens budget-friendly food ideas in StrengthHub.', 'Ready to open Budget Eats? Tap confirm to continue.')
+  }
+  if (/\b(deload|recovery week|easy week)\b/.test(m) && /\b(give|set|schedule|start|make|put|take)\b/.test(m)) {
+    return actionProposal({ action: 'deload' }, 'Schedule a deload week', 'Reduces training stress for one week while keeping your plan structure.', "Want me to schedule a deload week? Tap confirm and I'll apply it safely.")
+  }
+  if (/\b(start|begin)\b/.test(m) && /\b(workout|session|training)\b/.test(m)) {
+    const quick = /\b(15|quick|short)\b/.test(m)
+    return actionProposal(
+      { action: 'start_session', variant: quick ? 'quick15' : 'full' },
+      quick ? 'Start a 15-minute workout' : "Start today's workout",
+      quick ? 'Opens a shortened 15-minute version of the current session.' : 'Opens the full scheduled session for today.',
+      quick ? 'Ready for a 15-minute workout? Tap confirm to start it.' : "Ready to train? Tap confirm to start today's full workout.",
+    )
+  }
+  if (/\b(sessions?|workouts?)\b/.test(m) && /\b(minutes?|mins?|duration|length|fit into)\b/.test(m)) {
+    const n = Number(m.match(/\b(30|45|60|75|90)\b/)?.[1])
+    if (Number.isFinite(n)) return actionProposal({ action: 'set_session_length', sessionLengthMin: n }, `Set sessions to ${n} minutes`, `Regenerates future sessions around a ${n}-minute target after confirmation.`, `Want me to set your session length to ${n} minutes? Tap confirm and I'll update it.`)
+  }
+  if (!/\b(reschedule|move)\b/.test(m) && /\b(training|workout|gym)\s+days?\b|\bdays?\s+(?:i\s+)?train\b/.test(m)) {
+    const days = mentionedDays(m)
+    if (days.length >= 2 && days.length <= 6) {
+      const list = days.join(', ')
+      return actionProposal({ action: 'set_training_days', days: days.join(',') }, 'Change training days', `Moves your weekly training schedule to ${list}.`, `Want me to set your training days to ${list}? Tap confirm and I'll update the schedule.`)
+    }
+  }
+  const goalMatch = m.match(/\b(?:goal|focus)\b(?:\s+to|\s+is|:)?\s+(build muscle|hypertrophy|lose weight|fat loss|get stronger|strength|general fitness|healthy|fitness)\b/)
+  if (goalMatch) {
+    // The action contract changes a goal now; it cannot schedule a future goal transition. Asking
+    // for a concrete date is safer than silently applying "after exams" immediately.
+    if (/\b(after|once|when)\s+(?:my\s+|the\s+)?exams?\b|\blater\b/.test(m)) return null
+    const token = goalMatch[1]
+    const newGoal: BackendGoalLit = /build|hypertrophy/.test(token) ? 'Hypertrophy' : /lose|fat/.test(token) ? 'Fat Loss' : /strong|strength/.test(token) ? 'Strength' : 'General Fitness'
+    return actionProposal({ action: 'change_goal', newGoal }, `Change goal to ${newGoal}`, `Regenerates your program around ${newGoal} after confirmation.`, `Want me to change your training goal to ${newGoal}? Tap confirm and I'll update your program.`)
+  }
+  if (/\bexam mode\b/.test(m)) {
+    const weeks = Math.min(52, Math.max(1, Number(m.match(/\b(?:next|for)\s+(\d+)\s+weeks?\b/)?.[1] ?? 2)))
+    const startDate = dateKeyLocal(now)
+    const endDate = dateKeyLocal(addDays(now, weeks * 7 - 1))
+    return actionProposal({ action: 'exam_mode', startDate, endDate }, `Use exam mode for ${weeks} week${weeks === 1 ? '' : 's'}`, `Reduces training to a maintenance schedule from ${startDate} to ${endDate}.`, `Want me to use exam mode from ${startDate} to ${endDate}? Tap confirm and I'll adapt the schedule.`)
+  }
+  if (/\b(away|absence|holiday|vacation|pause training|pause my training)\b/.test(m)) {
+    const dates = explicitDateKeys(m)
+    if (dates.length >= 2) {
+      const mode: AbsenceModeLit = /\b(pause|completely|no training|full)\b/.test(m) ? 'full_pause' : /\bmaintenance\b/.test(m) ? 'maintenance' : /\breduced\b/.test(m) ? 'reduced_frequency' : 'active_rest'
+      return actionProposal({ action: 'planned_absence', mode, startDate: dates[0], endDate: dates[1] }, 'Schedule planned time away', `${mode === 'full_pause' ? 'Pauses' : 'Adapts'} training from ${dates[0]} to ${dates[1]}.`, `Want me to ${mode === 'full_pause' ? 'pause' : 'adapt'} training from ${dates[0]} to ${dates[1]}? Tap confirm and I'll update the schedule.`)
+    }
+  }
+  if (/\b(missed|skip(?:ped)?)\b/.test(m) && /\b(today|workout|session|training)\b/.test(m)) {
+    // Only the no-penalty exemption is genuinely implemented. Shift/fold/replan remain prose-only
+    // so the coach cannot offer a confirm button for a resolver path that would later refuse it.
+    if (!/\b(exempt|no[- ]penalty|rest day)\b/.test(m)) return null
+    const label = 'Mark today as a no-penalty rest day'
+    return actionProposal({ action: 'catch_up', mode: 'exempt' }, label, 'Marks today as planned rest without inventing extra training.', `Want me to ${label.toLowerCase()}? Tap confirm and I'll update the week.`)
+  }
+  if (/\b(reschedule|move)\b/.test(m) && /\b(training|workout|gym)\b/.test(m)) {
+    const days = mentionedDays(m)
+    if (days.length >= 2 && days.length <= 6) {
+      const list = days.join(', ')
+      return actionProposal({ action: 'reschedule_days', days: days.join(',') }, 'Reschedule training days', `Moves this schedule to ${list}.`, `Want me to reschedule training to ${list}? Tap confirm and I'll update it.`)
+    }
+  }
+  return null
+}
 
 export interface SynthProfileGoalProposal {
   title: string

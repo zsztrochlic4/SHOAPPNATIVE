@@ -7,6 +7,6 @@ tags:
 - runFlow: ../subflows/boot.yaml
 - assertVisible: "Dashboard"
 - assertVisible: "Workout"
+- assertVisible: "Coach"
 - assertVisible: "Nutrition"
-- assertVisible: "Progress"
 - assertVisible: "Community"

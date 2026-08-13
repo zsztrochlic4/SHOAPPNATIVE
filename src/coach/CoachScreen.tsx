@@ -122,7 +122,10 @@ export function CoachScreen({
   if (!welcomeSeen) {
     return (
       <View style={{ flex: 1, backgroundColor: c.ink900, paddingTop: chrome === 'sheet' ? insets.top : 0 }}>
-        <CoachWelcome onContinue={() => dispatch({ type: 'SET_SETTINGS', patch: { coachWelcomeSeen: true } })} />
+        <CoachWelcome
+          bottomInset={chrome === 'tab' ? navHeight : Math.max(insets.bottom, 12)}
+          onContinue={() => dispatch({ type: 'SET_SETTINGS', patch: { coachWelcomeSeen: true } })}
+        />
       </View>
     )
   }

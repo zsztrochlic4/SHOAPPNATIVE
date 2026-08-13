@@ -78,9 +78,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install validation-only tools (firebase-admin, firebase-tools)
-        run: npm install --no-save firebase-admin firebase-tools
-
       # ---- GitHub / code validation ----
       - name: Code test suite (typecheck + domain checks + safety sweep)
         continue-on-error: true
@@ -95,7 +92,7 @@ jobs:
       # to 1 once test/rules/ is in the repo and you want a rules regression to fail the run.
       - name: Firestore & Storage rules tests (emulator)
         continue-on-error: true
-        run: node scripts/run-step.mjs --name rules --critical 1 --skip-if-missing test/rules --cmd "npx firebase emulators:exec --only firestore,storage \"node --test test/rules/*.test.mjs\""
+        run: node scripts/run-step.mjs --name rules --critical 1 --skip-if-missing test/rules --cmd "npm run test:rules"
 
       - name: Generated-artifact drift (committed holdouts match source)
         continue-on-error: true

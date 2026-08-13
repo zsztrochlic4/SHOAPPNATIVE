@@ -26,6 +26,7 @@ import {
 } from '../lib/coachWorkspace'
 import { writeBackendUser } from '../backend/repo/userRepo'
 import { commitCoachAction, CoachActionConflictError } from '../backend/repo/programRepo'
+import { commitCoachPeriods, commitCoachProfilePatch } from '../store/cloudRepo'
 import {
   resolveCoachAction,
   applyCoachSwapChoice,
@@ -275,11 +276,70 @@ export function useCoachChat({ active }: { active: boolean }) {
       }
       setFailedApply({ proposalId, retry: () => { void commitProgramOutcome(outcome, proposalId, actionId) } })
       toast("That didn't save, so I've left your plan unchanged — tap retry to try again.")
-      if (actionId) void recordCoachActionOutcome(actionId, 'failed', 'persist_failed')
       return
     }
     setApplyingProposalId(null)
   }, [state, dispatch, user, toast])
+
+  const commitProfileOutcome = useCallback(async (outcome: Extract<CoachActionOutcome, { apply: 'profile_patch' }>, proposalId: string, actionId?: string) => {
+    const patch = outcome.patch as Partial<Profile>
+    const uid = user?.uid
+    const apply = () => {
+      dispatch({ type: 'SET_PROFILE', patch })
+      setSwapChoice(null); setFailedApply(null)
+      toast(outcome.message)
+      if (actionId) void recordCoachActionOutcome(actionId, 'applied')
+    }
+    if (!uid || uid === 'local') { apply(); return }
+    setFailedApply(null); setApplyingProposalId(proposalId)
+    try {
+      await commitCoachProfilePatch(uid, patch)
+      apply()
+    } catch {
+      setFailedApply({ proposalId, retry: () => { void commitProfileOutcome(outcome, proposalId, actionId) } })
+      toast("That didn't save, so I left your target unchanged — tap retry to try again.")
+    } finally {
+      setApplyingProposalId(null)
+    }
+  }, [dispatch, toast, user])
+
+  const commitPeriodOutcome = useCallback(async (outcome: Extract<CoachActionOutcome, { apply: 'period' }>, proposalId: string, actionId?: string) => {
+    const current = plannedPeriods(state)
+    const snapshot: ProgramSnapshot = {
+      backendUser: state.backendUser!,
+      generatedProgram: state.generatedProgram ?? null,
+      programStatus: state.programStatus ?? null,
+      programDoc: state.programDoc ?? null,
+      workoutInstances: state.workoutInstances,
+      plannedPeriods: current,
+    }
+    const period: PlannedPeriod = {
+      ...newPeriodDraft(), id: `coach_${Date.now()}`,
+      start: outcome.startDate, end: outcome.endDate,
+      mode: periodModeForAbsence(outcome.mode), note: outcome.label,
+    }
+    const next = [...current.filter((p) => p.id !== period.id), period]
+      .sort((a, b) => a.start.localeCompare(b.start))
+    const uid = user?.uid
+    const apply = () => {
+      dispatch({ type: 'SAVE_PERIOD', period })
+      setSwapChoice(null); setFailedApply(null)
+      setUndoTarget({ proposalId, snapshot, actionId })
+      toast(outcome.message)
+      if (actionId) void recordCoachActionOutcome(actionId, 'applied')
+    }
+    if (!uid || uid === 'local') { apply(); return }
+    setFailedApply(null); setApplyingProposalId(proposalId)
+    try {
+      await commitCoachPeriods(uid, next)
+      apply()
+    } catch {
+      setFailedApply({ proposalId, retry: () => { void commitPeriodOutcome(outcome, proposalId, actionId) } })
+      toast("That didn't save, so I left your schedule unchanged — tap retry to try again.")
+    } finally {
+      setApplyingProposalId(null)
+    }
+  }, [dispatch, state, toast, user])
 
   const handleProposalConfirmed = useCallback((proposal: CoachActionProposal, actionId?: string) => {
     if (proposal.kind === 'navigation') {
@@ -322,10 +382,7 @@ export function useCoachChat({ active }: { active: boolean }) {
         return
       }
       if (outcome.apply === 'profile_patch') {
-        dispatch({ type: 'SET_PROFILE', patch: outcome.patch as Partial<Profile> })
-        setSwapChoice(null)
-        toast(outcome.message)
-        if (actionId) void recordCoachActionOutcome(actionId, 'applied')
+        void commitProfileOutcome(outcome, proposal.id, actionId)
         return
       }
       if (outcome.apply === 'choose_swap') {
@@ -335,27 +392,7 @@ export function useCoachChat({ active }: { active: boolean }) {
         return
       }
       if (outcome.apply === 'period') {
-        const snapshot: ProgramSnapshot = {
-          backendUser,
-          generatedProgram: state.generatedProgram ?? null,
-          programStatus: state.programStatus ?? null,
-          programDoc: state.programDoc ?? null,
-          workoutInstances: state.workoutInstances,
-          plannedPeriods: plannedPeriods(state),
-        }
-        const period: PlannedPeriod = {
-          ...newPeriodDraft(),
-          id: `coach_${Date.now()}`,
-          start: outcome.startDate,
-          end: outcome.endDate,
-          mode: periodModeForAbsence(outcome.mode),
-          note: outcome.label,
-        }
-        dispatch({ type: 'SAVE_PERIOD', period })
-        setSwapChoice(null)
-        setUndoTarget({ proposalId: proposal.id, snapshot, actionId })
-        toast(outcome.message)
-        if (actionId) void recordCoachActionOutcome(actionId, 'applied')
+        void commitPeriodOutcome(outcome, proposal.id, actionId)
         return
       }
       if (outcome.apply === 'share_pr') {
@@ -370,7 +407,7 @@ export function useCoachChat({ active }: { active: boolean }) {
       }
       void commitProgramOutcome(outcome, proposal.id, actionId)
     }
-  }, [nav, state, dispatch, toast, commitProgramOutcome])
+  }, [nav, state, toast, commitProgramOutcome, commitProfileOutcome, commitPeriodOutcome])
 
   const handlePublishShare = useCallback((draft: { actionId?: string; text: string; pr: { lift: string; weight: string }; scope: CommunityScope }) => {
     dispatch({ type: 'ADD_POST', text: draft.text, pr: draft.pr, scope: draft.scope })
@@ -392,41 +429,49 @@ export function useCoachChat({ active }: { active: boolean }) {
   }, [state, toast, commitProgramOutcome])
 
   const handleUndo = useCallback((snapshot: ProgramSnapshot, actionId?: string, appliedVersion?: number) => {
-    const appliedState: ProgramSnapshot | null = state.backendUser
-      ? {
-          backendUser: state.backendUser,
-          generatedProgram: state.generatedProgram ?? null,
-          programStatus: state.programStatus ?? null,
-          programDoc: state.programDoc ?? null,
-          workoutInstances: state.workoutInstances,
-          plannedPeriods: state.plannedPeriods,
-        }
-      : null
-    dispatch({ type: 'RESTORE_PROGRAM_SNAPSHOT', snapshot })
     const uid = user?.uid
+    const periodsChanged = JSON.stringify(plannedPeriods(state)) !== JSON.stringify(snapshot.plannedPeriods ?? [])
+    const programChanged = JSON.stringify({
+      backendUser: state.backendUser,
+      generatedProgram: state.generatedProgram,
+      programDoc: state.programDoc,
+      workoutInstances: state.workoutInstances,
+    }) !== JSON.stringify({
+      backendUser: snapshot.backendUser,
+      generatedProgram: snapshot.generatedProgram,
+      programDoc: snapshot.programDoc,
+      workoutInstances: snapshot.workoutInstances,
+    })
     const persist = async () => {
       if (!uid || uid === 'local') return
-      if (snapshot.programDoc) {
-        const newVersion = await commitCoachAction(uid, snapshot.backendUser, snapshot.programDoc, snapshot.workoutInstances ?? [], appliedVersion)
-        if (newVersion != null) dispatch({ type: 'SET_PROGRAM_VERSION', version: newVersion })
-      } else {
-        await writeBackendUser(uid, snapshot.backendUser)
+      if (programChanged) {
+        if (snapshot.programDoc) {
+          await commitCoachAction(uid, snapshot.backendUser, snapshot.programDoc, snapshot.workoutInstances ?? [], appliedVersion)
+        } else {
+          await writeBackendUser(uid, snapshot.backendUser)
+        }
       }
+      if (periodsChanged) await commitCoachPeriods(uid, snapshot.plannedPeriods ?? [])
     }
+    const finish = () => {
+      dispatch({ type: 'RESTORE_PROGRAM_SNAPSHOT', snapshot })
+      if (actionId) void recordCoachActionOutcome(actionId, 'rolled_back')
+      setUndoTarget(null)
+      toast('Reverted — your plan is back to how it was.')
+    }
+    if (!uid || uid === 'local') { finish(); return }
+    setApplyingProposalId(undoTarget?.proposalId ?? 'undo')
     void persist()
-      .then(() => { if (actionId) void recordCoachActionOutcome(actionId, 'rolled_back') })
+      .then(finish)
       .catch((e: unknown) => {
-        if (e instanceof CoachActionConflictError && appliedState) {
-          dispatch({ type: 'RESTORE_PROGRAM_SNAPSHOT', snapshot: appliedState })
+        if (e instanceof CoachActionConflictError) {
           toast('Your plan was changed on another device, so I couldn’t undo this here — reopen the coach and try again.')
-          if (actionId) void recordCoachActionOutcome(actionId, 'failed', 'version_conflict')
           return
         }
-        toast("Your plan is reverted here, but that didn't sync — it'll retry when you're back online.")
+        toast("That didn't save, so I left the applied change in place — try undo again when you're back online.")
       })
-    setUndoTarget(null)
-    toast('Reverted — your plan is back to how it was.')
-  }, [dispatch, user, toast, state])
+      .finally(() => setApplyingProposalId(null))
+  }, [dispatch, user, toast, state, undoTarget])
 
   return {
     colors,

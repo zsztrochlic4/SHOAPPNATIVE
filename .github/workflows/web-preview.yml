@@ -32,6 +32,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Required release checks
+        run: npm run validate:coach-release && npm run lint && npm run typecheck && npm run check && npm run sweep && npm run test:safety && npm run test:unit && npm run test:rules && npm run test:e2e && npm --prefix functions ci && npm --prefix functions test
       - name: Export web build
         env:
           # GitHub Pages serves this project under the /sho-app-native/ sub-path.
@@ -40,6 +42,7 @@ jobs:
           # client bundle), so it lives in a repo Variable, not a secret. When set, initAppCheck()
           # attaches an attestation token to Firebase calls; absent, the client stays a safe no-op.
           EXPO_PUBLIC_APPCHECK_RECAPTCHA_ENTERPRISE_KEY: ${{ vars.APPCHECK_RECAPTCHA_ENTERPRISE_KEY }}
+          EXPO_PUBLIC_APPCHECK_WEB_ENABLED: ${{ vars.APPCHECK_WEB_ENABLED }}
         run: npx expo export --platform web
       - run: touch dist/.nojekyll
       - uses: actions/upload-pages-artifact@v3

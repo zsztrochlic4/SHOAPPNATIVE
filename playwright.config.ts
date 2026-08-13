@@ -31,15 +31,10 @@ export default defineConfig({
     viewport: { width: 420, height: 900 },
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
-  webServer: {
-    command: `npx expo start --web --port ${PORT}`,
-    port: PORT,
-    reuseExistingServer: !isCI,
-    timeout: 180_000,
-    env: {
-      EXPO_PUBLIC_DEMO_MODE: '1',
-      EXPO_PUBLIC_PAYWALL_PREVIEW: '0',
-      EXPO_PUBLIC_COACH_PREVIEW: '0',
-    },
+  // The package script owns the static export/server lifecycle. Keeping it outside Playwright's
+  // webServer wrapper avoids a Windows teardown deadlock after an otherwise green suite.
+  webServer: process.env.E2E_EXTERNAL_SERVER ? undefined : {
+    command: `node scripts/start-e2e-server.mjs ${PORT}`,
+    port: PORT, reuseExistingServer: !isCI, timeout: 180_000,
   },
 })

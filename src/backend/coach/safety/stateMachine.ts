@@ -10,7 +10,6 @@
 
 import type { CoachContext, DetectorHit, PersistentState, SafetyDecision, SafetySession } from './types'
 import { PERSISTENT_FOR, CATEGORY_TIER } from './types'
-import { engineExcludedExerciseIds } from './engineBridge'
 import { normalize, hasActiveCrisisSignal } from './rules'
 
 const p = (text: string) => normalize(text).p
@@ -42,9 +41,14 @@ const GENUINE_CORRECTION = ['i meant', 'i mean my', 'i mean because', 'i meant b
  *  reattributes the earlier one to a benign meaning. Gated below by the residual-signal check. */
 const CLARIFY_RE = /\b(i mean|i meant|by (it|that) i mean|what i mean(t)? (is|was)|meaning)\b/
 
+// An explicit, contextually consistent denial is a correction, not a bare “I'm fine” retraction.
+// The residual-signal guard below still prevents this from clearing a message that also contains a
+// current plan/intent. This gives benign users a deterministic recovery path without model judgement.
+const EXPLICIT_CRISIS_DENIAL = /\b(?:i am|i m|im) not (?:depressed|suicidal)|\bnot suicidal\b|\bno thoughts? of (?:self[- ]?harm|suicide)\b/
+
 export function isGenuineCorrection(text: string): boolean {
   if (hasActiveCrisisSignal(text)) return false // contradicted by a concurrent signal → not genuine
-  return GENUINE_CORRECTION.some((f) => p(text).includes(f)) || CLARIFY_RE.test(p(text))
+  return GENUINE_CORRECTION.some((f) => p(text).includes(f)) || CLARIFY_RE.test(p(text)) || EXPLICIT_CRISIS_DENIAL.test(p(text))
 }
 
 /**
@@ -90,6 +94,11 @@ export function correctionAdjust(session: SafetySession, text: string): Detector
     session.active.delete('crisis'); session.carriedOver.delete('crisis')
     out.push({ category: 'third_party_crisis', source: 'state', reason: 'crisis_reattributed_third_party' })
   }
+  if (EXPLICIT_CRISIS_DENIAL.test(t)) {
+    session.active.delete('crisis'); session.carriedOver.delete('crisis')
+    session.active.delete('overdose'); session.carriedOver.delete('overdose')
+    session.active.delete('emergency'); session.carriedOver.delete('emergency')
+  }
   // "that injury was last year, it's fine now" → resolved; clear the injury/condition hold.
   if (t.includes('last year') || t.includes('it s fine now') || t.includes('its fine now') || t.includes('was a typo')) {
     session.active.delete('injury'); session.carriedOver.delete('injury')
@@ -129,9 +138,11 @@ export function stateHits(session: SafetySession, text: string, ctx: CoachContex
 
   // Injury: a request that would load an engine-excluded area is still declined (cross-session).
   if (active.has('injury')) {
-    const loads = /\b(squat|deadlift|bench|run|running|lift|lifting|leg day|lower body|train|program|add)\b/.test(t)
-    // Only enforce where the engine actually excludes something for this user, or the message loads.
-    if (loads || engineExcludedExerciseIds(ctx).size > 0) {
+    const loads = /\b(squat|deadlift|bench|press|row|pull|push|run|running|lift|lifting|leg day|lower body|upper body|train|program|workout|exercise|session|add|swap|replace)\b/.test(t)
+    // Persist the protective state only on training/loading requests. The engine exclusions are still
+    // enforced by the resolver and outgoing guard, but cannot globally block food, hydration, study,
+    // community or other unrelated coaching domains.
+    if (loads) {
       out.push({ category: 'injury_override', source: 'state', reason: 'injury_state_persists' })
     }
   }

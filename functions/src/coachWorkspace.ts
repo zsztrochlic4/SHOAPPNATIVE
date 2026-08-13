@@ -9,16 +9,18 @@ import type {
 import type { CoachContextSnapshot } from './_shared/backend/coach/contextSelection'
 import type {
   CoachContext,
-  PersistentState,
   SafetyDecision,
   SafetySession,
 } from './_shared/backend/coach/safety/types'
-import { CROSS_SESSION_STATES, newSafetySession } from './_shared/backend/coach/safety/types'
+import { newSafetySession } from './_shared/backend/coach/safety/types'
+import { restorablePersistentStates } from './_shared/backend/coach/safety/persistedState'
 
 const COACH_SCHEMA_VERSION = 1
 const MAX_MEMORIES = 60
 const MAX_RECENT_TURNS = 16
-const ACUTE_TTL_MS = 24 * 60 * 60 * 1000
+// Acute crisis/emergency continuity belongs to the active conversation, not a new session the next
+// day. It remains protected in-memory throughout that conversation; we deliberately do not reload
+// it from Firestore. Cross-session medical/training restrictions keep their separate 30-day TTL.
 const CROSS_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000
 
 const ordinary = (value: unknown, max = 500): string =>
@@ -200,16 +202,8 @@ function restoreSafety(data: Record<string, unknown> | undefined): SafetySession
   const updated = iso(data?.updatedAt)
   if (!updated) return newSafetySession()
   const ageMs = Date.now() - Date.parse(updated)
-  const raw = Array.isArray(data?.activeStates) ? data!.activeStates : []
-  const valid = raw.filter((s): s is PersistentState => typeof s === 'string' && [
-    'crisis', 'injury', 'pregnancy', 'concussion', 'medical_condition', 'under_18',
-    'disordered_eating', 'overdose', 'emergency',
-  ].includes(s))
   const session = newSafetySession()
-  for (const state of valid) {
-    const ttl = CROSS_SESSION_STATES.includes(state) ? CROSS_SESSION_TTL_MS : ACUTE_TTL_MS
-    if (ageMs <= ttl) session.active.add(state)
-  }
+  for (const state of restorablePersistentStates(data?.activeStates, ageMs, CROSS_SESSION_TTL_MS)) session.active.add(state)
   const last = data?.lastDecision
   if (last && typeof last === 'object') session.lastDecision = last as SafetyDecision
   return session

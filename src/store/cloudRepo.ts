@@ -1,12 +1,15 @@
 import {
   doc, collection, getDoc, getDocs, query, orderBy, limit, startAfter, writeBatch, serverTimestamp,
+  updateDoc, deleteField,
   type QueryConstraint,
 } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { sanitizeForPersist, sanitizeEntry } from '../lib/sanitize'
 import { mergeById } from './historyMerge'
 import { hasMorePage, resolveRootConflict } from './conflict'
-import type { AppState } from './types'
+import { toPlannedAbsence } from './periods'
+import { todayKey } from '../lib/date'
+import type { AppState, PlannedPeriod, Profile } from './types'
 
 /**
  * Cloud persistence layer (Firestore) for a signed-in user.
@@ -168,6 +171,47 @@ export interface LoadedState {
 /** Drop `undefined` values (Firestore rejects them) via a plain-data round-trip. */
 function clean<T>(value: T): T {
   return JSON.parse(JSON.stringify(value))
+}
+
+const COACH_PROFILE_FIELDS = new Set<keyof Profile>([
+  'waterTargetL', 'sleepTargetH', 'stepTarget', 'goalWeightKg',
+])
+
+/**
+ * Persist a confirmed coach profile action before the UI is allowed to call it applied.
+ * Dot-path updates deliberately touch only the bounded numeric target being changed, so a
+ * concurrent edit to the rest of the profile cannot be overwritten.
+ */
+export async function commitCoachProfilePatch(uid: string, patch: Partial<Profile>): Promise<void> {
+  if (!db) throw new Error('firebase_unavailable')
+  const updates: Record<string, unknown> = { updatedAt: serverTimestamp() }
+  for (const [key, value] of Object.entries(patch) as [keyof Profile, unknown][]) {
+    if (!COACH_PROFILE_FIELDS.has(key) || typeof value !== 'number' || !Number.isFinite(value)) {
+      throw new Error(`invalid_coach_profile_patch:${String(key)}`)
+    }
+    updates[`profile.${String(key)}`] = value
+  }
+  if (Object.keys(updates).length === 1) throw new Error('empty_coach_profile_patch')
+  await updateDoc(doc(db, COL, uid), updates)
+}
+
+/**
+ * Atomically persist the three root projections changed by a planned period. This is used by
+ * coach confirm/undo so the card never says "Applied" while the durable period is still pending.
+ */
+export async function commitCoachPeriods(uid: string, periods: PlannedPeriod[]): Promise<void> {
+  if (!db) throw new Error('firebase_unavailable')
+  const sorted = [...periods].sort((a, b) => a.start.localeCompare(b.start))
+  const active = sorted.find((p) => p.start <= todayKey && p.end >= todayKey)
+  await updateDoc(doc(db, COL, uid), {
+    plannedPeriods: clean(sanitizeForPersist(sorted)),
+    'profile.examMode': sorted.length > 0,
+    'profile.examStartKey': active?.start ?? deleteField(),
+    'profile.examEndKey': active?.end ?? deleteField(),
+    'profile.examDates': deleteField(),
+    'backendUser.planned_absences': clean(sanitizeForPersist(sorted.map(toPlannedAbsence))),
+    updatedAt: serverTimestamp(),
+  })
 }
 
 function chunk<T>(items: T[], size: number): T[][] {

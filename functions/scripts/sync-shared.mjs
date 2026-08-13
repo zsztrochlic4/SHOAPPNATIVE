@@ -37,6 +37,7 @@ const ENTRIES = [
   'backend/coach/safety/index.ts',
   'backend/coach/safety/llmClassifier.ts',
   'backend/coach/safety/types.ts',
+  'backend/coach/safety/persistedState.ts',
   'backend/coach/safety/runCoachSafetyTests.ts',
   // Community competition scoring — the server recomputes league/group metrics
   // from its immutable event log using the SAME pure code the app displays, so

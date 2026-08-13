@@ -77,6 +77,24 @@ test('onboarding grants a band/pull-up bar only when the chip is ticked', () => 
   assert.ok(withBar.includes('pull_up_bar'), 'ticking Pull-up bar adds pull_up_bar')
 })
 
+test('home inventory is explicit and never inherits a stocked Basic Gym', () => {
+  const owned = mapEquipmentTags('home', ['Dumbbells', 'Bench or chair', 'Resistance bands'])
+  for (const tag of ['dumbbell', 'bench', 'chair', 'band', 'anchor_point']) assert.ok(owned.includes(tag), `home user should own ${tag}`)
+  for (const tag of ['cable_machine', 'barbell', 'plates', 'rack', 'machine_abduction']) {
+    assert.ok(!owned.includes(tag), `home user must not be granted ${tag}`)
+  }
+
+  const user = bodyweightUser({ equipment_tier: 'Basic Gym', equipment_tags: owned, session_length_min: 45 })
+  const r = generateProgram(user)
+  assert.ok(r.ok, 'limited-home program should generate')
+  for (const day of r.program.days) {
+    for (const e of day.exercises) {
+      const ex = EXERCISE_BY_ID[e.exerciseId]
+      assert.ok(equipmentTagsSatisfied(ex.requiredEquipmentTags, owned), `limited-home plan served impossible ${ex.name} [${ex.requiredEquipmentTags.join(', ')}]`)
+    }
+  }
+})
+
 test('a "none" (no-equipment) requirement is satisfiable for everyone, incl. a bare Bodyweight user', () => {
   // R5-005 root cause: the "none" sentinel was compared literally, so push-ups/squats/planks were
   // unreachable for every tier. It must now be always-satisfied.

@@ -1,36 +1,49 @@
-# Native E2E (Maestro) — MANUAL ONLY (workflow_dispatch).
-#
-# This deliberately does NOT run on push/PR: native flows need a built app on a
-# real device / emulator (or Maestro Cloud), which isn't provisioned yet. It's a
-# scaffold — fill in the build + device steps when the device lab / runners exist,
-# then add it to the `main` ruleset's required checks. See .maestro/README.md.
+# Native E2E (Maestro) — Android emulator gate.
 name: Native E2E (Maestro)
 
 on:
+  pull_request:
+    branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   maestro:
-    # A device lab is required. Options:
-    #  - macOS runner + iOS Simulator (`macos-14`), or Android emulator
-    #    (reactivecircus/android-emulator-runner), or
-    #  - Maestro Cloud (upload the built .app/.apk).
     runs-on: ubuntu-latest
-    if: ${{ false }}   # remove this guard once the device/build steps below are real
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-
-      # 1) Build (or download) the app artifact for the target platform.
-      #    e.g. `eas build --profile development --platform android --local` with
-      #    EXPO_PUBLIC_DEMO_MODE=1, or pull a prebuilt artifact.
-
-      # 2) Boot an emulator/simulator and install the artifact.
-
-      # 3) Install Maestro and run the suite:
-      #    - run: curl -fsSL "https://get.maestro.mobile.dev" | bash
-      #    - run: $HOME/.maestro/bin/maestro test .maestro --format junit --output maestro-report.xml
-
-      # 4) Upload the report:
-      #    - uses: actions/upload-artifact@v4
-      #      with: { name: maestro-report, path: maestro-report.xml }
-      - run: echo "Provision a device lab, then implement steps 1-4. See .maestro/README.md"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci
+      - name: Install Maestro
+        run: curl -Ls "https://get.maestro.mobile.dev" | bash
+      - name: Build and run native smoke suite
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          EXPO_PUBLIC_DEMO_MODE: '1'
+          EXPO_PUBLIC_COACH_RELEASE_CHANNEL: 'internal'
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          script: |
+            npx expo prebuild --platform android --clean --non-interactive
+            cd android && ./gradlew assembleDebug --no-daemon && cd ..
+            adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+            $HOME/.maestro/bin/maestro test .maestro --include-tags smoke --format junit --output maestro-report.xml
+      - name: Upload native report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-report
+          path: maestro-report.xml
+          if-no-files-found: warn

@@ -39,6 +39,7 @@ const RECAPTCHA_SITE_KEY =
   ''
 /** Optional debug token for LOCAL DEVELOPMENT / STAGING ONLY (never set in production, plan §9). */
 const DEBUG_TOKEN = process.env.EXPO_PUBLIC_APPCHECK_DEBUG_TOKEN || ''
+const WEB_ATTESTATION_ENABLED = process.env.EXPO_PUBLIC_APPCHECK_WEB_ENABLED === '1'
 
 let appCheck: AppCheck | null = null
 
@@ -55,7 +56,7 @@ export function initAppCheck(app: FirebaseApp): AppCheck | null {
     appCheck = initNativeAppCheck(app)
     return appCheck
   }
-  if (!RECAPTCHA_SITE_KEY) return null       // no key yet → stay a no-op until the console + key are set
+  if (!WEB_ATTESTATION_ENABLED || !RECAPTCHA_SITE_KEY) return null
   try {
     if (DEBUG_TOKEN && typeof globalThis !== 'undefined') {
       ;(globalThis as unknown as { FIREBASE_APPCHECK_DEBUG_TOKEN?: string }).FIREBASE_APPCHECK_DEBUG_TOKEN = DEBUG_TOKEN
@@ -99,9 +100,9 @@ export interface AppCheckStatus {
 export function appCheckStatus(): AppCheckStatus {
   return {
     platform: Platform.OS,
-    siteKeyConfigured: !!RECAPTCHA_SITE_KEY,
+    siteKeyConfigured: WEB_ATTESTATION_ENABLED && !!RECAPTCHA_SITE_KEY,
     debugToken: !!DEBUG_TOKEN,
     active: appCheck !== null,
-    attestableNow: Platform.OS === 'web' ? !!RECAPTCHA_SITE_KEY : true,
+    attestableNow: Platform.OS === 'web' ? WEB_ATTESTATION_ENABLED && !!RECAPTCHA_SITE_KEY : true,
   }
 }
