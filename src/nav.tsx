@@ -25,7 +25,7 @@ export type Overlay =
 export type NavCtx = {
   open: (o: Overlay, params?: Record<string, unknown>) => void
   close: () => void
-  goTab: (t: 'dashboard' | 'workout' | 'nutrition' | 'progress' | 'community') => void
+  goTab: (t: 'dashboard' | 'workout' | 'coach' | 'nutrition' | 'progress' | 'community') => void
   /** Full-screen side menu, layered under sheets so items return to it. */
   menuOpen: boolean
   openMenu: () => void

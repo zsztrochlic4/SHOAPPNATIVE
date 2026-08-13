@@ -41,6 +41,7 @@ import Progress from './screens/Progress'
 import Community from './screens/Community'
 import Onboarding from './screens/Onboarding'
 import ActiveWorkout from './screens/ActiveWorkout'
+import { CoachScreen } from './coach/CoachScreen'
 import {
   AddFoodSheet,
   ProfileSheet,
@@ -64,16 +65,20 @@ import {
 import { PlanAroundLifeSheet } from './overlays/planAroundLife'
 import { TrainingProfileSheet } from './overlays/trainingProfile'
 
-export type TabKey = 'dashboard' | 'workout' | 'nutrition' | 'progress' | 'community'
+export type TabKey = 'dashboard' | 'workout' | 'coach' | 'nutrition' | 'progress' | 'community'
 
-const screens: Record<TabKey, React.ComponentType> = {
+// Coach is a first-class tab too, but it owns its full layout (composer above the nav, keyboard
+// handling) so it's mounted separately from these outer-scrolled screens. `progress` keeps its
+// screen and stays reachable (dashboard "Progress overview", coach proposals) even though it's no
+// longer one of the five nav slots.
+const screens: Record<Exclude<TabKey, 'coach'>, React.ComponentType> = {
   dashboard: Dashboard,
   workout: Workout,
   nutrition: Nutrition,
   progress: Progress,
   community: Community,
 }
-const TAB_KEYS = Object.keys(screens) as TabKey[]
+const TAB_KEYS = Object.keys(screens) as Exclude<TabKey, 'coach'>[]
 const selectSoundEnabled = (state: AppState) => state.settings.soundEnabled ?? true
 const selectHapticsEnabled = (state: AppState) => state.settings.hapticsEnabled ?? true
 const selectReducedMotion = (state: AppState) => state.settings.reducedMotion ?? 'system'
@@ -116,6 +121,8 @@ function Shell() {
   const insets = useSafeAreaInsets()
   const [tab, setTab] = useState<TabKey>('dashboard')
   const [visitedTabs, setVisitedTabs] = useState<Set<TabKey>>(() => new Set(['dashboard']))
+  // While the Coach composer's keyboard is open we auto-hide the bottom nav (CLAUDE.md).
+  const [coachKeyboardOpen, setCoachKeyboardOpen] = useState(false)
   const [overlay, setOverlay] = useState<Overlay | null>(null)
   const [params, setParams] = useState<Record<string, unknown>>({})
   const [menuOpen, setMenuOpen] = useState(false)
@@ -207,7 +214,7 @@ function Shell() {
     )
   }
 
-  const renderTab = (tabKey: TabKey) => {
+  const renderTab = (tabKey: Exclude<TabKey, 'coach'>) => {
     const Screen = screens[tabKey]
     // Nutrition and Workout own their scrolling (section scrollers, sticky
     // controls, and virtualised lists); the remaining screens keep a dedicated
@@ -224,7 +231,7 @@ function Shell() {
       </ScrollView>
     )
     return tabKey === 'dashboard' ? (
-      <SwipeNav onOpenMenu={nav.openMenu} onOpenCoach={() => nav.open('coachChat')} coachLabel={coachLabel}>
+      <SwipeNav onOpenMenu={nav.openMenu} onOpenCoach={() => selectTab('coach')} coachLabel={coachLabel}>
         {content}
       </SwipeNav>
     ) : content
@@ -278,8 +285,17 @@ function Shell() {
               <ScreenFade tabKey={tabKey}>{renderTab(tabKey)}</ScreenFade>
             </Activity>
           ))}
+          {/* Coach owns its own layout (composer above the nav + keyboard handling), so it's mounted
+              on its own. Staying mounted preserves the conversation, draft and scroll across tabs. */}
+          {visitedTabs.has('coach') && (
+            <Activity key="coach" name="tab-coach" mode={tab === 'coach' ? 'visible' : 'hidden'}>
+              <ScreenFade tabKey="coach">
+                <CoachScreen chrome="tab" active={tab === 'coach'} onKeyboardVisibleChange={setCoachKeyboardOpen} />
+              </ScreenFade>
+            </Activity>
+          )}
         </View>
-        <BottomNav active={tab} onChange={selectTab} />
+        <BottomNav active={tab} onChange={selectTab} hidden={tab === 'coach' && coachKeyboardOpen} />
       </View>
 
       {/* Overlays */}

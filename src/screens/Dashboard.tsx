@@ -3,7 +3,7 @@ import { View, Text, Pressable, Image, Animated, Easing, Platform, ScrollView, S
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Circle, G, Defs, RadialGradient, Stop, Rect } from 'react-native-svg'
 import { LinearGradient } from 'expo-linear-gradient'
-import { Menu, MessageCircle, Clock, GraduationCap, ChevronRight, Leaf, Check, Flame, ChevronDown, Info, ArrowRight, X, SlidersHorizontal, Sparkles } from 'lucide-react-native'
+import { Menu, Clock, GraduationCap, ChevronRight, Leaf, Check, Flame, ChevronDown, Info, ArrowRight, X, SlidersHorizontal, Sparkles } from 'lucide-react-native'
 import { Icon } from '../components/Icon'
 import { ActivityIcon } from '../components/ActivityIcon'
 import { Card } from '../components/ui'
@@ -18,7 +18,7 @@ import { fmtFluid, fmtWeightNum, weightUnit, fmtVolume } from '../lib/format'
 import { prefersReducedMotion } from '../lib/a11y'
 import {
   todayHabit, habitForDay, todaySession, sessionForDay, activitiesForDay,
-  unreadChat, streakStats, foodReviewForDay, weeklyIndex, nutritionTagsForDay,
+  streakStats, foodReviewForDay, weeklyIndex, nutritionTagsForDay,
   workoutStartedForDay, sessionProgress,
 } from '../store/selectors'
 import { tagById, NUTRITION_TAGS, type TagTone } from '../data/nutrition'
@@ -88,7 +88,6 @@ export default function Dashboard() {
   const units = state.settings.units
   const habit = todayHabit(state)
   const session = todaySession(state)
-  const unread = unreadChat(state)
   const t = dailyTargets(state)
   const exam = examState(state)
   const streak = streakStats(state)
@@ -114,7 +113,9 @@ export default function Dashboard() {
     thud()
     dispatch({ type: 'SET_SETTINGS', patch: { coachCheckinDismissedKey: todayKey } })
   }
-  const openCheckin = (cta?: CoachMessage['cta']) => nav.open((cta?.overlay ?? 'coachChat') as Parameters<typeof nav.open>[0])
+  // A check-in with its own CTA opens that overlay; otherwise open the coach — now a first-class tab.
+  const openCheckin = (cta?: CoachMessage['cta']) =>
+    cta?.overlay ? nav.open(cta.overlay as Parameters<typeof nav.open>[0]) : nav.goTab('coach')
 
   const greeting = greetingFor(currentHour())
   const weekKeys = currentWeekKeys()
@@ -184,10 +185,8 @@ export default function Dashboard() {
           <Menu size={24} color={colors.fg} />
         </Pressable>
         <Wordmark size="sm" />
-        <Pressable onPress={() => nav.open('coachChat')} accessibilityRole="button" accessibilityLabel={unread > 0 ? `Open coach, ${unread} unread` : 'Open coach'} className="relative h-10 w-10 items-center justify-center rounded-xl active:opacity-70">
-          <MessageCircle size={23} color={colors.fg} />
-          {unread > 0 && <View className="absolute right-2 top-2 h-2 w-2 rounded-full bg-brand-400" style={{ borderWidth: 2, borderColor: colors.ink900 }} />}
-        </Pressable>
+        {/* Coach lives in the bottom nav now — no top-right shortcut. Spacer keeps the wordmark centred. */}
+        <View className="h-10 w-10" />
       </View>
 
       {/* Weekly performance index */}

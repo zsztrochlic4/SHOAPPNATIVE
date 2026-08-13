@@ -192,6 +192,8 @@ export interface Settings {
   /** Day-key of the most recent proactive coach check-in the user dismissed, so a check-in shows at
    *  most once per day and never reappears after being dismissed for that day. */
   coachCheckinDismissedKey?: string
+  /** True once the "Meet your coach" first-run welcome has been dismissed, so it shows only once. */
+  coachWelcomeSeen?: boolean
   /** Connected third-party integrations, e.g. { strava: true }. */
   connections?: Record<string, boolean>
   /** Which metric the main Progress chart shows (default 'weight'). */
