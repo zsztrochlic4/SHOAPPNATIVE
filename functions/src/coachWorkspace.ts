@@ -14,6 +14,10 @@ import type {
 } from './_shared/backend/coach/safety/types'
 import { newSafetySession } from './_shared/backend/coach/safety/types'
 import { restorablePersistentStates } from './_shared/backend/coach/safety/persistedState'
+import { EXERCISES } from './_shared/backend/data/exercises'
+
+// By-id exercise lookup for grounding technical answers in the app's reviewed technique fields.
+const EXERCISE_BY_ID = new Map(EXERCISES.map((e) => [e.id, e]))
 
 const COACH_SCHEMA_VERSION = 1
 const MAX_MEMORIES = 60
@@ -45,6 +49,10 @@ export interface CoachTurnData {
   safetySession: SafetySession
   memoryEnabled: boolean
   coachingStyle: CoachWorkspaceSummary['coachingStyle']
+  /** Flat list of the user's program exercises with app-reviewed technique, so deterministic
+   *  fallbacks can resolve an exercise NAME the user typed to its canonical id (swap) and to its
+   *  reviewed cues (technique answer) — never trusting the small model to pick from a list. */
+  programExercises: { id: string; name: string; whatItDoes?: string; steps?: string[]; commonMistake?: string; safetyNote?: string; topSwap?: { id: string; name: string } }[]
 }
 
 function compact(value: unknown, max = 1200): string {
@@ -161,6 +169,76 @@ function recovery7dText(habits: Record<string, unknown>[]): string {
   if (sleeps.length) parts.push(`sleep avg ${avg(sleeps).toFixed(1)}h over ${sleeps.length} logged night${sleeps.length > 1 ? 's' : ''}`)
   if (waters.length) parts.push(`water avg ${avg(waters).toFixed(1)}L over ${waters.length} logged day${waters.length > 1 ? 's' : ''}`)
   return parts.join('; ') + '.'
+}
+
+/** The user's saved weekly meal plan (this week only), grouped by day, so the coach can review the
+ *  PLAN qualitatively. Never emits calorie/macro targets — nutrition is qualitative app-wide. */
+const DAY_ORDER = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+function mealPlanText(raw: unknown): string {
+  if (!Array.isArray(raw)) return ''
+  const thisWeek = raw.filter((m) => m && typeof m === 'object' && ((m as { w?: number }).w == null || (m as { w?: number }).w === 0))
+  if (!thisWeek.length) return ''
+  const byDay = new Map<string, string[]>()
+  for (const m of thisWeek as Array<{ day?: unknown; slot?: unknown; name?: unknown }>) {
+    const day = ordinary(m.day, 8), slot = ordinary(m.slot, 20), name = ordinary(m.name, 60)
+    if (!day || !name) continue
+    if (!byDay.has(day)) byDay.set(day, [])
+    byDay.get(day)!.push(slot ? `${slot}: ${name}` : name)
+  }
+  if (!byDay.size) return ''
+  const days = [...byDay.keys()].sort((a, b) => DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b))
+  return days.map((d) => `${d}: ${byDay.get(d)!.join(', ')}`).join('; ')
+}
+
+/** Reviewed technique (what it does, top cues, common mistake, safety) for the user's PROGRAM lifts,
+ *  from the app's exercise database, so the coach can quote the app's own cues on how-to questions.
+ *  Bounded in length; only program lifts, so it can never dump the whole database. */
+function programTechniqueText(prog: unknown): string {
+  const p = prog as { days?: unknown[] } | undefined
+  if (!p || !Array.isArray(p.days)) return ''
+  const ids: string[] = []
+  const seen = new Set<string>()
+  for (const day of p.days as Array<{ exercises?: unknown[] }>) {
+    if (!day || !Array.isArray(day.exercises)) continue
+    for (const ex of day.exercises as Array<{ id?: unknown }>) {
+      const id = ordinary(ex?.id, 128)
+      if (id && !seen.has(id)) { seen.add(id); ids.push(id) }
+    }
+  }
+  const lines: string[] = []
+  for (const id of ids) {
+    const ex = EXERCISE_BY_ID.get(id)
+    if (!ex) continue
+    const cues = Array.isArray(ex.steps) ? ex.steps.slice(0, 3).join('; ') : ''
+    lines.push(`${ex.name}: ${ordinary(ex.whatItDoes, 160)} Cues: ${ordinary(cues, 300)} Common mistake: ${ordinary(ex.commonMistake, 160)} Safety: ${ordinary(ex.safetyNote, 200)}`)
+  }
+  return lines.join(' | ').slice(0, 2400)
+}
+
+/** A plain-English rationale for WHY the program is built the way it is, from the onboarding inputs and
+ *  the goal, so the coach can explain the plan rather than just listing it. Qualitative, no numbers
+ *  beyond the days/length the user chose. */
+function programRationaleText(backend: Record<string, any>, profile: Record<string, any>, prog: any): string {
+  const goal = ordinary(backend.goal || profile.goal, 40)
+  const exp = ordinary(backend.experience_level || profile.experience, 30)
+  const days = backend.days_per_week ?? profile.daysPerWeek
+  const len = backend.session_length_min ?? profile.sessionMinutes
+  const equip = ordinary(backend.equipment || profile.equipment, 40)
+  const alone = ordinary(backend.trains_alone, 20)
+  const dayTypes = prog && Array.isArray(prog.days) ? prog.days.map((d: any) => ordinary(d?.dayType, 20)).filter(Boolean).join(', ') : ''
+  const split = ordinary(prog?.name, 80) || (prog && Array.isArray(prog.days) ? `${prog.days.length} day split` : '')
+  if (!goal && !split) return ''
+  const why = /hyper|muscle|build/i.test(goal) ? 'It leans on compound lifts with progressive overload and enough weekly volume per muscle group to drive growth'
+    : /strength|strong/i.test(goal) ? 'It centres on the main compound lifts with heavier loading and lower reps to build strength'
+    : /fat|lose/i.test(goal) ? 'It keeps the key compound lifts to protect muscle while you are eating in a deficit, with volume you can recover from'
+    : 'It balances the main movement patterns for all round fitness'
+  const parts = [
+    split ? `${split}.` : '',
+    `Built around what you told us at onboarding: goal ${goal || 'general fitness'}, ${exp || 'your'} experience, ${days ?? '?'} days a week, about ${len ?? '?'} minute sessions, training with ${equip || 'your equipment'}${alone ? `, ${alone} with a spotter` : ''}.`,
+    dayTypes ? `Weekly structure: ${dayTypes}.` : '',
+    `${why}, chosen to fit those days and equipment.`,
+  ]
+  return parts.filter(Boolean).join(' ')
 }
 
 async function recentDocs(uid: string, name: string, limitCount: number, onFail?: () => void): Promise<Record<string, unknown>[]> {
@@ -313,6 +391,9 @@ export async function loadCoachTurnData(
     weights: compact(weights.slice(0, 8), 700),
     nutrition: `${meals.length} entries; latest ${compact(meals.slice(0, 8), 1000)}`,
     nutritionCheckins: compact(foodReviews.slice(0, 7), 900),
+    mealPlan: mealPlanText(user.mealPlan),
+    programTechnique: programTechniqueText(user.generatedProgram ?? user.program),
+    programRationale: programRationaleText(backend, profile, user.generatedProgram ?? user.program),
     memories: memoryList.map((m) => ({ category: m.category, value: m.value, sensitivity: m.sensitivity, scope: m.scope })),
     // Coach Capability Plan — enriched signals (all from the docs already loaded above).
     programDay: programDayText(user.generatedProgram ?? user.program, todayName),
@@ -346,6 +427,34 @@ export async function loadCoachTurnData(
     return `${data.role === 'coach' ? 'Coach' : 'User'}: ${ordinary(data.text, 2000)}`
   })
   const workspace = workspaceSnap.data() as Record<string, unknown> | undefined
+  // Flat {id,name} exercise list from the program schedule, for the deterministic swap fallback.
+  const prog = (user.generatedProgram ?? user.program) as { days?: unknown[] } | undefined
+  const programExercises: CoachTurnData['programExercises'] = []
+  const seenEx = new Set<string>()
+  if (prog && Array.isArray(prog.days)) {
+    for (const day of prog.days as Array<{ exercises?: unknown[] }>) {
+      if (!day || !Array.isArray(day.exercises)) continue
+      for (const ex of day.exercises as Array<{ id?: unknown; name?: unknown }>) {
+        const id = ordinary(ex?.id, 128), name = ordinary(ex?.name, 80)
+        if (id && name && !seenEx.has(id)) {
+          seenEx.add(id)
+          const db = EXERCISE_BY_ID.get(id)
+          // Best-first substitute, so the coach can NAME the replacement in a swap proposal before the
+          // user confirms (the engine still validates it on confirm and falls back if it doesn't fit).
+          const subId = db && Array.isArray(db.substitutionIds) ? db.substitutionIds.find((sid) => EXERCISE_BY_ID.has(sid)) : undefined
+          const subName = subId ? ordinary(EXERCISE_BY_ID.get(subId)!.name, 80) : ''
+          programExercises.push({
+            id, name,
+            whatItDoes: db ? ordinary(db.whatItDoes, 200) : undefined,
+            steps: db && Array.isArray(db.steps) ? db.steps.map((sX) => ordinary(sX, 200)).filter(Boolean) : undefined,
+            commonMistake: db ? ordinary(db.commonMistake, 200) : undefined,
+            safetyNote: db ? ordinary(db.safetyNote, 240) : undefined,
+            ...(subId && subName ? { topSwap: { id: subId, name: subName } } : {}),
+          })
+        }
+      }
+    }
+  }
   return {
     context,
     contextText: contextLines.join('\n'),
@@ -354,6 +463,7 @@ export async function loadCoachTurnData(
     safetySession: restoreSafety(safetySnap.data() as Record<string, unknown> | undefined),
     memoryEnabled: workspace?.consentVersion === 1 && workspace?.memoryEnabled === true,
     coachingStyle: (['supportive', 'direct', 'balanced'].includes(String(workspace?.coachingStyle)) ? workspace!.coachingStyle : 'balanced') as CoachWorkspaceSummary['coachingStyle'],
+    programExercises,
   }
 }
 

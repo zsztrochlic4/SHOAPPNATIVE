@@ -447,10 +447,21 @@ function detectRapidWeightLoss(n: Norm): DetectorHit[] {
 }
 
 function detectMealPlan(n: Norm): DetectorHit[] {
-  const plan = has(n, 'meal plan', 'diet plan', 'eating plan', 'what to eat every day', 'tell me exactly what to eat',
-    'food schedule', 'day meal plan', 'calorie meal plan', 'give me my macros', 'my macro targets',
-    'exact macros', 'meal prep plan') || hasRe(n, /\d{3,4}\s?(cal|calorie|kcal)\b.*(plan|diet|meal)/)
-  if (plan) return [hit('meal_plan', 'meal_plan_request')]
+  // Macro/calorie targets and building a personalised plan stay OUT of scope (spec §5) — always block.
+  const macros = has(n, 'give me my macros', 'my macro targets', 'exact macros', 'calorie meal plan',
+    'macro target', 'macros for', 'how many calories', 'calorie target', 'set my calories', 'set my macros')
+    || hasRe(n, /\d{3,4}\s?(cal|calorie|kcal)\b.*(plan|diet|meal)/)
+  const planPhrase = has(n, 'meal plan', 'diet plan', 'eating plan', 'what to eat every day',
+    'tell me exactly what to eat', 'food schedule', 'day meal plan', 'meal prep plan')
+  // QUALITATIVE review of the user's OWN existing plan is IN scope (owner decision): the coach may
+  // comment on balance, variety, veggies, protein, carbs qualitatively and suggest improvements —
+  // never numeric macro/calorie targets, never a from-scratch personalised plan. So a plan mention
+  // paired with a clear review/feedback intent is allowed; creation ("make/give/build me a plan") is not.
+  const reviewIntent = has(n, 'review', 'look at my', 'check my', 'is my', 'how is my', 'hows my',
+    'are my', 'thoughts on', 'feedback on', 'improve my', 'improvements', 'rate my', 'critique',
+    'balanced', 'enough protein', 'enough veg', 'good enough', 'any good', 'what do you think')
+  const block = macros || (planPhrase && !reviewIntent)
+  if (block) return [hit('meal_plan', 'meal_plan_request')]
   return []
 }
 

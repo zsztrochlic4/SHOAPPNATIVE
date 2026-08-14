@@ -185,8 +185,13 @@ export function CoachActionCard({
         <View style={{ marginTop: 9, gap: 8 }}>
           <Text style={{ fontSize: 11, fontWeight: '700', color: withAlpha(colors.fg, 0.45) }}>Pick a replacement</Text>
           {swapOptions.map((option) => (
-            <Pressable key={option.id} onPress={() => onChooseSwap(option)} accessibilityRole="button" accessibilityLabel={`Replace with ${option.name}${option.muscleGroup ? `, ${option.muscleGroup}` : ''}`} style={({ pressed }) => ({ minHeight: 44, borderRadius: 11, borderWidth: 1, borderColor: withAlpha(colors.brand400, 0.35), paddingVertical: 9, paddingHorizontal: 12, backgroundColor: withAlpha(colors.brand400, pressed ? 0.16 : 0.08) })}>
-              <Text style={{ fontSize: 12.5, fontWeight: '700', color: colors.fg }}>{option.name}</Text>
+            <Pressable key={option.id} onPress={() => onChooseSwap(option)} accessibilityRole="button" accessibilityLabel={`Replace with ${option.name}${option.recommended ? ', recommended' : ''}${option.muscleGroup ? `, ${option.muscleGroup}` : ''}`} style={({ pressed }) => ({ minHeight: 44, borderRadius: 11, borderWidth: option.recommended ? 1.5 : 1, borderColor: withAlpha(colors.brand400, option.recommended ? 0.7 : 0.35), paddingVertical: 9, paddingHorizontal: 12, backgroundColor: withAlpha(colors.brand400, pressed ? 0.16 : option.recommended ? 0.12 : 0.08) })}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={{ fontSize: 12.5, fontWeight: '700', color: colors.fg }}>{option.name}</Text>
+                {option.recommended && (
+                  <Text style={{ fontSize: 9.5, fontWeight: '800', letterSpacing: 0.3, color: colors.brand400, backgroundColor: withAlpha(colors.brand400, 0.16), paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, overflow: 'hidden' }}>RECOMMENDED</Text>
+                )}
+              </View>
               {!!option.muscleGroup && <Text style={{ marginTop: 1, fontSize: 11, color: withAlpha(colors.fg, 0.5) }}>{option.muscleGroup}</Text>}
             </Pressable>
           ))}

@@ -149,7 +149,11 @@ export default function Dashboard() {
   // when the user logs elsewhere in the app, so the row can't be ticked here.
   const selFoodReview = foodReviewForDay(state, selDate)
   const selCheckedIn = selTags.length > 0 || !!selFoodReview
-  const isRestDay = !selSession
+  // Plan Around Your Life: during a Full pause or Just-keep-moving period, today is shown as REST
+  // (no scheduled lifting), honouring the mode's promise. This is display only — the underlying
+  // session data, logging and streak are untouched; an opened workout is all-optional via examTrim.
+  const restByPeriodMode = isToday && exam.active && (exam.mode === 'pause' || exam.mode === 'moving')
+  const isRestDay = !selSession || restByPeriodMode
   const selWorkoutDone = isRestDay || workoutStartedForDay(state, selDate) || (selSession?.completed ?? false)
 
   // CTA for the muscle-map plan card, driven by today's tick progress (mirrors the Workout tab).
@@ -315,7 +319,7 @@ export default function Dashboard() {
 
       {/* Plan / workout: follows the selected day */}
       <Section title={isToday ? "Today's plan" : `${selWeekday}'s workout`} />
-      {selSession ? (
+      {selSession && !restByPeriodMode ? (
         isToday ? (
           <MuscleMapCard
             session={selSession}

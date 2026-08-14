@@ -46,6 +46,8 @@ export interface SwapOption {
   id: string
   name: string
   muscleGroup: string
+  /** True for the coach's recommended pick (the closest priority substitute). */
+  recommended?: boolean
 }
 
 export type CoachActionOutcome =
@@ -279,10 +281,12 @@ export function resolveCoachAction(
       }
       if (options.length === 1) return applySwap(state, options[0])
       const fromName = EXERCISE_BY_ID[action.fromExerciseId]?.name ?? 'that lift'
+      // Options come back in priority order, so the first is the closest match — recommend it.
+      const recName = options[0].toName
       return {
         ok: true, apply: 'choose_swap', fromExerciseId: action.fromExerciseId, reason: action.reason,
-        options: options.map((o) => ({ id: o.toId, name: o.toName, muscleGroup: EXERCISE_BY_ID[o.toId]?.muscleGroup ?? '' })),
-        message: `Two options to replace ${fromName} — pick the one you'd rather do:`,
+        options: options.map((o, i) => ({ id: o.toId, name: o.toName, muscleGroup: EXERCISE_BY_ID[o.toId]?.muscleGroup ?? '', recommended: i === 0 })),
+        message: `Two ways to replace ${fromName}. I'd go with ${recName}, it's the closest match to what you're already training. Pick whichever you prefer:`,
       }
     }
 

@@ -217,13 +217,17 @@ export function TypingDots({ colors }: { colors: Palette }) {
     return () => loops.forEach((l) => l.stop())
   }, [dots, reduceMotion])
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }} accessibilityRole="text" accessibilityLabel="Coach is typing">
-      <MiniAvatar colors={colors} />
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 20, borderBottomLeftRadius: 7, backgroundColor: colors.ink800, paddingHorizontal: 16, paddingVertical: 15 }}>
-        {dots.map((d, i) => (
-          <Animated.View key={i} style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: withAlpha(colors.fg, 0.4), transform: [{ translateY: d }] }} />
-        ))}
+    <View style={{ gap: 5 }} accessibilityRole="text" accessibilityLabel="Coach is thinking">
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
+        <MiniAvatar colors={colors} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 20, borderBottomLeftRadius: 7, backgroundColor: colors.ink800, paddingHorizontal: 16, paddingVertical: 15 }}>
+          {dots.map((d, i) => (
+            <Animated.View key={i} style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: withAlpha(colors.fg, 0.4), transform: [{ translateY: d }] }} />
+          ))}
+        </View>
       </View>
+      {/* A quiet "thinking" caption so the considered pause reads as intentional, not slow. */}
+      <Text style={{ marginLeft: 44, fontSize: 11.5, fontWeight: '600', color: withAlpha(colors.fg, 0.38) }}>Coach is thinking…</Text>
     </View>
   )
 }
