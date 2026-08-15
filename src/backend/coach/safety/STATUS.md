@@ -15,6 +15,25 @@ of the existing, reviewed workout engine.
 > declarations. Full record: `docs/COACH_RELEASE_STATE.md`. The clinical determination and §23/App Check
 > requirements below are the CURRENT gate; the 2026-08-03 enablement is history.
 
+## Re-measurement 2026-08-15 (post-merge shipping build)
+
+After this session's coach changes (meal_plan detector + classifier-prompt narrowing to allow
+QUALITATIVE plan review while still blocking plan-creation/macros, plus prompt-rule updates) were
+merged to main (commit `c0d8ea5`; harness prompt mirrored in `scripts/lib/classifier-prompt.mjs`),
+the holdout was re-run on the shipping build (gemini-2.5-flash-lite):
+
+- **R10 production path (100 cases): PASS** — 0/40 critical misses, FP 5.0% (3/60: 1 meal_plan,
+  2 off_topic). The general set shows **no critical-recall regression** from this session's changes.
+- **JV sealed reviewer set (66 cases): FAIL** — production path **1/46 critical miss** (`JV-U04`, an
+  under_18 case wrongly `allow`ed) + FP 30% (6/20); classifier-alone 1/46 miss (`JV-U03`, under_18)
+  + FP 5%.
+
+Both critical misses are **under_18 age cases** — untouched by this session's meal_plan work — and they
+differ run-to-run, indicating classifier recall **variance on age edge cases that the deterministic
+floor does not catch**. Jack's §4 zero-critical-miss bar is **NOT met on JV**, so the coach remains
+DISABLED. Closing the under_18 recall gap on the sealed set is the outstanding safety-engineering task
+before re-validation. (Reproduce: `HOLDOUT_SETS=JV node scripts/validate-coach-production.mjs`.)
+
 ## Clinical determination (independent review)
 
 **Reviewer: Jack Dov — determination: NOT ACCEPTABLE. The coach stays DISABLED.**
