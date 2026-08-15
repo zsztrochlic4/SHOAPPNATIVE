@@ -46,4 +46,10 @@ export const CLASSIFIER_EXEMPLARS: ReadonlyArray<ClassifierExemplar> = [
   {"text":"yeah just do it, go ahead and lock in my program","categories":["none"]},
   {"text":"that AMRAP finisher wrecked me in the best possible way","categories":["none"]},
   {"text":"I'm done for today, I'll be back at it tomorrow morning","categories":["none"]},
+  {"text":"work has been full-on and my sleep is all over the place, any tips to wind down after late shifts?","categories":["none"]},
+  {"text":"I am away for a fortnight visiting family, can we keep my program ticking along while I am gone?","categories":["none"]},
+  {"text":"my relationship wrapped up recently and honestly I feel lighter, keen to pour that energy into the gym","categories":["none"]},
+  {"text":"I am stepping back from my phone and socials for a bit to reset my headspace","categories":["none"]},
+  {"text":"can you write my history essay on the causes of World War One?","categories":["off_topic"]},
+  {"text":"what is the best route to drive from Sydney to Melbourne?","categories":["off_topic"]},
 ]

@@ -525,8 +525,21 @@ const NOT_A_QUANTITY = '(?!\\s*(kg|kgs|kilo|kilos|pound|pounds|lb|lbs|rep|reps|s
 function detectUnder18(n: Norm): DetectorHit[] {
   // Age with clear self-reference, guarding against reps/kg/weeks/etc.
   const ageStmt = hasRe(n, /\b(i am|i m|im|only|actually|just|turned|turning)\s+(1[0-7]|[1-9])\b(?!\s*(kg|kgs|kilo|kilos|pound|pounds|lb|lbs|rep|reps|set|sets|week|weeks|min|minutes|km|hour|hours|days|day|percent|reps))/)
-  const explicit = has(n, 'under 18', 'underage', 'im a minor', 'i m a minor', 'still in high school', 'in year 8',
-    'in year 9', 'in year 10', 'in year 11', 'year 8', 'year 9', 'year 10', 'high schooler')
+  const explicit = has(n, 'under 18', 'underage', 'im a minor', 'i m a minor', 'still in high school',
+    'in year 7', 'in year 8', 'in year 9', 'in year 10', 'in year 11', 'year 7', 'year 8', 'year 9', 'year 10',
+    'in grade 7', 'in grade 8', 'in grade 9', 'in grade 10', 'grade 7', 'grade 8', 'grade 9', 'high schooler')
+  // Birth-year disclosure that implies a CURRENT minor ("i was born in 2010", "birth year 2009", "dob 2010").
+  // Computed against the current year so it stays correct as time passes; only DEFINITE minors flag (born
+  // strictly after currentYear-18), leaving the ambiguous edge birth year to the server-trusted DOB gate.
+  // Third-party / historical / negated mentions are removed by scope() afterwards, so "my sister born in
+  // 2010" does not flag.
+  const bornMatch = n.p.match(/\bborn (?:in |on |back in )?(?:\w+ )?(20\d{2})\b/) || n.p.match(/\b(?:birth year|year of birth|dob)\b[^0-9]{0,8}(20\d{2})\b/)
+  let bornMinor = false
+  if (bornMatch) {
+    const y = Number(bornMatch[1])
+    const nowY = new Date().getFullYear()
+    bornMinor = y > nowY - 18 && y <= nowY
+  }
   // Indirect "not yet 18" disclosures (the Jack JV-U03 class): approaching 18, an UPCOMING 18th birthday,
   // or "not yet 18" all mean the user is CURRENTLY under 18. First-person is required by the pattern shape
   // ("i …", or "my 18th/eighteenth birthday" with no relative in between), so a third party's upcoming
@@ -536,7 +549,7 @@ function detectUnder18(n: Norm): DetectorHit[] {
     hasRe(n, /\bmy (?:18th|eighteenth) birthday\b/) ||
     hasRe(n, /\b(?:before|until|when) i turn (?:18|eighteen)\b/) ||
     hasRe(n, new RegExp(`\\bnot (?:yet|quite) (?:18|eighteen)\\b${NOT_A_QUANTITY}`))
-  if (ageStmt || explicit || approachingEighteen) return [hit('under_18', 'stated_under_18')]
+  if (ageStmt || explicit || approachingEighteen || bornMinor) return [hit('under_18', 'stated_under_18')]
   return []
 }
 
@@ -749,7 +762,8 @@ const CATEGORY_TERMS: Partial<Record<SafetyCategory, string[]>> = {
   prescribed_medication: ['medication', 'medicine', 'meds', 'prescription', 'tablets', 'pills'],
   injury_override: [...INJURY_TERMS],
   pregnancy: ['pregnant', 'pregnancy', 'expecting', 'postpartum'],
-  under_18: ['16', '15', '14', '13', '17', 'year old', 'years old', 'teenager', 'teenage'],
+  under_18: ['16', '15', '14', '13', '17', 'year old', 'years old', 'teenager', 'teenage',
+    'year 7', 'year 8', 'year 9', 'year 10', 'year 11', 'grade 7', 'grade 8', 'grade 9', 'high school', 'high schooler'],
 }
 
 /** Scoping options. `adult` = the server-trusted DOB proves the account holder is 18+. */
