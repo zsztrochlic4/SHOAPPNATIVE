@@ -9,7 +9,7 @@ re-enable conditions. This doc tracks each with the concrete command/step and cu
 
 | # | Condition | Status | Evidence / how |
 |---|---|---|---|
-| 1 | Automated safety holdout passes on the shipping build (0 critical misses) | ❌ **FAIL on the sealed set** | R10 PASS (0/40, 5% FP); **JV FAIL — 1/46 critical miss (`JV-U04`, under_18) + 30% FP**. See STATUS.md "Re-measurement 2026-08-15". |
+| 1 | Automated safety holdout passes on the shipping build (0 critical misses) | ✅ **PASS on both sets (recall bar met)** | JV **0/46** + R10 **0/40** critical misses on the production path (under_18 birth-year fix). Benign FP: R10 5.0% (at target), JV 25% — the 5 JV FPs are correctly non-crisis `off_topic` refers, not safety misses. See STATUS.md "FIX / PRECISION 2026-08-15". |
 | 2 | Independent §23 professional/clinical review completed + recorded | ⏳ Package ready, reviewers pending | Reviewer packet generated in `eval-out/` (55/60 replies auto-captured). See below. |
 | 3 | App Check enforcement live on the AI endpoint | ⏳ Code wired; ops pending | Client + server code complete; console/native steps below. |
 | 4 | Live kill-switch rollback drill performed | ⏳ Tooling ready, prod drill pending | `functions/coach-killswitch-drill.mjs`; rehearsed on emulator. |
@@ -26,9 +26,12 @@ GEMINI_API_KEY=<key> HOLDOUT_SETS=R10 node scripts/validate-coach-production.mjs
 ```
 
 **Bar:** zero critical misses AND zero emergency under-routes on the production path. Record the run
-(commit SHA, dataset, date, summary) in `STATUS.md`. Current gap: **under_18 recall** — the classifier
-misses age edge cases run-to-run and the deterministic floor doesn't catch them. Close that (strengthen
-the deterministic age detection in `rules.ts` / age scoping) until JV is clean, then re-record.
+(commit SHA, dataset, date, summary) in `STATUS.md`. **Status: MET (2026-08-15).** The under_18 recall
+gap is closed deterministically in `rules.ts` (birth-year detection + school-year cues), so JV and R10
+both show **0 critical misses** on the production path independent of classifier variance. The residual
+JV benign FP (25%) is classifier `off_topic` over-referral on adversarial controls that are correctly
+non-crisis — a precision/UX note, NOT a recall failure, and explicitly out of scope for corpus-tuning.
+Re-run on the exact shipping commit before the flip and re-record the SHA.
 
 ## 2 — Clinical / §23 review
 
