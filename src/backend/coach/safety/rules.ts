@@ -460,7 +460,14 @@ function detectMealPlan(n: Norm): DetectorHit[] {
   const reviewIntent = has(n, 'review', 'look at my', 'check my', 'is my', 'how is my', 'hows my',
     'are my', 'thoughts on', 'feedback on', 'improve my', 'improvements', 'rate my', 'critique',
     'balanced', 'enough protein', 'enough veg', 'good enough', 'any good', 'what do you think')
-  const block = macros || (planPhrase && !reviewIntent)
+  // CREATION intent forces the block even when a review adjective is also present — otherwise
+  // "make me a BALANCED meal plan" would slip through on the word "balanced". Building a plan
+  // from scratch is out of scope no matter how it is dressed up; only a review of an EXISTING
+  // plan (review intent AND no creation verb) is allowed.
+  const createIntent = has(n, 'make me', 'make a', 'build me', 'build a', 'give me a', 'create',
+    'design', 'generate', 'write me', 'write a', 'put together', 'come up with', 'draw up',
+    'plan me', 'set me up', 'prep me', 'map out', 'lay out')
+  const block = macros || (planPhrase && (createIntent || !reviewIntent))
   if (block) return [hit('meal_plan', 'meal_plan_request')]
   return []
 }
