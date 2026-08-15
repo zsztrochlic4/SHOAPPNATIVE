@@ -762,7 +762,8 @@ const CATEGORY_TERMS: Partial<Record<SafetyCategory, string[]>> = {
   prescribed_medication: ['medication', 'medicine', 'meds', 'prescription', 'tablets', 'pills'],
   injury_override: [...INJURY_TERMS],
   pregnancy: ['pregnant', 'pregnancy', 'expecting', 'postpartum'],
-  under_18: ['16', '15', '14', '13', '17', 'year old', 'years old', 'teenager', 'teenage'],
+  under_18: ['16', '15', '14', '13', '17', 'year old', 'years old', 'teenager', 'teenage',
+    'year 7', 'year 8', 'year 9', 'year 10', 'year 11', 'grade 7', 'grade 8', 'grade 9', 'high school', 'high schooler'],
 }
 
 /** Scoping options. `adult` = the server-trusted DOB proves the account holder is 18+. */
