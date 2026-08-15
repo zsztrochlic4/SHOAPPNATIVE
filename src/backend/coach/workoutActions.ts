@@ -712,3 +712,56 @@ export function synthesizeMealPlanReview(mealPlanText: string | undefined, goal:
 
   return `I'd give your planned meals a ${score}/10 for ${goalName}. You've got ${strengthsText}. To make it work harder for your goal, ${improvement}. This is a qualitative read of your own plan, not calorie or macro targets.`
 }
+
+/* ------------------------------------------------------------------ */
+/*  SEMANTIC proposal guard (run at SURFACING time)                    */
+/* ------------------------------------------------------------------ */
+
+export interface ProposalSurfacingContext {
+  /** Every exercise id that actually exists in the workbook database. */
+  validExerciseIds: ReadonlySet<string>
+  /** The "recent PRs" snapshot line (may be empty), used to sanity-check share_pr proposals. */
+  recentPRsText: string
+}
+
+/**
+ * A model-emitted `workout_action` proposal has already passed the SHAPE + id-FORMAT gate
+ * (`validateWorkoutActionPayload`). This second gate runs at SURFACING time (before the confirm card
+ * is shown) and checks the ids/values are REAL against the user's data, so the coach never:
+ *   • offers to swap in an exercise id that does not exist in the database (AD09), or
+ *   • offers to publish a personal record the user has not logged, or one implausibly beyond their
+ *     logged bests (AD07).
+ * Returns null when the proposal is safe to surface, or a reason + an honest line to show INSTEAD of
+ * the proposal. Higher-tier crisis/safety routing is upstream and unaffected.
+ */
+export function proposalSurfacingIssue(
+  payload: Record<string, unknown> | null | undefined,
+  ctx: ProposalSurfacingContext,
+): { reason: string; coachLine: string } | null {
+  const action = payload && typeof payload === 'object' ? String((payload as Record<string, unknown>).action ?? '') : ''
+  if (action === 'swap') {
+    const from = String((payload as Record<string, unknown>).fromExerciseId ?? '')
+    const wantedRaw = (payload as Record<string, unknown>).wantedExerciseId
+    const wanted = wantedRaw != null ? String(wantedRaw) : ''
+    if (from && !ctx.validExerciseIds.has(from)) {
+      return { reason: 'swap_unknown_from', coachLine: "I can't set that swap up: I don't recognise an exercise with that id. Tell me the exercise by name and I'll match it to a real, safe option from your program." }
+    }
+    if (wanted && !ctx.validExerciseIds.has(wanted)) {
+      return { reason: 'swap_unknown_wanted', coachLine: "I won't swap that in: I don't recognise an exercise with that id in the database. Name the exercise you'd like and I'll find a real, safe match." }
+    }
+  }
+  if (action === 'share_pr') {
+    const logged = (ctx.recentPRsText.match(/(\d+(?:\.\d+)?)\s*kg/gi) ?? []).map((s) => parseFloat(s)).filter((n) => Number.isFinite(n) && n > 0)
+    const prValue = Number((payload as Record<string, unknown>).prValue)
+    const noLoggedPRs = logged.length === 0
+    const loggedMax = logged.length ? Math.max(...logged) : 0
+    // Reject when there's nothing logged to celebrate, or the claimed value is implausibly beyond the
+    // user's own logged bests (an un-logged / fabricated PR — AD07). The tolerance leaves genuine PRs
+    // (a few kg over the last best) alone.
+    const implausible = Number.isFinite(prValue) && (prValue > loggedMax * 1.5 + 20 || prValue > 500)
+    if (noLoggedPRs || implausible) {
+      return { reason: 'pr_unbacked', coachLine: "I can only celebrate a personal record you've actually logged, and I don't see that one in your recent sessions, so I won't post it. Log the lift and I'll help you share a real PR." }
+    }
+  }
+  return null
+}

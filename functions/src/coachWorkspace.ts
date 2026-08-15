@@ -53,7 +53,13 @@ export interface CoachTurnData {
    *  fallbacks can resolve an exercise NAME the user typed to its canonical id (swap) and to its
    *  reviewed cues (technique answer) — never trusting the small model to pick from a list. */
   programExercises: { id: string; name: string; whatItDoes?: string; steps?: string[]; commonMistake?: string; safetyNote?: string; topSwap?: { id: string; name: string } }[]
+  /** Every exercise id in the workbook database — used to reject a model-emitted swap into an id that
+   *  does not exist before the confirm card is ever shown (AD09). */
+  validExerciseIds: ReadonlySet<string>
 }
+
+/** Frozen once: the set of every real exercise id, for the surfacing-time swap-id guard. */
+const VALID_EXERCISE_IDS: ReadonlySet<string> = new Set(EXERCISE_BY_ID.keys())
 
 function compact(value: unknown, max = 1200): string {
   try { return JSON.stringify(value).slice(0, max) } catch { return '' }
@@ -464,6 +470,7 @@ export async function loadCoachTurnData(
     memoryEnabled: workspace?.consentVersion === 1 && workspace?.memoryEnabled === true,
     coachingStyle: (['supportive', 'direct', 'balanced'].includes(String(workspace?.coachingStyle)) ? workspace!.coachingStyle : 'balanced') as CoachWorkspaceSummary['coachingStyle'],
     programExercises,
+    validExerciseIds: VALID_EXERCISE_IDS,
   }
 }
 

@@ -34,7 +34,7 @@ import {
   STRUCTURED_COACH_RESPONSE_SCHEMA,
   validateStructuredCoachReply,
 } from './_shared/backend/coach/structuredResponse'
-import { synthesizeBoundedActionProposal, synthesizeWellnessGoalProposal, synthesizeGoalWeightProposal, synthesizeSwapProposal, synthesizeExerciseDetailNav, synthesizeTechniqueAnswer, synthesizeMealPlanReview } from './_shared/backend/coach/workoutActions'
+import { synthesizeBoundedActionProposal, synthesizeWellnessGoalProposal, synthesizeGoalWeightProposal, synthesizeSwapProposal, synthesizeExerciseDetailNav, synthesizeTechniqueAnswer, synthesizeMealPlanReview, proposalSurfacingIssue } from './_shared/backend/coach/workoutActions'
 import { isOwnPlanReview, normalize as normalizeCoachText } from './_shared/backend/coach/safety/rules'
 import type {
   CoachActionProposal,
@@ -205,6 +205,7 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
         memoryEnabled: false,
         coachingStyle: 'balanced' as const,
         programExercises: [],
+        validExerciseIds: new Set<string>(),
       }
   const ctx = turnData.context
 
@@ -324,6 +325,22 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
   if (safe !== replyMessage && isOwnPlanReview(normalizeCoachText(message))) {
     const review = synthesizeMealPlanReview(turnData.snapshot.mealPlan, turnData.snapshot.goal)
     if (review) safe = review
+  }
+
+  // SEMANTIC proposal guard (AD07 / AD09): before a confirm card is ever shown, reject a model-emitted
+  // action whose ids/values are not real — an exercise id that does not exist (swap), or a personal
+  // record the user has not logged / one implausibly beyond their bests (share_pr). When it fires we
+  // DROP the proposal and answer honestly, so the coach never offers to action something fabricated.
+  // Skipped in the no-snapshot test path (empty id set); higher-tier safety routing is upstream.
+  if (replyProposal.kind === 'workout_action' && turnData.validExerciseIds.size > 0) {
+    const issue = proposalSurfacingIssue(replyProposal.payload, {
+      validExerciseIds: turnData.validExerciseIds,
+      recentPRsText: turnData.snapshot.recentPRs ?? '',
+    })
+    if (issue) {
+      replyProposal = { kind: 'none' }
+      safe = issue.coachLine
+    }
   }
 
   let memory: CoachMemory | null = null
