@@ -439,6 +439,53 @@ function roundForMetric(metric: WellnessMetricLit, value: number): number {
 }
 
 /**
+ * Deterministic fallback for an exercise swap ("I don't like the bench press", "swap my squat",
+ * "change the deadlift"). flash-lite reliably ASKS in prose instead of emitting the structured swap
+ * action — and unlike the goal actions, a swap needs the user's PROGRAM to resolve the exercise NAME
+ * to its id, so it takes the program's exercise list. We detect a dislike/swap intent, match the named
+ * exercise against the program by token overlap, and build a reason="dislike" swap (the engine picks a
+ * safe replacement). Returns null when there is no swap intent or no exercise matches, so the model
+ * reply stands. Still confirm-gated on the client and engine-clamped by the resolver.
+ */
+interface SwapCandidateExercise { id: string; name: string; topSwap?: { id: string; name: string } }
+const SWAP_INTENT = /\b(don'?t\s+(?:like|enjoy|want)|do\s+not\s+(?:like|enjoy|want)|dislike|hate|swap|replace|change|switch|drop|remove|sick\s+of|bored\s+(?:of|with)|tired\s+of|get\s+rid\s+of)\b/i
+export function synthesizeSwapProposal(userMessage: string, exercises: SwapCandidateExercise[]): SynthActionProposal | null {
+  if (typeof userMessage !== 'string' || !Array.isArray(exercises) || !exercises.length) return null
+  const m = userMessage.trim().toLowerCase()
+  if (!m || !SWAP_INTENT.test(m)) return null
+  // Match the named exercise by token overlap (equipment words rarely appear, so they just score 0).
+  const msgTokens = new Set(m.replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).map((w) => w.replace(/s$/, '')).filter((w) => w.length >= 3))
+  let best: { ex: SwapCandidateExercise; score: number } | null = null
+  for (const ex of exercises) {
+    if (!ex || typeof ex.id !== 'string' || !SAFE_ID.test(ex.id) || typeof ex.name !== 'string') continue
+    const nameTokens = ex.name.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).map((w) => w.replace(/s$/, '')).filter((w) => w.length >= 3)
+    const score = nameTokens.reduce((n, t) => n + (msgTokens.has(t) ? 1 : 0), 0)
+    if (score > 0 && (!best || score > best.score)) best = { ex, score }
+  }
+  if (!best) return null
+  const ex = best.ex
+  // NAME the substitute up front so the user confirms a concrete swap (e.g. "Bench Press for Dumbbell
+  // Bench Press"). The engine validates the named lift on confirm and, if it doesn't fit the user's
+  // equipment/injuries, replies offering a safe alternative. Falls back to an engine-picked swap
+  // (reason "dislike") only when we have no named substitute for this lift.
+  const sub = ex.topSwap && SAFE_ID.test(ex.topSwap.id) ? ex.topSwap : null
+  if (sub) {
+    return actionProposal(
+      { action: 'swap', fromExerciseId: ex.id, reason: 'specific', wantedExerciseId: sub.id },
+      `Swap ${ex.name} for ${sub.name}`,
+      `Replaces ${ex.name} in your program with ${sub.name}, the closest like-for-like alternative. Nothing changes until you confirm.`,
+      `Want me to swap ${ex.name} for ${sub.name}? Tap confirm and I'll update your plan.`,
+    )
+  }
+  return actionProposal(
+    { action: 'swap', fromExerciseId: ex.id, reason: 'dislike' },
+    `Swap ${ex.name}`,
+    `Replaces ${ex.name} in your program with a suitable alternative the engine picks for your goal and equipment.`,
+    `Want me to swap ${ex.name} for a suitable alternative? Tap confirm and I'll update your plan.`,
+  )
+}
+
+/**
  * Deterministic fallback for "set my water/sleep/step goal to N". flash-lite frequently ASKS in prose
  * ("Want me to set…?") instead of emitting the structured set_wellness_goal action, so no confirm card
  * renders and a later "yes" applies nothing. When the user's intent is unambiguous — a set/change verb
@@ -545,6 +592,48 @@ export function synthesizeExerciseDetailNav(userMessage: string): SynthExerciseN
     exercise: m.slice(0, 120),
     title: 'Open the technique guide',
     summary: 'Opens the step-by-step cues, the common mistake to avoid and a form clip for this lift.',
-    message: "Here's the technique guide — open it for the step-by-step cues and a form clip.",
+    message: "Here's the technique guide. Open it for the step-by-step cues and a form clip.",
   }
+}
+
+/** A program lift with its app-reviewed technique, for the deterministic technique answer. */
+export interface TechniqueExercise {
+  id: string
+  name: string
+  whatItDoes?: string
+  steps?: string[]
+  commonMistake?: string
+  safetyNote?: string
+}
+
+/**
+ * DETERMINISTIC technique answer. flash-lite unreliably picks the RIGHT lift's cues when several
+ * exercises sit in context (it will give squat cues for a bench-press question), so when the user
+ * asks how to perform a SPECIFIC program lift we build the answer straight from that lift's reviewed
+ * fields — correct exercise guaranteed. Matches the named lift against the program by token overlap
+ * (equipment words rarely appear, so they just score 0). Returns null when there is no how-to intent
+ * or no confident match, so the model reply + the guide card stand. Never invents cues.
+ */
+export function synthesizeTechniqueAnswer(userMessage: string, exercises: TechniqueExercise[]): string | null {
+  if (typeof userMessage !== 'string' || !Array.isArray(exercises) || !exercises.length) return null
+  const m = userMessage.trim()
+  if (!m || !_EXERCISE_HELP_INTENT.test(m)) return null
+  const msgTokens = new Set(m.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).map((w) => w.replace(/s$/, '')).filter((w) => w.length >= 3))
+  let best: { ex: TechniqueExercise; score: number } | null = null
+  for (const ex of exercises) {
+    if (!ex || typeof ex.name !== 'string') continue
+    const nameTokens = ex.name.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).map((w) => w.replace(/s$/, '')).filter((w) => w.length >= 3)
+    const score = nameTokens.reduce((n, t) => n + (msgTokens.has(t) ? 1 : 0), 0)
+    if (score > 0 && (!best || score > best.score)) best = { ex, score }
+  }
+  if (!best) return null
+  const ex = best.ex
+  const cues = Array.isArray(ex.steps) ? ex.steps.slice(0, 3).map((c) => String(c).trim()).filter(Boolean) : []
+  if (!cues.length && !ex.commonMistake) return null
+  const lines: string[] = []
+  lines.push(`${ex.name}: ${ex.whatItDoes ?? ''}`.trim())
+  if (cues.length) lines.push(`Key cues: ${cues.join(' ')}`)
+  if (ex.commonMistake) lines.push(`Common mistake to avoid: ${ex.commonMistake}`)
+  lines.push('Open the guide below for the full walkthrough and a form clip.')
+  return lines.join(' ')
 }

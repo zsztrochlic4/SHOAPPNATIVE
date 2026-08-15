@@ -34,7 +34,7 @@ import {
   STRUCTURED_COACH_RESPONSE_SCHEMA,
   validateStructuredCoachReply,
 } from './_shared/backend/coach/structuredResponse'
-import { synthesizeBoundedActionProposal, synthesizeWellnessGoalProposal, synthesizeGoalWeightProposal, synthesizeExerciseDetailNav } from './_shared/backend/coach/workoutActions'
+import { synthesizeBoundedActionProposal, synthesizeWellnessGoalProposal, synthesizeGoalWeightProposal, synthesizeSwapProposal, synthesizeExerciseDetailNav, synthesizeTechniqueAnswer } from './_shared/backend/coach/workoutActions'
 import type {
   CoachActionProposal,
   CoachAnswerMode,
@@ -203,6 +203,7 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
         safetySession: newSafetySession(),
         memoryEnabled: false,
         coachingStyle: 'balanced' as const,
+        programExercises: [],
       }
   const ctx = turnData.context
 
@@ -283,7 +284,7 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
     const emittedAction = replyProposal.kind === 'workout_action' ? String(replyProposal.payload?.action ?? '') : ''
     const alreadyAction = emittedAction.length > 0
     if (!alreadyAction) {
-      const synth = synthesizeWellnessGoalProposal(message) ?? synthesizeGoalWeightProposal(message) ?? synthesizeBoundedActionProposal(message, new Date(`${deps.todayKey}T12:00:00`))
+      const synth = synthesizeWellnessGoalProposal(message) ?? synthesizeGoalWeightProposal(message) ?? synthesizeSwapProposal(message, turnData.programExercises) ?? synthesizeBoundedActionProposal(message, new Date(`${deps.todayKey}T12:00:00`))
       if (synth) {
         replyProposal = { kind: 'workout_action', title: synth.title, summary: synth.summary, payload: synth.payload }
         replyMessage = synth.message
@@ -301,6 +302,12 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
       replyMessage = navSynth.message
     }
   }
+  // Deterministic technique answer (coach actionability): the small model unreliably picks the RIGHT
+  // lift's cues from a multi-exercise context (it gave squat cues for a bench-press question), so when
+  // the user asks how to do a SPECIFIC program lift, answer straight from that lift's reviewed fields.
+  // Correct exercise guaranteed; the guide card (nav backstop above) still offers the full walkthrough.
+  const techAnswer = synthesizeTechniqueAnswer(message, turnData.programExercises)
+  if (techAnswer) replyMessage = techAnswer
 
   const approved = new Map<string, string>(APPROVED_KNOWLEDGE_SOURCES.map((s) => [s.key, s.title]))
   const citations = structured.citations
@@ -408,7 +415,7 @@ export const coachMessage = onCall<CoachMessageInput>(
           const r = await m.generateContent(
             {
               contents: [{ role: 'user', parts: [{ text: prompt }] }],
-              generationConfig: { temperature: 0, responseMimeType: 'application/json', maxOutputTokens: 200 },
+              generationConfig: { temperature: 0, responseMimeType: 'application/json', maxOutputTokens: 200, thinkingConfig: { thinkingBudget: 0 } } as any,
             },
             { timeout: CLASSIFY_DEADLINE_MS, signal },
           )
@@ -429,10 +436,14 @@ export const coachMessage = onCall<CoachMessageInput>(
                 contents: [{ role: 'user', parts: [{ text: userText }] }],
                 generationConfig: {
                   temperature: 0.5,
-                  maxOutputTokens: 800,
+                  maxOutputTokens: 600,
                   responseMimeType: 'application/json',
                   responseSchema: STRUCTURED_COACH_RESPONSE_SCHEMA as any,
-                },
+                  // Speed: the coach reply is short and grounded, so skip the 2.5 "thinking" pass
+                  // (thinkingBudget 0) to cut latency. Safety is enforced by the deterministic floor +
+                  // classifier + outgoing validator, none of which depend on model thinking.
+                  thinkingConfig: { thinkingBudget: 0 },
+                } as any,
               },
               { timeout: REPLY_DEADLINE_MS, signal },
             )

@@ -42,6 +42,31 @@ function model() {
  */
 export function initCoachClassifier(): void {
   if (!firebaseEnabled || !app) return
+  // LOCAL-ONLY: when a dev Gemini key is present (EXPO_PUBLIC_GEMINI_KEY in .env.local,
+  // gitignored, served on localhost), classify by calling Gemini directly instead of via
+  // Firebase AI Logic — so the on-device precheck stays functional against the emulator
+  // without depending on the real project's AI Logic setup. Never set in a shipping build.
+  const devKey = process.env.EXPO_PUBLIC_GEMINI_KEY
+  if (devKey) {
+    setClassifierTransport(async (prompt: string) => {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${devKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: SYSTEM }] },
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0, maxOutputTokens: CLASSIFIER_MODEL_INFO.maxOutputTokens },
+          }),
+        },
+      )
+      const json = await res.json()
+      const text = json?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? '').join('') ?? ''
+      return String(text).trim()
+    })
+    return
+  }
   setClassifierTransport(async (prompt: string) => {
     const result = await model().generateContent(prompt)
     return (result.response.text() ?? '').trim()

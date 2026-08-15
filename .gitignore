@@ -73,3 +73,7 @@ data/exercise-media/*
 
 # Coach response-eval generated sheets (C-017 runner output)
 /eval-out/
+
+# Firebase functions local secrets (Gemini key etc.) — never commit
+*.secret.local
+functions/.secret.local

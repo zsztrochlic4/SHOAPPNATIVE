@@ -55,6 +55,9 @@ export interface CoachContextSnapshot {
   weights: string
   nutrition: string
   nutritionCheckins: string
+  /** The user's saved weekly meal plan (planned meals per day), so the coach can review the PLAN,
+   *  not just logged meals. Qualitative only — no calorie/macro targets (app-wide rule). */
+  mealPlan?: string
   memories: SnapshotMemory[]
   /** Coach Capability Plan — enriched context gaps. Optional: absent when not computable
    *  server-side (e.g. no program yet, too little history). Rendered inside the USER_DATA fence. */
@@ -62,6 +65,12 @@ export interface CoachContextSnapshot {
   recentPRs?: string
   plateaus?: string
   recovery7d?: string
+  /** Reviewed technique for the user's PROGRAM lifts (what it does, key cues, common mistake, safety),
+   *  from the app's exercise database, so technical how-to answers can quote the app's own cues. */
+  programTechnique?: string
+  /** WHY the program is built the way it is (goal, experience, days, equipment, split), so the coach
+   *  can explain the rationale rather than just listing the plan. */
+  programRationale?: string
   /** C-015: human-readable list of context reads that FAILED this turn (not merely empty), so
    *  the model discloses a gap instead of treating a failed read as "no history / no injury". */
   contextGaps?: string
@@ -90,6 +99,9 @@ export function classifyContextTopic(message: string, intent?: string): ContextT
   const nutrition = hasAny(m, 'eat', 'eating', 'food', 'meal', 'meals', 'snack', 'protein', 'carb', 'carbs',
     'calorie', 'calories', 'macro', 'macros', 'diet', 'nutrition', 'recipe', 'hydration', 'water', 'creatine',
     'supplement', 'breakfast', 'lunch', 'dinner')
+  // A meal / food review can contain "plan(ned)" (also a training word); the food signal wins so the
+  // meal-plan context is attached instead of the workout program. Meals beat "plan" but not progress.
+  if (nutrition && hasAny(m, 'meal', 'meals', 'food', 'eat', 'eating', 'diet', 'breakfast', 'lunch', 'dinner', 'snack') && !hasAny(m, 'workout', 'train', 'session', 'exercise', 'lift', 'squat', 'bench', 'deadlift', 'reps', 'sets')) return 'nutrition'
   const progress = hasAny(m, 'progress', 'on track', 'weight', 'scale', 'bodyweight', 'trend', 'plateau',
     'pb', '1rm', 'stronger', 'gains', 'gaining', 'losing', 'lost', 'dropped', 'goal', 'results', 'improving')
   const recovery = hasAny(m, 'sore', 'soreness', 'doms', 'recovery', 'recover', 'rest', 'sleep', 'tired',
@@ -135,6 +147,8 @@ function sectionsForTopic(s: CoachContextSnapshot, topic: ContextTopic): [string
       return []
     case 'training':
       return [pair('Today in your program', s.programDay ?? ''), pair('Program', s.program),
+        pair('Why your program is built this way', s.programRationale ?? ''),
+        pair('Technique for your program lifts (app-reviewed cues)', s.programTechnique ?? ''),
         pair('Recent training', s.recentTraining), pair('Recent training summaries', s.trainingSummaries),
         pair('Recent readiness', s.readiness), pair('Recent self-chosen activity', s.activity)]
     case 'progress':
@@ -142,7 +156,7 @@ function sectionsForTopic(s: CoachContextSnapshot, topic: ContextTopic): [string
         pair('Recent weight entries', s.weights), pair('Recent training summaries', s.trainingSummaries),
         pair('Recent training', s.recentTraining), pair('Program', s.program)]
     case 'nutrition':
-      return [pair('Recent nutrition entries', s.nutrition), pair('Recent nutrition check-ins', s.nutritionCheckins)]
+      return [pair('This week\'s planned meals', s.mealPlan ?? ''), pair('Recent nutrition entries', s.nutrition), pair('Recent nutrition check-ins', s.nutritionCheckins)]
     case 'recovery':
       return [pair('Sleep & hydration (7-day)', s.recovery7d ?? ''), pair('Recent readiness', s.readiness),
         pair('Recent training', s.recentTraining), pair('Recent training summaries', s.trainingSummaries)]

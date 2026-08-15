@@ -104,6 +104,9 @@ export type ExamState = {
   daysLeft: number | null
   startKey?: string
   endKey?: string
+  /** The active period's mode id ('pause'|'maintenance'|'moving'|'fewer'|'deload'|'asis'), so
+   *  consumers can apply mode-specific behaviour rather than a single "active" toggle. */
+  mode?: string
 }
 
 function daysBetween(aKey: string, bKey: string) {
@@ -130,6 +133,7 @@ export function examState(s: AppState): ExamState {
       daysLeft: Math.max(0, daysBetween(todayKey, current.end)),
       startKey: current.start,
       endKey: current.end,
+      mode: current.mode ?? undefined,
     }
   }
 
@@ -196,10 +200,19 @@ function shiftForGoal(goal: Goal): number {
   return 0
 }
 
-/** During exams, keep the key lifts and mark the rest optional. */
+/**
+ * Mode-aware busy-period trim (Plan Around Your Life). Each mode now behaves differently instead of
+ * collapsing to one "active" trim:
+ *  - 'pause' (Full pause) and 'moving' (Just keep moving, no lifting): nothing required — every
+ *    exercise is optional (keptCount 0), so the day reads as rest / walk-only.
+ *  - 'maintenance', 'fewer', 'deload' and any other active mode: keep the key lifts, rest optional.
+ * "Keep it as is" (asis) stays inactive and trims nothing.
+ */
 export function examTrim(session: WorkoutSession, s: AppState): { optionalIds: Set<string>; keptCount: number } {
-  if (!examState(s).active) return { optionalIds: new Set(), keptCount: session.exercises.length }
-  const keep = Math.min(3, session.exercises.length)
+  const st = examState(s)
+  if (!st.active) return { optionalIds: new Set(), keptCount: session.exercises.length }
+  const noRequiredLifting = st.mode === 'pause' || st.mode === 'moving'
+  const keep = noRequiredLifting ? 0 : Math.min(3, session.exercises.length)
   const optionalIds = new Set(session.exercises.slice(keep).map((e) => e.defId))
   return { optionalIds, keptCount: keep }
 }

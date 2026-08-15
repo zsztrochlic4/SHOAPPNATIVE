@@ -3,14 +3,18 @@ import { initializeApp, type FirebaseApp } from 'firebase/app'
 import {
   getAuth,
   initializeAuth,
+  connectAuthEmulator,
+  signInAnonymously,
+  signInWithCustomToken,
+  onAuthStateChanged,
   // @ts-expect-error — getReactNativePersistence is exported at runtime but
   // missing from the web-typed surface of firebase/auth.
   getReactNativePersistence,
   type Auth,
 } from 'firebase/auth'
-import { getFirestore, initializeFirestore, type Firestore } from 'firebase/firestore'
+import { getFirestore, initializeFirestore, connectFirestoreEmulator, type Firestore } from 'firebase/firestore'
 import { getStorage, type FirebaseStorage } from 'firebase/storage'
-import { getFunctions, type Functions } from 'firebase/functions'
+import { getFunctions, connectFunctionsEmulator, type Functions } from 'firebase/functions'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { initAppCheck } from './appCheck'
 import { startCoachKillSwitch } from './coachKillSwitch'
@@ -100,6 +104,34 @@ if (firebaseEnabled) {
   // Trusted backend (Cloud Functions v2) — co-located with Firestore. Hosts the
   // server-side meal analysis (and, later, coach / notifications / deletion).
   functions = getFunctions(app, 'australia-southeast2')
+
+  // LOCAL-ONLY: point the SDK at the Firebase emulator suite for on-device coach
+  // testing (EXPO_PUBLIC_USE_EMULATORS=1). Never set in a shipping build — it only
+  // rewires localhost transports and changes nothing about production behaviour.
+  if (process.env.EXPO_PUBLIC_USE_EMULATORS === '1' && auth && db && functions) {
+    const host = process.env.EXPO_PUBLIC_EMULATOR_HOST || 'localhost'
+    try { connectAuthEmulator(auth, `http://${host}:9099`, { disableWarnings: true }) } catch {}
+    try { connectFirestoreEmulator(db, host, 8080) } catch {}
+    try { connectFunctionsEmulator(functions, host, 5001) } catch {}
+    // Auto-sign-in a FIXED dev user so the coach backend is reachable AND the identity
+    // is stable across emulator restarts (localStorage onboarding + the Firestore seed
+    // stay valid every run). The auth emulator accepts an unsigned custom token and
+    // takes the uid verbatim; fall back to anonymous if that ever fails.
+    const b64url = (o: object) => btoa(JSON.stringify(o)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_')
+    const devEmulatorToken = (uid: string): string => {
+      const now = Math.floor(Date.now() / 1000)
+      const sa = `firebase-adminsdk@${config.projectId}.iam.gserviceaccount.com`
+      return `${b64url({ alg: 'none', typ: 'JWT' })}.${b64url({
+        iss: sa, sub: sa, aud: 'https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit',
+        iat: now, exp: now + 3600, uid,
+      })}.`
+    }
+    const authRef = auth
+    onAuthStateChanged(authRef, (u) => {
+      if (u) return
+      void signInWithCustomToken(authRef, devEmulatorToken('coach-demo-user')).catch(() => signInAnonymously(authRef).catch(() => {}))
+    })
+  }
 }
 
 export { app, auth, db, storage, functions }
