@@ -446,28 +446,45 @@ function detectRapidWeightLoss(n: Norm): DetectorHit[] {
   return []
 }
 
-function detectMealPlan(n: Norm): DetectorHit[] {
-  // Macro/calorie targets and building a personalised plan stay OUT of scope (spec §5) — always block.
-  const macros = has(n, 'give me my macros', 'my macro targets', 'exact macros', 'calorie meal plan',
+// Macro/calorie targets — always out of scope (spec §5), never numeric nutrition prescriptions.
+function mealPlanMacros(n: Norm): boolean {
+  return has(n, 'give me my macros', 'my macro targets', 'exact macros', 'calorie meal plan',
     'macro target', 'macros for', 'how many calories', 'calorie target', 'set my calories', 'set my macros')
     || hasRe(n, /\d{3,4}\s?(cal|calorie|kcal)\b.*(plan|diet|meal)/)
-  const planPhrase = has(n, 'meal plan', 'diet plan', 'eating plan', 'what to eat every day',
+}
+function mealPlanPhrase(n: Norm): boolean {
+  return has(n, 'meal plan', 'diet plan', 'eating plan', 'what to eat every day',
     'tell me exactly what to eat', 'food schedule', 'day meal plan', 'meal prep plan')
-  // QUALITATIVE review of the user's OWN existing plan is IN scope (owner decision): the coach may
-  // comment on balance, variety, veggies, protein, carbs qualitatively and suggest improvements —
-  // never numeric macro/calorie targets, never a from-scratch personalised plan. So a plan mention
-  // paired with a clear review/feedback intent is allowed; creation ("make/give/build me a plan") is not.
-  const reviewIntent = has(n, 'review', 'look at my', 'check my', 'is my', 'how is my', 'hows my',
+}
+// QUALITATIVE review of the user's OWN existing plan is IN scope (owner decision): the coach may
+// comment on balance, variety, veggies, protein, carbs qualitatively and suggest improvements.
+function mealReviewIntent(n: Norm): boolean {
+  return has(n, 'review', 'look at my', 'check my', 'is my', 'how is my', 'hows my',
     'are my', 'thoughts on', 'feedback on', 'improve my', 'improvements', 'rate my', 'critique',
     'balanced', 'enough protein', 'enough veg', 'good enough', 'any good', 'what do you think')
-  // CREATION intent forces the block even when a review adjective is also present — otherwise
-  // "make me a BALANCED meal plan" would slip through on the word "balanced". Building a plan
-  // from scratch is out of scope no matter how it is dressed up; only a review of an EXISTING
-  // plan (review intent AND no creation verb) is allowed.
-  const createIntent = has(n, 'make me', 'make a', 'build me', 'build a', 'give me a', 'create',
+}
+// CREATION intent — building a plan from scratch is out of scope no matter how it is dressed up, so it
+// forces the block even when a review adjective is also present ("make me a BALANCED meal plan").
+function mealCreateIntent(n: Norm): boolean {
+  return has(n, 'make me', 'make a', 'build me', 'build a', 'give me a', 'create',
     'design', 'generate', 'write me', 'write a', 'put together', 'come up with', 'draw up',
     'plan me', 'set me up', 'prep me', 'map out', 'lay out')
-  const block = macros || (planPhrase && (createIntent || !reviewIntent))
+}
+
+/**
+ * The user is asking us to REVIEW their own existing meals/plan qualitatively (in scope): clear
+ * review/feedback intent, NO from-scratch creation verb, and NO numeric macro/calorie target. Used to
+ * suppress an over-eager CLASSIFIER `meal_plan` hit so the model can actually give feedback — the
+ * rules floor still blocks real creation and macros, so a plan-CREATION request is unaffected.
+ */
+export function isOwnPlanReview(n: Norm): boolean {
+  return mealReviewIntent(n) && !mealCreateIntent(n) && !mealPlanMacros(n)
+}
+
+function detectMealPlan(n: Norm): DetectorHit[] {
+  // Only a review of an EXISTING plan (review intent AND no creation verb) is allowed; macros and
+  // from-scratch creation always block.
+  const block = mealPlanMacros(n) || (mealPlanPhrase(n) && (mealCreateIntent(n) || !mealReviewIntent(n)))
   if (block) return [hit('meal_plan', 'meal_plan_request')]
   return []
 }
@@ -847,7 +864,18 @@ export function runRules(text: string, ctx: CoachContext): RulesResult {
  * skips that one rule (fail-open toward keeping the hit — never less safe).
  */
 export function scopeClassifierHits(text: string, hits: DetectorHit[], ctx?: CoachContext): RulesResult {
-  return scope(normalize(text), hits, { adult: ctx ? isAdultCtx(ctx) : false })
+  const n = normalize(text)
+  const scoped = scope(n, hits, { adult: ctx ? isAdultCtx(ctx) : false })
+  // Own-plan REVIEW override: the LLM over-flags "review my meal plan" / "is my meal plan balanced"
+  // as `meal_plan`, which would refer the user away from the qualitative review the coach is meant to
+  // give (owner decision). When the deterministic signals show a review of the user's OWN plan with no
+  // creation verb and no numeric macro/calorie target, drop the classifier `meal_plan` hit. Real
+  // creation/macros still trip detectMealPlan on the rules floor, so they are unaffected.
+  if (isOwnPlanReview(n) && scoped.hits.some((h) => h.category === 'meal_plan')) {
+    scoped.hits = scoped.hits.filter((h) => h.category !== 'meal_plan')
+    scoped.suppressions.push({ category: 'meal_plan', rule: 'own_plan_review' })
+  }
+  return scoped
 }
 
 /** A known benign false-positive (workout hyperbole, or a bare crisis denial). */
