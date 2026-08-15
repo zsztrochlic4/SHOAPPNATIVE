@@ -637,3 +637,78 @@ export function synthesizeTechniqueAnswer(userMessage: string, exercises: Techni
   lines.push('Open the guide below for the full walkthrough and a form clip.')
   return lines.join(' ')
 }
+
+/* ------------------------------------------------------------------ */
+/*  Deterministic MEAL-PLAN REVIEW synthesiser                         */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Reliable qualitative review of the user's OWN saved meal plan, for when the flash-lite classifier
+ * flakily refers a genuine review to the meal_plan refusal. Given the plan text (the "This week's
+ * planned meals" context) and the user's goal, it computes a QUALITATIVE rating out of 10 plus
+ * goal-framed feedback read from the actual meals — and NEVER emits a calorie or macro number
+ * (nutrition is qualitative in this app). Returns null when there is no plan to read.
+ *
+ * The CALLER is responsible for only invoking this on a genuine own-plan REVIEW intent (never a
+ * from-scratch CREATION request); this function assumes that gate has already passed.
+ */
+function mealGoalKind(goal: string): 'muscle' | 'fatloss' | 'strength' | 'general' {
+  const g = (goal || '').toLowerCase()
+  if (/muscle|hypertroph|build|bulk|gain|mass/.test(g)) return 'muscle'
+  if (/fat|lose|loss|cut|lean|slim|deficit|weight.?loss/.test(g)) return 'fatloss'
+  if (/strength|stronger|power|1rm/.test(g)) return 'strength'
+  return 'general'
+}
+
+export function synthesizeMealPlanReview(mealPlanText: string | undefined, goal: string): string | null {
+  const plan = typeof mealPlanText === 'string' ? mealPlanText.trim() : ''
+  if (plan.length < 8) return null
+  const t = plan.toLowerCase()
+  const count = (...ws: string[]) => ws.reduce((n, w) => n + (t.split(w).length - 1), 0)
+  const protein = count('chicken', 'beef', 'salmon', 'tuna', 'fish', 'egg', 'yoghurt', 'yogurt', 'turkey', 'beans', 'tofu', 'steak', 'mince', 'prawn', 'lamb', 'protein')
+  const veg = count('broccoli', 'greens', 'salad', 'spinach', 'veg', 'pepper', 'carrot', 'tomato', 'kale', 'courgette', 'zucchini', 'mushroom')
+  const fruit = count('banana', 'berries', 'berry', 'fruit', 'apple', 'orange', 'mango')
+  const carbs = count('rice', 'oats', 'pasta', 'potato', 'noodle', 'bread', 'toast', 'granola', 'wrap', 'quinoa', 'couscous')
+  const indulgent = count('pizza', 'takeaway', 'take away', 'burger', 'chips', 'fries', 'fried', 'kebab', 'soft drink', 'soda', 'doughnut', 'donut')
+
+  let score = 5
+  if (protein >= 5) score += 2
+  else if (protein >= 3) score += 1
+  else if (protein <= 1) score -= 1
+  if (veg + fruit >= 3) score += 1
+  else if (veg + fruit === 0) score -= 1
+  if (carbs >= 4) score += 1
+  if (indulgent === 0) score += 1
+  else if (indulgent >= 3) score -= 1
+  score = Math.max(3, Math.min(9, score))
+
+  const kind = mealGoalKind(goal)
+  const goalName = kind === 'muscle' ? 'building muscle' : kind === 'fatloss' ? 'losing fat' : kind === 'strength' ? 'getting stronger' : 'staying healthy'
+
+  const strengths: string[] = []
+  if (protein >= 3) strengths.push('a solid spread of protein')
+  if (veg + fruit >= 2) strengths.push('good veg and fruit')
+  if (carbs >= 3) strengths.push('decent carbs for energy')
+  const strengthsText = strengths.length ? strengths.join(', ') : 'some good building blocks'
+
+  let improvement: string
+  if (kind === 'muscle') {
+    improvement = protein < 3 ? 'lean on protein a bit harder at each meal, chicken, fish, eggs or yoghurt, since muscle is built on it'
+      : carbs < 3 ? 'add a carb like rice, oats or potatoes around your training days to fuel sessions and recover'
+      : indulgent >= 3 ? 'swap one or two of the takeaway meals for a home-cooked plate to keep the quality high'
+      : 'keep protein at every meal and a carb around training, that combination is what drives muscle gain'
+  } else if (kind === 'fatloss') {
+    improvement = indulgent >= 2 ? 'trim the takeaway meals back and lean on the leaner home-cooked options to hold a slight deficit'
+      : protein < 3 ? 'keep protein high at each meal, it protects muscle and keeps you full while you lean out'
+      : 'lead with protein and veg and keep portions sensible, that keeps the deficit comfortable'
+  } else if (kind === 'strength') {
+    improvement = protein < 3 ? 'get protein into every meal to support recovery between heavy sessions'
+      : 'keep enough carbs in on training days so you have the energy to move heavy loads'
+  } else {
+    improvement = veg + fruit < 2 ? 'add a bit more veg or fruit across the week for variety'
+      : indulgent >= 3 ? 'balance the takeaway meals with a few more home-cooked plates'
+      : 'nice variety, keep it balanced and consistent'
+  }
+
+  return `I'd give your planned meals a ${score}/10 for ${goalName}. You've got ${strengthsText}. To make it work harder for your goal, ${improvement}. This is a qualitative read of your own plan, not calorie or macro targets.`
+}

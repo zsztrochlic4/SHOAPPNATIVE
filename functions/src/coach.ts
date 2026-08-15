@@ -34,7 +34,8 @@ import {
   STRUCTURED_COACH_RESPONSE_SCHEMA,
   validateStructuredCoachReply,
 } from './_shared/backend/coach/structuredResponse'
-import { synthesizeBoundedActionProposal, synthesizeWellnessGoalProposal, synthesizeGoalWeightProposal, synthesizeSwapProposal, synthesizeExerciseDetailNav, synthesizeTechniqueAnswer } from './_shared/backend/coach/workoutActions'
+import { synthesizeBoundedActionProposal, synthesizeWellnessGoalProposal, synthesizeGoalWeightProposal, synthesizeSwapProposal, synthesizeExerciseDetailNav, synthesizeTechniqueAnswer, synthesizeMealPlanReview } from './_shared/backend/coach/workoutActions'
+import { isOwnPlanReview, normalize as normalizeCoachText } from './_shared/backend/coach/safety/rules'
 import type {
   CoachActionProposal,
   CoachAnswerMode,
@@ -313,7 +314,17 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
   const citations = structured.citations
     .filter((c) => approved.get(c.sourceKey) === c.title)
     .slice(0, 5)
-  const safe = guardOutgoing(replyMessage, pre.decision, ctx, session)
+  let safe = guardOutgoing(replyMessage, pre.decision, ctx, session)
+  // Deterministic own-plan REVIEW fallback. The outgoing guard occasionally trips the meal_plan
+  // refusal on a genuine review of the user's OWN saved plan (flash-lite phrasing variance). When the
+  // guard has changed/refused the reply AND the message is unambiguously an own-plan review (never a
+  // from-scratch creation — same gate as the rules floor), answer it with a qualitative /10 review
+  // computed from their saved meals instead of refusing. A clean review the guard already passed is
+  // kept as-is, and creation/macros never reach here (they block earlier), so quality is unaffected.
+  if (safe !== replyMessage && isOwnPlanReview(normalizeCoachText(message))) {
+    const review = synthesizeMealPlanReview(turnData.snapshot.mealPlan, turnData.snapshot.goal)
+    if (review) safe = review
+  }
 
   let memory: CoachMemory | null = null
   if (!suppressMemory && turnData.memoryEnabled && structured.memory && deps.saveMemory) {
