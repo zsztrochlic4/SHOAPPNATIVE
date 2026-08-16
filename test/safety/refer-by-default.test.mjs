@@ -1,5 +1,5 @@
 /**
- * Option B — refer-by-default router (node --test).
+ * Refer-by-default router (node --test).
  *
  *   npm run test:safety
  *
@@ -7,6 +7,10 @@
  * affirmation). Off-topic / ambiguous input is referred, not coached — while every safety route is
  * unchanged (refer-by-default only ever acts on an otherwise-`allow` decision, so it can never downgrade
  * a crisis/emergency/under-18 route).
+ *
+ * NOTE (2026-08): a blanket "default-engage" was trialled to make the coach freer, then REVERTED — the
+ * fallback refusal is also the last net catching euphemistic crises the classifier misses run-to-run
+ * (see router.ts). Opening scope safely requires reliable classifier recall first.
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -45,7 +49,7 @@ for (const msg of [
   test(`recognises bounded health/wellbeing scope: ${msg}`, () => assert.equal(isOnTopicFitness(msg), true))
 }
 
-// Off-topic / ambiguous → referred, NOT coached (the Option-B inversion).
+// Off-topic / ambiguous → referred, NOT coached (refer-by-default; also the crisis backstop).
 for (const msg of ['tell me a joke', "what's the capital of france", 'write my history essay']) {
   test(`refers off-topic: ${msg}`, () => {
     const d = decide(msg)
