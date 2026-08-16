@@ -208,19 +208,6 @@ function concealedIntent(n: Norm): { hit: boolean; immediate: boolean } {
     hasRe(n, /\bhow (many|much)\b[a-z0-9 ]{0,25}\b(it would take|would it take|to (die|od|overdose|end (it|my life)))\b/)
   if (action || means || method) return { hit: true, immediate: true }
 
-  // (a2) ACCESS TO MEANS + IMMINENT INTENT TO ACT — the euphemism class that carries NO explicit
-  // self-harm word (e.g. "I have the means beside me and I am about to act"). Access to a method PLUS a
-  // stated imminent intent to act is a textbook high-risk combination; REQUIRING BOTH keeps ordinary
-  // talk out (neither alone fires here). Generalises to the mechanism — means access + imminent action —
-  // not to any one sentence. Added after a euphemistic reveal defeated both the classifier and (b) below.
-  const meansAccess = hasRe(n, /\b(have|ive got|i ve got|got|holding|hold|keeping)\s+the\s+means\b/) ||
-    has(n, 'the means are here', 'the means beside me', 'means beside me', 'means next to me',
-      'the means with me', 'means in front of me', 'means in my hand', 'means are ready', 'means ready')
-  const imminentAct =
-    hasRe(n, /\b(about to|going to|gonna|ready to|im about to|i m about to|im going to|im ready to)\s+(act|do it|do this|go through with it|use them|use it|end it|end things|end my life)\b/) ||
-    has(n, 'about to act', 'ready to act', 'going to act now', 'about to do it', 'ready to do it', 'about to go through with it')
-  if (meansAccess && imminentAct) return { hit: true, immediate: true }
-
   // (b) crisis TOPIC + a present REVEAL/commitment that is otherwise ambiguous, behind a wrapper.
   const topic = has(n, 'suicidal', 'self harm', 'self-harm', 'selfharm', 'kill myself', 'killing myself', 'end my life',
     'take my life', 'take my own life', 'overdose', 'hurt myself', 'harm myself', 'cut myself', 'cutting myself') || wantsToDie(n)
@@ -1047,34 +1034,10 @@ function matchesFitnessIntentPattern(n: Norm): boolean {
  * euphemism ("ok i'll do it tonight") from passing as a bare affirmation — that would still be scored by
  * the safety detectors upstream, and if it reaches here it is too long to be treated as continuity.
  */
-/** Day / schedule words that make a short question a PROGRAM-SCHEDULE follow-up. Deliberately excludes
- *  "tonight" (an imminence marker used by crisis phrasing), keeping the schedule sense clean. */
-const SCHEDULE_WORD =
-  /\b(today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|this week|next week|the week after|weekend|this weekend|rest day|training day)\b/
-
-/**
- * A short, benign follow-up about the user's PROGRAM SCHEDULE — "and how about monday next week?",
- * "what about next week?", "whats on tomorrow". These carry no fitness KEYWORD, so the pre-2026-08
- * default-deny bounced them even though the coach can answer straight from the user's own program.
- * Kept deliberately NARROW: a short question / continuation SHAPE **plus** an explicit day/schedule word.
- * A crisis is essentially never phrased this way, and the crisis FLOOR (rules + classifier) still runs
- * BEFORE this layer, so this only ever relaxes the off-topic bounce for a benign schedule question.
- */
-function isProgramScheduleFollowUp(n: Norm): boolean {
-  const words = n.p.trim().split(/\s+/).filter(Boolean)
-  if (words.length === 0 || words.length > 9) return false
-  if (!hasRe(n, SCHEDULE_WORD)) return false
-  const startsFollowUp = ['and', 'so', 'then', 'also', 'ok', 'okay', 'what', 'whats', 'how', 'hows',
-    'when', 'whens', 'do', 'am', 'is', 'are', 'have', 'whats'].includes(words[0])
-  const interrogative = hasRe(n, /\b(what|whats|how|hows|when|whens|which)\b/)
-  return startsFollowUp || interrogative
-}
-
 export function isOnTopicFitness(text: string): boolean {
   const n = normalize(text)
   if (has(n, ...FITNESS_TERMS)) return true
   if (matchesFitnessIntentPattern(n)) return true
-  if (isProgramScheduleFollowUp(n)) return true
   const words = n.p.trim().split(/\s+/).filter(Boolean)
   return words.length <= 4 && has(n, ...CONTINUITY)
 }
