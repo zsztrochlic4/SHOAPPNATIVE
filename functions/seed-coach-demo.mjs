@@ -30,6 +30,9 @@ const program = {
 const userDoc = {
   profile: {
     name: 'Alex', coachName: 'Coach', goal: 'Build muscle', experience: 'Beginner',
+    // Demo user is a real, onboarded, entitled account so the local client boots
+    // straight into the app (past onboarding + paywall) when it syncs this profile.
+    onboarded: true, premium: true,
     heightCm: 175, startWeightKg: 75, goalWeightKg: 78,
     daysPerWeek: 4, sessionMinutes: 60, equipment: 'Full gym',
     sleepTargetH: 8, stepTarget: 9000, waterTargetL: 3,
