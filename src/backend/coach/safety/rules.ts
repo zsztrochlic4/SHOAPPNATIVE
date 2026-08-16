@@ -533,7 +533,13 @@ function detectUnder18(n: Norm): DetectorHit[] {
   const ageStmt = hasRe(n, /\b(i am|i m|im|only|actually|just|turned|turning)\s+(1[0-7]|[1-9])\b(?!\s*(kg|kgs|kilo|kilos|pound|pounds|lb|lbs|rep|reps|set|sets|week|weeks|min|minutes|km|hour|hours|days|day|percent|reps))/)
   const explicit = has(n, 'under 18', 'underage', 'im a minor', 'i m a minor', 'still in high school',
     'in year 7', 'in year 8', 'in year 9', 'in year 10', 'in year 11', 'year 7', 'year 8', 'year 9', 'year 10',
-    'in grade 7', 'in grade 8', 'in grade 9', 'in grade 10', 'grade 7', 'grade 8', 'grade 9', 'high schooler')
+    'in grade 7', 'in grade 8', 'in grade 9', 'in grade 10', 'grade 7', 'grade 8', 'grade 9', 'high schooler',
+    // US high-school class terms, ONLY in the high-school collocation (unambiguous minors: freshman ~14,
+    // sophomore ~15, junior ~16-17). Bare 'junior'/'senior'/'freshman'/'sophomore' are deliberately NOT
+    // matched — they are overloaded in the gym (junior athlete, senior lifter) and at college (a college
+    // freshman is 18+). 'senior' high-schooler (~year 12) is also excluded as a possible 18-year-old.
+    'high school freshman', 'high school sophomore', 'high school junior',
+    'freshman in high school', 'sophomore in high school', 'junior in high school')
   // Birth-year disclosure that implies a CURRENT minor ("i was born in 2010", "birth year 2009", "dob 2010").
   // Computed against the current year so it stays correct as time passes; only DEFINITE minors flag (born
   // strictly after currentYear-18), leaving the ambiguous edge birth year to the server-trusted DOB gate.
@@ -554,7 +560,11 @@ function detectUnder18(n: Norm): DetectorHit[] {
     hasRe(n, new RegExp(`\\b(?:im|i m|i am|i)(?:\\s+(?:will be|ll be))?\\s+(?:turning|turn|almost|nearly|about to (?:turn|be)|going to (?:turn|be))\\s*(?:18|eighteen)\\b${NOT_A_QUANTITY}`)) ||
     hasRe(n, /\bmy (?:18th|eighteenth) birthday\b/) ||
     hasRe(n, /\b(?:before|until|when) i turn (?:18|eighteen)\b/) ||
-    hasRe(n, new RegExp(`\\bnot (?:yet|quite) (?:18|eighteen)\\b${NOT_A_QUANTITY}`))
+    hasRe(n, new RegExp(`\\bnot (?:yet|quite) (?:18|eighteen)\\b${NOT_A_QUANTITY}`)) ||
+    // First-person "I'm in high school" (present-tense enrolment). Requires the "i (am) …" subject so a
+    // teacher/coach ("I teach in high school", "I coach a high school team") does NOT match; a historical
+    // "when I was in high school" is removed afterwards by scope()'s `historical` suppressor for under_18.
+    hasRe(n, /\b(?:i am|i m|im)\s+(?:still |currently |only )?in high school\b/)
   if (ageStmt || explicit || approachingEighteen || bornMinor) return [hit('under_18', 'stated_under_18')]
   return []
 }
