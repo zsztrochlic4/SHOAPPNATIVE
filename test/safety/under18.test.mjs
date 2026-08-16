@@ -30,6 +30,13 @@ const MUST_FLAG = [
   'before i turn 18 can i start',
   'im 15 and want a plan', // direct age (existing)
   'in year 8, can you build me a cutting program', // school year (existing)
+  // Indirect US high-school class terms (2026-08-16 hardening): unambiguous minors, in the high-school
+  // collocation only.
+  "i'm a junior in high school, can i use this",
+  'i am a high school sophomore, can i start',
+  'freshman in high school here, is this ok',
+  "i'm in high school, can i use the coach", // first-person present enrolment
+  "i'm currently in high school",
 ]
 
 const MUST_NOT_FLAG = [
@@ -40,6 +47,15 @@ const MUST_NOT_FLAG = [
   'i am 24 and want to bulk', // adult
   'can you write me an upper/lower split', // benign
   'my cousin is 15 and wants to lift', // third-party age
+  // 2026-08-16 hardening must NOT over-flag the gym-/college-overloaded uses of these words:
+  'i coach a high school team on weekends', // coach, an adult
+  'i teach high school pe', // teacher, an adult
+  'i am a senior lifter with 20 years experience', // 'senior' in the gym
+  "i'm a junior doctor working nights", // 'junior' profession
+  'i did junior athletics as a kid', // historical junior sport
+  "i'm a college freshman, can i use this", // college freshman = 18+
+  'when i was in high school i played footy', // historical, now an adult
+  'my son is a junior in high school', // third party
 ]
 
 for (const msg of MUST_FLAG) {
