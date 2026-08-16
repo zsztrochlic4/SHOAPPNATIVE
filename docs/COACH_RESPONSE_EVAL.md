@@ -148,3 +148,34 @@ requesting that sign-off is at `accredited-signoff-covering-note.txt`.
 injection), a full capture on the exact shipping build, a second independent reviewer, the accredited
 sign-off, and the three infra gates (App Check, holdout re-run on the shipping build, kill-switch
 drill). The coach **enable gate stays fail-closed** until these close.
+
+### TF01–TF05 fault-injection harness — 2026-08-16
+
+A fault-injection harness now **forces** each of the five tool-failure modes at the real shipping
+action-layer seams and captures the recovery, closing the gap left by the reply-capture harness (which
+can only record a model utterance and so could not produce a forced failure). It drives the code that
+ships — `backend/runtime/coachActionResolver`, `backend/repo/programVersion`,
+`lib/coachActionOutboxCore`, `backend/coach/structuredResponse` — not a re-description of it:
+
+- **TF01** forced proposal-write failure → rolls back, shows *Couldn't save* + Retry, records a durable
+  `failed` outcome, **never** claims Applied, version not advanced.
+- **TF02** server ack then client-write failure → the terminal outcome is written to the durable outbox
+  **before** the client mirror, so it can't strand at `pending`; prior plan kept, no false Applied.
+- **TF03** partial program write / stale version → version-authoritative commit does **not** advance on a
+  partial write, and a stale expected version is rejected with a real `CoachActionConflictError`; no
+  half-written program shown as complete.
+- **TF04** model timeout after the charge → the structured guard turns empty/garbage model output into
+  the honest fallback (no fabricated answer); the live functions provider-resilience path additionally
+  throws the typed `resource-exhausted` overload (co-owned by `functions/test/providerResilience.test.mjs`).
+- **TF05** duplicate confirm → the pending-gate drops the second confirm, the outbox dedupes by
+  `actionId`, and the version advances by exactly one; no double-apply.
+
+Run: `npm run eval:toolfail` → writes `eval-out/tool-failure-capture.json` (the reviewer artifact for
+the `action_integrity` dimension) and exits non-zero on any breached invariant. The invariants are also
+locked in CI as `test/unit/coachToolFailure.test.mjs` (part of `npm run test:unit`).
+
+> **Scope — what this does NOT close.** This forces the failures through the real **pure** logic; it is
+> **not** a substitute for the on-device capture on the exact shipping **binary** (native persistence,
+> a live Firestore transaction, a real over-the-wire model timeout). That on-device capture, a full
+> shipping-build capture, the second reviewer, the accredited sign-off and the three infra gates all
+> remain open. The coach **enable gate stays fail-closed**.
