@@ -80,7 +80,10 @@ export interface CoachContextSnapshot {
 export const CONFLICT_PRECEDENCE =
   'When sources disagree, trust them in this order (highest first): server safety state → canonical backend profile → current program → confirmed memory → the user\'s most recent statement → any derived observation.'
 
-const DEFAULT_TOTAL_BUDGET = 6000
+// Full-context-by-default (product decision 2026-08) attaches the whole user picture on substantive
+// turns, so the total budget is larger than the old topic-slice budget. Sections are individually
+// length-capped by the server assembler, so this bounds the sum, not any one section.
+const DEFAULT_TOTAL_BUDGET = 9000
 const DEFAULT_RECENT_BUDGET = 2200
 
 const lc = (s: string): string => ` ${(s || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim()} `
@@ -139,33 +142,60 @@ function selectMemories(memories: SnapshotMemory[], message: string, topic: Cont
   return { lines: lines.slice(0, 12), withheldSensitive }
 }
 
-/** Which section strings to attach for each topic. Core is always separate and always present. */
+const pair = (label: string, value: string): [string, string] => [label, value]
+
+/**
+ * The user's WHOLE app picture. Attached on every SUBSTANTIVE turn (product decision 2026-08: full
+ * context by default) so the coach genuinely "knows everything the user is doing" and can answer or
+ * cross-reference anything — training, progress, nutrition, recovery — without the old topic gate
+ * starving a question of the data that would answer it. Empty sections drop out in selectCoachContext.
+ */
+function fullPicture(s: CoachContextSnapshot): [string, string][] {
+  return [
+    pair('Today in your program', s.programDay ?? ''),
+    pair('Program', s.program),
+    pair('Why your program is built this way', s.programRationale ?? ''),
+    pair('Technique for your program lifts (app-reviewed cues)', s.programTechnique ?? ''),
+    pair('Recent training', s.recentTraining),
+    pair('Recent training summaries', s.trainingSummaries),
+    pair('Recent readiness', s.readiness),
+    pair('Recent self-chosen activity', s.activity),
+    pair('Recent PRs', s.recentPRs ?? ''),
+    pair('Plateau flags', s.plateaus ?? ''),
+    pair('Recent weight entries', s.weights),
+    pair('This week\'s planned meals', s.mealPlan ?? ''),
+    pair('Recent nutrition entries', s.nutrition),
+    pair('Recent nutrition check-ins', s.nutritionCheckins),
+    pair('Sleep & hydration (7-day)', s.recovery7d ?? ''),
+    pair('Canonical training profile', s.canonicalProfile),
+  ]
+}
+
+/** Section priority per topic — the current topic's sections lead so they survive the budget trim
+ *  first; the rest of the whole picture follows so the coach can still cross-reference everything. */
+const TOPIC_LEAD: Record<Exclude<ContextTopic, 'conversational'>, string[]> = {
+  training: ['Today in your program', 'Program', 'Why your program is built this way',
+    'Technique for your program lifts (app-reviewed cues)', 'Recent training', 'Recent training summaries'],
+  progress: ['Recent PRs', 'Plateau flags', 'Recent weight entries', 'Recent training summaries'],
+  nutrition: ['This week\'s planned meals', 'Recent nutrition entries', 'Recent nutrition check-ins'],
+  recovery: ['Sleep & hydration (7-day)', 'Recent readiness', 'Recent training'],
+  general: ['Canonical training profile'],
+}
+
+/**
+ * Which section strings to attach. Conversational turns (greeting/thanks/etc.) stay lean — core +
+ * profile only. Every substantive turn now gets the user's FULL picture, ordered so the current
+ * topic leads. Core is always separate and always present (see selectCoachContext).
+ */
 function sectionsForTopic(s: CoachContextSnapshot, topic: ContextTopic): [string, string][] {
-  const pair = (label: string, value: string): [string, string] => [label, value]
-  switch (topic) {
-    case 'conversational':
-      return []
-    case 'training':
-      return [pair('Today in your program', s.programDay ?? ''), pair('Program', s.program),
-        pair('Why your program is built this way', s.programRationale ?? ''),
-        pair('Technique for your program lifts (app-reviewed cues)', s.programTechnique ?? ''),
-        pair('Recent training', s.recentTraining), pair('Recent training summaries', s.trainingSummaries),
-        pair('Recent readiness', s.readiness), pair('Recent self-chosen activity', s.activity)]
-    case 'progress':
-      return [pair('Recent PRs', s.recentPRs ?? ''), pair('Plateau flags', s.plateaus ?? ''),
-        pair('Recent weight entries', s.weights), pair('Recent training summaries', s.trainingSummaries),
-        pair('Recent training', s.recentTraining), pair('Program', s.program)]
-    case 'nutrition':
-      return [pair('This week\'s planned meals', s.mealPlan ?? ''), pair('Recent nutrition entries', s.nutrition), pair('Recent nutrition check-ins', s.nutritionCheckins)]
-    case 'recovery':
-      return [pair('Sleep & hydration (7-day)', s.recovery7d ?? ''), pair('Recent readiness', s.readiness),
-        pair('Recent training', s.recentTraining), pair('Recent training summaries', s.trainingSummaries)]
-    case 'general':
-    default:
-      // profile is now attached on every turn (see selectCoachContext); general adds the canonical
-      // training profile on top.
-      return [pair('Canonical training profile', s.canonicalProfile)]
-  }
+  if (topic === 'conversational') return []
+  const all = fullPicture(s)
+  const lead = TOPIC_LEAD[topic] ?? []
+  const leadPairs = lead
+    .map((label) => all.find((p) => p[0] === label))
+    .filter((p): p is [string, string] => !!p)
+  const rest = all.filter((p) => !lead.includes(p[0]))
+  return [...leadPairs, ...rest]
 }
 
 export interface SelectContextOptions {
@@ -181,7 +211,7 @@ export function selectCoachContext(snapshot: CoachContextSnapshot, message: stri
   const topic = classifyContextTopic(message, opts.intent)
   const budget = opts.totalBudget ?? DEFAULT_TOTAL_BUDGET
   const out: string[] = [
-    'SERVER-TRUSTED USER SNAPSHOT (selected for this turn — absent sections were not relevant here).',
+    'SERVER-TRUSTED USER SNAPSHOT — the user\'s full picture across the app (only genuinely empty sections are omitted). Use whatever is relevant to answer with real, specific context instead of deflecting.',
     CONFLICT_PRECEDENCE,
     `Coach preference: ${snapshot.coachingStyle || 'balanced'} style.`,
     `Core: goal ${snapshot.goal || 'unknown'}; experience ${snapshot.experience || 'unknown'}; units ${snapshot.units || 'metric'}.`,

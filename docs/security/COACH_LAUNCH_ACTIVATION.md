@@ -64,6 +64,11 @@ Code is fully wired: web `ReCaptchaEnterpriseProvider` + native App Attest/Play 
 
 ## 4 — Kill-switch rollback drill
 
+**Emulator rehearsal RE-VERIFIED 2026-08-16** — full toggle cycle clean against the local emulator:
+`engage` → `killSwitch false -> true`, `status` → `true`, `release` → `killSwitch true -> false`,
+`status` → `false`. The Firestore-write mechanism and the drill script are proven; the production
+run (with credentials, observing the live refuse-then-recover) remains the launch-time step below.
+
 ```bash
 # rehearse on the emulator (proven working):
 FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 GCLOUD_PROJECT=strengthhub-2ab33 node functions/coach-killswitch-drill.mjs engage

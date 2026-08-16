@@ -92,14 +92,6 @@ if (firebaseEnabled) {
   db = Platform.OS === 'web'
     ? initializeFirestore(app, { experimentalAutoDetectLongPolling: true })
     : getFirestore(app)
-  // Coach kill-switch source (spec §20). Dormant while COACH_ENABLED is false — no listener.
-  startCoachKillSwitch(db)
-  // LLM safety-classifier transport (Gemini via AI Logic). Registered only; it fires solely when a
-  // live coach surface runs the async precheck, which stays gated off while COACH_ENABLED is false.
-  // Imported LAZILY: coachClassifier itself imports `app` from this module, and a static import
-  // created a firebase ↔ coachClassifier require cycle (audit F-036) that surfaced as a Metro
-  // console warning and risks undefined bindings at init order changes.
-  void import('./coachClassifier').then((m) => m.initCoachClassifier()).catch(() => {})
   storage = getStorage(app)
   // Trusted backend (Cloud Functions v2) — co-located with Firestore. Hosts the
   // server-side meal analysis (and, later, coach / notifications / deletion).
@@ -132,6 +124,15 @@ if (firebaseEnabled) {
       void signInWithCustomToken(authRef, devEmulatorToken('coach-demo-user')).catch(() => signInAnonymously(authRef).catch(() => {}))
     })
   }
+
+  // Coach kill-switch source (spec §20) + the LLM safety-classifier transport (Gemini via AI Logic).
+  // These MUST start AFTER the emulator wiring above: the kill-switch onSnapshot "starts" Firestore
+  // the moment the coach is enabled (COACH_ENABLED true), and if that happens before
+  // connectFirestoreEmulator, the emulator connect throws and the client silently reads production.
+  // Dormant while COACH_ENABLED is false (no listener). The classifier is imported LAZILY to avoid
+  // the firebase ↔ coachClassifier require cycle (audit F-036).
+  startCoachKillSwitch(db)
+  void import('./coachClassifier').then((m) => m.initCoachClassifier()).catch(() => {})
 }
 
 export { app, auth, db, storage, functions }

@@ -64,16 +64,20 @@ test('greeting withholds program/weights/nutrition', () => {
   assert.ok(!out.includes('chicken and rice'), 'meals leaked into a greeting')
 })
 
-/* -------- Topic sections are selective -------- */
-test('training turn includes program, excludes meals', () => {
+/* -------- Full context by default (2026-08): every substantive turn gets the WHOLE picture, with the
+   current topic's sections LEADING so they survive the budget first. Conversational turns stay lean
+   (asserted above). -------- */
+test('training turn leads with program and still carries the full picture (incl. meals)', () => {
   const out = selectCoachContext(SNAP, 'plan my training session today', { intent: 'coaching' })
-  assert.match(out, /upper\/lower/)
-  assert.ok(!out.includes('chicken and rice'), 'nutrition leaked into a training turn')
+  assert.match(out, /upper\/lower/)                                   // program present
+  assert.ok(out.includes('chicken and rice'), 'full context should include meals too')
+  assert.ok(out.indexOf('upper/lower') < out.indexOf('chicken and rice'), 'training topic should lead')
 })
-test('nutrition turn includes meals, excludes program', () => {
+test('nutrition turn leads with meals and still carries the full picture (incl. program)', () => {
   const out = selectCoachContext(SNAP, 'what should I eat tonight', { intent: 'coaching' })
-  assert.match(out, /chicken and rice/)
-  assert.ok(!out.includes('upper/lower'), 'program leaked into a nutrition turn')
+  assert.match(out, /chicken and rice/)                              // meals present
+  assert.ok(out.includes('upper/lower'), 'full context should include the program too')
+  assert.ok(out.indexOf('chicken and rice') < out.indexOf('upper/lower'), 'nutrition topic should lead')
 })
 test('progress turn includes weight trend', () => {
   const out = selectCoachContext(SNAP, 'is my weight trending the right way', { intent: 'coaching' })
@@ -81,10 +85,11 @@ test('progress turn includes weight trend', () => {
 })
 
 /* -------- Enriched context gaps (Coach Capability Plan) surface in the right topic -------- */
-test('training turn surfaces the current program day, not PRs/recovery averages', () => {
+test('training turn leads with the current program day and now also carries recovery/PR context', () => {
   const out = selectCoachContext(SNAP, 'what should I train today', { intent: 'coaching' })
-  assert.match(out, /Push day/)
-  assert.ok(!out.includes('sleep avg 6.5h'), 'recovery averages leaked into a training turn')
+  assert.match(out, /Push day/)                                       // program day present + leads
+  assert.ok(out.includes('sleep avg 6.5h'), 'full context should include recovery averages too')
+  assert.ok(out.indexOf('Push day') < out.indexOf('sleep avg 6.5h'), 'training topic should lead recovery')
 })
 test('progress turn surfaces recent PRs and plateau flags', () => {
   const out = selectCoachContext(SNAP, 'am I making progress or have I plateaued', { intent: 'coaching' })

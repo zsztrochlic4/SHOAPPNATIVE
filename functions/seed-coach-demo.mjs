@@ -30,6 +30,9 @@ const program = {
 const userDoc = {
   profile: {
     name: 'Alex', coachName: 'Coach', goal: 'Build muscle', experience: 'Beginner',
+    // Demo user is a real, onboarded, entitled account so the local client boots
+    // straight into the app (past onboarding + paywall) when it syncs this profile.
+    onboarded: true, premium: true,
     heightCm: 175, startWeightKg: 75, goalWeightKg: 78,
     daysPerWeek: 4, sessionMinutes: 60, equipment: 'Full gym',
     sleepTargetH: 8, stepTarget: 9000, waterTargetL: 3,
@@ -103,7 +106,7 @@ async function seed() {
   for (let i = 0; i < 14; i++) {
     const dk = dayKey(i)
     b.set(db.collection('users').doc(uid).collection('habits').doc(dk), {
-      dateKey: dk, sleepH: +(6.6 + (i % 5) * 0.35).toFixed(1), waterL: +(2.0 + (i % 4) * 0.3).toFixed(1), steps: 6800 + (i % 6) * 520,
+      dateKey: dk, sleepH: +(6.6 + (i % 5) * 0.35).toFixed(1), waterL: +(2.0 + (i % 4) * 0.3).toFixed(1), steps: 6800 + (i % 6) * 520, nutritionScore: 6 + (i % 4),
     })
   }
   // Nutrition entries

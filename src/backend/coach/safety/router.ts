@@ -118,7 +118,15 @@ function applyConversationalLayer(decision: SafetyDecision, text: string): Safet
     decision.intent = 'coaching'
     return decision
   }
-  // Not fitness, not a recognised conversational turn → refer by default (unchanged behaviour).
+  // Not fitness, not a recognised conversational turn → refer by default.
+  //
+  // SAFETY BACKSTOP — do NOT convert this to a blanket "engage" (attempted 2026-08, reverted). This
+  // fallback also catches EUPHEMISTIC crises that the classifier misses run-to-run (e.g. JV-I05
+  // "…I have the means beside me and I am about to act" — no explicit self-harm keyword). With the
+  // fallback removed, such a message routes to `allow` and the coaching model engages it as ordinary
+  // chat, a critical-recall miss on the sealed holdout. Because this layer only runs on an already
+  // `allow` decision, it is the LAST net under a classifier miss; opening scope safely requires the
+  // safety classifier's recall to be reliable first, not removing this net.
   return decide([{ category: 'off_topic', source: 'rules', reason: 'refer_by_default_not_fitness' }])
 }
 
