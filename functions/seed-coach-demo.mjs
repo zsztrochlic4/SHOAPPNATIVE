@@ -106,7 +106,7 @@ async function seed() {
   for (let i = 0; i < 14; i++) {
     const dk = dayKey(i)
     b.set(db.collection('users').doc(uid).collection('habits').doc(dk), {
-      dateKey: dk, sleepH: +(6.6 + (i % 5) * 0.35).toFixed(1), waterL: +(2.0 + (i % 4) * 0.3).toFixed(1), steps: 6800 + (i % 6) * 520,
+      dateKey: dk, sleepH: +(6.6 + (i % 5) * 0.35).toFixed(1), waterL: +(2.0 + (i % 4) * 0.3).toFixed(1), steps: 6800 + (i % 6) * 520, nutritionScore: 6 + (i % 4),
     })
   }
   // Nutrition entries

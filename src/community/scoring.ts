@@ -116,7 +116,12 @@ export interface OdometerResult {
  */
 export function weeklyIndexCore(habitDays: HabitLike[], workouts7: number, t: ScoringTargets): OdometerResult {
   const n = Math.max(1, habitDays.length)
-  const avg = (sel: (h: HabitLike) => number) => habitDays.reduce((a, h) => a + sel(h), 0) / n
+  // Coerce every metric to a finite number: a habit row missing a field (e.g. a day logged with no
+  // nutritionScore) must count as 0 for that dimension, never poison the average. Without this, one
+  // undefined field makes `avg` NaN, which propagates through the ratios and the clamps
+  // (Math.max(0, Math.min(100, NaN)) === NaN) and surfaces as "NaN/100" on the dashboard.
+  const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
+  const avg = (sel: (h: HabitLike) => number) => habitDays.reduce((a, h) => a + num(sel(h)), 0) / n
 
   const ratios = {
     workouts: workouts7 / Math.max(1, t.daysPerWeek),
@@ -132,7 +137,8 @@ export function weeklyIndexCore(habitDays: HabitLike[], workouts7: number, t: Sc
     clamp(ratios.sleep) * 0.2 +
     clamp(ratios.water) * 0.15 +
     clamp(ratios.nutrition) * 0.15
-  const score = Math.round(Math.max(0, Math.min(100, weighted * 50)))
+  // Final NaN backstop: Math.max/min do not sanitise NaN, so guard before rounding.
+  const score = Number.isFinite(weighted) ? Math.round(Math.max(0, Math.min(100, weighted * 50))) : 0
   return { score, ratios }
 }
 
