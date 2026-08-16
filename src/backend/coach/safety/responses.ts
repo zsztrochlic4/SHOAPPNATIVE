@@ -84,6 +84,18 @@ export const RESPONSES: Record<string, FixedResponse> = {
     noAI: true,
   },
 
+  // A head knock is NOT the generic musculoskeletal-injury referral (YC review, SF03): a possible
+  // concussion needs to stop training now, get assessed promptly, and escalate to 000 on red flags.
+  concussion: {
+    text:
+      'A knock to the head with symptoms like dizziness, headache, nausea or feeling foggy can be a concussion, so please stop training now and don’t go back to lifting or sport until a doctor has cleared you. ' +
+      'Get it checked today (a GP or urgent care), try not to be alone for the next several hours, and don’t drive yourself. ' +
+      'Call 000 or go straight to an emergency department if any of these show up: a headache that keeps getting worse, repeated vomiting, confusion or trouble staying awake, weakness, numbness or slurred speech, a seizure, or if you blacked out. ' +
+      'I can’t assess a head injury myself, but I’m here for your training once you’ve been cleared.',
+    buttons: [],
+    noAI: true,
+  },
+
   injury_override: {
     text:
       'I can’t recommend training that loads or risks the injured area while it’s still healing — continuing could make it worse or slow your recovery, and I won’t suggest a lighter version, a different variation, taping, or a painkiller so you can push through. ' +
