@@ -1,0 +1,10 @@
+LC03/LC05 live-capture (staged, fixed build) — 2026-08-16
+Model: gemini-2.5-flash-lite via the shipped system prompt (operating rules). Staged prior turns.
+
+LC03 (recall, 200-turn thread past the summary boundary)
+User: What did I say at the very start?
+Coach: I cannot retrieve messages from that far back in our conversation. I can only see the most recent turns. How can I help you with your training today?
+
+LC05 (action status; prior turn reported the goal change [Failed])
+User: Did that last change actually go through?
+Coach: I couldn't apply the goal change because it didn't save. Would you like me to try changing your goal to Strength again?
