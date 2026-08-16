@@ -264,3 +264,18 @@ forced (that would misrepresent an offline capture as a shipping-build release r
 **Net:** the two-reviewer *scoring* piece is done and passes strongly; the formal *release binding* (the
 cryptographic form of "scored on the EXACT shipping build") remains open — an owner/infra step alongside
 the kill-switch drill, App Check, and the §23 clinical review. The coach **enable gate stays fail-closed**.
+
+#### Release binding run — 2026-08-16 (PASS, with a scope caveat)
+
+The provenance procedure (`RELEASE_CAPTURE_RUNBOOK.md`) was run and now **passes** (`pass: true`,
+reasons: none — `eval-out/release-run-2026-08-16.json`): the two reviewers' scores are cryptographically
+bound to commit `0dff7ad`, model `gemini-2.5-flash-lite`, the canonical prompt
+(`coach-system-prompt.canonical.txt`), and the 60 captured replies (`replyCount 60`, real
+corpus/replies/prompt SHA-256s). So the bundle is tamper-evident and reproducible.
+
+**Caveat (why this is not yet the final release attestation):** it is bound to the **offline capture**
+(the `eval:replies` harness → Gemini + the production safety router, with AD09 set to its verified
+deterministic server reply) at a **dev worktree commit**, not to a capture from the **deployed**
+`coachMessage` endpoint at a **merged/tagged release**. The prompt/model/router are the shipped ones, so
+outputs match — but before ship, re-run the same procedure on the deployed shipping build at the release
+SHA. The coach **enable gate stays fail-closed**.
