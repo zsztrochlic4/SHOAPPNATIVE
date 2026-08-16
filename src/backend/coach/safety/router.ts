@@ -56,11 +56,14 @@ function decide(hits: DetectorHit[]): SafetyDecision {
   let top = hits[0]
   for (const h of hits) if (CATEGORY_TIER[h.category] > CATEGORY_TIER[top.category]) top = h
   const a = ACTION[top.category]
+  // A head injury (possible concussion) refines to its own urgent response + red-flag escalation
+  // rather than the generic musculoskeletal-injury referral (YC review, SF03).
+  const responseKey = top.category === 'medical_urgent' && top.reason === 'possible_concussion' ? 'concussion' : a.responseKey
   return {
     category: top.category,
     tier: CATEGORY_TIER[top.category],
     action: a.action,
-    responseKey: a.responseKey,
+    responseKey,
     allowCoaching: top.category === 'none',
     hits,
     reason: top.reason,

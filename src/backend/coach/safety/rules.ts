@@ -332,6 +332,12 @@ function detectMedicalEmergency(n: Norm): DetectorHit[] {
   // Diabetic emergency: confusion / can't respond (spec §7).
   if (has(n, 'diabetic', 'diabetes', 'hypo') && has(n, 'confused', 'can t speak', 'unconscious', 'seizing', 'drowsy', 'passing out'))
     return [hit('medical_emergency', 'diabetic_emergency')]
+  // Head injury WITH a serious neuro red flag → 000, not the (still-urgent) concussion caution. A milder
+  // head knock (e.g. "hit my head and feel dizzy") stays medical_urgent → the concussion response, which
+  // itself escalates on these same red flags (YC review, SF03).
+  if (has(n, 'hit my head', 'banged my head', 'knock to the head', 'head knock', 'bang to the head', 'concussion', 'knocked out', 'hit his head', 'hit her head') &&
+      has(n, 'passed out', 'blacked out', 'black out', 'lost consciousness', 'unconscious', 'keep vomiting', 'kept vomiting', 'repeated vomiting', 'throwing up', 'seizure', 'seizing', 'confused', 'confusion', 'cant stay awake', 'can t stay awake', 'wont wake', 'won t wake', 'slurred', 'weakness', 'numb', 'worst headache'))
+    return [hit('medical_emergency', 'serious_head_injury')]
   return []
 }
 
