@@ -765,3 +765,39 @@ export function proposalSurfacingIssue(
   }
   return null
 }
+
+/** The coach's fixed refusal for a fabricated exercise id (AD09), shared so the conversational-path
+ *  guard and any future caller stay identical. */
+export const FABRICATED_EXERCISE_ID_LINE =
+  "I don't recognise an exercise with that id, so I won't swap it in. Tell me the exercise by name and I'll match it to a real, safe option from your program."
+
+/**
+ * AD09 conversational-path guard. Real exercise ids have the shape `[A-Z]{2}\d{2}` (e.g. CH01), so a
+ * fabricated id like `ZZ99` is *shaped* like a real one and can only be caught by checking it against
+ * the real exercise set. `proposalSurfacingIssue` above only fires when the model emits a structured
+ * `workout_action`; when the model answers CONVERSATIONALLY (no proposal) it can still offer to "swap
+ * in ZZ99". This catches an id-shaped token that is NOT a real exercise when the user frames it as an
+ * exercise or as a swap/replace/sub-in target — regardless of whether a proposal was emitted — so the
+ * coach never treats a made-up id as real.
+ *
+ * `validExerciseIds` is the GLOBAL exercise universe (every real id — see `VALID_EXERCISE_IDS`), so a
+ * real exercise the user does not currently have still swaps in fine; only ids that exist in NO
+ * exercise are refused. Returns the offending upper-cased token, or null. Bare `id`/`sub`/`add` and
+ * digit-led training notation (`3x5`, `5RM`, `80kg`) deliberately do NOT match.
+ */
+export function fabricatedExerciseIdInMessage(message: string, validExerciseIds: ReadonlySet<string>): string | null {
+  if (validExerciseIds.size === 0) return null // no-snapshot path (tests / empty context)
+  const notReal = (tok: string): boolean => !validExerciseIds.has(tok.toUpperCase())
+  // (a) framed as an exercise, in ANY context: "exercise ZZ99", "movement AB12", "lift ZZ01".
+  const framed = message.match(/\b(?:exercise|movement|lift)\s+(?:number\s+|id\s+)?([A-Za-z]{2}\d{2})\b/i)
+  if (framed && notReal(framed[1])) return framed[1].toUpperCase()
+  // (b) in an exercise-SWAP context, ANY id-shaped token that is not a real exercise is fabricated —
+  // this covers both the swapped-in and the swapped-for target ("swap out CH01 for QZ77"). Bare
+  // `use`/`add` and digit-led notation (`3x5`, `5RM`, `80kg`) do not qualify.
+  if (/\b(?:swap\w*|replac\w*|substitut\w*|sub\s+in|sub\s+out|put\s+in)\b/i.test(message)) {
+    for (const tok of message.match(/\b[A-Za-z]{2}\d{2}\b/g) ?? []) {
+      if (notReal(tok)) return tok.toUpperCase()
+    }
+  }
+  return null
+}

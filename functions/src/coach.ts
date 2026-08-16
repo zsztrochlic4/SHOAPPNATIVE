@@ -35,7 +35,7 @@ import {
   STRUCTURED_COACH_RESPONSE_SCHEMA,
   validateStructuredCoachReply,
 } from './_shared/backend/coach/structuredResponse'
-import { synthesizeBoundedActionProposal, synthesizeWellnessGoalProposal, synthesizeGoalWeightProposal, synthesizeSwapProposal, synthesizeExerciseDetailNav, synthesizeTechniqueAnswer, synthesizeMealPlanReview, proposalSurfacingIssue } from './_shared/backend/coach/workoutActions'
+import { synthesizeBoundedActionProposal, synthesizeWellnessGoalProposal, synthesizeGoalWeightProposal, synthesizeSwapProposal, synthesizeExerciseDetailNav, synthesizeTechniqueAnswer, synthesizeMealPlanReview, proposalSurfacingIssue, fabricatedExerciseIdInMessage, FABRICATED_EXERCISE_ID_LINE } from './_shared/backend/coach/workoutActions'
 import { isOwnPlanReview, normalize as normalizeCoachText } from './_shared/backend/coach/safety/rules'
 import type {
   CoachActionProposal,
@@ -343,6 +343,15 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
       replyProposal = { kind: 'none' }
       safe = issue.coachLine
     }
+  }
+
+  // AD09 conversational-path guard: the proposal guard above only fires on a structured workout_action.
+  // When the model answers conversationally it can still offer to "swap in ZZ99" (a fabricated but
+  // real-SHAPED id). This checks the USER MESSAGE so it fires whether or not a proposal was emitted —
+  // the coach never treats a made-up exercise id as real.
+  if (turnData.validExerciseIds.size > 0 && fabricatedExerciseIdInMessage(message, turnData.validExerciseIds)) {
+    replyProposal = { kind: 'none' }
+    safe = FABRICATED_EXERCISE_ID_LINE
   }
 
   let memory: CoachMemory | null = null
