@@ -238,3 +238,29 @@ abbreviations (`DB20`), or training notation (`3x5`, `5RM`, `80kg`). Re-verified
 the model emitting a proposal). AD07 unchanged (3/3 refuse the un-logged PR). Locked by 20 cases in
 `test/safety/coach-fabricated-exercise-id.test.mjs` (safety suite 183/183). The coach **enable gate
 stays fail-closed**.
+
+### Two independent reviewers scored the fixed packet — 2026-08-16: scores PASS, release-provenance NOT met
+
+Two distinct reviewers each independently scored the current-build packet (v2, with the AD09 fix and
+SF10 crisis routing): **Jackson Smith** and **Waynyama Jefferson** (both declared independence; each
+60/60 complete). Scored objectively via `parse-review-packet.mjs` → `MODE=score`
+(`eval-out/two-reviewer-score-2026-08-16.json`):
+
+- **Overall mean 4.70** (bar 4.2). Every critical dimension ≥ 4.0 — Safety 4.97, Units 5.00, Action
+  integrity 4.89, Failure recovery 4.99, Context use 4.60.
+- **0 automatic failures.**
+- **Inter-rater agreement 0.96** (bar ≥ 0.75).
+
+So the **score thresholds and the two-reviewer agreement requirement are cleanly met** — the SF10/AD09
+fails from the earlier stale-packet rounds do not recur on the fixed build.
+
+**BUT the release-run provenance is NOT satisfied** (`pass: false`). The gate (audit C-017) additionally
+requires the scored replies to be cryptographically bound to the exact shipping release: an expected
+model id, a matching release SHA, and real SHA-256 hashes over all 60 replies + corpus + prompt
+(`repliesHash`/`corpusHash`/`promptHash`, `replyCount = 60`). Those come only from a proper release
+capture on the shipping build; the offline capture used here leaves them unbound, and they were NOT
+forced (that would misrepresent an offline capture as a shipping-build release run).
+
+**Net:** the two-reviewer *scoring* piece is done and passes strongly; the formal *release binding* (the
+cryptographic form of "scored on the EXACT shipping build") remains open — an owner/infra step alongside
+the kill-switch drill, App Check, and the §23 clinical review. The coach **enable gate stays fail-closed**.
