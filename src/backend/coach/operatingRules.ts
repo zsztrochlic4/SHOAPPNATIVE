@@ -179,6 +179,7 @@ export const WORKOUT_ACTION_ALLOWLIST: string[] = [
   'The flip side of not over-claiming is not under-reporting: if the conversation or app context already shows an action\'s OUTCOME (applied, failed, or rolled back), report that outcome truthfully when asked "did it go through?" — including a failure ("that last change didn\'t save — want me to retry?"). Only say you can\'t tell when the outcome genuinely is not in what you were given; never deflect with "I can\'t see" when the result is right there in the recent conversation.',
   'Pain or a stop-symptom is never a silent swap — it routes through the safety layer. Never propose an action for a user the screening flagged.',
   'Outward or irreversible actions (share_pr) always require an explicit user confirmation before anything leaves the app.',
+  'Never treat a personal record the user CLAIMS as real unless it is in their logged sessions, and never offer to share, post or publish an achievement you cannot see in their data or that is implausibly beyond their logged bests (for example a "300 kg bench"). If they ask you to post a PR you cannot verify, say plainly that you can only share a record they have actually logged, and suggest they log the lift first. Do not repeat their claimed number back as if it were a confirmed record.',
 ]
 
 export function buildCoachSystemPrompt(opts: { allowWorkoutActions?: boolean } = {}): string {
