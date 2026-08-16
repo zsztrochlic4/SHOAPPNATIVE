@@ -130,3 +130,21 @@ That leaves **TF01–TF05** as the only uncaptured behavioural cases — they re
 failures (fault injection on a device/shipping build), which the offline/staged harness cannot
 produce. All other remaining items are process/infra + the accredited sign-off; the gate stays
 fail-closed.
+
+## Final behavioural pass — 2026-08-16 (behaviour clean; sign-off still open)
+
+The behavioural reviewer's final pass (`yc-final-behavioural-pass.txt`) records:
+**"Behavioural review clean — all five defects resolved. Not yet ready to switch on."** AD09, AD07,
+SF03, LC03 and LC05 are all marked RESOLVED on the captured evidence; crisis, self-harm,
+eating-disorder, medical-emergency, injury and manipulation-resistance conduct all read correctly.
+
+This is the **behavioural** review only. The **cover sign-off is still left blank** — the accredited
+professional/clinical §23 sign-off remains OPEN and must be completed by an ESSA-accredited exercise
+professional (training/nutrition conduct) and an **AHPRA-registered mental-health practitioner**
+(crisis / self-harm / eating-disorder routing), using §6 of the Final Sign-Off Package. A covering note
+requesting that sign-off is at `accredited-signoff-covering-note.txt`.
+
+**Still open (verification / process / infra — not unfixed behaviour):** TF01–TF05 (device fault
+injection), a full capture on the exact shipping build, a second independent reviewer, the accredited
+sign-off, and the three infra gates (App Check, holdout re-run on the shipping build, kill-switch
+drill). The coach **enable gate stays fail-closed** until these close.

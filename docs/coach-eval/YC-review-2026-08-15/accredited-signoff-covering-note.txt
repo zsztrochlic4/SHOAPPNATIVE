@@ -1,0 +1,32 @@
+
+STRENGTHHUB AI COACH
+Covering Note — Request for Accredited Safety Sign-Off
+
+Date:  16 August 2026
+To:  The accredited safety reviewer(s)
+Re:  StrengthHub AI Coach — professional / clinical safety sign-off (release Condition 2)
+Thank you for agreeing to review the safety behaviour of the StrengthHub AI coach — a training and wellbeing assistant for Australian university students. We are asking you to complete the professional / clinical sign-off for the coach, within your accreditation. Everything needed to decide is in the attached Final Sign-Off Package; this note summarises what has been done and what we are asking you to put your name to.
+What has already been done
+Two independent behavioural review rounds against a 60-case packet (multi-turn, safety-sensitive, adversarial, long-context and tool-failure scenarios) plus staged crisis and injury cases.
+Every specific defect raised was fixed and re-captured on the current build; the behavioural reviewer’s final verdict is “no outstanding safety-behaviour defect.” Corrected replies for AD07, AD09, SF03, LC03 and LC05 are shown verbatim in the package (§3).
+Automated safety holdout through the full production router: 0 of 36 critical crisis / self-harm / eating-disorder cases missed; benign over-referral 7.7%. A fresh sealed holdout of your own can be run on request.
+What we are asking you to sign
+Please sign only within your accreditation. If a portion is outside your remit, note that in “Scope reviewed” and it will be routed to the right specialist rather than represented as covered.
+Portion
+Who we are asking to sign
+Crisis / self-harm / eating-disorder routing
+An AHPRA-registered mental-health practitioner (e.g. psychologist). This is the portion that most needs mental-health accreditation.
+Training & general-nutrition conduct
+An ESSA-accredited exercise professional (AEP / AES). Confirms scope discipline, injury deferral, and qualitative-only nutrition.
+
+What is still open (so the sign-off is not over-relied on)
+TF01–TF05 tool-failure cases are not yet captured (they need real forced tool failures on a device / shipping build).
+A full response capture on the exact shipping build, and a second independent reviewer for the response-quality gate.
+Infrastructure gates, separate from your sign-off: Firebase App Check enforcement on the AI endpoint, the automated holdout re-run on the exact shipping build (0 critical misses), and a live emergency-shutoff (kill-switch) drill.
+Your decision satisfies one of four release conditions. Enabling the coach for real users remains a separate, explicit decision by the app owner once the items above are complete.
+How to record your decision
+Complete the decision block in §6 of the Final Sign-Off Package: your name, accreditation / registration number, issuing body (ESSA / AHPRA), decision (Approved / Approved with conditions / Not approved), any conditions, the scope you actually reviewed, signature and date. Please return the signed package.
+Attached
+StrengthHub_Coach_FINAL_SignOff_Package.docx — self-contained; the coach’s real replies, the routing summary, and the §6 decision block.
+Safety-Behaviour Review (final behavioural pass) — the independent behavioural reviewer’s findings and readiness table, for your reference.
+
