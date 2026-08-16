@@ -174,6 +174,13 @@ elected to treat the §23 reviews as a hard gate._
    secret to `1` and redeploy functions. Steps: `docs/APP_CHECK_ENFORCEMENT_CHECKLIST.md`.
 4. **Live rollback drill**: set `config/coach.killSwitch = true` in production, confirm
    the callable refuses without a redeploy, record the drill owner/date.
+   **Mechanism drilled end-to-end 2026-08-16 (emulator, PASS):** the real `runCoachTurn` gate was
+   exercised against the real `config/coach.killSwitch` field on the Firestore emulator —
+   `false → ANSWERS`, `true → coach_unavailable` (no redeploy), `false → ANSWERS`
+   (`npm run drill:killswitch:emulator`; reviewed-layer contract also passes via `drill:killswitch`).
+   The `config/coach.killSwitch` field is now provisioned at its `false` baseline in production. **Still
+   open:** the *production* drill against the deployed, enabled coach — performed as the first step of
+   the enablement rollout (a production drill is only observable once the coach is live).
 5. Only then: a reviewed production-manifest/channel change updates this file and
    `STATUS.md` in the same change, and names the deployed Functions revision + the
    passing run.
