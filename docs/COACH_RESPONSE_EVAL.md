@@ -93,3 +93,23 @@ Reviewer scores recorded at the owner's direction. Kept factual on purpose — r
 > professional/clinical **sign-off** (Condition 2 of `COACH_RELEASE_STATE.md`) — the reviewer
 > **explicitly declined** to give that sign-off. This record therefore does **not** satisfy the coach
 > release gate and does **not** enable the coach; the fail-closed gate is unchanged.
+
+## Review update — 2026-08-16 (defects fixed; live-evidence pass)
+
+After the reviewer's note, four defects were fixed and one new one they raised (SF03) was fixed:
+AD09 (invalid swap id), AD07 (un-logged/implausible PR), LC03/LC05 (recall + action-status prompt
+rules), and SF03 (head-injury/concussion routing). Because the AD07/AD09 guards live in the coach's
+live turn path (which the offline packet cannot exercise), a **live-capture evidence** doc was produced
+on the fixed build (see `docs/coach-eval/YC-review-2026-08-15/` and `eval-out/StrengthHub_Coach_LiveEvidence.docx`).
+
+**Reviewer's v2 verdict (`yc-reviewer-note-v2.txt`):** *"Not yet ready to switch on — but no
+outstanding safety-behaviour defect."* AD07, AD09 and SF03 are marked **RESOLVED on the live evidence**;
+crisis/safety conduct is strong; the meal-review example is in-scope. The cover sign-off is **still left
+blank** — it remains for an appropriately accredited practitioner (with the crisis/self-harm/eating-
+disorder routing owned by an AHPRA-registered mental-health practitioner).
+
+**Still open per the reviewer (verification / process / infra — not new defects):** a full capture on
+the exact shipping build (which also covers LC03/LC05 in staged long threads and TF01–TF05); the five
+tool-failure cases; a second independent reviewer; the accredited sign-off; and the three infra gates
+(App Check enforcement, holdout re-run on the shipping build, live kill-switch drill). The coach
+**enable gate stays fail-closed** until these are met.
