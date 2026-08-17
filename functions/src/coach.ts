@@ -35,7 +35,7 @@ import {
   STRUCTURED_COACH_RESPONSE_SCHEMA,
   validateStructuredCoachReply,
 } from './_shared/backend/coach/structuredResponse'
-import { synthesizeBoundedActionProposal, synthesizeWellnessGoalProposal, synthesizeGoalWeightProposal, synthesizeSwapProposal, synthesizeDayMoveProposal, synthesizeScheduleGroundedReply, synthesizeExerciseDetailNav, synthesizeTechniqueAnswer, synthesizeMealPlanReview, proposalSurfacingIssue, fabricatedExerciseIdInMessage, FABRICATED_EXERCISE_ID_LINE, isDayRescheduleIntent, dayRescheduleAsk } from './_shared/backend/coach/workoutActions'
+import { synthesizeBoundedActionProposal, synthesizeWellnessGoalProposal, synthesizeGoalWeightProposal, synthesizeSwapProposal, synthesizeDayMoveProposal, synthesizeScheduleGroundedReply, synthesizeMemoryFromMessage, synthesizeExerciseDetailNav, synthesizeTechniqueAnswer, synthesizeMealPlanReview, proposalSurfacingIssue, fabricatedExerciseIdInMessage, FABRICATED_EXERCISE_ID_LINE, isDayRescheduleIntent, dayRescheduleAsk } from './_shared/backend/coach/workoutActions'
 import { isOwnPlanReview, normalize as normalizeCoachText } from './_shared/backend/coach/safety/rules'
 import type {
   CoachActionProposal,
@@ -395,9 +395,15 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
     safe = FABRICATED_EXERCISE_ID_LINE
   }
 
+  // Memory learning: prefer the model's extracted fact (unless this turn stored an action value), and
+  // fall back to a deterministic high-confidence capture of durable setup facts (trains at home, only
+  // has dumbbells) that the small model routinely misses. The save path re-checks the evidence quote,
+  // dedups and caps, and the user can see/edit/clear everything in the coach memory settings.
   let memory: CoachMemory | null = null
-  if (!suppressMemory && turnData.memoryEnabled && structured.memory && deps.saveMemory) {
-    memory = await deps.saveMemory(uid, message, structured.memory)
+  const modelMemory = suppressMemory ? null : structured.memory
+  const memoryToSave = modelMemory ?? synthesizeMemoryFromMessage(message)
+  if (turnData.memoryEnabled && memoryToSave && deps.saveMemory) {
+    memory = await deps.saveMemory(uid, message, memoryToSave)
   }
   let proposal: CoachActionProposal | null = null
   // Defence in depth: a workout_action is only ever surfaced when the client opted into

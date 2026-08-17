@@ -303,6 +303,51 @@ test('phantom confirm-card guard: parroted "Tap confirm" with no proposal is rep
   assert.equal(out.proposal, null)
 })
 
+/* ---- Richer memory: reliably capture durable setup facts the model misses ---- */
+
+test('memory: "I train at home" is captured deterministically when the model misses it', async () => {
+  let saved = null
+  const { deps } = baseDeps({ generateReply: async () => JSON.stringify({ mode: 'general', message: 'Got it.', citations: [], memory: null, proposal: { kind: 'none' } }) })
+  deps.loadTurnData = async () => ({
+    context: { dateOfBirth: '2000-01-01', affectedRegions: [], screeningOutcome: null, engineExcludedExerciseIds: [], isAustralia: true },
+    contextText: '', snapshot: { coachingStyle: 'balanced', goal: '', experience: '', units: 'metric', constraints: '', profile: '', canonicalProfile: '', program: '', recentTraining: '', trainingSummaries: '', activity: '', readiness: '', weights: '', nutrition: '', nutritionCheckins: '', memories: [] },
+    recent: [], safetySession: newSafetySession(), memoryEnabled: true, coachingStyle: 'balanced',
+    programExercises: [], trainingDays: [], programSchedule: [], todayWeekday: 'Monday', validExerciseIds: new Set(),
+  })
+  deps.saveMemory = async (_uid, _msg, candidate) => { saved = candidate; return { ...candidate, id: 'm1', status: 'confirmed', confidence: 1, source: 'user_statement', evidenceRef: '', visible: true, createdAt: '', updatedAt: '' } }
+  const out = await coachTurnCore('u1', { message: 'i train at home now', allowActions: true }, deps)
+  assert.equal(out.blocked, false)
+  assert.equal(saved?.value, 'Trains at home')
+  assert.equal(saved?.category, 'Training location')
+})
+
+test('memory: nothing is captured when memory is OFF (consent gate honoured)', async () => {
+  let called = false
+  const { deps } = baseDeps()
+  deps.loadTurnData = async () => ({
+    context: { dateOfBirth: '2000-01-01', affectedRegions: [], screeningOutcome: null, engineExcludedExerciseIds: [], isAustralia: true },
+    contextText: '', snapshot: { coachingStyle: 'balanced', goal: '', experience: '', units: 'metric', constraints: '', profile: '', canonicalProfile: '', program: '', recentTraining: '', trainingSummaries: '', activity: '', readiness: '', weights: '', nutrition: '', nutritionCheckins: '', memories: [] },
+    recent: [], safetySession: newSafetySession(), memoryEnabled: false, coachingStyle: 'balanced',
+    programExercises: [], trainingDays: [], programSchedule: [], todayWeekday: 'Monday', validExerciseIds: new Set(),
+  })
+  deps.saveMemory = async () => { called = true; return null }
+  await coachTurnCore('u1', { message: 'i only have dumbbells', allowActions: true }, deps)
+  assert.equal(called, false)
+})
+
+test('synthesizeMemoryFromMessage: high-precision, no false positives', async () => {
+  const { synthesizeMemoryFromMessage } = await import('../lib/_shared/backend/coach/workoutActions.js')
+  assert.equal(synthesizeMemoryFromMessage('i train at home')?.value, 'Trains at home')
+  assert.equal(synthesizeMemoryFromMessage('i only have dumbbells and a bench')?.value, 'Only has dumbbells, bench')
+  assert.equal(synthesizeMemoryFromMessage('i dont have a barbell')?.value, 'Does not have a barbell')
+  assert.equal(synthesizeMemoryFromMessage('i only have 20 minutes today'), null)
+  assert.equal(synthesizeMemoryFromMessage('how do i squat'), null)
+  assert.equal(synthesizeMemoryFromMessage('i hate mondays'), null)
+  const cand = synthesizeMemoryFromMessage('i train at home')
+  // evidenceQuote must be an exact slice of the message (the save path re-checks this).
+  assert.ok('i train at home'.includes(cand.evidenceQuote))
+})
+
 test('synthesizeScheduleGroundedReply: grounded, dash-free, defers moves and non-schedule turns', async () => {
   const { synthesizeScheduleGroundedReply } = await import('../lib/_shared/backend/coach/workoutActions.js')
   assert.match(synthesizeScheduleGroundedReply('i dont like training chest on monday', SCHEDULE, 'Friday'), /do not train chest on Monday.*Legs day/i)
