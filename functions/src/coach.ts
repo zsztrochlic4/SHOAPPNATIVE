@@ -34,7 +34,7 @@ import {
   STRUCTURED_COACH_RESPONSE_SCHEMA,
   validateStructuredCoachReply,
 } from './_shared/backend/coach/structuredResponse'
-import { synthesizeBoundedActionProposal, synthesizeWellnessGoalProposal, synthesizeGoalWeightProposal, synthesizeSwapProposal, synthesizeExerciseDetailNav, synthesizeTechniqueAnswer, synthesizeMealPlanReview, proposalSurfacingIssue, fabricatedExerciseIdInMessage, FABRICATED_EXERCISE_ID_LINE } from './_shared/backend/coach/workoutActions'
+import { synthesizeBoundedActionProposal, synthesizeWellnessGoalProposal, synthesizeGoalWeightProposal, synthesizeSwapProposal, synthesizeExerciseDetailNav, synthesizeTechniqueAnswer, synthesizeMealPlanReview, proposalSurfacingIssue, fabricatedExerciseIdInMessage, FABRICATED_EXERCISE_ID_LINE, isDayRescheduleIntent, DAY_RESCHEDULE_LINE } from './_shared/backend/coach/workoutActions'
 import { isOwnPlanReview, normalize as normalizeCoachText } from './_shared/backend/coach/safety/rules'
 import type {
   CoachActionProposal,
@@ -292,6 +292,15 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
         replyMessage = synth.message
         suppressMemory = true // never also store the requested value as a memory
       }
+    }
+    // Day-reschedule misroute guard: "swap/rearrange my (exercise) DAYS" is a training-DAY change, not
+    // an exercise swap. flash-lite sometimes emits an exercise `swap` for it (or on a bare "yes" that
+    // follows such a request). Drop the wrong swap and ask which days, so the coach never offers to
+    // change a lift when the user asked to move their training days.
+    if (replyProposal.kind === 'workout_action' && String(replyProposal.payload?.action ?? '') === 'swap' && isDayRescheduleIntent(message, recent)) {
+      replyProposal = { kind: 'none' }
+      replyMessage = DAY_RESCHEDULE_LINE
+      suppressMemory = true
     }
   }
   // Exercise-detail navigation backstop (not action-gated): when the user asks how to do a lift and the
