@@ -83,6 +83,23 @@ function isWorkoutHyperbole(n: Norm): boolean {
     'dying to', 'killer workout', 'killing it', 'destroyed my', 'wrecked me', 'dead tired')
 }
 
+/** Ordinary TRAINING FATIGUE the classifier sometimes over-reads as crisis ("everything feels heavy",
+ *  "I'm exhausted / run down / wrecked / drained"). It is a recovery / deload topic, not distress. Used
+ *  ONLY to suppress a crisis_concern hit, and only ever alongside suppressionRule's paramount
+ *  no-live-distress guard, so it can never hide a genuine disclosure. Self-guards on any first-person
+ *  distress and on ambiguous life-directed phrases, so "everything feels heavy and I can't keep going"
+ *  keeps the crisis flag. */
+const _LIFE_DIRECTED = /\b(be here|here anymore|want to be here|the point|whats the point|what s the point|keep going|go on|carry on|hate (?:my )?(?:life|myself)|not worth|worth (?:it|living)|my life|to live|to die|die|dying|kill|suicid|self harm|hurt myself|harm myself|disappear|dont belong|do not belong|empty inside|numb|worthless|hopeless|give up|giving up|no reason|reason to (?:keep|go|live)|cant anymore|can t anymore|cant go on|can t go on|cant cope|can t cope|breaking down|falling apart|over it all|want it to stop|end it|cant keep going|can t keep going|cant do (?:it|this) anymore|can t do (?:it|this) anymore)\b/
+function isBenignTrainingFatigue(n: Norm): boolean {
+  if (hasFirstPersonDistress(n) || wantsToDie(n)) return false
+  if (hasRe(n, _LIFE_DIRECTED)) return false // any life/existence-directed phrasing keeps the crisis flag
+  return has(n, 'everything feels heavy', 'everything is heavy', 'feels heavy', 'feeling heavy',
+    'weights feel heavy', 'lifts feel heavy', 'exhausted', 'run down', 'rundown', 'run-down', 'wrecked',
+    'shattered', 'drained', 'wiped out', 'knackered', 'no energy', 'zero energy', 'so tired',
+    'really tired', 'burnt out', 'burned out', 'sluggish', 'so flat', 'feeling flat', 'running on empty',
+    'worn out', 'no gas left')
+}
+
 /* ------------------------------------------------------------------ */
 /*  Individual guardrail detectors                                     */
 /* ------------------------------------------------------------------ */
@@ -753,9 +770,10 @@ export function hasCurrentSafetySignal(n: Norm): boolean {
 
 /** Which scoping rules apply to which categories (Jack round-3). Crisis/emergency keep their in-detector
  *  guards too; this adds the cross-category historical/third-party/negation/topical layer. */
-const SCOPED: Partial<Record<SafetyCategory, ('third_party' | 'historical' | 'negation' | 'topical')[]>> = {
-  crisis_concern: ['historical', 'topical'],
-  immediate_danger: ['historical', 'topical'],
+const SCOPED: Partial<Record<SafetyCategory, ('third_party' | 'historical' | 'negation' | 'topical' | 'fatigue')[]>> = {
+  crisis_concern: ['historical', 'topical', 'fatigue'],
+  immediate_danger: ['historical', 'topical'], // never 'fatigue' — an imminent-danger flag is never suppressed by tiredness
+
   medical_emergency: ['negation'],
   overdose_poisoning: ['topical', 'negation', 'historical'],
   medical_condition: ['third_party', 'historical', 'negation', 'topical'],
@@ -807,6 +825,7 @@ function suppressionRule(n: Norm, category: SafetyCategory, opts: ScopeOpts = {}
   if (rules.includes('historical') && historicalResolved(n)) return 'historical_resolved'
   if (rules.includes('negation') && terms.length > 0 && negatedTerm(n, terms)) return 'explicit_negation'
   if (rules.includes('topical') && topicalFrame(n)) return 'topical_reference'
+  if (rules.includes('fatigue') && isBenignTrainingFatigue(n)) return 'training_fatigue'
   return null
 }
 
@@ -1005,6 +1024,10 @@ const FITNESS_TERMS = [
   'skipping', 'skip', 'missing sessions', 'missed sessions', 'fell off', 'falling off', 'consistency', 'stick to',
   'supplement', 'supplements', 'bcaa', 'bcaas', 'protein powder', 'multivitamin', 'fish oil',
   'alcohol', 'drinking', 'beer', 'wine',
+  // Training fatigue / recovery vocabulary: a deload or rest conversation, not a crisis (the crisis
+  // classifier over-flags these; a scoped fatigue suppressor removes that false positive).
+  'exhausted', 'run down', 'rundown', 'worn out', 'wrecked', 'drained', 'shattered', 'sluggish',
+  'no energy', 'everything feels heavy', 'feels heavy', 'lifts feel heavy', 'feeling flat', 'running on empty',
 ]
 
 /** Very short in-flow affirmations — allowed only when the whole message is a brief continuation. */
