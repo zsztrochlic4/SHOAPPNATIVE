@@ -53,6 +53,15 @@ export interface CoachTurnData {
    *  fallbacks can resolve an exercise NAME the user typed to its canonical id (swap) and to its
    *  reviewed cues (technique answer) — never trusting the small model to pick from a list. */
   programExercises: { id: string; name: string; whatItDoes?: string; steps?: string[]; commonMistake?: string; safetyNote?: string; topSwap?: { id: string; name: string } }[]
+  /** Weekdays the user currently trains, in the program's own order, so a day-reschedule reply can
+   *  NAME the current schedule and resolve it in one turn instead of making the user ask. */
+  trainingDays: string[]
+  /** The user's real weekly schedule (weekday, day type, exercise names, muscle groups), so the coach
+   *  can GROUND and CORRECT any claim about what is trained on a given day rather than accepting a false
+   *  premise ("why the rest day today" when today is a Push day; "chest on Monday" when Monday is Legs). */
+  programSchedule: { weekday: string; dayType: string; exercises: string[]; muscles: string[] }[]
+  /** The user's LOCAL weekday name for THIS turn, so "today" questions resolve to the real day. */
+  todayWeekday: string
   /** Every exercise id in the workbook database — used to reject a model-emitted swap into an id that
    *  does not exist before the confirm card is ever shown (AD09). */
   validExerciseIds: ReadonlySet<string>
@@ -439,7 +448,29 @@ export async function loadCoachTurnData(
   const prog = (user.generatedProgram ?? user.program) as { days?: unknown[] } | undefined
   const programExercises: CoachTurnData['programExercises'] = []
   const seenEx = new Set<string>()
+  // Weekdays the user actually trains (a day with at least one exercise), deduped, for the
+  // day-reschedule reply so it can name the current schedule without a round trip.
+  const trainingDays: string[] = []
+  const programSchedule: CoachTurnData['programSchedule'] = []
+  const seenDay = new Set<string>()
   if (prog && Array.isArray(prog.days)) {
+    for (const day of prog.days as Array<{ weekday?: unknown; dayType?: unknown; exercises?: unknown[] }>) {
+      const wd = ordinary(day?.weekday, 12)
+      if (wd && WEEKDAY_NAMES.includes(wd) && Array.isArray(day?.exercises) && day.exercises.length > 0 && !seenDay.has(wd)) {
+        seenDay.add(wd)
+        trainingDays.push(wd)
+        const exNames: string[] = []
+        const muscles: string[] = []
+        for (const ex of day.exercises as Array<{ id?: unknown; name?: unknown }>) {
+          const name = ordinary(ex?.name, 80)
+          if (name) exNames.push(name)
+          const db = EXERCISE_BY_ID.get(ordinary(ex?.id, 128))
+          const mg = db ? ordinary((db as { muscleGroup?: unknown }).muscleGroup, 40) : ''
+          if (mg && !muscles.includes(mg)) muscles.push(mg)
+        }
+        programSchedule.push({ weekday: wd, dayType: ordinary(day?.dayType, 20) || 'Training', exercises: exNames, muscles })
+      }
+    }
     for (const day of prog.days as Array<{ exercises?: unknown[] }>) {
       if (!day || !Array.isArray(day.exercises)) continue
       for (const ex of day.exercises as Array<{ id?: unknown; name?: unknown }>) {
@@ -472,6 +503,9 @@ export async function loadCoachTurnData(
     memoryEnabled: workspace?.consentVersion === 1 && workspace?.memoryEnabled === true,
     coachingStyle: (['supportive', 'direct', 'balanced'].includes(String(workspace?.coachingStyle)) ? workspace!.coachingStyle : 'balanced') as CoachWorkspaceSummary['coachingStyle'],
     programExercises,
+    trainingDays,
+    programSchedule,
+    todayWeekday: todayName,
     validExerciseIds: VALID_EXERCISE_IDS,
   }
 }

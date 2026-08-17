@@ -423,6 +423,165 @@ export function synthesizeBoundedActionProposal(userMessage: string, now = new D
 export const DAY_RESCHEDULE_LINE =
   'To rearrange your training days, just tell me which days you’d like to train, for example Monday, Wednesday, Friday, and I’ll update your schedule. I won’t change your exercises.'
 
+/** Natural-language weekday list in canonical order: ['Friday','Monday'] -> 'Monday and Friday'. */
+export function joinWeekdays(days: readonly string[]): string {
+  const list = WEEKDAY_LITS.filter((d) => days.includes(d))
+  if (list.length === 0) return ''
+  if (list.length === 1) return list[0]
+  return `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}`
+}
+
+/**
+ * To-the-point reply for a day-reschedule request that has NOT named the target days yet. It goes
+ * straight to the one thing that moves it forward: it states the days the user trains now, so they can
+ * decide in a single turn, and asks once which days they want, without first re-confirming an intent
+ * they already stated and without making them ask what their current days are. Falls back to the
+ * generic line when the current schedule is not in view. Dash-free per the app-wide output rule.
+ */
+export function dayRescheduleAsk(currentDays: readonly string[] = []): string {
+  const current = joinWeekdays(currentDays)
+  if (!current) return DAY_RESCHEDULE_LINE
+  return `Right now you train ${current}. Which days would you like instead? Tell me the days and I'll move your schedule and keep your exercises the same.`
+}
+
+const DAY_TOKENS = 'monday|tuesday|wednesday|thursday|friday|saturday|sunday'
+const DAY_MOVE_RE = new RegExp(
+  `\\b(?:move|change|switch|shift|swap)\\b[^.?!]*?\\b(${DAY_TOKENS})\\b[^.?!]{0,30}?\\b(?:to|for|and|onto|into|over to|across to|with)\\b[^.?!]{0,10}?\\b(${DAY_TOKENS})\\b`,
+  'i',
+)
+
+/**
+ * Move ONE training day to another weekday, e.g. "change monday to saturday" or "move my monday session
+ * to saturday". The user names one day they train now and one day to move it to; we compute the resulting
+ * full week and emit a `set_training_days` proposal for it, so the change flows through the SAME validated
+ * resolver (no new engine action) and stays confirm-gated. Deliberately narrow: it needs the current
+ * schedule in view, the "from" day must be one they actually train, and the "to" day must be free, so an
+ * ambiguous request (target already a training day, unknown schedule) returns null and the coach asks
+ * rather than guessing. Dash-free per the app-wide output rule.
+ */
+export function synthesizeDayMoveProposal(userMessage: string, currentDays: readonly string[] = []): SynthActionProposal | null {
+  if (typeof userMessage !== 'string') return null
+  const match = userMessage.toLowerCase().match(DAY_MOVE_RE)
+  if (!match) return null
+  const cap = (t: string): WeekdayLit => (t[0].toUpperCase() + t.slice(1)) as WeekdayLit
+  const from = cap(match[1])
+  const to = cap(match[2])
+  if (from === to) return null
+  const current = WEEKDAY_LITS.filter((d) => currentDays.includes(d))
+  if (current.length < 2) return null // no known schedule to move within
+  if (!current.includes(from)) return null // cannot move a day they do not train
+  if (current.includes(to)) return null // target already trained: ambiguous, let the coach clarify
+  const next = WEEKDAY_LITS.filter((d) => (current.includes(d) && d !== from) || d === to)
+  if (next.length < 2 || next.length > 6) return null
+  const list = joinWeekdays(next)
+  return actionProposal(
+    { action: 'set_training_days', days: next.join(',') },
+    `Move ${from} training to ${to}`,
+    `Moves your ${from} session to ${to}. Your training days become ${list}.`,
+    `Want me to move your ${from} training to ${to}? Your week becomes ${list}. Tap confirm and I'll update the schedule.`,
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Schedule grounding — correct a false premise about what is trained  */
+/*  on a given day, from the REAL program, instead of playing along.    */
+/* ------------------------------------------------------------------ */
+
+/** One weekday of the user's real program: its type, its lifts, and the muscle groups it trains. */
+export interface DaySchedule { weekday: string; dayType: string; exercises: string[]; muscles: string[] }
+
+/** User words → the canonical muscleGroup labels used in the exercise database. */
+const MUSCLE_ALIASES: Record<string, string[]> = {
+  chest: ['Chest'], pecs: ['Chest'], pec: ['Chest'],
+  back: ['Back'], lats: ['Back'], lat: ['Back'],
+  legs: ['Quads', 'Hamstrings & Glutes', 'Calves'], leg: ['Quads', 'Hamstrings & Glutes', 'Calves'],
+  quads: ['Quads'], quad: ['Quads'], thighs: ['Quads'],
+  hamstrings: ['Hamstrings & Glutes'], hams: ['Hamstrings & Glutes'], glutes: ['Hamstrings & Glutes'], glute: ['Hamstrings & Glutes'],
+  calves: ['Calves'], calf: ['Calves'],
+  shoulders: ['Shoulders'], shoulder: ['Shoulders'], delts: ['Shoulders'], delt: ['Shoulders'],
+  arms: ['Biceps', 'Triceps'], arm: ['Biceps', 'Triceps'],
+  biceps: ['Biceps'], bicep: ['Biceps'], triceps: ['Triceps'], tricep: ['Triceps'],
+  core: ['Core'], abs: ['Core'], ab: ['Core'],
+}
+
+function namedMuscle(m: string): { word: string; groups: string[] } | null {
+  for (const [word, groups] of Object.entries(MUSCLE_ALIASES)) {
+    if (new RegExp(`\\b${word}\\b`, 'i').test(m)) return { word, groups }
+  }
+  return null
+}
+
+function weekdayIn(m: string): WeekdayLit | null {
+  const match = m.toLowerCase().match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/)
+  return match ? ((match[1][0].toUpperCase() + match[1].slice(1)) as WeekdayLit) : null
+}
+
+function naturalList(items: readonly string[]): string {
+  const list = items.filter(Boolean)
+  if (list.length === 0) return ''
+  if (list.length === 1) return list[0]
+  return `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}`
+}
+
+/**
+ * Answer a schedule fact or CORRECT a false premise about a training day, grounded entirely in the real
+ * program. Returns dash-free reply text, or null when the message is not a schedule fact/claim (so it
+ * does not hijack ordinary turns). This is what stops the coach being "sucked in" to a wrong premise
+ * ("why the rest day today" when today is a training day; "chest on Monday" when Monday is Legs): the
+ * answer is computed from the program, never from the model. A two-weekday move request is left to
+ * synthesizeDayMoveProposal.
+ */
+export function synthesizeScheduleGroundedReply(userMessage: string, schedule: readonly DaySchedule[] = [], todayWeekday = ''): string | null {
+  if (typeof userMessage !== 'string' || !Array.isArray(schedule) || schedule.length === 0) return null
+  const m = userMessage.toLowerCase()
+  // Leave an explicit day-to-day move ("change monday to saturday") to the move synth.
+  if (/\b(move|change|switch|shift|swap)\b/.test(m) && (m.match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/g) || []).length >= 2) return null
+
+  const byDay = new Map(schedule.map((d) => [d.weekday, d]))
+  const trainsGroup = (groups: string[]): WeekdayLit[] =>
+    WEEKDAY_LITS.filter((wd) => { const d = byDay.get(wd); return !!d && d.muscles.some((mg: string) => groups.includes(mg)) })
+
+  const muscle = namedMuscle(m)
+  const explicitDay = weekdayIn(m)
+  const saysToday = /\b(today|todays|today's|tonight|this (morning|afternoon|evening))\b/.test(m)
+  const scheduleCue = /\b(rest day|train|training|trained|gym|gymming|workout|work out|working out|session|schedule|split|do i|what do i|why|is it|meant to|supposed to|on)\b/.test(m) || !!muscle
+  const dislike = /\b(don'?t|do not|dont|hate|rather not|sick of|tired of|not a fan|not keen)\b/.test(m)
+
+  // Only engage a genuine schedule fact/claim: a named weekday, or a "today ..." schedule question.
+  const targetDay: WeekdayLit | null = explicitDay ?? (saysToday && WEEKDAY_LITS.includes(todayWeekday as WeekdayLit) ? (todayWeekday as WeekdayLit) : null)
+  if (!targetDay || !scheduleCue) return null
+
+  const day = byDay.get(targetDay)
+  const isRest = !day
+  const dayNoun = (saysToday && targetDay === todayWeekday) ? `Today (${targetDay})` : targetDay
+
+  // Muscle premise: "chest on Monday", "why legs on Friday", "I don't like chest on Monday".
+  if (muscle) {
+    const onDays = trainsGroup(muscle.groups)
+    const dayHasIt = !isRest && day!.muscles.some((mg: string) => muscle.groups.includes(mg))
+    if (dayHasIt) {
+      return `Yes, ${dayNoun} is your ${day!.dayType} day and it trains ${muscle.word}: ${naturalList(day!.exercises)}.`
+    }
+    // The claimed muscle is NOT on that day: correct it plainly and point to the real day(s).
+    const where = onDays.length ? `Your ${muscle.word} work is on ${naturalList(onDays)}.` : `Your program does not have a dedicated ${muscle.word} day right now.`
+    const what = isRest ? `${dayNoun} is a rest day, so there is no training then.` : `${dayNoun} is your ${day!.dayType} day: ${naturalList(day!.exercises)}.`
+    return `You do not train ${muscle.word} on ${targetDay}. ${what} ${where}`
+  }
+
+  // No muscle named: a plain "what/why do I train on <day>" or a "don't want to train on <day>".
+  if (isRest) {
+    return `${dayNoun} is a rest day in your program, so nothing is scheduled then. Recovery is part of the plan, not a gap in it.`
+  }
+  const lifts = naturalList(day!.exercises)
+  if (/\brest day\b/.test(m)) {
+    return `${dayNoun} is not a rest day, it's your ${day!.dayType} day: ${lifts}.`
+  }
+  if (dislike) {
+    return `${dayNoun} is your ${day!.dayType} day: ${lifts}. Want to move it to another day? Tell me which day and I'll update your schedule.`
+  }
+  return `${dayNoun} is your ${day!.dayType} day: ${lifts}.`
+}
+
 /**
  * A request to "swap / rearrange / move my (training/exercise) DAYS" is a training-DAY reschedule, NOT
  * an exercise swap. flash-lite sometimes latches onto "swap"/"exercise" and emits an exercise `swap`
