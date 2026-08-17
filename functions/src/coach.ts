@@ -3,6 +3,7 @@ import { defineSecret } from 'firebase-functions/params'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { getFirestore } from 'firebase-admin/firestore'
 import { requireVerifiedUser, APP_CHECK_ENFORCED } from './lib/guards'
+import { stripDashPunctuation } from './_shared/lib/sanitize'
 import { enforceDailyLimit, enforceBurstLimit, enforceGlobalDailyLimit } from './lib/rateLimit'
 import { coachKillSwitch, coachActionsSwitch } from './killSwitchRemote'
 import { callWithResilience } from './lib/providerResilience'
@@ -144,7 +145,8 @@ export interface CoachTurnDeps {
 }
 
 const asResponse = (r: { text: string; buttons: ContactButton[] }): CoachTurnResult => ({
-  text: r.text,
+  text: stripDashPunctuation(r.text), // owner rule: no dashes in any coach output, incl. fixed safety replies
+
   buttons: r.buttons,
   blocked: true,
   mode: 'safety',
@@ -354,8 +356,8 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
   if (proposalAllowed && replyProposal.kind !== 'none' && replyProposal.title && replyProposal.summary && deps.saveProposal) {
     proposal = await deps.saveProposal(uid, {
       kind: replyProposal.kind,
-      title: replyProposal.title,
-      summary: replyProposal.summary,
+      title: stripDashPunctuation(replyProposal.title), // no dashes on the confirm card either
+      summary: stripDashPunctuation(replyProposal.summary),
       payload: replyProposal.payload ?? {},
     })
   }
@@ -366,7 +368,7 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
     memoryId: memory?.id ?? null,
     proposalId: proposal?.id ?? null,
   })
-  return { text: safe, blocked: false, buttons: [], mode: structured.mode, citations, memory, proposal }
+  return { text: stripDashPunctuation(safe), blocked: false, buttons: [], mode: structured.mode, citations, memory, proposal }
 }
 
 /** Read the caller's stored DOB from the canonical backendUser record. Missing/unreadable stays null (fail-closed). */
