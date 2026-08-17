@@ -35,7 +35,7 @@ import {
   STRUCTURED_COACH_RESPONSE_SCHEMA,
   validateStructuredCoachReply,
 } from './_shared/backend/coach/structuredResponse'
-import { synthesizeBoundedActionProposal, synthesizeWellnessGoalProposal, synthesizeGoalWeightProposal, synthesizeSwapProposal, synthesizeDayMoveProposal, synthesizeScheduleGroundedReply, synthesizeMemoryFromMessage, synthesizeExerciseDetailNav, synthesizeTechniqueAnswer, synthesizeMealPlanReview, proposalSurfacingIssue, fabricatedExerciseIdInMessage, FABRICATED_EXERCISE_ID_LINE, isDayRescheduleIntent, dayRescheduleAsk } from './_shared/backend/coach/workoutActions'
+import { synthesizeBoundedActionProposal, synthesizeWellnessGoalProposal, synthesizeGoalWeightProposal, synthesizeSwapProposal, synthesizeDayMoveProposal, synthesizeScheduleGroundedReply, synthesizeMemoryFromMessage, synthesizeExerciseDetailNav, synthesizeTechniqueAnswer, synthesizeDepthFactAnswer, synthesizeMealPlanReview, proposalSurfacingIssue, fabricatedExerciseIdInMessage, FABRICATED_EXERCISE_ID_LINE, isDayRescheduleIntent, dayRescheduleAsk } from './_shared/backend/coach/workoutActions'
 import { isOwnPlanReview, normalize as normalizeCoachText } from './_shared/backend/coach/safety/rules'
 import type {
   CoachActionProposal,
@@ -325,6 +325,13 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
       }
     }
   }
+  // BUDGET-EATS MIS-FIRE GUARD: the small model sometimes attaches an "open Budget Eats" (a food
+  // feature) card to a non-food answer, e.g. a squat or bench technique question. Drop it unless the
+  // message is actually about food, so a wrong food card never rides along on an exercise reply.
+  if (replyProposal.kind === 'workout_action' && String(replyProposal.payload?.action ?? '') === 'open_budget_eats' &&
+    !/\b(budget eats|eat|eating|food|meal|meals|recipe|recipes|snack|snacks|hungry|protein|carb|carbs|breakfast|lunch|dinner|nutrition|diet)\b/i.test(message)) {
+    replyProposal = { kind: 'none' }
+  }
   // Exercise-detail navigation backstop (not action-gated): when the user asks how to do a lift and the
   // model under-emitted, synthesise the form-guide nav. The client resolves the exercise and suppresses
   // the card if it doesn't match a real lift, so a non-exercise how-to shows no card.
@@ -338,9 +345,17 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
   // Deterministic technique answer (coach actionability): the small model unreliably picks the RIGHT
   // lift's cues from a multi-exercise context (it gave squat cues for a bench-press question), so when
   // the user asks how to do a SPECIFIC program lift, answer straight from that lift's reviewed fields.
-  // Correct exercise guaranteed; the guide card (nav backstop above) still offers the full walkthrough.
+  // Correct exercise guaranteed. It ALSO owns the card for this turn: attach the technique guide (or
+  // nothing), so a stray model action can never sit under a technique answer.
   const techAnswer = synthesizeTechniqueAnswer(message, turnData.programExercises)
-  if (techAnswer) replyMessage = techAnswer
+  if (techAnswer) {
+    replyMessage = techAnswer
+    const navSynth = synthesizeExerciseDetailNav(message)
+    replyProposal = navSynth ? { kind: 'navigation', title: navSynth.title, summary: navSynth.summary, payload: { overlay: navSynth.overlay, exercise: navSynth.exercise } } : { kind: 'none' }
+  }
+  // Deterministic depth answer: "how low should I squat" is about range of motion, not reps in reserve.
+  const depthAnswer = synthesizeDepthFactAnswer(message)
+  if (depthAnswer) replyMessage = depthAnswer
 
   // PHANTOM CONFIRM-CARD GUARD: the small model sometimes PARROTS a confirm-card lead-in it saw earlier
   // in the thread ("Want me to move your Monday training to Saturday? Tap confirm…") WITHOUT emitting the

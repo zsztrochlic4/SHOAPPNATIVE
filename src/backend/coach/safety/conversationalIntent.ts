@@ -39,7 +39,12 @@ function isRelational(n: Norm): boolean {
     'do you like talking to me', 'do you like chatting', 'do you enjoy talking to me',
     'are we friends', 'are we mates', 'is this a friendship', 'do you actually care',
     'you re the best', 'youre the best', 'best coach', 'i appreciate you', 'appreciate you',
-    'you re amazing', 'youre amazing', 'you get me', 'you understand me')
+    'you re amazing', 'youre amazing', 'you get me', 'you understand me',
+    // Gratitude and warm sign-offs to the coach: respond warmly, never bounce as off-topic.
+    'thanks coach', 'thank you coach', 'thanks so much', 'thank you so much', 'thanks a lot',
+    'thanks for', 'thank you for', 'cheers coach', 'appreciate it', 'appreciate the help',
+    'you ve been a big help', 'youve been a big help', 'this week actually felt good',
+    'this week felt good', 'good week this week')
 }
 
 /**
