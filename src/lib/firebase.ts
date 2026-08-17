@@ -7,6 +7,8 @@ import {
   signInAnonymously,
   signInWithCustomToken,
   onAuthStateChanged,
+  setPersistence,
+  browserLocalPersistence,
   // @ts-expect-error — getReactNativePersistence is exported at runtime but
   // missing from the web-typed surface of firebase/auth.
   getReactNativePersistence,
@@ -119,6 +121,12 @@ if (firebaseEnabled) {
       })}.`
     }
     const authRef = auth
+    // Robust auth persistence for LOCAL testing. The default web persistence is IndexedDB
+    // (firebaseLocalStorageDb), which becomes unavailable ("Database is closing/hidden") in a
+    // backgrounded / hidden webview such as an automated preview pane, so the session is lost on
+    // reload and the app falls back to the anon/demo identity. localStorage persistence survives a
+    // hidden page. Emulator-only: production keeps the default (IndexedDB works in a real, visible tab).
+    if (Platform.OS === 'web') void setPersistence(authRef, browserLocalPersistence).catch(() => {})
     onAuthStateChanged(authRef, (u) => {
       if (u) return
       void signInWithCustomToken(authRef, devEmulatorToken('coach-demo-user')).catch(() => signInAnonymously(authRef).catch(() => {}))
