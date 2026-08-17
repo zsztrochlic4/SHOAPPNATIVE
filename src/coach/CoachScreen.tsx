@@ -20,7 +20,7 @@ import {
   type NativeSyntheticEvent, type NativeScrollEvent,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Send, ChevronLeft, X, MessageCircle } from 'lucide-react-native'
+import { Send, ChevronLeft, X, MessageCircle, ThumbsUp, ThumbsDown } from 'lucide-react-native'
 import { PressableScale } from '../components/PressableScale'
 import { CoachComingSoon } from '../components/CoachComingSoon'
 import { CoachMemoryView } from '../components/CoachMemoryView'
@@ -63,6 +63,7 @@ export function CoachScreen({
     coachConsented, setCoachConsented, revealX,
     send, cancelPending, handleProposalConfirmed, handlePublishShare, handleChooseSwap, handleUndo,
     undoTarget, swapChoice, shareDraft, applyingProposalId, failedApply,
+    showFeedback, submitFeedback,
   } = chat
 
   const welcomeSeen = state.settings.coachWelcomeSeen === true
@@ -193,7 +194,11 @@ export function CoachScreen({
         onScroll={onScroll}
         scrollEventThrottle={16}
         onContentSizeChange={() => { if (atBottom.current) listRef.current?.scrollToEnd({ animated: true }) }}
-        ListFooterComponent={typing ? <View style={{ paddingHorizontal: 16, paddingTop: 4 }}><TypingDots colors={colors} /></View> : null}
+        ListFooterComponent={
+          typing ? <View style={{ paddingHorizontal: 16, paddingTop: 4 }}><TypingDots colors={colors} /></View>
+            : showFeedback ? <FeedbackRow colors={colors} onRate={submitFeedback} />
+              : null
+        }
       />
 
       {/* Footer: chips → reply banner → composer, lifting above the nav / keyboard. */}
@@ -273,6 +278,23 @@ export function CoachScreen({
         </View>
       </Animated.View>
     </Shell>
+  )
+}
+
+/** One quiet end-of-chat rating. Tapping records the feedback and the row dismisses itself for the rest
+ *  of the session. A "not helpful" tap is what the review pass turns into a new coach eval case. */
+function FeedbackRow({ colors, onRate }: { colors: ReturnType<typeof useColors>; onRate: (helpful: boolean) => void }) {
+  const pill = { width: 40, height: 34, borderRadius: 12, alignItems: 'center' as const, justifyContent: 'center' as const, backgroundColor: withAlpha(colors.fg, 0.06), borderWidth: 1, borderColor: withAlpha(colors.fg, 0.08) }
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, paddingTop: 12, paddingBottom: 4 }}>
+      <Text style={{ fontSize: 12.5, fontWeight: '600', color: withAlpha(colors.fg, 0.5) }}>Was this helpful?</Text>
+      <PressableScale onPress={() => { tick(); onRate(true) }} accessibilityRole="button" accessibilityLabel="This chat was helpful" style={pill}>
+        <ThumbsUp size={16} color={withAlpha(colors.fg, 0.7)} strokeWidth={2.2} />
+      </PressableScale>
+      <PressableScale onPress={() => { tick(); onRate(false) }} accessibilityRole="button" accessibilityLabel="This chat was not helpful" style={pill}>
+        <ThumbsDown size={16} color={withAlpha(colors.fg, 0.7)} strokeWidth={2.2} />
+      </PressableScale>
+    </View>
   )
 }
 
