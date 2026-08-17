@@ -35,7 +35,7 @@ import {
   STRUCTURED_COACH_RESPONSE_SCHEMA,
   validateStructuredCoachReply,
 } from './_shared/backend/coach/structuredResponse'
-import { synthesizeBoundedActionProposal, synthesizeWellnessGoalProposal, synthesizeGoalWeightProposal, synthesizeSwapProposal, synthesizeExerciseDetailNav, synthesizeTechniqueAnswer, synthesizeMealPlanReview, proposalSurfacingIssue, fabricatedExerciseIdInMessage, FABRICATED_EXERCISE_ID_LINE, isDayRescheduleIntent, DAY_RESCHEDULE_LINE } from './_shared/backend/coach/workoutActions'
+import { synthesizeBoundedActionProposal, synthesizeWellnessGoalProposal, synthesizeGoalWeightProposal, synthesizeSwapProposal, synthesizeDayMoveProposal, synthesizeScheduleGroundedReply, synthesizeExerciseDetailNav, synthesizeTechniqueAnswer, synthesizeMealPlanReview, proposalSurfacingIssue, fabricatedExerciseIdInMessage, FABRICATED_EXERCISE_ID_LINE, isDayRescheduleIntent, dayRescheduleAsk } from './_shared/backend/coach/workoutActions'
 import { isOwnPlanReview, normalize as normalizeCoachText } from './_shared/backend/coach/safety/rules'
 import type {
   CoachActionProposal,
@@ -207,6 +207,9 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
         memoryEnabled: false,
         coachingStyle: 'balanced' as const,
         programExercises: [],
+        trainingDays: [],
+        programSchedule: [],
+        todayWeekday: '',
         validExerciseIds: new Set<string>(),
       }
   const ctx = turnData.context
@@ -284,25 +287,42 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
   let replyMessage = structured.message
   let replyProposal = structured.proposal
   let suppressMemory = false
-  if (allowActions) {
+  // GROUNDING FIRST (correctness over agreeableness): if the user asks about, or asserts, what is
+  // trained on a given day ("why the rest day today", "I don't like chest on Monday"), answer from the
+  // REAL program schedule and correct a false premise, instead of letting the small model play along or
+  // fabricate a justification. This overrides the model text and suppresses any action for the turn, so
+  // the coach never swaps a lift on a day the user is simply wrong about.
+  const scheduleGrounded = synthesizeScheduleGroundedReply(message, turnData.programSchedule, turnData.todayWeekday)
+  if (scheduleGrounded) {
+    replyMessage = scheduleGrounded
+    replyProposal = { kind: 'none' }
+    suppressMemory = true
+  }
+  if (allowActions && !scheduleGrounded) {
     const emittedAction = replyProposal.kind === 'workout_action' ? String(replyProposal.payload?.action ?? '') : ''
     const alreadyAction = emittedAction.length > 0
     if (!alreadyAction) {
-      const synth = synthesizeWellnessGoalProposal(message) ?? synthesizeGoalWeightProposal(message) ?? synthesizeSwapProposal(message, turnData.programExercises) ?? synthesizeBoundedActionProposal(message, new Date(`${deps.todayKey}T12:00:00`))
+      const synth = synthesizeWellnessGoalProposal(message) ?? synthesizeGoalWeightProposal(message) ?? synthesizeDayMoveProposal(message, turnData.trainingDays) ?? synthesizeSwapProposal(message, turnData.programExercises) ?? synthesizeBoundedActionProposal(message, new Date(`${deps.todayKey}T12:00:00`))
       if (synth) {
         replyProposal = { kind: 'workout_action', title: synth.title, summary: synth.summary, payload: synth.payload }
         replyMessage = synth.message
         suppressMemory = true // never also store the requested value as a memory
       }
     }
-    // Day-reschedule misroute guard: "swap/rearrange my (exercise) DAYS" is a training-DAY change, not
-    // an exercise swap. flash-lite sometimes emits an exercise `swap` for it (or on a bare "yes" that
-    // follows such a request). Drop the wrong swap and ask which days, so the coach never offers to
-    // change a lift when the user asked to move their training days.
-    if (replyProposal.kind === 'workout_action' && String(replyProposal.payload?.action ?? '') === 'swap' && isDayRescheduleIntent(message, recent)) {
-      replyProposal = { kind: 'none' }
-      replyMessage = DAY_RESCHEDULE_LINE
-      suppressMemory = true
+    // Day-reschedule misroute + redundancy guard: "swap/rearrange/change my (training) DAYS" is a
+    // training-DAY change, not an exercise swap. When the intent is a day reschedule but this turn has
+    // no concrete day-set proposal (the model mis-emitted an exercise swap, OR just asked in prose
+    // whether they'd like to change days), skip straight to the single question that moves it forward:
+    // name the days they train now and ask which days they want, in one reply. This removes the
+    // re-confirm, then ask, then make-the-user-ask loop; when they DO name days the synth above already
+    // produced the confirm card, so that path is left untouched.
+    if (isDayRescheduleIntent(message, recent)) {
+      const emitted = replyProposal.kind === 'workout_action' ? String(replyProposal.payload?.action ?? '') : ''
+      if (emitted !== 'set_training_days' && emitted !== 'reschedule_days') {
+        replyProposal = { kind: 'none' }
+        replyMessage = dayRescheduleAsk(turnData.trainingDays)
+        suppressMemory = true
+      }
     }
   }
   // Exercise-detail navigation backstop (not action-gated): when the user asks how to do a lift and the
@@ -321,6 +341,18 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
   // Correct exercise guaranteed; the guide card (nav backstop above) still offers the full walkthrough.
   const techAnswer = synthesizeTechniqueAnswer(message, turnData.programExercises)
   if (techAnswer) replyMessage = techAnswer
+
+  // PHANTOM CONFIRM-CARD GUARD: the small model sometimes PARROTS a confirm-card lead-in it saw earlier
+  // in the thread ("Want me to move your Monday training to Saturday? Tap confirm…") WITHOUT emitting the
+  // structured action, so the reply promises a button that never renders. When there is no real proposal
+  // this turn but the text imitates a confirm offer, replace it with an honest clarifier so the coach
+  // never dangles a confirm it cannot deliver.
+  if (replyProposal.kind === 'none') {
+    const t = replyMessage.toLowerCase()
+    const phantom = /\btap confirm\b/.test(t) || /\byour week becomes\b/.test(t) ||
+      (/\bwant me to\b/.test(t) && /\b(swap|move|change|update|set|reschedule|adjust)\b/.test(t) && /\bconfirm\b/.test(t))
+    if (phantom) replyMessage = "I can set that up for you. Tell me exactly what you'd like to change and I'll put it through for you to confirm."
+  }
 
   const approved = new Map<string, string>(APPROVED_KNOWLEDGE_SOURCES.map((s) => [s.key, s.title]))
   const citations = structured.citations
