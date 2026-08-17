@@ -421,7 +421,7 @@ export function synthesizeBoundedActionProposal(userMessage: string, now = new D
 
 /** The coach's redirect when it drops a mis-routed exercise swap for a day-reschedule request. */
 export const DAY_RESCHEDULE_LINE =
-  'To rearrange your training days, just tell me which days you’d like to train — e.g. “Monday, Wednesday, Friday” — and I’ll update your schedule. I won’t change your exercises.'
+  'To rearrange your training days, just tell me which days you’d like to train, for example Monday, Wednesday, Friday, and I’ll update your schedule. I won’t change your exercises.'
 
 /**
  * A request to "swap / rearrange / move my (training/exercise) DAYS" is a training-DAY reschedule, NOT
