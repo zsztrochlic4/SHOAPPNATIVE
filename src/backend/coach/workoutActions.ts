@@ -19,6 +19,8 @@
  * days) are therefore encoded as a comma-separated string and re-validated token by token.
  */
 
+import type { CoachMemoryCandidate } from './contracts'
+
 /* ------------------------------------------------------------------ */
 /*  Value domains — MIRROR the engine enums (kept in sync by test)     */
 /* ------------------------------------------------------------------ */
@@ -580,6 +582,46 @@ export function synthesizeScheduleGroundedReply(userMessage: string, schedule: r
     return `${dayNoun} is your ${day!.dayType} day: ${lifts}. Want to move it to another day? Tell me which day and I'll update your schedule.`
   }
   return `${dayNoun} is your ${day!.dayType} day: ${lifts}.`
+}
+
+/* ------------------------------------------------------------------ */
+/*  Memory learning — reliably capture durable facts the model misses  */
+/* ------------------------------------------------------------------ */
+
+/** Equipment nouns we can recognise with confidence in a durable-setup statement. */
+const EQUIP_NOUN = /\b(dumbbells?|barbell|kettlebells?|resistance bands?|bands?|bench|squat rack|power rack|rack|pull[ -]?up bar|machines?|cables?|smith machine|leg press)\b/gi
+
+/**
+ * Capture a HIGH-CONFIDENCE durable training fact the small model routinely fails to store: where the
+ * user trains and what equipment they have. Returns a memory candidate whose evidenceQuote is an exact
+ * slice of the message (the save path re-checks that), or null. Deliberately narrow, a wrong memory is
+ * worse than none, so only unambiguous setup statements match. Non-sensitive, stable scope. This is the
+ * app "learning" the user, done in our code, never by changing the model.
+ */
+export function synthesizeMemoryFromMessage(userMessage: string): CoachMemoryCandidate | null {
+  if (typeof userMessage !== 'string') return null
+  const m = userMessage.trim()
+  const lower = m.toLowerCase()
+
+  // Trains at home.
+  const home = lower.match(/\b(?:i|we)\s+(?:train|work\s?out|lift|exercise)\s+(?:at|from)\s+home\b/) ||
+    lower.match(/\b(?:i|we)\s+(?:have|have got|got)\s+a\s+home\s+gym\b/) || lower.match(/\bhome\s+gym\b/)
+  if (home) return { category: 'Training location', value: 'Trains at home', evidenceQuote: home[0], scope: 'stable', sensitivity: 'ordinary' }
+
+  // Equipment they do NOT have.
+  const missing = lower.match(/\b(?:no|don'?t have|do not have|dont have|without)\s+(?:a\s+|an\s+|any\s+)?(dumbbells?|barbell|kettlebells?|bench|squat rack|power rack|rack|pull[ -]?up bar|machines?|cables?|gym access|equipment)\b/)
+  if (missing) return { category: 'Equipment', value: `Does not have a ${missing[1]}`, evidenceQuote: missing[0], scope: 'stable', sensitivity: 'ordinary' }
+
+  // A constrained "I only have …" setup.
+  if (/\bonly\b/.test(lower) && /\b(?:i|we)\s+(?:only\s+)?(?:have|have got|got|own)\b/.test(lower)) {
+    const nouns = [...new Set((lower.match(EQUIP_NOUN) || []).map((x) => x.toLowerCase().trim()))]
+    if (nouns.length) {
+      const idx = lower.indexOf('only')
+      const quote = m.slice(idx, Math.min(m.length, idx + 60)).trim()
+      return { category: 'Equipment', value: `Only has ${nouns.join(', ')}`, evidenceQuote: quote, scope: 'stable', sensitivity: 'ordinary' }
+    }
+  }
+  return null
 }
 
 /**
