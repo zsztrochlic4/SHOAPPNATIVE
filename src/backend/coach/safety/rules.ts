@@ -1050,10 +1050,29 @@ function matchesFitnessIntentPattern(n: Norm): boolean {
  * euphemism ("ok i'll do it tonight") from passing as a bare affirmation — that would still be scored by
  * the safety detectors upstream, and if it reaches here it is too long to be treated as continuity.
  */
+/**
+ * A training-SCHEDULE edit: a weekday or schedule noun together with a rearrange/move/set verb, e.g.
+ * "change monday to saturday", "move my leg day to friday", "swap my training days around", "shift
+ * saturday to sunday". This is affirmatively about the user's own training schedule, so refer-by-default
+ * must treat it as on-topic rather than bouncing it as off-topic. Word-boundaried regexes are used on
+ * purpose (not `has`, which substring-matches and would trip on money/satisfied/sunset); only full
+ * weekday names are accepted so a bare "sat"/"sun" cannot false-match. A euphemistic crisis does not
+ * take this weekday-plus-rearrange shape, so widening here does not weaken the crisis backstop.
+ */
+export function isScheduleEditIntent(text: string): boolean {
+  const n = normalize(text)
+  const weekday = /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/
+  const scheduleNoun = /\b(training|workout|gym|rest)\s+days?\b|\b(training\s+week|session|sessions|schedule|split|program|programme|routine)\b/
+  const editVerb = /\b(move|moved|moving|change|changed|changing|swap|swapped|switch|switched|shift|shifted|reschedul\w*|rearrang\w*|reorder|shuffle)\b/
+  const hasDayOrSchedule = hasRe(n, weekday) || hasRe(n, scheduleNoun)
+  return hasDayOrSchedule && hasRe(n, editVerb)
+}
+
 export function isOnTopicFitness(text: string): boolean {
   const n = normalize(text)
   if (has(n, ...FITNESS_TERMS)) return true
   if (matchesFitnessIntentPattern(n)) return true
+  if (isScheduleEditIntent(text)) return true
   const words = n.p.trim().split(/\s+/).filter(Boolean)
   return words.length <= 4 && has(n, ...CONTINUITY)
 }
