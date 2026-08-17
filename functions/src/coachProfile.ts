@@ -2,6 +2,7 @@ import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore'
 import { HttpsError, onCall, type CallableRequest } from 'firebase-functions/v2/https'
 import { APP_CHECK_ENFORCED, requireVerifiedUser } from './lib/guards'
 import { getWorkspaceSummary } from './coachWorkspace'
+import { sanitizeMultiline } from './_shared/lib/sanitize'
 
 interface PreferenceInput {
   memoryEnabled?: boolean
@@ -89,6 +90,30 @@ export const clearCoachMemories = onCall(
   async (req: CallableRequest) => {
     const uid = requireVerifiedUser(req, 'clearCoachMemories')
     await getFirestore().recursiveDelete(getFirestore().collection('coachUsers').doc(uid).collection('memories'))
+    return { ok: true }
+  },
+)
+
+interface FeedbackInput { rating?: 'helpful' | 'not_helpful'; reason?: string }
+
+/**
+ * One end-of-chat rating. Writes coachUsers/{uid}/feedback/{id} server-side (Admin SDK, no client-write
+ * rules needed; auto-created collection). This is the flywheel: a "not_helpful" rating is reviewed and
+ * turned into a case in the coach eval harness, so real mistakes become permanent regression guards. No
+ * new Firebase resources beyond deploying this callable at launch.
+ */
+export const recordCoachFeedback = onCall<FeedbackInput>(
+  { enforceAppCheck: APP_CHECK_ENFORCED, timeoutSeconds: 30 },
+  async (req: CallableRequest<FeedbackInput>) => {
+    const uid = requireVerifiedUser(req, 'recordCoachFeedback')
+    const rating = req.data?.rating
+    if (rating !== 'helpful' && rating !== 'not_helpful') throw new HttpsError('invalid-argument', 'Invalid rating.')
+    const reason = sanitizeMultiline(req.data?.reason ?? '', 500)
+    await getFirestore().collection('coachUsers').doc(uid).collection('feedback').doc().set({
+      rating,
+      reason: reason || null,
+      createdAt: FieldValue.serverTimestamp(),
+    })
     return { ok: true }
   },
 )
