@@ -92,7 +92,7 @@ export const RESPONSES: Record<string, FixedResponse> = {
       'Get it checked today (a GP or urgent care), try not to be alone for the next several hours, and don’t drive yourself. ' +
       'Call 000 or go straight to an emergency department if any of these show up: a headache that keeps getting worse, repeated vomiting, confusion or trouble staying awake, weakness, numbness or slurred speech, a seizure, or if you blacked out. ' +
       'I can’t assess a head injury myself, but I’m here for your training once you’ve been cleared.',
-    buttons: [],
+    buttons: [callButton('emergency', 'Call 000')],
     noAI: true,
   },
 
