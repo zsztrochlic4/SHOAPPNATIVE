@@ -997,6 +997,14 @@ const FITNESS_TERMS = [
   'anatomy', 'adaptation', 'detraining', 'heart health', 'bone health', 'posture', 'sedentary',
   // First-class coach modes/actions. These are bounded by the deterministic action schema downstream.
   'exam mode', 'budget eats', 'planned absence',
+  // Scheduling frequency, planned time away, consistency, supplements and alcohol are all on-topic coach
+  // conversations (previously bounced as off-topic). Adding them only relaxes the off-topic net; a real
+  // safety category is still decided first and is never downgraded by an on-topic term.
+  'days a week', 'times a week', 'days per week', 'day a week',
+  'time off', 'days off', 'week off', 'away', 'holiday', 'vacation', 'travelling', 'traveling', 'going home', 'trip',
+  'skipping', 'skip', 'missing sessions', 'missed sessions', 'fell off', 'falling off', 'consistency', 'stick to',
+  'supplement', 'supplements', 'bcaa', 'bcaas', 'protein powder', 'multivitamin', 'fish oil',
+  'alcohol', 'drinking', 'beer', 'wine',
 ]
 
 /** Very short in-flow affirmations — allowed only when the whole message is a brief continuation. */
@@ -1074,5 +1082,6 @@ export function isOnTopicFitness(text: string): boolean {
   if (matchesFitnessIntentPattern(n)) return true
   if (isScheduleEditIntent(text)) return true
   const words = n.p.trim().split(/\s+/).filter(Boolean)
-  return words.length <= 4 && has(n, ...CONTINUITY)
+  // Word-boundaried so a continuity token can't match INSIDE another word ("ok" in "joke").
+  return words.length <= 4 && CONTINUITY.some((c) => new RegExp(`\\b${c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(n.p))
 }
