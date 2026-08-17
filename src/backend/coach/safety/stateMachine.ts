@@ -143,15 +143,15 @@ export function stateHits(session: SafetySession, text: string, ctx: CoachContex
   // enforce that the injured area is never programmed, so this coarse state block can safely be narrow.
   if (active.has('injury')) {
     const wantsToLoad =
-      // a specific loading lift or heavy work named
-      /\b(squat|deadlift|bench|overhead press|leg press|barbell|dumbbell press|lunge|row|pull ?up|chin ?up|dip|clean|snatch|heavy|1 ?rm|one rep max|max out|lift weights?|load (?:it|the|my))\b/.test(t) ||
+      // a specific loading lift or heavy work named (plurals allowed: "squats", "deadlifts")
+      /\b(squats?|deadlifts?|bench(?:es)?|overhead press|leg press|barbell|dumbbell press|lunges?|rows?|pull ?ups?|chin ?ups?|dips?|cleans?|snatch(?:es)?|heavy|1 ?rm|one rep max|max out|lift weights?|load (?:it|the|my))\b/.test(t) ||
       // wanting to train THROUGH / around / despite the injury or pain
       (/\b(through|around|despite|regardless|anyway|still)\b/.test(t) && /\b(train|training|work ?out|workout|lift|push|session|it|pain|injury|area)\b/.test(t)) ||
       /\b(train through|push through|work around it|train anyway|still train|ignore the pain)\b/.test(t) ||
       // add / swap / put an exercise or program back
-      /\b(add|swap|replace|put)\b[\s\S]{0,25}\b(exercise|lift|squat|deadlift|bench|press|row|workout|program|routine|back (?:in|to))\b/.test(t) ||
+      /\b(add|swap|replace|put)\b[\s\S]{0,25}\b(exercises?|lifts?|squats?|deadlifts?|bench(?:es)?|press|rows?|workouts?|programs?|routines?|back (?:in|to))\b/.test(t) ||
       // should / can I (still) do a loading movement
-      /\b(should|can)\s+i\s+(?:still\s+)?(train|lift|work ?out|squat|deadlift|bench|press|row|run|do)\b/.test(t)
+      /\b(should|can)\s+i\s+(?:still\s+)?(train|lift|work ?out|squats?|deadlifts?|bench|press|rows?|run|do)\b/.test(t)
     if (wantsToLoad) {
       out.push({ category: 'injury_override', source: 'state', reason: 'injury_state_persists' })
     }
