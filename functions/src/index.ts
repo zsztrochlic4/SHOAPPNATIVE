@@ -36,6 +36,7 @@ export {
   clearCoachMemories,
   respondToCoachProposal,
   recordCoachActionOutcome,
+  recordCoachFeedback,
 } from './coachProfile'
 export { deleteAccount, resumeAccountDeletions } from './account'
 export { reconcileCoachActions } from './coachReconciler'
