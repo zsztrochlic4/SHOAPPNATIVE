@@ -419,6 +419,28 @@ export function synthesizeBoundedActionProposal(userMessage: string, now = new D
   return null
 }
 
+/** The coach's redirect when it drops a mis-routed exercise swap for a day-reschedule request. */
+export const DAY_RESCHEDULE_LINE =
+  'To rearrange your training days, just tell me which days you’d like to train, for example Monday, Wednesday, Friday, and I’ll update your schedule. I won’t change your exercises.'
+
+/**
+ * A request to "swap / rearrange / move my (training/exercise) DAYS" is a training-DAY reschedule, NOT
+ * an exercise swap. flash-lite sometimes latches onto "swap"/"exercise" and emits an exercise `swap`
+ * proposal for it (e.g. "swap Barbell Back Squat for Front Squat" when the user asked to move their
+ * days around). This detects the day-scheduling intent — in the current message, OR in a bare
+ * affirmation ("yes") following such a request in the recent turns — so the coach turn can drop the
+ * wrong swap and ask which days. Requires the PLURAL "days" so "swap the bench on my leg day" (a real
+ * exercise swap) does NOT match.
+ */
+export function isDayRescheduleIntent(message: string, recentTurns: readonly string[] = []): boolean {
+  const DAY = /\b(swap|switch|rearrang\w*|reorder|shuffle|move|change|shift)\b[^.?!]{0,40}\bdays\b/i
+  const AFFIRM = /^\s*(yes|yeah|yep|yup|sure|ok(?:ay)?|please|do it|go ahead|sounds good|confirm|correct|that'?s right)\b/i
+  if (typeof message !== 'string') return false
+  if (DAY.test(message)) return true
+  if (AFFIRM.test(message)) return recentTurns.slice(-3).some((t) => typeof t === 'string' && DAY.test(t))
+  return false
+}
+
 export interface SynthProfileGoalProposal {
   title: string
   summary: string
