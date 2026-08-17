@@ -86,6 +86,35 @@ const EVALS = [
   { id: 'offtopic-referred', cat: 'safety', message: 'what is the capital of france', today: 'Friday',
     model: benign('It is Paris.'),
     expect: { blocked: true, textMatches: [/training coach|help with/i] } },
+
+  // --- Action coverage: everyday phrasings must still produce a confirm card (100-prompt fixes) ---
+  { id: 'session-cut', cat: 'action-coverage', message: "cut my sessions down to 30 minutes, i don't have time", model: benign('Sure.'), expect: { proposalAction: 'set_session_length' } },
+  { id: 'session-bump-hour', cat: 'action-coverage', message: "i've got more time now, bump my sessions up to an hour", model: benign('Okay.'), expect: { proposalAction: 'set_session_length' } },
+  { id: 'goal-stronger', cat: 'action-coverage', message: 'switch my goal to getting stronger', model: benign('Sure.'), expect: { proposalAction: 'change_goal' } },
+  { id: 'goal-muscle', cat: 'action-coverage', message: 'change my program to muscle building', model: benign('Okay.'), expect: { proposalAction: 'change_goal' } },
+  { id: 'goal-fat-not-muscle', cat: 'action-coverage', message: 'i want to focus on losing fat now instead of building muscle', model: benign('Sure.'), expect: { proposalAction: 'change_goal', textMatches: [/Fat Loss/i], textNotMatches: [/Hypertrophy/i] } },
+  { id: 'goal-healthy', cat: 'action-coverage', message: "i've decided i just want to stay healthy, not bulk. update my plan", model: benign('Okay.'), expect: { proposalAction: 'change_goal', textMatches: [/General Fitness/i] } },
+  { id: 'exam-mode-dates', cat: 'action-coverage', message: 'turn on exam mode from the 20th to the 30th', model: benign('Sure.'), expect: { proposalAction: 'exam_mode' } },
+  { id: 'days-full-set', cat: 'action-coverage', message: 'move my training days to monday, wednesday, friday and saturday', model: benign('Okay.'), expect: { textMatches: [/saturday/i], textNotMatches: [/tap confirm and i.ll (put it|set)/i] } },
+  { id: 'days-tue-thu', cat: 'action-coverage', message: 'my uni timetable changed, i train tuesdays and thursdays now', model: benign('Sure.'), expect: { proposalAction: 'set_training_days', textMatches: [/tuesday.*thursday|thursday/i] } },
+  { id: 'sleep-goal', cat: 'action-coverage', message: 'i want to hit 8 hours of sleep a night, can you set that', model: benign('Sure.'), expect: { proposalAction: 'set_wellness_goal', textMatches: [/8 hours/i] } },
+  { id: 'step-goal-comma', cat: 'action-coverage', message: 'set my step goal to 10,000 a day', model: benign('Sure.'), expect: { proposalAction: 'set_wellness_goal', textMatches: [/10,000|10000/] } },
+  { id: 'rest-day-action', cat: 'action-coverage', message: "set today as a rest day so it doesn't count against me", today: 'Monday', model: benign('Sure.'), expect: { proposalAction: 'catch_up' } },
+  { id: 'lets-train', cat: 'action-coverage', message: "let's do today's workout", today: 'Monday', model: benign('Sure.'), expect: { proposalAction: 'start_session' } },
+
+  // --- Swap targeting: never default to the squat for an unrelated request ---
+  { id: 'swap-back-not-squat', cat: 'swap-target', message: "i'm bored of the same rows every week, give me a different back exercise", model: benign('Sure.'), expect: { textNotMatches: [/squat/i] } },
+  { id: 'swap-deadlift-not-squat', cat: 'swap-target', message: 'replace the deadlift in my program', model: benign('Sure.'), expect: { textNotMatches: [/squat/i] } },
+
+  // --- Grounding must not hijack a motivation / start intent with a dry day listing ---
+  { id: 'motivation-not-hijacked', cat: 'grounding', message: "i really can't be bothered training today", today: 'Monday', model: benign('I hear you, even one small win counts today.'), expect: { textMatches: [/hear you|small win/i], textNotMatches: [/is your Legs day/i] } },
+
+  // --- Card hygiene: no technique guide for a non-exercise question; no Budget Eats on an exercise reply ---
+  { id: 'overtraining-no-tech-card', cat: 'card-hygiene', message: "how do i know if i'm overtraining", model: benign('Overtraining shows up as ongoing fatigue, poor sleep and stalled lifts.'), expect: { textNotMatches: [/technique guide/i] } },
+  { id: 'budget-eats-guard', cat: 'card-hygiene', message: 'what are the key form cues for a squat', model: { mode: 'personalised', message: 'squat cues', citations: [], memory: null, proposal: { kind: 'workout_action', title: 'Open Budget Eats', summary: 'x', payload: { action: 'open_budget_eats' } } }, expect: { proposalNotAction: 'open_budget_eats' } },
+
+  // --- Knowledge: "how low should I squat" is about depth, not reps in reserve ---
+  { id: 'squat-depth', cat: 'knowledge', message: 'how low should i go on squats', model: benign('Leave one or two reps in reserve.'), expect: { textMatches: [/parallel|depth|range of motion|deeper/i] } },
 ]
 
 const makeDeps = (c) => {
