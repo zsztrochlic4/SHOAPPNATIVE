@@ -136,13 +136,23 @@ export function stateHits(session: SafetySession, text: string, ctx: CoachContex
   // Under-18: coach remains unavailable until age eligibility is resolved (cross-session).
   if (active.has('under_18')) out.push({ category: 'under_18', source: 'state', reason: 'under18_state_persists' })
 
-  // Injury: a request that would load an engine-excluded area is still declined (cross-session).
+  // Injury: a request that would LOAD or train through the injured area is still declined (cross-session).
+  // Scoped to a genuine loading intent, not any incidental mention of "train": a bare "I keep telling
+  // myself I'll train tomorrow" (a consistency lament) or "a meal after training" is NOT an attempt to
+  // load the injury and must not be blocked. The engine exclusions + resolver + outgoing guard still
+  // enforce that the injured area is never programmed, so this coarse state block can safely be narrow.
   if (active.has('injury')) {
-    const loads = /\b(squat|deadlift|bench|press|row|pull|push|run|running|lift|lifting|leg day|lower body|upper body|train|program|workout|exercise|session|add|swap|replace)\b/.test(t)
-    // Persist the protective state only on training/loading requests. The engine exclusions are still
-    // enforced by the resolver and outgoing guard, but cannot globally block food, hydration, study,
-    // community or other unrelated coaching domains.
-    if (loads) {
+    const wantsToLoad =
+      // a specific loading lift or heavy work named
+      /\b(squat|deadlift|bench|overhead press|leg press|barbell|dumbbell press|lunge|row|pull ?up|chin ?up|dip|clean|snatch|heavy|1 ?rm|one rep max|max out|lift weights?|load (?:it|the|my))\b/.test(t) ||
+      // wanting to train THROUGH / around / despite the injury or pain
+      (/\b(through|around|despite|regardless|anyway|still)\b/.test(t) && /\b(train|training|work ?out|workout|lift|push|session|it|pain|injury|area)\b/.test(t)) ||
+      /\b(train through|push through|work around it|train anyway|still train|ignore the pain)\b/.test(t) ||
+      // add / swap / put an exercise or program back
+      /\b(add|swap|replace|put)\b[\s\S]{0,25}\b(exercise|lift|squat|deadlift|bench|press|row|workout|program|routine|back (?:in|to))\b/.test(t) ||
+      // should / can I (still) do a loading movement
+      /\b(should|can)\s+i\s+(?:still\s+)?(train|lift|work ?out|squat|deadlift|bench|press|row|run|do)\b/.test(t)
+    if (wantsToLoad) {
       out.push({ category: 'injury_override', source: 'state', reason: 'injury_state_persists' })
     }
   }
