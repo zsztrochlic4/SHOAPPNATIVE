@@ -9,7 +9,7 @@
  * same way LeagueScreen/UsernameSheet route through backend.ts.
  */
 import { httpsCallable } from 'firebase/functions'
-import { collection, doc, getDoc, getDocs, limit, orderBy, query, startAt, endAt } from 'firebase/firestore'
+import { collection, doc, getDoc, getDocs, limit, orderBy, query, startAt, endAt, where } from 'firebase/firestore'
 import { auth, db, firebaseEnabled, functions } from '../lib/firebase'
 import type { CommunityGroup, GroupMember } from '../store/types'
 
@@ -20,13 +20,20 @@ function call<I, O>(name: string) {
 
 /* --------------------------------- writes ---------------------------------- */
 
-export async function createGroupRemote(name: string, icon: string, color: string): Promise<{ groupId: string; passcode: string }> {
-  const res = await call<{ name: string; icon: string; color: string }, { ok: true; groupId: string; passcode: string }>('createGroup')({ name, icon, color })
+export async function createGroupRemote(name: string, icon: string, color: string, visibility: 'private' | 'public' = 'private'): Promise<{ groupId: string; passcode: string }> {
+  const res = await call<{ name: string; icon: string; color: string; visibility: string }, { ok: true; groupId: string; passcode: string }>('createGroup')({ name, icon, color, visibility })
   return { groupId: res.data.groupId, passcode: res.data.passcode }
 }
 
 export async function joinGroupRemote(groupId: string, passcode: string): Promise<{ groupId: string; name: string }> {
   const res = await call<{ groupId: string; passcode: string }, { ok: true; groupId: string; name: string }>('joinGroupByPasscode')({ groupId, passcode })
+  return { groupId: res.data.groupId, name: res.data.name }
+}
+
+/** Join a group by its short code alone — works for private groups (not listed
+ *  in the searchable directory), resolved server-side via groupCodes. */
+export async function joinGroupByCodeRemote(code: string): Promise<{ groupId: string; name: string }> {
+  const res = await call<{ code: string }, { ok: true; groupId: string; name: string }>('joinGroupByCode')({ code })
   return { groupId: res.data.groupId, name: res.data.name }
 }
 
@@ -48,9 +55,12 @@ export async function searchGroupsRemote(q: string): Promise<DirectoryHit[]> {
   if (!db) return []
   const term = q.trim().toLowerCase()
   const base = collection(db, 'groupDirectory')
+  // Only PUBLIC groups are searchable; the visibility filter is also required by
+  // firestore.rules (a query without it is rejected), keeping private groups hidden.
+  const pub = where('visibility', '==', 'public')
   const qy = term
-    ? query(base, orderBy('nameLower'), startAt(term), endAt(term + 'ï£¿'), limit(20))
-    : query(base, orderBy('memberCount', 'desc'), limit(20))
+    ? query(base, pub, orderBy('nameLower'), startAt(term), endAt(term + 'ï£¿'), limit(20))
+    : query(base, pub, orderBy('memberCount', 'desc'), limit(20))
   const snap = await getDocs(qy)
   return snap.docs.map((d) => ({
     id: d.id,

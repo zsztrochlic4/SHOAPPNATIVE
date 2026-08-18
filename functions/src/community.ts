@@ -50,6 +50,7 @@ import {
   type TimeContext,
 } from './_shared/community/scoring'
 import { evaluateAnomalies, type AnomalySignals } from './_shared/community/anomaly'
+import { screenUsername } from './_shared/community/contentModeration'
 
 /** Promotion/demotion DIRECTION per tier (promote>0 = can rise, demote>0 = can
  *  fall) — mirror of src/community/league.ts TIERS. The counts are no longer used
@@ -94,8 +95,10 @@ function firstMondayKeyOfMonth(year: number, month1: number): string {
 /** The league period key — leagues reset on the FIRST MONDAY of each month (design
  *  spec), so the period id is that Monday's date-key, computed in the app's home
  *  timezone (Australia/Sydney). If today is before this month's first Monday we're
- *  still in last month's period. Matches the client's src/community/league.ts. */
-function leaguePeriodKey(d: Date): string {
+ *  still in last month's period. Matches the client's src/community/league.ts.
+ *  Exported for the ops-metrics aggregate (communityMetrics.ts) so "active this
+ *  period" counts against the same key syncCommunityStats writes to each profile. */
+export function leaguePeriodKey(d: Date): string {
   const parts = APP_TZ_PARTS.formatToParts(d)
   const get = (t: string): string => parts.find((p) => p.type === t)?.value ?? ''
   const y = Number(get('year')), m = Number(get('month'))
@@ -197,6 +200,10 @@ export const claimUsername = onCall<ClaimInput>(
     if (!USERNAME_RE.test(lower)) {
       throw new HttpsError('invalid-argument', 'Usernames are 3–20 characters: letters, numbers, underscores.')
     }
+    // Content moderation: reserved handles + profanity/slurs (same screen the
+    // client runs, enforced here so the UI can't be bypassed).
+    const screen = screenUsername(lower)
+    if (!screen.ok) throw new HttpsError('invalid-argument', screen.reason)
 
     const db = getFirestore()
     await db.runTransaction(async (tx) => {
@@ -575,6 +582,62 @@ export const syncCommunityStats = onCall<SyncInput>(
 
     if (status !== 'ok') logger.info('community.syncCommunityStats.flagged', { status, flags, backfilledDayCount })
     return { ok: true, tier, weekKey, calcVersion: CALC_VERSION, status }
+  },
+)
+
+/* -------------------------------- globalStreaks ---------------------------- */
+
+/** Global consistency-streak leaderboard: top-N users by CURRENT streak, plus the caller's own
+ *  row and global rank. This must be a server aggregate — `communityProfiles` is `list`-forbidden
+ *  in firestore.rules (a client can only read its OWN), so there is no client path to a cross-user
+ *  streak board. The Admin SDK bypasses rules; we return only public leaderboard fields
+ *  (username + streak numbers), never the full profile. Single-field index on `streakCurrent`
+ *  (auto-created in prod; unenforced in the emulator) covers the ordered read + the rank count. */
+export const globalStreaks = onCall<{ limit?: number }>(
+  // maxInstances: 1 — new + low-traffic; keeps the CPU this adds to the region
+  // minimal (the region's total-CPU quota is tight on this young billing account).
+  { region: 'australia-southeast2', enforceAppCheck: APP_CHECK_ENFORCED, maxInstances: 1 },
+  async (req) => {
+    const uid = requireAuth(req)
+    auditAppCheck(req, 'globalStreaks')
+    const db = getFirestore()
+    const N = Math.min(Math.max(Math.floor(Number(req.data?.limit ?? 50)) || 50, 1), 100)
+    const snap = await db
+      .collection('communityProfiles')
+      .where('streakCurrent', '>', 0)
+      .orderBy('streakCurrent', 'desc')
+      .limit(N)
+      .get()
+    const rows = snap.docs
+      .filter((d) => d.get('username'))
+      .map((d) => ({
+        uid: d.id,
+        username: String(d.get('username')),
+        streakCurrent: Number(d.get('streakCurrent') ?? 0),
+        streakBest: Number(d.get('streakBest') ?? 0),
+      }))
+    const meSnap = await db.collection('communityProfiles').doc(uid).get()
+    let me: { uid: string; username: string; streakCurrent: number; streakBest: number } | null = null
+    let youRank: number | null = null
+    if (meSnap.exists && meSnap.get('username')) {
+      me = {
+        uid,
+        username: String(meSnap.get('username')),
+        streakCurrent: Number(meSnap.get('streakCurrent') ?? 0),
+        streakBest: Number(meSnap.get('streakBest') ?? 0),
+      }
+      const inTop = rows.findIndex((r) => r.uid === uid)
+      if (inTop >= 0) youRank = inTop + 1
+      else if (me.streakCurrent > 0) {
+        try {
+          const ahead = await db.collection('communityProfiles').where('streakCurrent', '>', me.streakCurrent).count().get()
+          youRank = ahead.data().count + 1
+        } catch {
+          youRank = null // count() unavailable (older emulator) — leave rank unknown rather than fail the board
+        }
+      }
+    }
+    return { ok: true as const, rows, me, youRank }
   },
 )
 

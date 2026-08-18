@@ -416,12 +416,42 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // --- Private friend groups (server-authoritative, membership-gated) --- //
-    // Public, secret-free directory used to SEARCH for a group by name. Carries
-    // no passcode and no member list. Written only by the group functions.
-    match /groupDirectory/{groupId} {
-      allow get, list: if request.auth != null;
+    // Content-moderation report queue. A user reports an offensive username / group
+    // via reportContent; the owner triages via resolveContentReport. Written ONLY by
+    // those callables. Readable ONLY by a moderator (`owner` claim) — never the
+    // reporter (avoids a "did my report land?" oracle) and never the subject.
+    match /contentReports/{reportId} {
+      allow get, list: if request.auth != null && request.auth.token.owner == true;
       allow write: if false;
+    }
+
+    // Community ops/health metrics — daily aggregate snapshots (participation,
+    // integrity holds, moderation backlog, group mix). No PII. Readable ONLY by a
+    // moderator (`owner` claim); written only by the metrics function.
+    match /communityMetrics/{dateKey} {
+      allow get, list: if request.auth != null && request.auth.token.owner == true;
+      allow write: if false;
+    }
+
+    // --- Private friend groups (server-authoritative, membership-gated) --- //
+    // Secret-free directory used to SEARCH for a group by name. Carries no passcode
+    // and no member list. Written only by the group functions. A group is PRIVATE
+    // by default and PUBLIC only by opt-in: `list` (search) is allowed only for
+    // public rows, so a private group never surfaces in search — its `visibility`
+    // filter must be present in the query, and a private doc can only be fetched by
+    // its exact id (which is not discoverable).
+    match /groupDirectory/{groupId} {
+      allow get: if request.auth != null;
+      allow list: if request.auth != null && resource.data.visibility == 'public';
+      allow write: if false;
+    }
+
+    // Passcode → groupId lookup that lets a private group be joined by its short
+    // code (joinGroupByCode). Non-enumerable: clients can neither read nor write it
+    // (only the Admin SDK in the group functions touches it), so codes can't be
+    // brute-forced by listing.
+    match /groupCodes/{code} {
+      allow read, write: if false;
     }
 
     // The private group document + its members and cheers. Readable only by a
