@@ -828,10 +828,12 @@ function reducer(state: AppState, action: Action): AppState {
 
     // Weekly freeze grant — idempotent per week, capped so tokens can't stockpile.
     case 'GRANT_WEEKLY_FREEZE': {
+      // Each league reset (now the first Monday of the month) tops the user up to
+      // 2 fresh freezes (design spec). Idempotent on the period key so it fires
+      // once per period, not on every render.
       if (state.community.freezeGrantWeek === action.weekKey) return state
       const FREEZE_CAP = 2
-      const tokens = Math.min(FREEZE_CAP, (state.community.freezeTokens ?? 0) + 1)
-      return { ...state, community: { ...state.community, freezeTokens: tokens, freezeGrantWeek: action.weekKey } }
+      return { ...state, community: { ...state.community, freezeTokens: FREEZE_CAP, freezeGrantWeek: action.weekKey } }
     }
 
     // Backend hydration: replace the local group cache with the server's copy.
