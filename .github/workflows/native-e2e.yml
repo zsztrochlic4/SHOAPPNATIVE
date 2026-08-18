@@ -37,6 +37,10 @@ jobs:
           profile: pixel_6
           script: |
             npx expo prebuild --platform android --clean --non-interactive
+            # Expo's default Gradle heap (~2g) OOMs the D8 dex merger on this app
+            # (Task :app:mergeExtDexDebug -> java.lang.OutOfMemoryError). Raise it;
+            # the ubuntu-latest runner has 16g, so 6g is safe.
+            printf '\norg.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8\n' >> android/gradle.properties
             cd android && ./gradlew assembleDebug --no-daemon && cd ..
             adb install -r android/app/build/outputs/apk/debug/app-debug.apk
             $HOME/.maestro/bin/maestro test .maestro --include-tags smoke --format junit --output maestro-report.xml
