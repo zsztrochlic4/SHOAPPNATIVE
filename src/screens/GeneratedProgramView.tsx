@@ -125,9 +125,13 @@ function repRange(e: StoredProgram['days'][number]['exercises'][number]): string
 }
 
 export function GeneratedProgramView({ program }: { program: StoredProgram }) {
-  const training = program.days.length
+  // Defensive: the program can arrive partially hydrated (a seeded/legacy doc, or a mid-sync state),
+  // so never assume the computed arrays/maps are present — degrade gracefully instead of crashing the
+  // whole screen behind the error boundary.
+  const days = Array.isArray(program?.days) ? program.days : []
+  const training = days.length
   // Accordion: one day open at a time (first by default), matching the design.
-  const [openDay, setOpenDay] = useState<string | null>(program.days[0]?.weekday ?? null)
+  const [openDay, setOpenDay] = useState<string | null>(days[0]?.weekday ?? null)
   return (
     <View className="gap-2.5">
       <View className="rounded-[20px] border border-brand-400/20 bg-brand-400/[0.06] p-4">
@@ -135,24 +139,25 @@ export function GeneratedProgramView({ program }: { program: StoredProgram }) {
         <Text className="mt-1.5 text-[12.5px] leading-5 text-secondary">{program.recommendationNote}</Text>
       </View>
 
-      {program.days.map((d) => {
+      {days.map((d) => {
         const open = openDay === d.weekday
+        const exercises = Array.isArray(d.exercises) ? d.exercises : []
         return (
           <View key={d.weekday} className="overflow-hidden rounded-[20px] border border-white/5 bg-ink-800">
             <Pressable onPress={() => setOpenDay(open ? null : d.weekday)} className="flex-row items-center gap-3 p-4 active:opacity-90">
               <View className="w-[34px] shrink-0"><Text className="text-[11px] font-bold uppercase tracking-wider text-tertiary">{d.weekday.slice(0, 3)}</Text></View>
               <View className="min-w-0 flex-1">
                 <Text className="text-[14.5px] font-bold text-white">{d.dayType}</Text>
-                <Text numberOfLines={1} className="mt-0.5 text-[12px] text-secondary">{d.exercises.map((e) => e.muscleGroup).filter((m, i, a) => a.indexOf(m) === i).slice(0, 3).join(' · ')}</Text>
+                <Text numberOfLines={1} className="mt-0.5 text-[12px] text-secondary">{exercises.map((e) => e.muscleGroup).filter((m, i, a) => a.indexOf(m) === i).slice(0, 3).join(' · ')}</Text>
               </View>
-              <Chip color="green">{d.exercises.length} ex</Chip>
+              <Chip color="green">{exercises.length} ex</Chip>
               <ChevronDown size={17} color="rgba(255,255,255,0.3)" style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
             </Pressable>
             {open && (
               <View className="px-4 pb-4">
                 <View className="mb-1 h-px bg-white/5" />
                 <View className="mt-2 gap-2.5">
-                  {d.exercises.map((e, i) => (
+                  {exercises.map((e, i) => (
                     <View key={`${e.exerciseId}-${i}`} className="flex-row items-start justify-between gap-3">
                       <View className="min-w-0 flex-1">
                         <Text className="text-[13.5px] font-semibold text-white">{e.name}</Text>
@@ -182,8 +187,8 @@ export function GeneratedProgramView({ program }: { program: StoredProgram }) {
       <View className="rounded-[20px] border border-white/5 bg-ink-800 p-4">
         <Text className="mb-2.5 text-[13px] font-bold text-white">Weekly sets by muscle</Text>
         <View className="flex-row flex-wrap gap-2">
-          {Object.entries(program.weeklySetsByMuscle).map(([m, n]) => {
-            const t = program.volumeTargets[m]
+          {Object.entries(program.weeklySetsByMuscle ?? {}).map(([m, n]) => {
+            const t = program.volumeTargets?.[m]
             return (
               <View key={m} className="flex-row items-center gap-1.5 rounded-full bg-white/5 px-2.5 py-1.5">
                 <Text className="text-[12px] text-secondary">{m}</Text>
@@ -195,9 +200,9 @@ export function GeneratedProgramView({ program }: { program: StoredProgram }) {
         </View>
       </View>
 
-      {program.coverageNotes.length > 0 && (
+      {(program.coverageNotes?.length ?? 0) > 0 && (
         <View className="rounded-2xl border border-white/5 bg-ink-800 p-4">
-          {program.coverageNotes.map((c, i) => (
+          {(program.coverageNotes ?? []).map((c, i) => (
             <Text key={i} className="text-[12px] leading-5 text-secondary">{c}</Text>
           ))}
         </View>
