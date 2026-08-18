@@ -611,6 +611,13 @@ export function synthesizeScheduleGroundedReply(userMessage: string, schedule: r
   if (/\b(can'?t be bothered|cant be bothered|do not want to|dont want to|don'?t want to|not feeling|no motivation|lost .*motivation|talk me into|worth it|be bothered|too lazy|unmotivated|let'?s (do|go|train)|do (today'?s|my|the) (workout|session)|quick session|15 min)\b/.test(m)) return null
   // A "mark/set today as a rest day" is an ACTION request; let the catch-up action handle it.
   if (/\b(mark|set|make|log)\b[\s\S]{0,20}\b(rest day|no.?penalty|exempt|doesn'?t count|does not count)\b/.test(m)) return null
+  // 500-prompt eval (#388/#407/#146): do NOT ground (list the day's workout) when the message carries an
+  // intoxication or compensatory / disordered-eating signal, or is a training-frequency question. Those
+  // need alcohol/recovery coaching, a disordered-eating referral, or a direct frequency answer, never a
+  // dry exercise listing. Suppressing the synth here lets the safety router / coaching model handle it.
+  if (/\b(hungover|hangover|big night|drunk|tipsy|wasted|hammered|had (a few )?(beers?|drinks?|wines?)|been drinking|smoked weed|stoned)\b/.test(m)) return null
+  if (/\b(ate too much|over ?ate|because i ate|to burn (it |that |the )?off|burn off (what|everything|the)|make up for|punish (myself|my body)|compensate)\b/.test(m)) return null
+  if (/\b(is that enough|is this enough|enough to (make|see|build|get|progress)|how many (days|times)|days? (a|per) week|times? (a|per) week)\b/.test(m)) return null
 
   const byDay = new Map(schedule.map((d) => [d.weekday, d]))
   const trainsGroup = (groups: string[]): WeekdayLit[] =>
