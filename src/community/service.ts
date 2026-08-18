@@ -84,6 +84,30 @@ export async function checkUsernameAvailable(raw: string, ownHandle?: string | n
 /* ------------------------------- Leaderboard ------------------------------- */
 
 export async function loadGlobalBoard(me: MyLeaderStats): Promise<{ rows: LeaderRow[]; youRank: number | null }> {
+  if (COMMUNITY_BACKEND) {
+    try {
+      // Live: the global streak board is a server aggregate (communityProfiles is list-forbidden), so it
+      // comes back through the `globalStreaks` callable. Map to the UI row shape; tag the caller's row.
+      const backend = await import('./backend')
+      if (backend.isCommunityBackendOn()) {
+        const res = await backend.loadGlobalStreaksRemote(50)
+        const rows: LeaderRow[] = res.rows.map((r, i) => ({
+          rank: i + 1,
+          username: r.username,
+          streakCurrent: r.streakCurrent,
+          streakBest: r.streakBest,
+          isYou: !!res.me && res.me.uid === r.uid,
+        }))
+        // If the caller has a synced profile but isn't in the top-N, append their own ranked row.
+        if (res.me && res.youRank && !rows.some((r) => r.isYou)) {
+          rows.push({ rank: res.youRank, username: res.me.username, streakCurrent: res.me.streakCurrent, streakBest: res.me.streakBest, isYou: true })
+        }
+        return { rows, youRank: res.youRank }
+      }
+    } catch {
+      // Fall through to local simulation on any backend/availability error.
+    }
+  }
   await wait(LATENCY.board)
   return simulateGlobalBoard(me)
 }
