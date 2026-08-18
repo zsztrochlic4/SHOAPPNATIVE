@@ -125,7 +125,7 @@ test('syncCommunityStats: recomputes from RAW inputs, ignores client-claimed poi
     clientTz: 'Australia/Sydney',
   })
   assert.equal(res.ok, true)
-  assert.equal(res.calcVersion, 'v1')
+  assert.equal(res.calcVersion, 'v2')
   assert.equal(res.status, 'ok') // one honest day → clean
 
   // The standing carries a SERVER-recomputed score, never the injected 999.
@@ -134,7 +134,7 @@ test('syncCommunityStats: recomputes from RAW inputs, ignores client-claimed poi
   assert.notEqual(points, 999)
   assert.ok(typeof points === 'number' && points > 0 && points <= 100)
   assert.equal(standing.get('status'), 'ok')
-  assert.equal(standing.get('calcVersion'), 'v1')
+  assert.equal(standing.get('calcVersion'), 'v2')
 
   // Group fan-out reflects the recomputed values (volume is a deterministic sum).
   const member = await getDoc(doc(B.db, `groups/${g.groupId}/members/${B.uid}`))
