@@ -12,13 +12,13 @@ tags:
 # Background, then foreground — the app should resume on the same tab, not reset.
 - pressKey: Home
 - launchApp            # foreground WITHOUT clearState
-- assertVisible:
-    text: "Today's food log"
+- extendedWaitUntil:
+    visible: "Today's food log"
     timeout: 20000
 
 # Full cold restart — persisted session should still land in the app (not the sign-in wall).
 - stopApp
 - launchApp            # still no clearState
-- assertVisible:
-    text: "Dashboard"
+- extendedWaitUntil:
+    visible: "Dashboard"
     timeout: 40000

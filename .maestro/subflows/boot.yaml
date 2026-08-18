@@ -6,6 +6,6 @@ appId: com.zaggy887.strengthhub
 # For a non-demo build, replace this with a sign-in subflow (see README "Auth").
 - launchApp:
     clearState: true
-- assertVisible:
-    text: "Dashboard"
+- extendedWaitUntil:
+    visible: "Dashboard"
     timeout: 40000
