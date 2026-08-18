@@ -35,13 +35,22 @@ function stateWith({ habits = [], sessions = [], activities = [], restDays = [],
 }
 
 test('weeklyIndexCore: everything at target scores 50 (the "on track" midpoint)', () => {
-  const habitDays = Array.from({ length: 7 }, () => ({ steps: 10000, sleepH: 8, waterL: 2.5, nutritionScore: 8 }))
-  const { score } = weeklyIndexCore(habitDays, 4, TARGETS)
+  const habitDays = Array.from({ length: 14 }, () => ({ steps: 10000, sleepH: 8, waterL: 2.5, nutritionScore: 8 }))
+  // 14-day window: "at target" workouts = weekly target (4) × 2 weeks = 8.
+  const { score } = weeklyIndexCore(habitDays, 8, TARGETS)
   assert.equal(score, 50)
 })
 
 test('weeklyIndexCore: zero activity scores 0', () => {
   assert.equal(weeklyIndexCore([], 0, TARGETS).score, 0)
+})
+
+test('weeklyIndexCore: the workout target scales to the window (14 days needs 2× weekly)', () => {
+  const habitDays = Array.from({ length: 14 }, () => ({ steps: 10000, sleepH: 8, waterL: 2.5, nutritionScore: 8 }))
+  // Only one week's worth of workouts over the 14-day window → workouts ratio 0.5.
+  assert.equal(weeklyIndexCore(habitDays, 4, TARGETS).score, 43)
+  // The explicit 7-day window still treats 4 workouts as on-target → 50.
+  assert.equal(weeklyIndexCore(habitDays, 4, TARGETS, 7).score, 50)
 })
 
 test('computeStreak: a rest day bridges a gap that would otherwise reset', () => {
@@ -62,12 +71,15 @@ test('computeCompetitionMetrics: known scenario yields the hand-computed metrics
   const sessions = [0, 1, 2, 3].map((n) => ({ dateKey: dayKey(n), completed: true, volumeKg: 1000, exercises: [] }))
   const records = buildDayRecords(stateWith({ habits, sessions }))
   const m = computeCompetitionMetrics({ records, targets: TARGETS, ctx })
-  assert.equal(m.odometer, 50)
+  // Odometer is over 14 days: 7 perfect habit days + only one week's workouts (4)
+  // over the 14-day window → workouts ratio 0.5 → 43. (A full 2 weeks at target = 50.)
+  assert.equal(m.odometer, 43)
   assert.equal(m.streakCurrent, 7)
   assert.equal(m.streakBest, 7)
-  assert.equal(m.volume7, 4000)
+  assert.equal(m.volume7, 4000) // volume7 is still a 7-day window
   assert.equal(m.volume30, 4000)
-  assert.equal(m.sessions7, 4)
+  assert.equal(m.sessions7, 4) // sessions "this week" stays 7-day
+
 })
 
 test('PARITY: server recompute from the serialized day-log == live client selectors', () => {
