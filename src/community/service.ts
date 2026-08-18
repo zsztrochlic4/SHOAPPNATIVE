@@ -22,6 +22,7 @@ import {
   type LeaderRow,
 } from './simulate'
 import { COMMUNITY_BACKEND } from './backendConfig'
+import { screenUsername, screenGroupName } from './contentModeration'
 
 /** Simulated network latency so skeletons/spinners are exercised. Kept short. */
 const LATENCY = { username: 420, board: 520, search: 320, mutate: 460 } as const
@@ -45,6 +46,10 @@ export function validateUsername(raw: string): UsernameValidation {
   if (canonical.length > USERNAME_MAX) return { ok: false, message: `At most ${USERNAME_MAX} characters` }
   if (!/^[a-z0-9_]+$/.test(canonical)) return { ok: false, message: 'Letters, numbers and underscores only' }
   if (!/^[a-z0-9]/.test(canonical)) return { ok: false, message: 'Start with a letter or number' }
+  // Content moderation (reserved handles + profanity) — the same screen the server
+  // enforces, run here for instant feedback while typing.
+  const screen = screenUsername(canonical)
+  if (!screen.ok) return { ok: false, message: screen.reason }
   return { ok: true, canonical }
 }
 
@@ -93,6 +98,7 @@ export async function loadGlobalBoard(me: MyLeaderStats): Promise<{ rows: Leader
         const res = await backend.loadGlobalStreaksRemote(50)
         const rows: LeaderRow[] = res.rows.map((r, i) => ({
           rank: i + 1,
+          uid: r.uid,
           username: r.username,
           streakCurrent: r.streakCurrent,
           streakBest: r.streakBest,
@@ -110,6 +116,43 @@ export async function loadGlobalBoard(me: MyLeaderStats): Promise<{ rows: Leader
   }
   await wait(LATENCY.board)
   return simulateGlobalBoard(me)
+}
+
+/* ------------------------------- Moderation -------------------------------- */
+
+export type ReportReason = 'offensive_name' | 'harassment' | 'impersonation' | 'cheating' | 'other'
+
+export const REPORT_REASONS: { value: ReportReason; label: string }[] = [
+  { value: 'offensive_name', label: 'Offensive name' },
+  { value: 'impersonation', label: 'Impersonation' },
+  { value: 'harassment', label: 'Harassment' },
+  { value: 'cheating', label: 'Cheating' },
+  { value: 'other', label: 'Something else' },
+]
+
+/** File a moderation report against a username or group. Live path goes to the
+ *  owner-triaged queue; with the backend off it accepts locally (simulation) so
+ *  the flow is exercisable. Never throws for the expected outcomes. */
+export async function reportContent(input: {
+  targetType: 'user' | 'group'
+  targetId: string
+  targetLabel?: string
+  reason: ReportReason
+  note?: string
+}): Promise<{ ok: boolean }> {
+  if (COMMUNITY_BACKEND) {
+    try {
+      const backend = await import('./backend')
+      if (backend.isCommunityBackendOn()) {
+        await backend.reportContentRemote(input)
+        return { ok: true }
+      }
+    } catch {
+      return { ok: false }
+    }
+  }
+  await wait(LATENCY.mutate)
+  return { ok: true }
 }
 
 /* --------------------------------- Groups ---------------------------------- */
@@ -130,6 +173,8 @@ export async function createGroup(
   const name = rawName.trim()
   if (name.length < 2) return { ok: false, message: 'Give your group a name' }
   if (name.length > 30) return { ok: false, message: 'Keep the name under 30 characters' }
+  const nameScreen = screenGroupName(name)
+  if (!nameScreen.ok) return { ok: false, message: nameScreen.reason }
   if (!me.username) return { ok: false, message: 'Set a username first' }
   if (existing.some((g) => g.name.trim().toLowerCase() === name.toLowerCase())) {
     return { ok: false, message: "You're already in a group with that name" }

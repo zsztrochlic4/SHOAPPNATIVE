@@ -50,6 +50,7 @@ import {
   type TimeContext,
 } from './_shared/community/scoring'
 import { evaluateAnomalies, type AnomalySignals } from './_shared/community/anomaly'
+import { screenUsername } from './_shared/community/contentModeration'
 
 /** Promotion/demotion counts per tier — mirror of src/community/league.ts TIERS. */
 const TIERS = [
@@ -81,7 +82,7 @@ const APP_TZ_PARTS = new Intl.DateTimeFormat('en-CA', {
  *  they read in Sydney, then step back to that week's Monday with pure calendar
  *  arithmetic (Date.UTC handles month/day underflow). DST is irrelevant — a Sydney
  *  calendar day belongs to exactly one calendar Monday regardless of offset. */
-function mondayKey(d: Date): string {
+export function mondayKey(d: Date): string {
   const parts = APP_TZ_PARTS.formatToParts(d)
   const get = (t: string): string => parts.find((p) => p.type === t)?.value ?? ''
   const y = Number(get('year')), m = Number(get('month')), day = Number(get('day'))
@@ -158,6 +159,10 @@ export const claimUsername = onCall<ClaimInput>(
     if (!USERNAME_RE.test(lower)) {
       throw new HttpsError('invalid-argument', 'Usernames are 3–20 characters: letters, numbers, underscores.')
     }
+    // Content moderation: reserved handles + profanity/slurs (same screen the
+    // client runs, enforced here so the UI can't be bypassed).
+    const screen = screenUsername(lower)
+    if (!screen.ok) throw new HttpsError('invalid-argument', screen.reason)
 
     const db = getFirestore()
     await db.runTransaction(async (tx) => {

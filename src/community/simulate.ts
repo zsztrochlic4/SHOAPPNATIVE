@@ -9,6 +9,7 @@
  * always comes from live activity (selectors.myLeaderStats) and is injected here.
  */
 import { makeRng, randInt } from '../lib/rng'
+import { RESERVED_HANDLES } from './contentModeration'
 import type { CommunityGroup, GroupMember } from '../store/types'
 import type { MyLeaderStats } from '../store/selectors'
 
@@ -24,19 +25,13 @@ export const TAKEN_HANDLES: string[] = [
   'sienna_p', 'marcus_l', 'evie_t', 'rohan_s', 'daisy_k',
 ]
 
-/** Reserved words no one may take (avoids impersonation / confusion). */
-const RESERVED_WORDS = new Set([
-  'admin', 'administrator', 'coach', 'strengthhub', 'sho', 'support', 'staff',
-  'moderator', 'mod', 'official', 'team', 'help', 'root', 'system', 'null',
-  'undefined', 'me', 'you',
-])
-
 /** Case-insensitive "is this handle already in use by someone else?". `ownHandle`
- *  (the user's current username) is excluded so re-saving the same name is fine. */
+ *  (the user's current username) is excluded so re-saving the same name is fine.
+ *  Reserved handles come from the shared moderation source of truth. */
 export function isHandleTaken(name: string, ownHandle?: string | null): boolean {
   const n = name.trim().toLowerCase()
   if (ownHandle && n === ownHandle.trim().toLowerCase()) return false
-  if (RESERVED_WORDS.has(n)) return true
+  if (RESERVED_HANDLES.has(n)) return true
   return TAKEN_HANDLES.some((h) => h.toLowerCase() === n)
 }
 
@@ -46,6 +41,9 @@ export interface LeaderRow {
   streakCurrent: number
   streakBest: number
   isYou?: boolean
+  /** Present only on the live board (from the backend) — needed to report a user.
+   *  Undefined in simulation, so the report affordance simply doesn't show. */
+  uid?: string
 }
 
 /**

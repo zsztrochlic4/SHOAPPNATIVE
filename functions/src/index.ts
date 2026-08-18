@@ -48,4 +48,8 @@ export { createCheckoutSession, createBillingPortalSession, stripeWebhook } from
 export { claimUsername, syncCommunityStats, globalStreaks, rolloverLeagues, grantStreakFreezes, reprocessStandings, pruneScoreLog, appealStanding, resolveStandingReview } from './community'
 // Private friend groups (create / join / leave / delete / goal / cheer). Also
 // feature-flagged OFF client-side.
-export { createGroup, joinGroupByPasscode, leaveGroup, deleteGroup, setGroupGoal, cheerGroupActivity } from './communityGroups'
+export { createGroup, joinGroupByPasscode, joinGroupByCode, leaveGroup, deleteGroup, setGroupGoal, cheerGroupActivity } from './communityGroups'
+// Content moderation (report an offensive username/group) + owner triage.
+export { reportContent, resolveContentReport } from './communityModeration'
+// Community ops/health metrics (daily aggregate + owner on-demand refresh).
+export { computeCommunityMetrics, refreshCommunityMetrics } from './communityMetrics'

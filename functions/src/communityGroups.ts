@@ -22,6 +22,7 @@
 import { FieldValue, getFirestore, type DocumentSnapshot } from 'firebase-admin/firestore'
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { requireVerifiedUser, APP_CHECK_ENFORCED } from './lib/guards'
+import { screenGroupName } from './_shared/community/contentModeration'
 
 const REGION = 'australia-southeast2'
 const NAME_MIN = 2
@@ -61,7 +62,18 @@ async function requireProfile(uid: string): Promise<DocumentSnapshot> {
 
 /* --------------------------------- create ---------------------------------- */
 
-interface CreateInput { name?: string; icon?: string; color?: string }
+interface CreateInput { name?: string; icon?: string; color?: string; visibility?: string }
+
+/** Reserve a unique passcode → groupId lookup so a PRIVATE group (absent from the
+ *  searchable directory) can still be joined by its short code. Retries on the
+ *  (astronomically rare) collision. Returns the claimed code. */
+async function reserveUniqueCode(db: FirebaseFirestore.Firestore): Promise<string> {
+  for (let i = 0; i < 8; i++) {
+    const code = generatePasscode()
+    if (!(await db.collection('groupCodes').doc(code).get()).exists) return code
+  }
+  throw new HttpsError('resource-exhausted', 'Could not allocate a group code. Try again.')
+}
 
 export const createGroup = onCall<CreateInput>({ region: REGION, enforceAppCheck: APP_CHECK_ENFORCED }, async (req) => {
   const uid = requireVerifiedUser(req, 'communityGroups')
@@ -69,6 +81,11 @@ export const createGroup = onCall<CreateInput>({ region: REGION, enforceAppCheck
   if (name.length < NAME_MIN || name.length > NAME_MAX) {
     throw new HttpsError('invalid-argument', `Group name must be ${NAME_MIN}–${NAME_MAX} characters.`)
   }
+  const nameScreen = screenGroupName(name)
+  if (!nameScreen.ok) throw new HttpsError('invalid-argument', nameScreen.reason)
+  // Private by default; only an explicit opt-in lists the group in the searchable
+  // directory. Both kinds are joinable by their short code.
+  const visibility = req.data?.visibility === 'public' ? 'public' : 'private'
   const db = getFirestore()
   const prof = await requireProfile(uid)
   if ((prof.get('groupIds')?.length ?? 0) >= MAX_GROUPS) {
@@ -77,27 +94,53 @@ export const createGroup = onCall<CreateInput>({ region: REGION, enforceAppCheck
 
   const groupRef = db.collection('groups').doc()
   const groupId = groupRef.id
-  const passcode = generatePasscode()
+  const passcode = await reserveUniqueCode(db)
   const icon = typeof req.data?.icon === 'string' ? req.data.icon : 'dumbbell'
   const color = typeof req.data?.color === 'string' ? req.data.color : '#7ED957'
   const now = FieldValue.serverTimestamp()
 
   const batch = db.batch()
   batch.set(groupRef, {
-    name, nameLower: name.toLowerCase(), passcode, ownerUid: uid,
+    name, nameLower: name.toLowerCase(), passcode, visibility, ownerUid: uid,
     ownerUsername: prof.get('username'), icon, color, weeklyGoal: 12, memberCount: 1, createdAt: now,
   })
+  batch.set(db.collection('groupCodes').doc(passcode), { groupId })
+  // The directory carries `visibility`; firestore.rules only allows LISTing public
+  // rows, so a private group's entry is never returned by search (get-by-id only).
   batch.set(db.collection('groupDirectory').doc(groupId), {
-    name, nameLower: name.toLowerCase(), icon, color, memberCount: 1,
+    name, nameLower: name.toLowerCase(), icon, color, memberCount: 1, visibility,
   })
   batch.set(groupRef.collection('members').doc(uid), { ...memberStatsFrom(prof), joinedAt: now })
   batch.set(db.collection('communityProfiles').doc(uid), { groupIds: FieldValue.arrayUnion(groupId) }, { merge: true })
   await batch.commit()
 
-  return { ok: true, groupId, passcode }
+  return { ok: true, groupId, passcode, visibility }
 })
 
 /* ---------------------------------- join ----------------------------------- */
+
+/** Add `uid` to `group` as a member (shared by the passcode + code join paths).
+ *  Assumes the caller has already authorised the join. Idempotent. */
+async function performJoin(
+  db: FirebaseFirestore.Firestore,
+  uid: string,
+  prof: DocumentSnapshot,
+  groupRef: FirebaseFirestore.DocumentReference,
+  group: DocumentSnapshot,
+): Promise<{ ok: true; groupId: string; name: unknown; already?: boolean }> {
+  const groupId = groupRef.id
+  const memberRef = groupRef.collection('members').doc(uid)
+  if ((await memberRef.get()).exists) return { ok: true, groupId, name: group.get('name'), already: true }
+
+  const now = FieldValue.serverTimestamp()
+  const batch = db.batch()
+  batch.set(memberRef, { ...memberStatsFrom(prof), joinedAt: now })
+  batch.set(groupRef, { memberCount: FieldValue.increment(1) }, { merge: true })
+  batch.set(db.collection('groupDirectory').doc(groupId), { memberCount: FieldValue.increment(1) }, { merge: true })
+  batch.set(db.collection('communityProfiles').doc(uid), { groupIds: FieldValue.arrayUnion(groupId) }, { merge: true })
+  await batch.commit()
+  return { ok: true, groupId, name: group.get('name') }
+}
 
 interface JoinInput { groupId?: string; passcode?: string }
 
@@ -113,22 +156,27 @@ export const joinGroupByPasscode = onCall<JoinInput>({ region: REGION, enforceAp
   const group = await groupRef.get()
   if (!group.exists) throw new HttpsError('not-found', 'That group no longer exists.')
 
-  const memberRef = groupRef.collection('members').doc(uid)
-  if ((await memberRef.get()).exists) return { ok: true, groupId, name: group.get('name'), already: true }
-
   if (normalizeCode((group.get('passcode') as string) ?? '') !== code) {
     throw new HttpsError('permission-denied', "That code doesn't match this group.")
   }
+  return performJoin(db, uid, prof, groupRef, group)
+})
 
-  const now = FieldValue.serverTimestamp()
-  const batch = db.batch()
-  batch.set(memberRef, { ...memberStatsFrom(prof), joinedAt: now })
-  batch.set(groupRef, { memberCount: FieldValue.increment(1) }, { merge: true })
-  batch.set(db.collection('groupDirectory').doc(groupId), { memberCount: FieldValue.increment(1) }, { merge: true })
-  batch.set(db.collection('communityProfiles').doc(uid), { groupIds: FieldValue.arrayUnion(groupId) }, { merge: true })
-  await batch.commit()
+/** Join by short code alone — the path for PRIVATE groups (not in the directory,
+ *  so the client has no groupId to pass). Resolves groupCodes/{code} → group. */
+export const joinGroupByCode = onCall<{ code?: string }>({ region: REGION, enforceAppCheck: APP_CHECK_ENFORCED }, async (req) => {
+  const uid = requireVerifiedUser(req, 'communityGroups')
+  const code = normalizeCode(req.data?.code ?? '')
+  if (!code) throw new HttpsError('invalid-argument', 'A code is required.')
 
-  return { ok: true, groupId, name: group.get('name') }
+  const db = getFirestore()
+  const prof = await requireProfile(uid)
+  const codeSnap = await db.collection('groupCodes').doc(code).get()
+  if (!codeSnap.exists) throw new HttpsError('not-found', "That code doesn't match any group.")
+  const groupRef = db.collection('groups').doc(String(codeSnap.get('groupId')))
+  const group = await groupRef.get()
+  if (!group.exists) throw new HttpsError('not-found', 'That group no longer exists.')
+  return performJoin(db, uid, prof, groupRef, group)
 })
 
 /* ---------------------------------- leave ---------------------------------- */
@@ -178,6 +226,8 @@ export const deleteGroup = onCall<{ groupId?: string }>({ region: REGION, enforc
     if (++ops >= 400) { await batch.commit(); batch = db.batch(); ops = 0 }
   }
   batch.delete(db.collection('groupDirectory').doc(groupId))
+  const code = normalizeCode((group.get('passcode') as string) ?? '')
+  if (code) batch.delete(db.collection('groupCodes').doc(code))
   await batch.commit()
   await db.recursiveDelete(groupRef)
 

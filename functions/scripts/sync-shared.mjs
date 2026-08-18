@@ -47,6 +47,9 @@ const ENTRIES = [
   // points can't be forged and the two can't drift (F-003). Both are firebase-free.
   'community/scoring.ts',
   'community/anomaly.ts',
+  // Content moderation blocklist — the SAME screen runs on the client (instant
+  // feedback) and in the claimUsername/createGroup callables (authoritative).
+  'community/contentModeration.ts',
 ].map((p) => join(srcRoot, p))
 
 /** Resolve a relative import specifier from `fromFile` to an existing .ts under src/. */

@@ -29,7 +29,7 @@ import {
   createGroup, searchGroups, joinGroup,
   type DiscoverableGroup,
 } from './service'
-import { youMember } from './simulate'
+import { youMember, DISCOVERABLE_GROUPS } from './simulate'
 import { COMMUNITY_BACKEND } from './backendConfig'
 
 /* ------------------------------ ranking metrics ---------------------------- */
@@ -231,11 +231,12 @@ function CreateGroupSheet({ open, onClose, onCreated }: { open: boolean; onClose
   const me = useMemo(() => myLeaderStats(state), [state])
   const [name, setName] = useState('')
   const [pick, setPick] = useState(0)
+  const [visibility, setVisibility] = useState<'private' | 'public'>('private')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Reset when the sheet reopens.
-  useEffect(() => { if (open) { setName(''); setPick(0); setBusy(false); setError(null) } }, [open])
+  useEffect(() => { if (open) { setName(''); setPick(0); setVisibility('private'); setBusy(false); setError(null) } }, [open])
 
   const submit = async () => {
     setBusy(true)
@@ -244,7 +245,7 @@ function CreateGroupSheet({ open, onClose, onCreated }: { open: boolean; onClose
     if (COMMUNITY_BACKEND) {
       try {
         const b = await import('./groupsBackend')
-        const { groupId, passcode } = await b.createGroupRemote(name.trim(), appearance.icon, appearance.color)
+        const { groupId, passcode } = await b.createGroupRemote(name.trim(), appearance.icon, appearance.color, visibility)
         const group: CommunityGroup = {
           id: groupId, name: name.trim(), passcode, ownerUsername: me.username ?? '',
           createdAtKey: todayKey, members: [youMember(me)], icon: appearance.icon, color: appearance.color, weeklyGoal: 12,
@@ -316,6 +317,29 @@ function CreateGroupSheet({ open, onClose, onCreated }: { open: boolean; onClose
         })}
       </View>
 
+      <Text className="mb-2 mt-4 text-[12px] font-semibold uppercase tracking-wide text-tertiary">Visibility</Text>
+      <View className="flex-row gap-2.5">
+        {([
+          { value: 'private' as const, label: 'Private', hint: 'Join by code only' },
+          { value: 'public' as const, label: 'Public', hint: 'Listed in search' },
+        ]).map((opt) => {
+          const active = opt.value === visibility
+          return (
+            <Pressable
+              key={opt.value}
+              onPress={() => setVisibility(opt.value)}
+              accessibilityRole="button"
+              accessibilityLabel={`${opt.label} — ${opt.hint}`}
+              accessibilityState={{ selected: active }}
+              className={`flex-1 rounded-2xl border-2 px-3.5 py-3 active:opacity-90 ${active ? 'border-brand-400 bg-brand-400/10' : 'border-white/10 bg-ink-700'}`}
+            >
+              <Text className={`text-[14px] font-bold ${active ? 'text-brand-300' : 'text-white'}`}>{opt.label}</Text>
+              <Text className="mt-0.5 text-[12px] text-tertiary">{opt.hint}</Text>
+            </Pressable>
+          )
+        })}
+      </View>
+
       <Pressable
         onPress={submit}
         disabled={!canSubmit}
@@ -345,13 +369,48 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<DiscoverableGroup | null>(null)
   const [code, setCode] = useState('')
+  const [directCode, setDirectCode] = useState('')
+  const [directBusy, setDirectBusy] = useState(false)
+  const [directError, setDirectError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const tokenRef = useRef(0)
 
   useEffect(() => {
-    if (open) { setQuery(''); setSelected(null); setCode(''); setError(null) }
+    if (open) { setQuery(''); setSelected(null); setCode(''); setDirectCode(''); setDirectError(null); setError(null) }
   }, [open])
+
+  // Join a PRIVATE group by its code alone (it isn't in the searchable directory).
+  const submitDirectCode = async () => {
+    const c = directCode.trim().toUpperCase()
+    if (c.length < 4 || directBusy) return
+    setDirectBusy(true)
+    setDirectError(null)
+    if (COMMUNITY_BACKEND) {
+      try {
+        const b = await import('./groupsBackend')
+        const { groupId, name } = await b.joinGroupByCodeRemote(c)
+        const full = await b.loadGroupRemote(groupId)
+        setDirectBusy(false)
+        if (full) dispatch({ type: 'JOIN_GROUP_BY_CODE', group: full })
+        toast(`Joined ${name}`)
+        onClose()
+      } catch {
+        setDirectBusy(false)
+        setDirectError("That code doesn't match any group.")
+      }
+      return
+    }
+    // Simulation: resolve the code against the discoverable directory's passcodes.
+    const match = DISCOVERABLE_GROUPS.find((g) => g.passcode.toUpperCase() === c)
+    if (!match) { setDirectBusy(false); setDirectError("That code doesn't match any group."); return }
+    const res = await joinGroup(match, c, me, todayKey, state.community.groups.map((g) => g.id))
+    setDirectBusy(false)
+    if (!res.ok) { if (res.reason === 'duplicate') { toast(res.message); onClose(); return } setDirectError(res.message); return }
+    dispatch({ type: 'JOIN_GROUP_BY_CODE', group: res.group })
+    toast(`Joined ${res.group.name}`)
+    onClose()
+  }
 
   // Debounced directory search (name only). Re-runs as the query changes.
   useEffect(() => {
@@ -473,6 +532,38 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
               style={{ color: colors.fg }}
             />
           </View>
+
+          {/* Private groups aren't listed — join one directly with its code. */}
+          <Text className="mb-1.5 mt-4 text-[12px] font-semibold uppercase tracking-wide text-tertiary">Have a code?</Text>
+          <View className="flex-row items-center gap-2">
+            <View className="flex-1 flex-row items-center gap-2 rounded-2xl border bg-ink-700 px-3.5" style={{ borderColor: directError ? `${colors.danger}aa` : 'rgba(255,255,255,0.12)', height: 50 }}>
+              <KeyRound size={18} color="rgba(255,255,255,0.4)" />
+              <TextInput
+                value={directCode}
+                onChangeText={(t) => { setDirectCode(t.toUpperCase().slice(0, 8)); setDirectError(null) }}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                maxLength={8}
+                placeholder="Enter code"
+                placeholderTextColor="rgba(255,255,255,0.3)"
+                accessibilityLabel="Group join code"
+                className="flex-1 text-[15px] font-bold tracking-[3px] text-white"
+                style={{ color: colors.fg }}
+              />
+            </View>
+            <Pressable
+              onPress={submitDirectCode}
+              disabled={directBusy || directCode.trim().length < 4}
+              accessibilityRole="button"
+              accessibilityLabel="Join by code"
+              accessibilityState={{ disabled: directBusy || directCode.trim().length < 4 }}
+              className={`items-center justify-center rounded-2xl px-4 ${!directBusy && directCode.trim().length >= 4 ? 'bg-brand-400 active:opacity-90' : 'bg-white/10'}`}
+              style={{ height: 50 }}
+            >
+              {directBusy ? <ActivityIndicator size="small" color="#000" /> : <Text className={`text-[14px] font-bold ${directCode.trim().length >= 4 ? 'text-black' : 'text-disabled'}`}>Join</Text>}
+            </Pressable>
+          </View>
+          {directError && <Text className="mt-1.5 px-1 text-[12px] font-semibold" style={{ color: colors.danger }}>{directError}</Text>}
 
           <View className="mt-4 gap-2">
             {loading ? (

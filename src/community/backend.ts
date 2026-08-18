@@ -68,6 +68,21 @@ export async function appealStandingRemote(note?: string): Promise<{ ok: true; s
   return res.data
 }
 
+export type ReportReason = 'offensive_name' | 'harassment' | 'impersonation' | 'cheating' | 'other'
+
+/** File a moderation report against a username or group. Idempotent per
+ *  (reporter, target) server-side. `targetLabel` is what the reporter saw
+ *  (username / group name), passed for the moderator's context. */
+export async function reportContentRemote(input: {
+  targetType: 'user' | 'group'
+  targetId: string
+  targetLabel?: string
+  reason: ReportReason
+  note?: string
+}): Promise<void> {
+  await call<typeof input, { ok: true }>('reportContent')(input)
+}
+
 /* ---------------------------------- reads ---------------------------------- */
 
 export interface RemoteStanding { uid: string; username: string; points: number; isYou: boolean }
