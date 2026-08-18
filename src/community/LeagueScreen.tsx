@@ -23,7 +23,7 @@ import { RankBadge, StreakFlame } from './ui'
 import { GlobalLeaderboard } from './GlobalLeaderboard'
 import { TIERS, tierOf, leaguePeriodKey, daysLeftInPeriod, promoteCutoff, simulateLeague, zoneFor, type Tier, type LeagueRow, type Zone } from './league'
 import { COMMUNITY_BACKEND } from './backendConfig'
-import { shouldPostCommunityStats } from './syncGate'
+import { shouldPostCommunityStats, clampDayCadence } from './syncGate'
 
 type LeagueStatus = 'loading' | 'ready' | 'error'
 /** Competitive-integrity status of the user's own standing (F-003). `ok` ranks
@@ -108,7 +108,7 @@ export function LeagueScreen({ onClaimUsername }: { onClaimUsername: () => void 
   // the competitive metrics itself. Built here (the component holds full state) and
   // threaded through, so useLeagueData never posts a client-computed points/streak.
   const syncPayload = useMemo<SyncPayload>(
-    () => ({ targets: targetsFrom(state.profile), days: buildDayRecords(state), clientTz: deviceTimezone() ?? undefined }),
+    () => ({ targets: targetsFrom(state.profile), days: clampDayCadence(buildDayRecords(state)), clientTz: deviceTimezone() ?? undefined }),
     [state],
   )
 
