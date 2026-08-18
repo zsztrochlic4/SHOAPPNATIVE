@@ -10,7 +10,7 @@
 
 import type { CoachContext, DetectorHit, SafetyAction, SafetyCategory, SafetyDecision, SafetySession } from './types'
 import { CATEGORY_TIER } from './types'
-import { runRules, scopeClassifierHits, hasImmediacy, hasCurrentSafetySignal, normalize, isOnTopicFitness } from './rules'
+import { runRules, scopeClassifierHits, hasImmediacy, hasCurrentSafetySignal, normalize, isOnTopicFitness, clearedConditionBenign, painlessNoiseBenign } from './rules'
 import { activeClassifier } from './classifier'
 import { correctionAdjust, isGenuineCorrection, stateHits, applyDecision } from './stateMachine'
 import { classifyConversationalIntent } from './conversationalIntent'
@@ -95,6 +95,27 @@ function isSubstantiallyNonLatin(text: string): boolean {
   let nonAscii = 0
   for (const ch of chars) if (ch.charCodeAt(0) > 127) nonAscii++
   return nonAscii / chars.length >= 0.2
+}
+
+/**
+ * Benign de-escalation for the TWO lowest-severity referral categories only, mirroring the
+ * off_topic rescue below: it NEVER touches a crisis / emergency / 000 route (those are decided
+ * far above these tiers, under the emergency floor). It relaxes:
+ *   • medical_condition → allow, when the message carries explicit CURRENT clinician clearance
+ *     to exercise and no acute sign (a professional already assessed it);
+ *   • medical_urgent → allow, when the message is a PAINLESS joint noise with no red flag —
+ *     but never a possible concussion or rhabdo (those keep their urgent response).
+ * Tightly bounded and unit-tested (test/safety/cleared-condition) so it cannot open a real
+ * safety route. Added for the IRH-2026-08-18-B over-caution classes, by general mechanism.
+ */
+function applyBenignOverride(decision: SafetyDecision, text: string): SafetyDecision {
+  if (decision.category === 'medical_condition' && clearedConditionBenign(text)) {
+    return { category: 'none', tier: 0, action: 'allow', responseKey: null, allowCoaching: true, hits: [], reason: 'cleared_condition_benign' }
+  }
+  if (decision.category === 'medical_urgent' && decision.reason !== 'possible_concussion' && decision.reason !== 'possible_rhabdo' && painlessNoiseBenign(text)) {
+    return { category: 'none', tier: 0, action: 'allow', responseKey: null, allowCoaching: true, hits: [], reason: 'painless_noise_benign' }
+  }
+  return decision
 }
 
 function applyConversationalLayer(decision: SafetyDecision, text: string): SafetyDecision {
@@ -223,6 +244,7 @@ export function route(text: string, ctx: CoachContext, session: SafetySession): 
     // composed decision came out lower, the emergency wins. Most-protective route always prevails.
     const floor = emergencyFloor([...ruleHits, ...escalated])
     if (floor && decision.tier < CATEGORY_TIER[floor.category]) decision = decide([floor])
+    decision = applyBenignOverride(decision, text) // de-escalate cleared-condition / painless-noise (low tiers only)
     decision = applyConversationalLayer(decision, text) // additive; refer non-fitness/non-conversational
     decision.suppressions = [...rules.suppressions, ...clsScoped.suppressions]
     applyDecision(session, decision)
@@ -271,6 +293,7 @@ export async function routeAsync(
     if (floor && decision.tier < CATEGORY_TIER[floor.category]) decision = decide([floor])
     // Fail-safe: classifier unavailable AND nothing else caught it → never allow normal coaching.
     if (clsUnavailable && decision.action === 'allow') return failSafe()
+    decision = applyBenignOverride(decision, text) // de-escalate cleared-condition / painless-noise (low tiers only)
     decision = applyConversationalLayer(decision, text) // additive; refer non-fitness/non-conversational
     decision.suppressions = [...rules.suppressions, ...clsScoped.suppressions]
     applyDecision(session, decision)

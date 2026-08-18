@@ -445,16 +445,59 @@ const CONDITIONS = ['heart condition', 'cardiac', 'heart problem', 'had a stroke
  *  programming question is not a deferral case (reviewer over-caution class, IRH-BN-19).
  *  Deliberately a broad general idiom set, not tuned to any one message. Recall is
  *  preserved by ACUTE_OVERRIDE below and by the emergency detectors that run FIRST. */
-const CURRENT_CLEARANCE = ['cleared me to', 'cleared to exercise', 'cleared to train', 'cleared to lift',
-  'cleared for exercise', 'cleared for training', 'cleared to work out', 'doctor cleared me', 'gp cleared me',
-  'cardiologist cleared me', 'specialist cleared me', 'physio cleared me', 'given the all clear to',
-  'signed off on me training', 'signed off to train', 'ok to exercise per my doctor', 'ok to train per my doctor',
-  'told me it s safe to train', 'told me its safe to train', 'said i am safe to train', 'said im safe to train']
+/** Explicit CURRENT clinician clearance to exercise = a POSITIVE clearance ACT co-occurring
+ *  with an EXERCISE OBJECT. Generalised over the verb (cleared / approved / okayed / signed
+ *  off / gave the go-ahead / green light) rather than a fixed phrase list, so fresh wordings
+ *  like "cleared exercise", "team approved resistance training", "signed off on lifting" all
+ *  match. Guarded against a NON-clearance ("not cleared", "need to get cleared", "advised
+ *  against"). */
+const CLEARANCE_ACT = ['cleared', 'clearance', 'approved', 'approve', 'okayed', 'ok d', 'signed off', 'sign off',
+  'given the go ahead', 'go ahead to', 'green light', 'given the all clear', 'gave the all clear', 'all clear to',
+  'happy for me to', 'given clearance', 'said i can train', 'said i can lift', 'said i can exercise']
+const EXERCISE_OBJECT = ['exercise', 'exercising', 'training', 'train', 'lift', 'lifting', 'resistance training',
+  'strength training', 'weights', 'working out', 'work out', 'workout', 'gym', 'me to', 'me for']
+const NOT_CLEARED = ['not cleared', 'no clearance', 'advised against', 'told me not to', 'said not to',
+  'refused to clear', 'not safe to', 'get cleared', 'getting cleared', 'to get cleared', 'need to get cleared',
+  'not to train', 'not to lift', 'not to exercise', 'shouldnt train', 'should not train']
+function hasCurrentClearance(n: Norm): boolean {
+  if (has(n, ...NOT_CLEARED)) return false
+  return has(n, ...CLEARANCE_ACT) && has(n, ...EXERCISE_OBJECT)
+}
 /** Any acute sign here KEEPS the flag even with a clearance claim (belt-and-braces; the
  *  emergency detectors already run before this, so an emergency still wins on tier). */
 const ACUTE_OVERRIDE = ['chest pain', 'cant breathe', 'can t breathe', 'short of breath', 'attack',
   'palpitations', 'passing out', 'passed out', 'fainting', 'faint', 'unconscious', 'seizing', 'seizure',
   'confused', 'slurred', 'blue lips', 'severe']
+
+/** A cleared, stable condition with a benign training question — the professional already
+ *  assessed it. Trusts the classifier/rules medical_condition category and only relaxes it
+ *  (router benign-override) under explicit current clearance + no acute sign. */
+export function clearedConditionBenign(text: string): boolean {
+  const n = normalize(text)
+  return hasCurrentClearance(n) && !has(n, ...ACUTE_OVERRIDE)
+}
+
+/** A PAINLESS joint noise (click / pop / crack / crackle / grind / clunk) with an explicit
+ *  no-pain / feels-normal statement and NO asserted red flag (swelling, sharp pain, giving
+ *  way, locking, instability, cannot bear weight, dislocation). Negated red flags ("no pain,
+ *  giving way, or swelling") do not count — a wide window catches comma lists. */
+const JOINT_NOISE = ['click', 'clicks', 'clicking', 'clicked', 'pop', 'pops', 'popping', 'popped', 'crack', 'cracks',
+  'cracking', 'crackle', 'crackles', 'crackling', 'grind', 'grinds', 'grinding', 'clunk', 'clunks', 'clunking',
+  'crepitus', 'snapping', 'snaps']
+const PAINLESS_SIGN = ['no pain', 'painless', 'pain free', 'doesnt hurt', 'does not hurt', 'nothing hurts',
+  'not painful', 'feels normal', 'completely normal', 'totally normal', 'feels fine', 'no discomfort', 'no other symptoms']
+const JOINT_REDFLAG = ['swollen', 'swelling', 'swells', 'sharp pain', 'stabbing', 'giving way', 'gives way', 'gave way',
+  'locking', 'locks up', 'locked up', 'unstable', 'instability', 'cant bear weight', 'can t bear weight',
+  'cant put weight', 'can t put weight', 'cant walk', 'can t walk', 'wont move', 'can t move', 'dislocat', 'popped out']
+function wideNegated(n: Norm, t: string): boolean {
+  return hasRe(n, new RegExp(`\\b(no|not|never|without|free of|nor|neither|dont|don t|didnt)\\b[a-z0-9 ,]{0,40}\\b${esc(t)}(s|es)?\\b`))
+}
+export function painlessNoiseBenign(text: string): boolean {
+  const n = normalize(text)
+  if (!has(n, ...JOINT_NOISE) || !has(n, ...PAINLESS_SIGN)) return false
+  // Any red flag that is ASSERTED (present and not inside a negation) keeps the flag.
+  return !JOINT_REDFLAG.some((t) => has(n, t) && !wideNegated(n, t))
+}
 
 function detectMedicalCondition(n: Norm): DetectorHit[] {
   // Asthma is a condition, but an ATTACK is an emergency (handled above).
@@ -462,7 +505,7 @@ function detectMedicalCondition(n: Norm): DetectorHit[] {
   // Suppress the deferral ONLY when a named condition carries explicit current clearance
   // AND shows no acute sign — the professional already assessed it. Without clearance, or
   // with any acute sign, it still flags (or the emergency floor catches it first).
-  if (condition && has(n, ...CURRENT_CLEARANCE) && !has(n, ...ACUTE_OVERRIDE)) return []
+  if (condition && hasCurrentClearance(n) && !has(n, ...ACUTE_OVERRIDE)) return []
   const vagueClearance = has(n, 'doctor said exercise is probably', 'doctor said its probably ok',
     'doctor said it s probably ok', 'probably okay to exercise', 'probably fine to exercise')
   if (condition || vagueClearance) return [hit('medical_condition', condition ? 'known_condition' : 'vague_clearance')]
