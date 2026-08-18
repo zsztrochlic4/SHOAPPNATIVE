@@ -87,6 +87,11 @@ export async function clearCoachMemories(): Promise<void> {
   await callable<Record<string, never>, { ok: true }>('clearCoachMemories')({})
 }
 
+/** One end-of-chat rating. Best-effort: never blocks or interrupts the chat if it fails. */
+export async function recordCoachFeedback(rating: 'helpful' | 'not_helpful', reason?: string): Promise<void> {
+  try { await callable<{ rating: string; reason?: string }, { ok: true }>('recordCoachFeedback')({ rating, reason }) } catch { /* best-effort telemetry */ }
+}
+
 export async function respondToCoachProposal(id: string, decision: 'confirm' | 'reject') {
   const result = await callable<
     { id: string; decision: 'confirm' | 'reject' },

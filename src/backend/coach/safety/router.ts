@@ -98,6 +98,18 @@ function isSubstantiallyNonLatin(text: string): boolean {
 }
 
 function applyConversationalLayer(decision: SafetyDecision, text: string): SafetyDecision {
+  // Rescue a clearly on-topic fitness message (a schedule edit, a supplement or alcohol question, a
+  // planned absence...) that the classifier mislabeled off_topic. This ONLY ever relaxes the
+  // lowest-stakes scope route: it fires solely when the category is `off_topic` AND the curated on-topic
+  // fitness recognizer agrees. Every safety category is decided above under the emergency floor and is
+  // never touched here; a genuine crisis carrying a fitness word is flagged as crisis (a different
+  // category), not off_topic, so the safety net stays intact. isOnTopicFitness is now word-boundaried,
+  // so it no longer rescues false positives like "ok" inside "joke".
+  if (decision.action === 'refer' && decision.category === 'off_topic' && isOnTopicFitness(text)) {
+    const rescued: SafetyDecision = { category: 'none', tier: 0, action: 'allow', responseKey: null, allowCoaching: true, hits: [], reason: 'off_topic_overridden_on_topic_fitness' }
+    rescued.intent = 'coaching'
+    return rescued
+  }
   if (decision.action !== 'allow') return decision
   if (isOnTopicFitness(text)) {
     decision.intent = 'coaching'

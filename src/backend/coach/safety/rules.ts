@@ -83,6 +83,23 @@ function isWorkoutHyperbole(n: Norm): boolean {
     'dying to', 'killer workout', 'killing it', 'destroyed my', 'wrecked me', 'dead tired')
 }
 
+/** Ordinary TRAINING FATIGUE the classifier sometimes over-reads as crisis ("everything feels heavy",
+ *  "I'm exhausted / run down / wrecked / drained"). It is a recovery / deload topic, not distress. Used
+ *  ONLY to suppress a crisis_concern hit, and only ever alongside suppressionRule's paramount
+ *  no-live-distress guard, so it can never hide a genuine disclosure. Self-guards on any first-person
+ *  distress and on ambiguous life-directed phrases, so "everything feels heavy and I can't keep going"
+ *  keeps the crisis flag. */
+const _LIFE_DIRECTED = /\b(be here|here anymore|want to be here|the point|whats the point|what s the point|keep going|go on|carry on|hate (?:my )?(?:life|myself)|not worth|worth (?:it|living)|my life|to live|to die|die|dying|kill|suicid|self harm|hurt myself|harm myself|disappear|dont belong|do not belong|empty inside|numb|worthless|hopeless|give up|giving up|no reason|reason to (?:keep|go|live)|cant anymore|can t anymore|cant go on|can t go on|cant cope|can t cope|breaking down|falling apart|over it all|want it to stop|end it|cant keep going|can t keep going|cant do (?:it|this) anymore|can t do (?:it|this) anymore)\b/
+function isBenignTrainingFatigue(n: Norm): boolean {
+  if (hasFirstPersonDistress(n) || wantsToDie(n)) return false
+  if (hasRe(n, _LIFE_DIRECTED)) return false // any life/existence-directed phrasing keeps the crisis flag
+  return has(n, 'everything feels heavy', 'everything is heavy', 'feels heavy', 'feeling heavy',
+    'weights feel heavy', 'lifts feel heavy', 'exhausted', 'run down', 'rundown', 'run-down', 'wrecked',
+    'shattered', 'drained', 'wiped out', 'knackered', 'no energy', 'zero energy', 'so tired',
+    'really tired', 'burnt out', 'burned out', 'sluggish', 'so flat', 'feeling flat', 'running on empty',
+    'worn out', 'no gas left')
+}
+
 /* ------------------------------------------------------------------ */
 /*  Individual guardrail detectors                                     */
 /* ------------------------------------------------------------------ */
@@ -440,6 +457,15 @@ const DE_SIGNALS = ['skipping meals', 'skip meals', 'only eating once', 'once a 
 
 function detectDisorderedEating(n: Norm): DetectorHit[] {
   if (has(n, ...DE_SIGNALS)) return [hit('disordered_eating', 'de_signal')]
+  // Compensatory exercise (500-prompt eval #407): training used to make up for / burn off eating, or
+  // extra training framed as a consequence of eating "too much". High precision — requires BOTH an
+  // extra-exercise cue AND a compensation-for-eating cue, so a benign "I overate and skipped my workout"
+  // does not trip it.
+  const compExercise = has(n, 'train twice', 'train again', 'train extra', 'extra session', 'extra workout',
+    'extra cardio', 'more cardio', 'train harder', 'work it off', 'burn it off', 'twice today')
+  const compFood = has(n, 'because i ate', 'since i ate', 'after eating', 'i ate too much', 'ate too much',
+    'to burn off', 'burn off', 'make up for', 'to earn', 'compensate')
+  if (compExercise && compFood) return [hit('disordered_eating', 'compensatory_exercise')]
   return []
 }
 
@@ -502,7 +528,13 @@ function detectSteroidsPED(n: Norm): DetectorHit[] {
   const ped = has(n, 'steroids', 'steroid cycle', 'anabolic', 'sarm', 'sarms', 'testosterone', 'test e',
     'test cyp', 'trenbolone', 'anavar', 'dianabol', 'winstrol', 'clenbuterol', 'peptide', 'peptides',
     'post cycle', 'post cycle therapy', 'pct', 'inject test', 'how much testosterone', 'best cycle', 'safest cycle',
-    'pass a drug test', 'beat a drug test', 'where can i buy sarms', 'buy steroids') ||
+    'pass a drug test', 'beat a drug test', 'where can i buy sarms', 'buy steroids',
+    // 500-prompt eval: definition/education/myth PED questions ("what does TRT mean", "risks of PED use")
+    // were falling to the generic off-topic bucket or an awkward model refusal. Route them to the PED
+    // referral so they get a risk-aware "speak to a doctor" answer, not a generic deflection. The referral
+    // never gives cycles/doses/sourcing, so this only tightens (never loosens) the guardrail.
+    'trt', 'peds', 'ped use', 'ped usage', 'ped cycle', 'performance enhancing', 'performance-enhancing',
+    'performance enhancer', 'gear cycle') ||
     // 'tren' (trenbolone slang) ONLY as a whole word — a bare substring wrongly fired inside common
     // fitness words "s-TREN-gth" and "TREN-d", referring every strength/weight-trend question as a PED.
     hasRe(n, /\btren\b/)
@@ -533,7 +565,13 @@ function detectUnder18(n: Norm): DetectorHit[] {
   const ageStmt = hasRe(n, /\b(i am|i m|im|only|actually|just|turned|turning)\s+(1[0-7]|[1-9])\b(?!\s*(kg|kgs|kilo|kilos|pound|pounds|lb|lbs|rep|reps|set|sets|week|weeks|min|minutes|km|hour|hours|days|day|percent|reps))/)
   const explicit = has(n, 'under 18', 'underage', 'im a minor', 'i m a minor', 'still in high school',
     'in year 7', 'in year 8', 'in year 9', 'in year 10', 'in year 11', 'year 7', 'year 8', 'year 9', 'year 10',
-    'in grade 7', 'in grade 8', 'in grade 9', 'in grade 10', 'grade 7', 'grade 8', 'grade 9', 'high schooler')
+    'in grade 7', 'in grade 8', 'in grade 9', 'in grade 10', 'grade 7', 'grade 8', 'grade 9', 'high schooler',
+    // US high-school class terms, ONLY in the high-school collocation (unambiguous minors: freshman ~14,
+    // sophomore ~15, junior ~16-17). Bare 'junior'/'senior'/'freshman'/'sophomore' are deliberately NOT
+    // matched — they are overloaded in the gym (junior athlete, senior lifter) and at college (a college
+    // freshman is 18+). 'senior' high-schooler (~year 12) is also excluded as a possible 18-year-old.
+    'high school freshman', 'high school sophomore', 'high school junior',
+    'freshman in high school', 'sophomore in high school', 'junior in high school')
   // Birth-year disclosure that implies a CURRENT minor ("i was born in 2010", "birth year 2009", "dob 2010").
   // Computed against the current year so it stays correct as time passes; only DEFINITE minors flag (born
   // strictly after currentYear-18), leaving the ambiguous edge birth year to the server-trusted DOB gate.
@@ -554,7 +592,11 @@ function detectUnder18(n: Norm): DetectorHit[] {
     hasRe(n, new RegExp(`\\b(?:im|i m|i am|i)(?:\\s+(?:will be|ll be))?\\s+(?:turning|turn|almost|nearly|about to (?:turn|be)|going to (?:turn|be))\\s*(?:18|eighteen)\\b${NOT_A_QUANTITY}`)) ||
     hasRe(n, /\bmy (?:18th|eighteenth) birthday\b/) ||
     hasRe(n, /\b(?:before|until|when) i turn (?:18|eighteen)\b/) ||
-    hasRe(n, new RegExp(`\\bnot (?:yet|quite) (?:18|eighteen)\\b${NOT_A_QUANTITY}`))
+    hasRe(n, new RegExp(`\\bnot (?:yet|quite) (?:18|eighteen)\\b${NOT_A_QUANTITY}`)) ||
+    // First-person "I'm in high school" (present-tense enrolment). Requires the "i (am) …" subject so a
+    // teacher/coach ("I teach in high school", "I coach a high school team") does NOT match; a historical
+    // "when I was in high school" is removed afterwards by scope()'s `historical` suppressor for under_18.
+    hasRe(n, /\b(?:i am|i m|im)\s+(?:still |currently |only )?in high school\b/)
   if (ageStmt || explicit || approachingEighteen || bornMinor) return [hit('under_18', 'stated_under_18')]
   return []
 }
@@ -593,7 +635,14 @@ function detectAiRelationship(n: Norm): DetectorHit[] {
     'do you like me', 'do you actually like me', 'do you really like me', 'do you even like me',
     'are you my friend', 'will you be my friend', 'do you have feelings', 'do you have feelings for me',
     'can we be friends', 'do you care about me', 'are you in love with me', 'do you think about me',
-    'will you always be here for me', 'are you my only friend', 'do you miss me'))
+    'will you always be here for me', 'are you my only friend', 'do you miss me',
+    // 500-prompt eval: identity / clinical-role / diagnosis questions belong here (the ai_relationship
+    // reply already states "not a real person, a therapist, or your doctor" and redirects to training),
+    // not in the generic off-topic bucket they were falling into (#423/#424/#425).
+    'are you a doctor', 'are you a physio', 'are you a physiotherapist', 'are you a nurse',
+    'are you a dietitian', 'are you a psychologist', 'are you a physician', 'are you medically qualified',
+    'are you a qualified', 'are you qualified', 'can you diagnose', 'diagnose injuries', 'diagnose my',
+    'diagnose what', 'tell me what is wrong with', 'what is wrong with my'))
     return [hit('ai_relationship', 'relationship_boundary')]
   return []
 }
@@ -743,9 +792,10 @@ export function hasCurrentSafetySignal(n: Norm): boolean {
 
 /** Which scoping rules apply to which categories (Jack round-3). Crisis/emergency keep their in-detector
  *  guards too; this adds the cross-category historical/third-party/negation/topical layer. */
-const SCOPED: Partial<Record<SafetyCategory, ('third_party' | 'historical' | 'negation' | 'topical')[]>> = {
-  crisis_concern: ['historical', 'topical'],
-  immediate_danger: ['historical', 'topical'],
+const SCOPED: Partial<Record<SafetyCategory, ('third_party' | 'historical' | 'negation' | 'topical' | 'fatigue')[]>> = {
+  crisis_concern: ['historical', 'topical', 'fatigue'],
+  immediate_danger: ['historical', 'topical'], // never 'fatigue' — an imminent-danger flag is never suppressed by tiredness
+
   medical_emergency: ['negation'],
   overdose_poisoning: ['topical', 'negation', 'historical'],
   medical_condition: ['third_party', 'historical', 'negation', 'topical'],
@@ -797,6 +847,7 @@ function suppressionRule(n: Norm, category: SafetyCategory, opts: ScopeOpts = {}
   if (rules.includes('historical') && historicalResolved(n)) return 'historical_resolved'
   if (rules.includes('negation') && terms.length > 0 && negatedTerm(n, terms)) return 'explicit_negation'
   if (rules.includes('topical') && topicalFrame(n)) return 'topical_reference'
+  if (rules.includes('fatigue') && isBenignTrainingFatigue(n)) return 'training_fatigue'
   return null
 }
 
@@ -987,6 +1038,52 @@ const FITNESS_TERMS = [
   'anatomy', 'adaptation', 'detraining', 'heart health', 'bone health', 'posture', 'sedentary',
   // First-class coach modes/actions. These are bounded by the deterministic action schema downstream.
   'exam mode', 'budget eats', 'planned absence',
+  // Scheduling frequency, planned time away, consistency, supplements and alcohol are all on-topic coach
+  // conversations (previously bounced as off-topic). Adding them only relaxes the off-topic net; a real
+  // safety category is still decided first and is never downgraded by an on-topic term.
+  'days a week', 'times a week', 'days per week', 'day a week',
+  'time off', 'days off', 'week off', 'away', 'holiday', 'vacation', 'travelling', 'traveling', 'going home', 'trip',
+  'skipping', 'skip', 'missing sessions', 'missed sessions', 'fell off', 'falling off', 'consistency', 'stick to',
+  'supplement', 'supplements', 'bcaa', 'bcaas', 'protein powder', 'multivitamin', 'fish oil',
+  'alcohol', 'drinking', 'beer', 'wine',
+  // Training fatigue / recovery vocabulary: a deload or rest conversation, not a crisis (the crisis
+  // classifier over-flags these; a scoped fatigue suppressor removes that false positive).
+  'exhausted', 'run down', 'rundown', 'worn out', 'wrecked', 'drained', 'shattered', 'sluggish',
+  'no energy', 'everything feels heavy', 'feels heavy', 'lifts feel heavy', 'feeling flat', 'running on empty',
+  // 500-PROMPT EVAL (2026-08-17): a broad batch of ordinary training / technique / programming / nutrition /
+  // equipment / recovery / beginner vocabulary the classifier was bouncing as "off topic". These ONLY relax
+  // the off-topic net (a real safety category is decided first and never downgraded by an on-topic term).
+  // Curated to avoid short substrings that could match distress words (e.g. no bare "arm" -> "harm").
+  // programming / concepts
+  'amrap', 'emom', 'drop set', 'dropset', 'to failure', 'progressive overload', 'compound', 'isolation',
+  'unilateral', 'range of motion', 'eccentric', 'concentric', 'partial rep', 'partial reps', 'full body',
+  'upper lower', 'push pull legs', 'muscle confusion', 'junk volume', 'time under tension', 'rest between',
+  'rest period', 'between sets', 'how much rest', 'rest too long', 'periodis', 'periodiz', 'overtrain',
+  'over training', 'overreach', 'plateau', 'stalled', 'stalling',
+  // recovery / modalities
+  'foam roll', 'foam roller', 'sauna', 'ice bath', 'cold shower', 'cold plunge', 'massage', 'active recovery',
+  'doing too much', 'too much volume', 'overdoing',
+  // exercises / technique
+  'lats', 'lat pulldown', 'pulldown', 'pull down', 'lunge', 'lunges', 'lateral raise', 'side raise',
+  'chest fly', 'cable fly', 'flyes', 'triceps extension', 'leg extension', 'pushdown', 'dips', 'plank',
+  'crunch', 'hip thrust', 'split squat', 'romanian deadlift', 'mixed grip', 'grip strength', 'my grip',
+  // accessories / equipment
+  'belt', 'lifting belt', 'wrist wrap', 'wrist wraps', 'lifting straps', 'knee sleeve', 'knee sleeves', 'chalk',
+  'equipment', 'no equipment',
+  // body parts (safe forms only)
+  'forearm', 'forearms', 'traps', 'delts', 'left arm', 'right arm', 'weaker', 'imbalance', 'lagging', 'one side',
+  // nutrition education
+  'fats', 'body fat', 'fat loss', 'healthy fats', 'dietary fat', 'salt', 'sodium', 'sugar', 'fibre', 'fiber',
+  'vitamin', 'multivitamin', 'electrolyte', 'electrolytes', 'caffeine', 'beta alanine', 'beta-alanine', 'whey',
+  'casein', 'fat burner', 'fat burners', 'cheat meal', 'takeaway', 'breakfast', 'vegan', 'vegetarian', 'fasted', 'fasting',
+  // beginner / general coaching
+  'beginner', 'beginners', 'novice', 'personal trainer', 'biggest mistake', 'what to track', 'track my',
+  'tracking', 'first session', 'first time at the gym', 'never been to a gym', 'starting out', 'get started',
+  'inconsistent', 'restart', 'back into it', 'off track', 'fell off', 'feel weak', 'feeling weak',
+  // sport / activity (specific, to avoid substring traps)
+  'footy', 'football', 'basketball', 'soccer', 'tennis', 'pickleball', 'climbing', 'martial arts', 'dance class',
+  // time available
+  'an hour', 'one hour', 'half hour', 'hour today', 'quick workout', 'something quick',
 ]
 
 /** Very short in-flow affirmations — allowed only when the whole message is a brief continuation. */
@@ -1003,6 +1100,8 @@ const CONTINUITY = [
  * in isolation. Generalises to phrasing, not to a specific sentence.
  */
 function matchesFitnessIntentPattern(n: Norm): boolean {
+  // Set x rep notation ("3 x 10", "5x5", "4 x 8") is unambiguously a training question.
+  if (hasRe(n, /\b\d{1,3}\s?x\s?\d{1,3}\b/)) return true
   // exams / study / a busy academic period AND its effect on training, time or recovery.
   const examContext = has(n, 'exam', 'exams', 'study', 'studying', 'assignment', 'deadline', 'deadlines',
     'finals', 'midterm', 'midterms', 'placement', 'thesis')
@@ -1021,12 +1120,13 @@ function matchesFitnessIntentPattern(n: Norm): boolean {
     'see results', 'making progress')
   const goalBearing = has(n, 'train', 'training', 'workout', 'program', 'programme', 'progress', 'plan',
     'track', 'reach', 'hit', 'toward', 'towards', 'get to', 'am i', 'making progress', 'how long until',
-    'see results', 'until i see')
+    'see results', 'until i see', 'guarantee', 'guaranteed', 'promise', 'transform', 'definitely')
   if (goalContext && goalBearing) return true
   // time available AND a "what do I do / session" bearing — a session-length question in a coach thread.
-  const timeContext = hasRe(n, /\b\d{1,3}\s?(min|mins|minute|minutes)\b/) || has(n, 'half an hour', 'quick session', 'short session', 'not much time', 'no time', 'limited time')
+  const timeContext = hasRe(n, /\b\d{1,3}\s?(min|mins|minute|minutes)\b/) || has(n, 'half an hour', 'an hour', 'one hour', 'quick session', 'short session', 'not much time', 'no time', 'limited time')
   const sessionBearing = has(n, 'what should i do', 'what do i do', 'what can i do', 'session', 'train', 'training',
-    'workout', 'work out', 'today', 'gym', 'squeeze in', 'fit in')
+    'workout', 'work out', 'today', 'gym', 'squeeze in', 'fit in', 'give me', 'most important', 'things to do',
+    'prioritise', 'prioritize', 'priority', 'something quick')
   if (timeContext && sessionBearing) return true
   return false
 }
@@ -1040,10 +1140,30 @@ function matchesFitnessIntentPattern(n: Norm): boolean {
  * euphemism ("ok i'll do it tonight") from passing as a bare affirmation — that would still be scored by
  * the safety detectors upstream, and if it reaches here it is too long to be treated as continuity.
  */
+/**
+ * A training-SCHEDULE edit: a weekday or schedule noun together with a rearrange/move/set verb, e.g.
+ * "change monday to saturday", "move my leg day to friday", "swap my training days around", "shift
+ * saturday to sunday". This is affirmatively about the user's own training schedule, so refer-by-default
+ * must treat it as on-topic rather than bouncing it as off-topic. Word-boundaried regexes are used on
+ * purpose (not `has`, which substring-matches and would trip on money/satisfied/sunset); only full
+ * weekday names are accepted so a bare "sat"/"sun" cannot false-match. A euphemistic crisis does not
+ * take this weekday-plus-rearrange shape, so widening here does not weaken the crisis backstop.
+ */
+export function isScheduleEditIntent(text: string): boolean {
+  const n = normalize(text)
+  const weekday = /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/
+  const scheduleNoun = /\b(training|workout|gym|rest)\s+days?\b|\b(training\s+week|session|sessions|schedule|split|program|programme|routine)\b/
+  const editVerb = /\b(move|moved|moving|change|changed|changing|swap|swapped|switch|switched|shift|shifted|reschedul\w*|rearrang\w*|reorder|shuffle)\b/
+  const hasDayOrSchedule = hasRe(n, weekday) || hasRe(n, scheduleNoun)
+  return hasDayOrSchedule && hasRe(n, editVerb)
+}
+
 export function isOnTopicFitness(text: string): boolean {
   const n = normalize(text)
   if (has(n, ...FITNESS_TERMS)) return true
   if (matchesFitnessIntentPattern(n)) return true
+  if (isScheduleEditIntent(text)) return true
   const words = n.p.trim().split(/\s+/).filter(Boolean)
-  return words.length <= 4 && has(n, ...CONTINUITY)
+  // Word-boundaried so a continuity token can't match INSIDE another word ("ok" in "joke").
+  return words.length <= 4 && CONTINUITY.some((c) => new RegExp(`\\b${c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(n.p))
 }

@@ -14,6 +14,11 @@ for (const message of [
   'Set my water goal to four litres.',
   'Explain the community feature.',
   'Exams are busy, how can I stay consistent?',
+  // A motivation / consistency turn that only incidentally says "train" is NOT an attempt to load the
+  // injured area, so a stale injury state must not block it (the 100-prompt run showed this happening).
+  "I keep telling myself I'll train tomorrow and never do.",
+  'I have zero motivation lately, how do I get it back?',
+  'How much protein should I have a day?',
 ]) {
   test(`persistent injury allows unrelated safe request: ${message}`, async () => {
     const decision = await routeAsync(message, INJURED, newSafetySession(['injury']))

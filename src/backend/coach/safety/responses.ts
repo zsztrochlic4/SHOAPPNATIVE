@@ -39,7 +39,7 @@ export const RESPONSES: Record<string, FixedResponse> = {
 
   crisis_concern: {
     text:
-      'I’m really sorry you’re feeling like this, and I want to make sure you get proper support — this is beyond what I can help with as a training coach. ' +
+      'I’m really sorry you’re feeling like this, and I want to make sure you get proper support, this is beyond what I can help with as a training coach. ' +
       'We recommend reaching out to Lifeline on 13 11 14 (24/7, call or text 0477 13 11 14), or the Suicide Call Back Service on 1300 659 467. If you’re in immediate danger, please call 000. You don’t have to go through this alone.',
     buttons: [callButton('lifeline', 'Call Lifeline'), textButton('lifeline', 'Text Lifeline'), callButton('suicideCallBack', 'Suicide Call Back'), callButton('emergency', 'Call 000')],
     noAI: true,
@@ -62,7 +62,7 @@ export const RESPONSES: Record<string, FixedResponse> = {
 
   medical_emergency: {
     text:
-      'This could be a medical emergency, so please stop and call 000 right now — that’s more important than any workout. ' +
+      'This could be a medical emergency, so please stop and call 000 right now, that’s more important than any workout. ' +
       'If you can, move to a safe, cool place while help is on the way. I can’t coach through this.',
     buttons: [callButton('emergency', 'Call 000')],
     noAI: true,
@@ -78,7 +78,7 @@ export const RESPONSES: Record<string, FixedResponse> = {
 
   medical_urgent: {
     text:
-      'I’m sorry you’re dealing with that. That’s something to get looked at rather than train through — please stop the activity that brings it on and see a physiotherapist or GP for proper advice. ' +
+      'I’m sorry you’re dealing with that. That’s something to get looked at rather than train through, please stop the activity that brings it on and see a physiotherapist or GP for proper advice. ' +
       'I can’t diagnose it or prescribe treatment, but I’m here for your training once you’ve been cleared.',
     buttons: [],
     noAI: true,
@@ -101,7 +101,7 @@ export const RESPONSES: Record<string, FixedResponse> = {
 
   injury_override: {
     text:
-      'I can’t recommend training that loads or risks the injured area while it’s still healing — continuing could make it worse or slow your recovery, and I won’t suggest a lighter version, a different variation, taping, or a painkiller so you can push through. ' +
+      'I can’t recommend training that loads or risks the injured area while it’s still healing, continuing could make it worse or slow your recovery, and I won’t suggest a lighter version, a different variation, taping, or a painkiller so you can push through. ' +
       'Please follow the advice of your doctor or physiotherapist and get clearance before returning to that training.',
     buttons: [],
     noAI: true,
@@ -110,14 +110,14 @@ export const RESPONSES: Record<string, FixedResponse> = {
   pregnancy: {
     text:
       'Congratulations, and thanks for telling me. Training during pregnancy or after birth really needs to be guided by your own health, so I can’t set intensity, loading, or a return-to-training timeline. ' +
-      'Please check with your GP, midwife, obstetric team, or a pelvic-health physiotherapist. If you have any warning signs — bleeding, fluid leaking, painful contractions, chest pain, dizziness, severe pain, or reduced baby movement — seek medical care now (000 for anything severe).',
+      'Please check with your GP, midwife, obstetric team, or a pelvic-health physiotherapist. If you have any warning signs, bleeding, fluid leaking, painful contractions, chest pain, dizziness, severe pain, or reduced baby movement, seek medical care now (000 for anything severe).',
     buttons: [callButton('emergency', 'Call 000')],
     noAI: true,
   },
 
   medical_condition: {
     text:
-      'Thanks for letting me know — a condition like that affects what’s safe, and it’s not something I’m qualified to build a program around or set heart-rate, glucose, or intensity targets for. ' +
+      'Thanks for letting me know, a condition like that affects what’s safe, and it’s not something I’m qualified to build a program around or set heart-rate, glucose, or intensity targets for. ' +
       'Please talk to your treating GP or specialist, or an Accredited Exercise Physiologist, who can advise safely. I can help with your training once you have clearance and any restrictions written down.',
     buttons: [],
     noAI: true,
@@ -125,15 +125,15 @@ export const RESPONSES: Record<string, FixedResponse> = {
 
   disordered_eating: {
     text:
-      'Thank you for telling me — that sounds really hard, and I care about how you’re doing more than any training goal. This isn’t something I can coach, and I don’t want to give numbers that could make it harder. ' +
-      'Please reach out to the Butterfly Foundation on 1800 33 4673 (8am–midnight, 7 days), and to an Accredited Practising Dietitian, GP, or a health professional experienced in eating disorders. You deserve proper support.',
+      'Thank you for telling me, that sounds really hard, and I care about how you’re doing more than any training goal. This isn’t something I can coach, and I don’t want to give numbers that could make it harder. ' +
+      'Please reach out to the Butterfly Foundation on 1800 33 4673 (8am to midnight, 7 days), and to an Accredited Practising Dietitian, GP, or a health professional experienced in eating disorders. You deserve proper support.',
     buttons: [callButton('butterfly', 'Call Butterfly')],
     noAI: true,
   },
 
   rapid_weight_loss: {
     text:
-      'Losing weight quickly and safely really depends on your individual health, so that’s something an Accredited Practising Dietitian or your GP is best placed to help with — I’d recommend seeing one rather than a crash approach. ' +
+      'Losing weight quickly and safely really depends on your individual health, so that’s something an Accredited Practising Dietitian or your GP is best placed to help with, I’d recommend seeing one rather than a crash approach. ' +
       'I can keep your training solid in the meantime.',
     buttons: [],
     noAI: true,
@@ -141,7 +141,7 @@ export const RESPONSES: Record<string, FixedResponse> = {
 
   meal_plan: {
     text:
-      'I can share general nutrition ideas, but I can’t create a personalised meal plan or set calorie and macro targets — that’s outside what I do as a training coach. ' +
+      'I can share general nutrition ideas, but I can’t create a personalised meal plan or set calorie and macro targets, that’s outside what I do as a training coach. ' +
       'An Accredited Practising Dietitian can build a plan around your health, goals, and individual needs.',
     buttons: [],
     noAI: true,
@@ -149,7 +149,7 @@ export const RESPONSES: Record<string, FixedResponse> = {
 
   steroids_ped: {
     text:
-      'I can’t recommend steroid cycles, doses, stacks, sourcing, or performance-enhancing drugs, and I can’t help avoid a drug test — these carry serious health risks. ' +
+      'I can’t recommend steroid cycles, doses, stacks, sourcing, or performance-enhancing drugs, and I can’t help avoid a drug test, these carry serious health risks. ' +
       'If you’re considering or already using them, please speak confidentially with a GP, sports physician, or endocrinologist who can look after your health. I can help you improve your training and recovery without them.',
     buttons: [],
     noAI: true,
@@ -157,7 +157,7 @@ export const RESPONSES: Record<string, FixedResponse> = {
 
   supplement_dosing: {
     text:
-      'I can explain what a supplement is in general terms, but I can’t give you a personal dose or tell you it’s safe to stack stimulants — the label directions and a pharmacist or GP are the right source for that, especially alongside any medication. ' +
+      'I can explain what a supplement is in general terms, but I can’t give you a personal dose or tell you it’s safe to stack stimulants, the label directions and a pharmacist or GP are the right source for that, especially alongside any medication. ' +
       'If you’ve taken far too much, call the Poisons Information Centre on 13 11 26, or 000 if you have chest pain, palpitations, or feel like collapsing.',
     buttons: [callButton('poisons', 'Call Poisons (13 11 26)'), callButton('emergency', 'Call 000')],
     noAI: true,
@@ -165,7 +165,7 @@ export const RESPONSES: Record<string, FixedResponse> = {
 
   prescribed_medication: {
     text:
-      'I can’t advise you to start, stop, or change any prescribed medication — that decision belongs with the doctor who prescribed it, or your pharmacist. Please check with them.',
+      'I can’t advise you to start, stop, or change any prescribed medication, that decision belongs with the doctor who prescribed it, or your pharmacist. Please check with them.',
     buttons: [],
     noAI: true,
   },
@@ -188,7 +188,7 @@ export const RESPONSES: Record<string, FixedResponse> = {
 
   unsafe_training: {
     text:
-      'I won’t build that — training that hard with no recovery tends to cause injury and burnout rather than progress, and I won’t help you train while unwell, impaired, or by pushing through with painkillers or stimulants. ' +
+      'I won’t build that, training that hard with no recovery tends to cause injury and burnout rather than progress, and I won’t help you train while unwell, impaired, or by pushing through with painkillers or stimulants. ' +
       'Rest is part of the plan, not a break from it. When you’re recovered, I’ll set you up with something sustainable.',
     buttons: [],
     noAI: true,
@@ -196,7 +196,7 @@ export const RESPONSES: Record<string, FixedResponse> = {
 
   ai_relationship: {
     text:
-      'Just so we’re clear, I’m an app feature, not a real person, a therapist, or your doctor — and I’m only here to help with training, recovery, and general nutrition. ' +
+      'Just so we’re clear, I’m an app feature, not a real person, a therapist, or your doctor, and I’m only here to help with training, recovery, and general nutrition. ' +
       'If something heavier is going on, please reach out to someone you trust or a professional. What would you like to work on in your training?',
     buttons: [],
     noAI: false, // boundary reminder, but the user may continue on a safe topic
@@ -204,14 +204,14 @@ export const RESPONSES: Record<string, FixedResponse> = {
 
   off_topic: {
     text:
-      'That’s outside what I can help with — I’m your training coach, so I stick to workouts, recovery, motivation, and general nutrition. Want to pick one of those up?',
+      'That’s outside what I can help with, I’m your training coach, so I stick to workouts, recovery, motivation, and general nutrition. Want to pick one of those up?',
     buttons: [],
     noAI: true,
   },
 
   catch_all: {
     text:
-      'Thanks for flagging that. Because it could affect what’s safe for you to do, I don’t want to guess or build around it — I’d rather you check with a qualified health professional first. ' +
+      'Thanks for flagging that. Because it could affect what’s safe for you to do, I don’t want to guess or build around it, I’d rather you check with a qualified health professional first. ' +
       'If you have any severe or sudden symptoms, treat it as urgent and call 000. I’m here for your training once you’ve got the all-clear.',
     buttons: [callButton('emergency', 'Call 000')],
     noAI: true,
@@ -230,7 +230,7 @@ export const RESPONSES_NON_AU: Record<string, FixedResponse> = {
     buttons: [], noAI: true,
   },
   crisis_concern: {
-    text: 'I’m really sorry you’re feeling like this, and I want to make sure you get proper support — this is beyond what I can help with as a training coach. Please reach out to a local crisis or suicide-prevention line, and to your local emergency services if you’re in immediate danger. You don’t have to go through this alone.',
+    text: 'I’m really sorry you’re feeling like this, and I want to make sure you get proper support, this is beyond what I can help with as a training coach. Please reach out to a local crisis or suicide-prevention line, and to your local emergency services if you’re in immediate danger. You don’t have to go through this alone.',
     buttons: [], noAI: true,
   },
   third_party_crisis: {
@@ -242,27 +242,27 @@ export const RESPONSES_NON_AU: Record<string, FixedResponse> = {
     buttons: [], noAI: true,
   },
   medical_emergency: {
-    text: 'This could be a medical emergency — please stop and contact your local emergency services right now. If you can, move somewhere safe while help is on the way. I can’t coach through this.',
+    text: 'This could be a medical emergency, please stop and contact your local emergency services right now. If you can, move somewhere safe while help is on the way. I can’t coach through this.',
     buttons: [], noAI: true,
   },
   overdose_poisoning: {
-    text: 'Please don’t wait on this — contact your local poisons information service or emergency services right now for advice. I can’t advise on doses or treatment.',
+    text: 'Please don’t wait on this, contact your local poisons information service or emergency services right now for advice. I can’t advise on doses or treatment.',
     buttons: [], noAI: true,
   },
   disordered_eating: {
-    text: 'Thank you for telling me — that sounds really hard, and I care about how you’re doing more than any training goal. This isn’t something I can coach, and I don’t want to give numbers that could make it harder. Please reach out to a local eating-disorder support service and to a doctor or dietitian experienced in eating disorders. You deserve proper support.',
+    text: 'Thank you for telling me, that sounds really hard, and I care about how you’re doing more than any training goal. This isn’t something I can coach, and I don’t want to give numbers that could make it harder. Please reach out to a local eating-disorder support service and to a doctor or dietitian experienced in eating disorders. You deserve proper support.',
     buttons: [], noAI: true,
   },
   supplement_dosing: {
-    text: 'I can explain what a supplement is in general terms, but I can’t give you a personal dose or say it’s safe to stack stimulants — the label directions and a pharmacist or doctor are the right source, especially alongside any medication. If you’ve taken far too much, contact your local poisons information service, or your local emergency services if you have chest pain, palpitations, or feel like collapsing.',
+    text: 'I can explain what a supplement is in general terms, but I can’t give you a personal dose or say it’s safe to stack stimulants, the label directions and a pharmacist or doctor are the right source, especially alongside any medication. If you’ve taken far too much, contact your local poisons information service, or your local emergency services if you have chest pain, palpitations, or feel like collapsing.',
     buttons: [], noAI: true,
   },
   pregnancy: {
-    text: 'Congratulations, and thanks for telling me. Training during pregnancy or after birth really needs to be guided by your own health, so I can’t set intensity, loading, or a return-to-training timeline. Please check with your doctor, midwife, obstetric team, or a pelvic-health physiotherapist. If you have any warning signs — bleeding, fluid leaking, painful contractions, chest pain, dizziness, severe pain, or reduced baby movement — seek medical care now, and your local emergency services for anything severe.',
+    text: 'Congratulations, and thanks for telling me. Training during pregnancy or after birth really needs to be guided by your own health, so I can’t set intensity, loading, or a return-to-training timeline. Please check with your doctor, midwife, obstetric team, or a pelvic-health physiotherapist. If you have any warning signs, bleeding, fluid leaking, painful contractions, chest pain, dizziness, severe pain, or reduced baby movement, seek medical care now, and your local emergency services for anything severe.',
     buttons: [], noAI: true,
   },
   catch_all: {
-    text: 'Thanks for flagging that. Because it could affect what’s safe for you to do, I don’t want to guess or build around it — please check with a qualified health professional first. If you have any severe or sudden symptoms, treat it as urgent and contact your local emergency services. I’m here for your training once you’ve got the all-clear.',
+    text: 'Thanks for flagging that. Because it could affect what’s safe for you to do, I don’t want to guess or build around it, please check with a qualified health professional first. If you have any severe or sudden symptoms, treat it as urgent and contact your local emergency services. I’m here for your training once you’ve got the all-clear.',
     buttons: [], noAI: true,
   },
 }

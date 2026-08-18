@@ -7,6 +7,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { runCoachTurn, coachTurnCore } from '../lib/coach.js'
+import { newSafetySession } from '../lib/_shared/backend/coach/safety/index.js'
 
 const baseDeps = (over = {}) => {
   let replyCalls = 0
@@ -150,6 +151,213 @@ test('C-006: the server DOWNGRADES a workout_action when actioning is disabled s
   const deps = actionReplyDeps({ actionsDisabled: () => true })
   const out = await coachTurnCore('u1', { message: 'can you set up a deload week for me?', allowActions: true }, deps)
   assert.equal(out.proposal, null) // a modified/stale client cannot force an action through
+})
+
+/* ---- To-the-point day reschedule: name current days + ask once, no re-confirm loop ---- */
+
+test('day reschedule with no days named: replies to the point, no proposal, asks which days once', async () => {
+  // Model stalls with a re-confirm ("would you like to change your days?"); the backstop replaces it
+  // with the single forward question instead of looping the user through extra messages.
+  const { deps } = baseDeps({
+    generateReply: async () => JSON.stringify({ mode: 'personalised', message: 'Would you like to change which days you train on?', citations: [], memory: null, proposal: { kind: 'none' } }),
+  })
+  const out = await coachTurnCore('u1', { message: 'can u change my training days', allowActions: true }, deps)
+  assert.equal(out.proposal, null) // never a confirm card until they name days
+  assert.match(out.text, /which days/i) // asks the one thing it needs
+  assert.doesNotMatch(out.text, /would you like to change/i) // the redundant re-confirm is gone
+})
+
+test('day reschedule names the current training days when the schedule is in view', async () => {
+  const { deps } = baseDeps()
+  deps.loadTurnData = async () => ({
+    context: { dateOfBirth: '2000-01-01', affectedRegions: [], screeningOutcome: null, engineExcludedExerciseIds: [], isAustralia: true },
+    contextText: '', snapshot: { coachingStyle: 'balanced', goal: '', experience: '', units: 'metric', constraints: '', profile: '', canonicalProfile: '', program: '', recentTraining: '', trainingSummaries: '', activity: '', readiness: '', weights: '', nutrition: '', nutritionCheckins: '', memories: [] },
+    recent: [], safetySession: newSafetySession(), memoryEnabled: false, coachingStyle: 'balanced',
+    programExercises: [], trainingDays: ['Monday', 'Wednesday', 'Friday', 'Sunday'], validExerciseIds: new Set(),
+  })
+  const out = await coachTurnCore('u1', { message: 'can u change my training days', allowActions: true }, deps)
+  assert.equal(out.proposal, null)
+  assert.match(out.text, /Monday, Wednesday, Friday and Sunday/) // current days surfaced in the same reply
+  assert.match(out.text, /which days/i)
+})
+
+test('day reschedule WITH days named still surfaces the confirm card (no regression)', async () => {
+  const { deps } = baseDeps({
+    generateReply: async () => JSON.stringify({ mode: 'personalised', message: 'Sure.', citations: [], memory: null, proposal: { kind: 'none' } }),
+    saveProposal: async (_uid, p) => ({ ...p, id: 'prop1', status: 'pending', createdAt: '', expiresAt: '' }),
+  })
+  const out = await coachTurnCore('u1', { message: 'change my training days to Tuesday, Thursday and Saturday', allowActions: true }, deps)
+  assert.equal(out.proposal?.kind, 'workout_action')
+  assert.equal(out.proposal?.payload?.action, 'set_training_days')
+})
+
+test('joinWeekdays / dayRescheduleAsk build a dash-free, canonically ordered reply', async () => {
+  const { joinWeekdays, dayRescheduleAsk, DAY_RESCHEDULE_LINE } = await import('../lib/_shared/backend/coach/workoutActions.js')
+  assert.equal(joinWeekdays(['Friday', 'Monday']), 'Monday and Friday') // reordered Mon..Sun
+  assert.equal(joinWeekdays(['Wednesday']), 'Wednesday')
+  assert.equal(joinWeekdays([]), '')
+  const ask = dayRescheduleAsk(['Monday', 'Wednesday', 'Friday'])
+  assert.match(ask, /Monday, Wednesday and Friday/)
+  assert.match(ask, /which days/i)
+  assert.doesNotMatch(ask, /[—–]/) // no em or en dash
+  assert.equal(dayRescheduleAsk([]), DAY_RESCHEDULE_LINE) // graceful fallback when schedule not in view
+})
+
+/* ---- Single-day move: "change monday to saturday" becomes a confirm-gated set_training_days ---- */
+
+const dayMoveDeps = (trainingDays) => {
+  const { deps } = baseDeps({
+    generateReply: async () => JSON.stringify({ mode: 'personalised', message: 'Sure.', citations: [], memory: null, proposal: { kind: 'none' } }),
+    saveProposal: async (_uid, p) => ({ ...p, id: 'prop1', status: 'pending', createdAt: '', expiresAt: '' }),
+  })
+  deps.loadTurnData = async () => ({
+    context: { dateOfBirth: '2000-01-01', affectedRegions: [], screeningOutcome: null, engineExcludedExerciseIds: [], isAustralia: true },
+    contextText: '', snapshot: { coachingStyle: 'balanced', goal: '', experience: '', units: 'metric', constraints: '', profile: '', canonicalProfile: '', program: '', recentTraining: '', trainingSummaries: '', activity: '', readiness: '', weights: '', nutrition: '', nutritionCheckins: '', memories: [] },
+    recent: [], safetySession: newSafetySession(), memoryEnabled: false, coachingStyle: 'balanced',
+    programExercises: [], trainingDays, validExerciseIds: new Set(),
+  })
+  return deps
+}
+
+test('day move: "change monday to saturday" proposes the moved full week', async () => {
+  const deps = dayMoveDeps(['Monday', 'Wednesday', 'Friday', 'Sunday'])
+  const out = await coachTurnCore('u1', { message: 'change monday to saturday', allowActions: true }, deps)
+  assert.equal(out.proposal?.kind, 'workout_action')
+  assert.equal(out.proposal?.payload?.action, 'set_training_days')
+  assert.equal(out.proposal?.payload?.days, 'Wednesday,Friday,Saturday,Sunday') // Monday removed, Saturday added, canonical order
+  assert.match(out.text, /move your Monday training to Saturday/i)
+  assert.doesNotMatch(out.text, /[—–]/)
+})
+
+test('day move is ambiguous when the target day is already trained: no proposal', async () => {
+  // Sunday already trained, so "move monday to sunday" is left for the coach to clarify, not auto-applied.
+  const deps = dayMoveDeps(['Monday', 'Wednesday', 'Friday', 'Sunday'])
+  const out = await coachTurnCore('u1', { message: 'change monday to sunday', allowActions: true }, deps)
+  assert.notEqual(out.proposal?.payload?.action, 'set_training_days')
+})
+
+test('synthesizeDayMoveProposal is null without a known schedule or a real from-day', async () => {
+  const { synthesizeDayMoveProposal } = await import('../lib/_shared/backend/coach/workoutActions.js')
+  assert.equal(synthesizeDayMoveProposal('change monday to saturday', []), null) // no schedule in view
+  assert.equal(synthesizeDayMoveProposal('change tuesday to saturday', ['Monday', 'Wednesday', 'Friday', 'Sunday']), null) // Tuesday not a training day
+  const ok = synthesizeDayMoveProposal('move my monday to saturday', ['Monday', 'Wednesday', 'Friday', 'Sunday'])
+  assert.equal(ok?.payload?.days, 'Wednesday,Friday,Saturday,Sunday')
+  assert.doesNotMatch(ok.message, /[—–]/)
+})
+
+/* ---- Schedule grounding: correct a false premise from the REAL program, do not play along ---- */
+
+const SCHEDULE = [
+  { weekday: 'Monday', dayType: 'Legs', exercises: ['Barbell Back Squat', 'Romanian Deadlift', 'Leg Press'], muscles: ['Quads', 'Hamstrings & Glutes', 'Calves'] },
+  { weekday: 'Wednesday', dayType: 'Pull', exercises: ['Barbell Bent Over Row', 'Lat Pulldown', 'Barbell Curl'], muscles: ['Back', 'Biceps'] },
+  { weekday: 'Friday', dayType: 'Push', exercises: ['Barbell Bench Press', 'Overhead Press', 'Cable Chest Fly'], muscles: ['Chest', 'Shoulders', 'Triceps'] },
+  { weekday: 'Sunday', dayType: 'Upper', exercises: ['Barbell Bench Press', 'Bent Over Row'], muscles: ['Chest', 'Back', 'Shoulders'] },
+]
+
+const scheduleDeps = (over = {}) => {
+  const { deps } = baseDeps({
+    generateReply: async () => JSON.stringify({ mode: 'personalised', message: over.modelText ?? 'Sure thing.', citations: [], memory: null, proposal: over.modelProposal ?? { kind: 'none' } }),
+    saveProposal: async (_uid, p) => ({ ...p, id: 'prop1', status: 'pending', createdAt: '', expiresAt: '' }),
+  })
+  deps.loadTurnData = async () => ({
+    context: { dateOfBirth: '2000-01-01', affectedRegions: [], screeningOutcome: null, engineExcludedExerciseIds: [], isAustralia: true },
+    contextText: '', snapshot: { coachingStyle: 'balanced', goal: '', experience: '', units: 'metric', constraints: '', profile: '', canonicalProfile: '', program: '', recentTraining: '', trainingSummaries: '', activity: '', readiness: '', weights: '', nutrition: '', nutritionCheckins: '', memories: [] },
+    recent: [], safetySession: newSafetySession(), memoryEnabled: false, coachingStyle: 'balanced',
+    programExercises: [], trainingDays: ['Monday', 'Wednesday', 'Friday', 'Sunday'],
+    programSchedule: SCHEDULE, todayWeekday: over.today ?? 'Friday', validExerciseIds: new Set(),
+  })
+  return deps
+}
+
+test('grounding: "why the rest day today" is CORRECTED, today is a training day (no fabrication)', async () => {
+  const deps = scheduleDeps({ today: 'Friday', modelText: 'Today is a rest day because you have trained enough.' })
+  const out = await coachTurnCore('u1', { message: 'why did you give me a rest day today', allowActions: true }, deps)
+  assert.match(out.text, /not a rest day/i)
+  assert.match(out.text, /Push day/i)
+  assert.equal(out.proposal, null)
+})
+
+test('grounding: "I dont like chest on monday" is CORRECTED (Monday is Legs), no swap proposal', async () => {
+  const deps = scheduleDeps({ today: 'Friday', modelProposal: { kind: 'workout_action', title: 'Swap', summary: 'x', payload: { action: 'swap', fromExerciseId: 'CH06', reason: 'dislike' } } })
+  const out = await coachTurnCore('u1', { message: 'i dont like training chest on monday', allowActions: true }, deps)
+  assert.match(out.text, /do not train chest on Monday/i)
+  assert.match(out.text, /Legs day/i)
+  assert.equal(out.proposal, null) // must NOT be sucked into swapping a chest lift on a legs day
+})
+
+test('grounding: "I dont like gymming on monday" grounds the day and offers a move, invents no target', async () => {
+  const deps = scheduleDeps({ today: 'Friday' })
+  const out = await coachTurnCore('u1', { message: 'i dont like gymming on monday', allowActions: true }, deps)
+  assert.match(out.text, /Monday is your Legs day/i)
+  assert.match(out.text, /which day/i)
+  assert.doesNotMatch(out.text, /saturday/i) // no invented target day
+  assert.equal(out.proposal, null)
+})
+
+test('phantom confirm-card guard: parroted "Tap confirm" with no proposal is replaced', async () => {
+  const deps = scheduleDeps({ today: 'Tuesday', modelText: "Want me to move your Monday training to Saturday? Tap confirm and I'll update the schedule." })
+  // Tuesday is a rest day and the message is unrelated to schedule, so grounding does not fire; the
+  // phantom guard must catch the parroted confirm prose that has no proposal behind it.
+  const out = await coachTurnCore('u1', { message: 'sounds good', allowActions: true }, deps)
+  assert.doesNotMatch(out.text, /tap confirm/i)
+  assert.equal(out.proposal, null)
+})
+
+/* ---- Richer memory: reliably capture durable setup facts the model misses ---- */
+
+test('memory: "I train at home" is captured deterministically when the model misses it', async () => {
+  let saved = null
+  const { deps } = baseDeps({ generateReply: async () => JSON.stringify({ mode: 'general', message: 'Got it.', citations: [], memory: null, proposal: { kind: 'none' } }) })
+  deps.loadTurnData = async () => ({
+    context: { dateOfBirth: '2000-01-01', affectedRegions: [], screeningOutcome: null, engineExcludedExerciseIds: [], isAustralia: true },
+    contextText: '', snapshot: { coachingStyle: 'balanced', goal: '', experience: '', units: 'metric', constraints: '', profile: '', canonicalProfile: '', program: '', recentTraining: '', trainingSummaries: '', activity: '', readiness: '', weights: '', nutrition: '', nutritionCheckins: '', memories: [] },
+    recent: [], safetySession: newSafetySession(), memoryEnabled: true, coachingStyle: 'balanced',
+    programExercises: [], trainingDays: [], programSchedule: [], todayWeekday: 'Monday', validExerciseIds: new Set(),
+  })
+  deps.saveMemory = async (_uid, _msg, candidate) => { saved = candidate; return { ...candidate, id: 'm1', status: 'confirmed', confidence: 1, source: 'user_statement', evidenceRef: '', visible: true, createdAt: '', updatedAt: '' } }
+  const out = await coachTurnCore('u1', { message: 'i train at home now', allowActions: true }, deps)
+  assert.equal(out.blocked, false)
+  assert.equal(saved?.value, 'Trains at home')
+  assert.equal(saved?.category, 'Training location')
+})
+
+test('memory: nothing is captured when memory is OFF (consent gate honoured)', async () => {
+  let called = false
+  const { deps } = baseDeps()
+  deps.loadTurnData = async () => ({
+    context: { dateOfBirth: '2000-01-01', affectedRegions: [], screeningOutcome: null, engineExcludedExerciseIds: [], isAustralia: true },
+    contextText: '', snapshot: { coachingStyle: 'balanced', goal: '', experience: '', units: 'metric', constraints: '', profile: '', canonicalProfile: '', program: '', recentTraining: '', trainingSummaries: '', activity: '', readiness: '', weights: '', nutrition: '', nutritionCheckins: '', memories: [] },
+    recent: [], safetySession: newSafetySession(), memoryEnabled: false, coachingStyle: 'balanced',
+    programExercises: [], trainingDays: [], programSchedule: [], todayWeekday: 'Monday', validExerciseIds: new Set(),
+  })
+  deps.saveMemory = async () => { called = true; return null }
+  await coachTurnCore('u1', { message: 'i only have dumbbells', allowActions: true }, deps)
+  assert.equal(called, false)
+})
+
+test('synthesizeMemoryFromMessage: high-precision, no false positives', async () => {
+  const { synthesizeMemoryFromMessage } = await import('../lib/_shared/backend/coach/workoutActions.js')
+  assert.equal(synthesizeMemoryFromMessage('i train at home')?.value, 'Trains at home')
+  assert.equal(synthesizeMemoryFromMessage('i only have dumbbells and a bench')?.value, 'Only has dumbbells, bench')
+  assert.equal(synthesizeMemoryFromMessage('i dont have a barbell')?.value, 'Does not have a barbell')
+  assert.equal(synthesizeMemoryFromMessage('i only have 20 minutes today'), null)
+  assert.equal(synthesizeMemoryFromMessage('how do i squat'), null)
+  assert.equal(synthesizeMemoryFromMessage('i hate mondays'), null)
+  const cand = synthesizeMemoryFromMessage('i train at home')
+  // evidenceQuote must be an exact slice of the message (the save path re-checks this).
+  assert.ok('i train at home'.includes(cand.evidenceQuote))
+})
+
+test('synthesizeScheduleGroundedReply: grounded, dash-free, defers moves and non-schedule turns', async () => {
+  const { synthesizeScheduleGroundedReply } = await import('../lib/_shared/backend/coach/workoutActions.js')
+  assert.match(synthesizeScheduleGroundedReply('i dont like training chest on monday', SCHEDULE, 'Friday'), /do not train chest on Monday.*Legs day/i)
+  assert.match(synthesizeScheduleGroundedReply('why the rest day today', SCHEDULE, 'Friday'), /not a rest day.*Push/i)
+  assert.match(synthesizeScheduleGroundedReply('do i train chest on friday', SCHEDULE, 'Friday'), /trains chest/i)
+  assert.match(synthesizeScheduleGroundedReply('is saturday a rest day', SCHEDULE, 'Friday'), /rest day/i)
+  assert.equal(synthesizeScheduleGroundedReply('change monday to saturday', SCHEDULE, 'Friday'), null) // a move, not a fact
+  assert.equal(synthesizeScheduleGroundedReply('how do i squat', SCHEDULE, 'Friday'), null) // not a schedule question
+  assert.equal(synthesizeScheduleGroundedReply('anything', [], 'Friday'), null) // no schedule in view
+  assert.doesNotMatch(synthesizeScheduleGroundedReply('i dont like gymming on monday', SCHEDULE, 'Friday'), /[—–]/)
 })
 
 test('U-003: a cold-start action switch that resolves DISABLED after being read blocks the action (fail-closed freshness)', async () => {

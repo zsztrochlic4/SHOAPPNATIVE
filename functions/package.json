@@ -11,6 +11,7 @@
     "build": "npm run sync-shared && tsc",
     "build:watch": "tsc --watch",
     "typecheck": "npm run sync-shared && tsc --noEmit",
+    "evals": "npm run build && node --test test/coach-evals.test.mjs",
     "test": "npm run build && node --test test/*.test.mjs && node lib/_shared/backend/coach/safety/runCoachSafetyTests.js",
     "serve": "npm run build && firebase emulators:start --only functions",
     "deploy": "firebase deploy --only functions",
