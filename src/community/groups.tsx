@@ -5,12 +5,13 @@
  * always live (myLeaderStats) regardless of what's stored on the group.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { View, Text, Pressable, TextInput, ActivityIndicator, Animated } from 'react-native'
+import { View, Text, Pressable, TextInput, ActivityIndicator } from 'react-native'
 import * as Clipboard from 'expo-clipboard'
 import {
-  Users, Plus, Minus, KeyRound, Copy, Share2, Crown, ChevronRight, Trash2,
+  Users, Plus, Minus, KeyRound, Copy, Crown, ChevronRight, Trash2,
   LogOut, Search, ShieldCheck, Gauge, ChevronDown, Flame, Dumbbell,
-  TrendingUp, ArrowUp, UserPlus, CheckCircle2, Activity, Target, Hand,
+  TrendingUp, ArrowUp, UserPlus, CheckCircle2, Activity, Target,
+  SmilePlus, Info, Check,
 } from 'lucide-react-native'
 import { useStore } from '../store/store'
 import { myLeaderStats, type MyLeaderStats } from '../store/selectors'
@@ -22,8 +23,7 @@ import { Avatar } from '../components/Avatar'
 import { Icon } from '../components/Icon'
 import { ProgressBar } from '../components/ui'
 import { Skeleton } from '../components/Skeleton'
-import { shareText } from '../lib/share'
-import type { CommunityGroup, GroupMember, GroupRankMetric, CheerTally } from '../store/types'
+import type { CommunityGroup, GroupMember, GroupRankMetric } from '../store/types'
 import { RankBadge, StreakFlame, formatKgCompact, odometerColor } from './ui'
 import {
   createGroup, searchGroups, joinGroup,
@@ -106,6 +106,38 @@ function buildActivity(members: GroupMember[]): GroupActivity[] {
   const last = others[others.length - 1]
   if (last && last !== others[1]) out.push({ id: 'a-join', kind: 'join', text: `${handleOf(last)} joined the group`, when: '3d ago' })
   return out
+}
+
+/* --------------------------------- reactions ------------------------------- */
+
+// Positive-only emoji reactions on an activity item (design spec). Client-side
+// prototype state while the backend is off; a server-owned reaction model
+// replaces this when COMMUNITY_BACKEND goes on.
+const REACTION_EMOJIS = ['💪', '🔥', '👏', '🙌', '⚡', '🏆'] as const
+type EmojiTally = { count: number; mine: boolean }
+type ReactionMap = Record<string, EmojiTally> // emoji -> tally
+
+/** Deterministic starting reactions per activity id, so the feed feels alive. */
+function seedReactions(activityId: string): ReactionMap {
+  const m: Record<string, ReactionMap> = {
+    'a-streak': { '🔥': { count: 3, mine: false } },
+    'a-vol': { '💪': { count: 5, mine: false }, '🔥': { count: 2, mine: false } },
+    'a-odo': { '👏': { count: 2, mine: true } },
+    'a-you': {},
+    'a-log': { '🙌': { count: 1, mine: false } },
+    'a-join': { '👏': { count: 4, mine: false } },
+  }
+  return { ...(m[activityId] ?? {}) }
+}
+
+/** Toggle the signed-in user's reaction with `emoji` on one activity. */
+function toggleReaction(map: ReactionMap, emoji: string): ReactionMap {
+  const next = { ...map }
+  const e = next[emoji] ? { ...next[emoji] } : { count: 0, mine: false }
+  if (e.mine) { e.count -= 1; e.mine = false } else { e.count += 1; e.mine = true }
+  if (e.count <= 0) delete next[emoji]
+  else next[emoji] = e
+  return next
 }
 
 /* ---------------------------------- Tab ------------------------------------ */
@@ -528,21 +560,33 @@ function GroupDetailSheet({ open, groupId, onClose }: { open: boolean; groupId: 
   const [metric, setMetric] = useState<GroupRankMetric>('odometer')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [reactions, setReactions] = useState<Record<string, ReactionMap>>({})
+  const [pickerFor, setPickerFor] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  const [volInfoOpen, setVolInfoOpen] = useState(false)
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  useEffect(() => { if (open) { setMetric('odometer'); setConfirmDelete(false); setExpandedId(null) } }, [open, groupId])
+  useEffect(() => {
+    if (open) { setMetric('odometer'); setConfirmDelete(false); setExpandedId(null); setReactions({}); setPickerFor(null); setCopied(false); setVolInfoOpen(false) }
+  }, [open, groupId])
+  useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current) }, [])
 
   const owner = !!group && group.ownerUsername === me.username
 
+  const react = (activityId: string, emoji: string) => {
+    setReactions((prev) => ({ ...prev, [activityId]: toggleReaction(prev[activityId] ?? seedReactions(activityId), emoji) }))
+    setPickerFor(null)
+  }
+
   const copyCode = async () => {
     if (!group) return
-    try { await Clipboard.setStringAsync(group.passcode); toast('Passcode copied') }
-    catch { toast("Couldn't copy") }
-  }
-  const shareCode = async () => {
-    if (!group) return
-    const res = await shareText(`Join my group "${group.name}" on StrengthHub — code: ${group.passcode}`, group.name)
-    if (res === 'copied') toast('Invite copied to clipboard')
-    else if (res === 'failed') toast("Couldn't open share")
+    try {
+      await Clipboard.setStringAsync(group.passcode)
+      // Flip the button to "Copied" for ~1.6s (design spec) instead of a toast.
+      setCopied(true)
+      if (copyTimer.current) clearTimeout(copyTimer.current)
+      copyTimer.current = setTimeout(() => setCopied(false), 1600)
+    } catch { toast("Couldn't copy") }
   }
   const leave = async () => {
     if (!group) return
@@ -598,22 +642,37 @@ function GroupDetailSheet({ open, groupId, onClose }: { open: boolean; groupId: 
           {/* group pulse */}
           <PulseHeader pulse={pulse} />
 
+          {/* what the numbers mean */}
+          <View className="mt-2 rounded-xl bg-white/[0.03] px-3 py-2.5">
+            <Pressable onPress={() => setVolInfoOpen((v) => !v)} accessibilityRole="button" accessibilityLabel="What the numbers mean" accessibilityState={{ expanded: volInfoOpen }} className="flex-row items-center gap-2">
+              <Info size={14} color="rgba(255,255,255,0.4)" />
+              <Text className="flex-1 text-[11px] font-bold text-secondary">What the numbers mean</Text>
+              <ChevronDown size={15} color="rgba(255,255,255,0.4)" style={{ transform: [{ rotate: volInfoOpen ? '180deg' : '0deg' }] }} />
+            </Pressable>
+            {volInfoOpen && (
+              <Text className="mt-2 pl-[22px] text-[11px] leading-relaxed text-tertiary">
+                <Text className="font-bold text-secondary">Volume</Text> is the total weight lifted across all workouts (sets × reps × weight). <Text className="font-bold text-secondary">Odometer</Text> is your weekly consistency score out of 100.
+              </Text>
+            )}
+          </View>
+
           {/* shared weekly team goal */}
           <TeamGoalCard done={sessionsDone} goal={goal} owner={owner} color={groupAppearance(group).color} onAdjust={(d) => setGoal(goal + d)} />
 
-          {/* passcode */}
+          {/* invite code */}
           <View className="mt-4 rounded-2xl border border-white/8 bg-ink-800 p-3.5">
             <Text className="text-[11px] font-semibold uppercase tracking-wide text-tertiary">Invite code</Text>
             <View className="mt-1.5 flex-row items-center justify-between">
               <Text className="text-[22px] font-black tracking-[4px] text-white">{group.passcode}</Text>
-              <View className="flex-row gap-2">
-                <Pressable onPress={copyCode} accessibilityRole="button" accessibilityLabel="Copy passcode" hitSlop={8} className="h-9 w-9 items-center justify-center rounded-full bg-white/10 active:opacity-80">
-                  <Copy size={16} color={colors.fg} />
-                </Pressable>
-                <Pressable onPress={shareCode} accessibilityRole="button" accessibilityLabel="Share passcode" hitSlop={8} className="h-9 w-9 items-center justify-center rounded-full bg-brand-400 active:opacity-90">
-                  <Share2 size={16} color="#000" />
-                </Pressable>
-              </View>
+              <Pressable
+                onPress={copyCode}
+                accessibilityRole="button"
+                accessibilityLabel={copied ? 'Copied' : 'Copy invite code'}
+                className="h-9 flex-row items-center gap-1.5 rounded-full bg-brand-400 px-3.5 active:opacity-90"
+              >
+                {copied ? <Check size={15} color="#000" strokeWidth={2.6} /> : <Copy size={15} color="#000" />}
+                <Text className="text-[13px] font-bold text-black">{copied ? 'Copied' : 'Copy'}</Text>
+              </Pressable>
             </View>
           </View>
 
@@ -666,11 +725,10 @@ function GroupDetailSheet({ open, groupId, onClose }: { open: boolean; groupId: 
                   <ActivityRow
                     key={a.id}
                     item={a}
-                    tally={group.cheers?.[a.id]}
-                    onCheer={() => {
-                      if (COMMUNITY_BACKEND) { import('./groupsBackend').then((b) => b.cheerRemote(group.id, a.id)).catch(() => {}) }
-                      dispatch({ type: 'CHEER_ACTIVITY', groupId: group.id, activityId: a.id })
-                    }}
+                    reactions={reactions[a.id] ?? seedReactions(a.id)}
+                    pickerOpen={pickerFor === a.id}
+                    onTogglePicker={() => setPickerFor((p) => (p === a.id ? null : a.id))}
+                    onReact={(emoji) => react(a.id, emoji)}
                   />
                 ))}
               </View>
@@ -888,49 +946,86 @@ const ACTIVITY_STYLE: Record<ActivityKind, { Glyph: typeof Flame; color: string 
   join: { Glyph: UserPlus, color: '#EC4899' },
 }
 
-function ActivityRow({ item, tally, onCheer }: { item: GroupActivity; tally?: CheerTally; onCheer: () => void }) {
+function ActivityRow({ item, reactions, pickerOpen, onTogglePicker, onReact }: {
+  item: GroupActivity
+  reactions: ReactionMap
+  pickerOpen: boolean
+  onTogglePicker: () => void
+  onReact: (emoji: string) => void
+}) {
   const s = ACTIVITY_STYLE[item.kind]
   const Glyph = s.Glyph
+  // Emojis that have at least one reaction, shown as toggleable count pills.
+  const active = REACTION_EMOJIS.filter((e) => reactions[e] && reactions[e].count > 0)
   return (
-    <View className="flex-row items-center gap-3 rounded-2xl border border-white/5 bg-white/[0.02] p-3">
-      <View className="h-9 w-9 items-center justify-center rounded-full" style={{ backgroundColor: `${s.color}1a` }}>
-        <Glyph size={16} color={s.color} />
+    <View className="rounded-2xl border border-white/5 bg-white/[0.02] p-3">
+      <View className="flex-row items-center gap-3">
+        <View className="h-9 w-9 items-center justify-center rounded-full" style={{ backgroundColor: `${s.color}1a` }}>
+          <Glyph size={16} color={s.color} />
+        </View>
+        <View className="min-w-0 flex-1">
+          <Text className="text-[13px] leading-snug text-white/80">{item.text}</Text>
+          <Text className="text-[11px] text-tertiary">{item.when}</Text>
+        </View>
+        <Pressable
+          onPress={onTogglePicker}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Add a reaction"
+          accessibilityState={{ expanded: pickerOpen }}
+          className="flex-row items-center gap-1 rounded-full bg-white/[0.06] px-2.5 py-1.5 active:opacity-80"
+        >
+          <SmilePlus size={16} color="rgba(255,255,255,0.6)" />
+        </Pressable>
       </View>
-      <View className="min-w-0 flex-1">
-        <Text className="text-[13px] leading-snug text-white/80">{item.text}</Text>
-        <Text className="text-[11px] text-tertiary">{item.when}</Text>
-      </View>
-      <CheerButton tally={tally} onPress={onCheer} />
-    </View>
-  )
-}
 
-/** Reaction-only "cheer" (a high-five). Positive-only, attaches to the action,
- *  never to a person — no free text, nothing to moderate. */
-function CheerButton({ tally, onPress }: { tally?: CheerTally; onPress: () => void }) {
-  const mine = !!tally?.mine
-  const count = tally?.count ?? 0
-  const pop = useRef(new Animated.Value(1)).current
-  const press = () => {
-    onPress()
-    pop.setValue(mine ? 0.85 : 0.68)
-    Animated.spring(pop, { toValue: 1, useNativeDriver: true, speed: 15, bounciness: mine ? 6 : 16 }).start()
-  }
-  return (
-    <Pressable
-      onPress={press}
-      hitSlop={8}
-      accessibilityRole="button"
-      accessibilityLabel={mine ? 'Remove your cheer' : `Cheer this (${count})`}
-      accessibilityState={{ selected: mine }}
-      className="flex-row items-center gap-1 rounded-full px-2.5 py-1.5"
-      style={{ backgroundColor: mine ? `${brand[400]}22` : 'rgba(255,255,255,0.06)' }}
-    >
-      <Animated.View style={{ transform: [{ scale: pop }] }}>
-        <Hand size={14} color={mine ? brand[400] : 'rgba(255,255,255,0.5)'} fill={mine ? brand[400] : 'none'} />
-      </Animated.View>
-      {count > 0 && <Text className="text-[11px] font-bold" style={{ color: mine ? brand[400] : 'rgba(255,255,255,0.5)' }}>{count}</Text>}
-    </Pressable>
+      {/* reaction count pills */}
+      {active.length > 0 && (
+        <View className="mt-2.5 flex-row flex-wrap gap-1.5">
+          {active.map((e) => {
+            const t = reactions[e]
+            return (
+              <Pressable
+                key={e}
+                onPress={() => onReact(e)}
+                accessibilityRole="button"
+                accessibilityLabel={`${t.mine ? 'Remove' : 'Add'} ${e} reaction`}
+                accessibilityState={{ selected: t.mine }}
+                className="flex-row items-center gap-1 rounded-full px-2.5 py-1 active:opacity-80"
+                style={{ borderWidth: 1, borderColor: t.mine ? `${brand[400]}80` : 'transparent', backgroundColor: t.mine ? `${brand[400]}26` : 'rgba(255,255,255,0.06)' }}
+              >
+                <Text className="text-[13px]">{e}</Text>
+                <Text className="text-[12px] font-bold" style={{ color: t.mine ? brand[300] : 'rgba(255,255,255,0.6)' }}>{t.count}</Text>
+              </Pressable>
+            )
+          })}
+        </View>
+      )}
+
+      {/* floating emoji popover */}
+      {pickerOpen && (
+        <>
+          <Pressable onPress={onTogglePicker} accessibilityLabel="Close reactions" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 4 }} />
+          <View
+            className="absolute right-2.5 top-2 z-10 flex-row gap-0.5 rounded-full border border-white/10 bg-ink-700 p-1.5"
+            style={{ shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 26, shadowOffset: { width: 0, height: 10 } }}
+          >
+            {REACTION_EMOJIS.map((e) => (
+              <Pressable
+                key={e}
+                onPress={() => onReact(e)}
+                accessibilityRole="button"
+                accessibilityLabel={`React with ${e}`}
+                className="h-8 w-8 items-center justify-center rounded-full active:opacity-70"
+                style={{ backgroundColor: reactions[e]?.mine ? `${brand[400]}33` : 'transparent' }}
+              >
+                <Text className="text-[18px]">{e}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </>
+      )}
+    </View>
   )
 }
 
