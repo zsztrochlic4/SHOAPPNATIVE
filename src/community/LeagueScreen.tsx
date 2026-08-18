@@ -23,6 +23,7 @@ import { RankBadge, StreakFlame } from './ui'
 import { GlobalLeaderboard } from './GlobalLeaderboard'
 import { TIERS, tierOf, leaguePeriodKey, daysLeftInPeriod, promoteCutoff, simulateLeague, zoneFor, type Tier, type LeagueRow, type Zone } from './league'
 import { COMMUNITY_BACKEND } from './backendConfig'
+import { shouldPostCommunityStats } from './syncGate'
 
 type LeagueStatus = 'loading' | 'ready' | 'error'
 /** Competitive-integrity status of the user's own standing (F-003). `ok` ranks
@@ -50,7 +51,7 @@ const REVIEW_PREVIEW: Integrity | null =
 /** The raw inputs the client sends the server to recompute from (F-003). */
 type SyncPayload = { targets: ScoringTargets; days: DayRecord[]; clientTz?: string }
 
-function useLeagueData(me: ReturnType<typeof myLeaderStats>, sync: SyncPayload, storedTier: number, enabled: boolean): LeagueData {
+function useLeagueData(me: ReturnType<typeof myLeaderStats>, sync: SyncPayload, storedTier: number, enabled: boolean, demo: boolean): LeagueData {
   const local = useMemo<LeagueData>(() => {
     const t = tierOf(storedTier)
     const r = simulateLeague(me, t, leaguePeriodKey())
@@ -61,7 +62,10 @@ function useLeagueData(me: ReturnType<typeof myLeaderStats>, sync: SyncPayload, 
   const [nonce, setNonce] = useState(0)
 
   useEffect(() => {
-    if (!COMMUNITY_BACKEND || !enabled) { setRemote(null); return }
+    // Demo accounts run on a frozen clock, which collapses logged workouts onto one
+    // dateKey and trips the server's `impossible_session_cadence` anti-cheat rule; they
+    // are not real competitors and must never post. Fall back to the local simulation.
+    if (!shouldPostCommunityStats({ backendOn: COMMUNITY_BACKEND, hasUsername: enabled, demo })) { setRemote(null); return }
     let cancelled = false
     const reload = () => setNonce((n) => n + 1)
     setRemote((prev) => ({ ...(prev ?? local), status: 'loading', reload }))
@@ -85,7 +89,7 @@ function useLeagueData(me: ReturnType<typeof myLeaderStats>, sync: SyncPayload, 
     })()
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, nonce, sync, storedTier])
+  }, [enabled, nonce, sync, storedTier, demo])
 
   // Flag off → always the local simulation; on → remote once ready, local until then.
   if (COMMUNITY_BACKEND && remote) return remote
@@ -114,7 +118,7 @@ export function LeagueScreen({ onClaimUsername }: { onClaimUsername: () => void 
   }, [dispatch])
 
   // Hooks must run before any early return.
-  const data = useLeagueData(me, syncPayload, storedTier, !!me.username)
+  const data = useLeagueData(me, syncPayload, storedTier, !!me.username, state.demo === true)
 
   // No username yet: browse the global streak board and claim when ready.
   if (!me.username) return <GlobalLeaderboard onClaimUsername={onClaimUsername} />
