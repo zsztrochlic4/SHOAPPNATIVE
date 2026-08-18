@@ -41,6 +41,7 @@ import Progress from './screens/Progress'
 import Community from './screens/Community'
 import Onboarding from './screens/Onboarding'
 import ActiveWorkout from './screens/ActiveWorkout'
+import { LogProgressSheet } from './screens/LogProgressSheet'
 import { CoachScreen } from './coach/CoachScreen'
 import {
   AddFoodSheet,
@@ -49,7 +50,6 @@ import {
   SettingsSheet,
   MenuDrawer,
   LogWeightSheet,
-  LogHabitSheet,
   QuickWorkoutsSheet,
   BadgesSheet,
   CoachSheet,
@@ -245,7 +245,7 @@ function Shell() {
       case 'profile': return <ProfileSheet open onClose={nav.close} />
       case 'trainingProfile': return <TrainingProfileSheet open onClose={nav.close} />
       case 'logWeight': return <LogWeightSheet open onClose={nav.close} />
-      case 'logHabit': return <LogHabitSheet open onClose={nav.close} params={params} />
+      case 'logProgress': return <LogProgressSheet open onClose={nav.close} />
       case 'quick': return <QuickWorkoutsSheet open onClose={nav.close} />
       case 'badges': return <BadgesSheet open onClose={nav.close} />
       case 'examMode': return <PlanAroundLifeSheet open onClose={nav.close} />

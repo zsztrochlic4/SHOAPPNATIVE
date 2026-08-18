@@ -62,7 +62,7 @@ function toneColor(tone: TagTone, c: ReturnType<typeof useColors>): string {
  * (nutrition check-in, workout) are derived from what the user did elsewhere in
  * the app — they can't be ticked here, only jumped to.
  */
-type Goal = {
+export type Goal = {
   id: string
   icon: string
   tile: string // tint colour for the icon tile (and its 15% background)
@@ -1119,7 +1119,7 @@ function DonePill({ colors, onPress }: { colors: ThemeColors; onPress?: () => vo
   return <PressableScale onPress={onPress} scaleTo={0.96} accessibilityLabel="Tap to undo">{body}</PressableScale>
 }
 
-function UpdateTodaySheet({ open, onClose, goals, doneCount, total, colors }: { open: boolean; onClose: () => void; goals: Goal[]; doneCount: number; total: number; colors: ThemeColors }) {
+export function UpdateTodaySheet({ open, onClose, goals, doneCount, total, colors }: { open: boolean; onClose: () => void; goals: Goal[]; doneCount: number; total: number; colors: ThemeColors }) {
   const win = useWindowDimensions()
   const screenH = IS_WEB ? WEB_SCREEN.height : win.height
   const insets = useSafeAreaInsets()
