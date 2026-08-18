@@ -559,6 +559,8 @@ function GroupDetailSheet({ open, groupId, onClose }: { open: boolean; groupId: 
   const group = state.community.groups.find((g) => g.id === groupId) ?? null
   const [metric, setMetric] = useState<GroupRankMetric>('odometer')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [confirmLeave, setConfirmLeave] = useState(false)
+  const [transferMode, setTransferMode] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [reactions, setReactions] = useState<Record<string, ReactionMap>>({})
   const [pickerFor, setPickerFor] = useState<string | null>(null)
@@ -569,7 +571,7 @@ function GroupDetailSheet({ open, groupId, onClose }: { open: boolean; groupId: 
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    if (open) { setMetric('odometer'); setConfirmDelete(false); setExpandedId(null); setReactions({}); setPickerFor(null); setCopied(false); setVolInfoOpen(false); setGoalEditing(false); setGoalDraft(20) }
+    if (open) { setMetric('odometer'); setConfirmDelete(false); setConfirmLeave(false); setTransferMode(false); setExpandedId(null); setReactions({}); setPickerFor(null); setCopied(false); setVolInfoOpen(false); setGoalEditing(false); setGoalDraft(20) }
   }, [open, groupId])
   useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current) }, [])
 
@@ -604,6 +606,24 @@ function GroupDetailSheet({ open, groupId, onClose }: { open: boolean; groupId: 
     toast('Group deleted')
     onClose()
   }
+  // Transfer ownership to another member (owner stays in the group). A server
+  // transfer callable lands with the groups backend (governance is deferred);
+  // this drives the local/preview model.
+  const makeOwner = (username: string) => {
+    if (!group) return
+    dispatch({ type: 'TRANSFER_GROUP_OWNER', id: group.id, newOwnerUsername: username })
+    setExpandedId(null)
+    toast(`@${username} is now the owner`)
+  }
+  // Owner hands the group to a successor and leaves in one step.
+  const makeOwnerAndLeave = (username: string) => {
+    if (!group) return
+    dispatch({ type: 'TRANSFER_GROUP_OWNER', id: group.id, newOwnerUsername: username })
+    dispatch({ type: 'LEAVE_GROUP', id: group.id })
+    toast(`Handed ${group.name} to @${username}`)
+    onClose()
+  }
+  const cancelAction = () => { setConfirmLeave(false); setConfirmDelete(false); setTransferMode(false) }
 
   const ranked = useMemo(
     () => (group ? rankMembers(resolveMembers(group, me), metric) : []),
@@ -731,6 +751,8 @@ function GroupDetailSheet({ open, groupId, onClose }: { open: boolean; groupId: 
                 metric={metric}
                 expanded={expandedId === m.id}
                 onToggle={() => setExpandedId((id) => (id === m.id ? null : m.id))}
+                canMakeOwner={owner && !m.isYou}
+                onMakeOwner={() => makeOwner(m.username)}
               />
             ))}
           </View>
@@ -757,44 +779,132 @@ function GroupDetailSheet({ open, groupId, onClose }: { open: boolean; groupId: 
             </>
           )}
 
-          {/* danger zone */}
-          <View className="mt-7 gap-2.5">
-            {owner && (
-              confirmDelete ? (
-                <View className="rounded-2xl border p-3.5" style={{ borderColor: `${colors.danger}55`, backgroundColor: `${colors.danger}12` }}>
-                  <Text className="font-bold text-white">Delete this group?</Text>
-                  <Text className="mt-1 text-[13px] text-secondary">This removes it for everyone and can't be undone.</Text>
-                  <View className="mt-3 flex-row gap-2">
-                    <Pressable onPress={() => setConfirmDelete(false)} accessibilityRole="button" accessibilityLabel="Cancel delete" className="flex-1 items-center rounded-xl border border-white/10 bg-white/5 py-3 active:opacity-80">
-                      <Text className="text-[14px] font-bold text-white/80">Cancel</Text>
-                    </Pressable>
-                    <Pressable onPress={remove} accessibilityRole="button" accessibilityLabel="Confirm delete group" className="flex-1 items-center rounded-xl py-3 active:opacity-90" style={{ backgroundColor: colors.danger }}>
-                      <Text className="text-[14px] font-bold text-white">Delete</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              ) : (
-                <Pressable onPress={() => setConfirmDelete(true)} accessibilityRole="button" accessibilityLabel="Delete group" className="flex-row items-center justify-center gap-2 rounded-2xl border border-white/10 py-3.5 active:opacity-80">
-                  <Trash2 size={16} color={colors.danger} />
-                  <Text className="text-[14px] font-bold" style={{ color: colors.danger }}>Delete group</Text>
-                </Pressable>
-              )
-            )}
-            {!owner && (
-              <Pressable onPress={leave} accessibilityRole="button" accessibilityLabel="Leave group" className="flex-row items-center justify-center gap-2 rounded-2xl border border-white/10 py-3.5 active:opacity-80">
-                <LogOut size={16} color="rgba(255,255,255,0.7)" />
-                <Text className="text-[14px] font-bold text-white/70">Leave group</Text>
-              </Pressable>
-            )}
-            {owner && (
-              <Pressable onPress={leave} accessibilityRole="button" accessibilityLabel="Leave group" className="items-center py-1 active:opacity-70">
-                <Text className="text-[13px] font-semibold text-tertiary">Leave without deleting</Text>
-              </Pressable>
-            )}
+          {/* leave / ownership / delete */}
+          <View className="mt-7">
+            <OwnershipFooter
+              owner={owner}
+              others={ranked.filter((m) => !m.isYou)}
+              danger={colors.danger}
+              confirmLeave={confirmLeave}
+              confirmDelete={confirmDelete}
+              transferMode={transferMode}
+              onAskLeave={() => (owner ? setTransferMode(true) : setConfirmLeave(true))}
+              onAskDelete={() => setConfirmDelete(true)}
+              onCancel={cancelAction}
+              onLeave={leave}
+              onDelete={remove}
+              onHandOver={makeOwnerAndLeave}
+            />
           </View>
         </View>
       )}
     </Sheet>
+  )
+}
+
+/* ------------------------------ ownership footer --------------------------- */
+
+/** The leave / delete / transfer controls, which differ by role:
+ *  - member: leave (confirm)
+ *  - owner, only member: leave == delete (confirm)
+ *  - owner with others: leave requires choosing a successor; or delete (confirm) */
+function OwnershipFooter({ owner, others, danger, confirmLeave, confirmDelete, transferMode, onAskLeave, onAskDelete, onCancel, onLeave, onDelete, onHandOver }: {
+  owner: boolean
+  others: GroupMember[]
+  danger: string
+  confirmLeave: boolean
+  confirmDelete: boolean
+  transferMode: boolean
+  onAskLeave: () => void
+  onAskDelete: () => void
+  onCancel: () => void
+  onLeave: () => void
+  onDelete: () => void
+  onHandOver: (username: string) => void
+}) {
+  const CancelBtn = (
+    <Pressable onPress={onCancel} accessibilityRole="button" accessibilityLabel="Cancel" className="items-center py-2.5 active:opacity-70">
+      <Text className="text-[13px] font-bold text-tertiary">Cancel</Text>
+    </Pressable>
+  )
+  const DeleteConfirm = ({ note }: { note: string }) => (
+    <View className="gap-2">
+      <Text className="px-2 pb-0.5 text-center text-[12px] leading-snug text-secondary">{note}</Text>
+      <Pressable onPress={onDelete} accessibilityRole="button" accessibilityLabel="Delete group permanently" className="flex-row items-center justify-center gap-2 rounded-2xl border py-3.5 active:opacity-90" style={{ borderColor: `${danger}80`, backgroundColor: `${danger}29` }}>
+        <Trash2 size={16} color={danger} />
+        <Text className="text-[14px] font-extrabold" style={{ color: danger }}>Delete group permanently</Text>
+      </Pressable>
+      {CancelBtn}
+    </View>
+  )
+
+  // Member
+  if (!owner) {
+    return confirmLeave ? (
+      <View className="gap-2">
+        <Pressable onPress={onLeave} accessibilityRole="button" accessibilityLabel="Confirm leave group" className="flex-row items-center justify-center gap-2 rounded-2xl border py-3.5 active:opacity-90" style={{ borderColor: `${danger}80`, backgroundColor: `${danger}29` }}>
+          <LogOut size={16} color={danger} />
+          <Text className="text-[14px] font-extrabold" style={{ color: danger }}>Are you sure you want to leave group?</Text>
+        </Pressable>
+        {CancelBtn}
+      </View>
+    ) : (
+      <Pressable onPress={onAskLeave} accessibilityRole="button" accessibilityLabel="Leave group" className="flex-row items-center justify-center gap-2 rounded-2xl border border-white/10 py-3.5 active:opacity-80">
+        <LogOut size={16} color="rgba(255,255,255,0.7)" />
+        <Text className="text-[14px] font-bold text-secondary">Leave group</Text>
+      </Pressable>
+    )
+  }
+
+  // Owner, sole member → leaving deletes
+  if (others.length === 0) {
+    return confirmDelete ? (
+      <DeleteConfirm note="You're the only member, so leaving deletes this group for good." />
+    ) : (
+      <Pressable onPress={onAskDelete} accessibilityRole="button" accessibilityLabel="Delete group" className="flex-row items-center justify-center gap-2 rounded-2xl border border-white/10 py-3.5 active:opacity-80">
+        <Trash2 size={16} color={danger} />
+        <Text className="text-[14px] font-bold" style={{ color: danger }}>Delete group</Text>
+      </Pressable>
+    )
+  }
+
+  // Owner with other members
+  if (transferMode) {
+    return (
+      <View>
+        <Text className="text-[13px] font-bold text-white">Choose who takes over</Text>
+        <Text className="mt-0.5 text-[12px] leading-snug text-tertiary">A group always needs an owner. Pick a member to hand the group to, and you'll leave once they take over.</Text>
+        <View className="mt-3 gap-2">
+          {others.map((m) => (
+            <Pressable key={m.id} onPress={() => onHandOver(m.username)} accessibilityRole="button" accessibilityLabel={`Hand over to ${m.username}`} className="flex-row items-center gap-3 rounded-2xl border p-3 active:opacity-90" style={{ borderColor: 'rgba(245,197,24,0.25)', backgroundColor: 'rgba(245,197,24,0.06)' }}>
+              <Avatar name={m.username} size={36} />
+              <View className="min-w-0 flex-1">
+                <Text numberOfLines={1} className="font-bold text-white">@{m.username}</Text>
+                <Text className="text-[12px] text-tertiary">{m.streak}-day streak · {m.odometer}/100</Text>
+              </View>
+              <View className="flex-row items-center gap-1.5 rounded-full px-2.5 py-1" style={{ backgroundColor: 'rgba(245,197,24,0.15)' }}>
+                <Crown size={12} color="#F5C518" />
+                <Text className="text-[11px] font-bold text-[#F5C518]">Hand over</Text>
+              </View>
+            </Pressable>
+          ))}
+        </View>
+        {CancelBtn}
+      </View>
+    )
+  }
+  if (confirmDelete) return <DeleteConfirm note="This deletes the group for all members. This can't be undone." />
+  return (
+    <View className="flex-row gap-2.5">
+      <Pressable onPress={onAskLeave} accessibilityRole="button" accessibilityLabel="Leave group" className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl border border-white/10 py-3.5 active:opacity-80">
+        <LogOut size={16} color="rgba(255,255,255,0.7)" />
+        <Text className="text-[14px] font-bold text-secondary">Leave group</Text>
+      </Pressable>
+      <Pressable onPress={onAskDelete} accessibilityRole="button" accessibilityLabel="Delete group" className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl border py-3.5 active:opacity-80" style={{ borderColor: `${danger}40` }}>
+        <Trash2 size={16} color={danger} />
+        <Text className="text-[14px] font-bold" style={{ color: danger }}>Delete</Text>
+      </Pressable>
+    </View>
   )
 }
 
@@ -899,12 +1009,14 @@ function TeamGoalSetter({ draft, color, onDec, onInc, onSave }: {
 
 /* --------------------------------- members --------------------------------- */
 
-function MemberRow({ member, rank, metric, expanded, onToggle }: {
+function MemberRow({ member, rank, metric, expanded, onToggle, canMakeOwner, onMakeOwner }: {
   member: GroupMember
   rank: number
   metric: GroupRankMetric
   expanded: boolean
   onToggle: () => void
+  canMakeOwner: boolean
+  onMakeOwner: () => void
 }) {
   const colors = useColors()
   const you = !!member.isYou
@@ -937,12 +1049,12 @@ function MemberRow({ member, rank, metric, expanded, onToggle }: {
         <MetricValue member={member} metric={metric} colors={colors} />
         <ChevronDown size={16} color="rgba(255,255,255,0.3)" style={{ transform: [{ rotate: expanded ? '180deg' : '0deg' }] }} />
       </Pressable>
-      {expanded && <MemberStats member={member} rank={rank} colors={colors} />}
+      {expanded && <MemberStats member={member} rank={rank} colors={colors} canMakeOwner={canMakeOwner} onMakeOwner={onMakeOwner} />}
     </View>
   )
 }
 
-function MemberStats({ member, rank, colors }: { member: GroupMember; rank: number; colors: ReturnType<typeof useColors> }) {
+function MemberStats({ member, rank, colors, canMakeOwner, onMakeOwner }: { member: GroupMember; rank: number; colors: ReturnType<typeof useColors>; canMakeOwner: boolean; onMakeOwner: () => void }) {
   const best = member.bestStreak ?? member.streak
   const tiles: { label: string; value: string; sub?: string; color?: string }[] = [
     { label: 'Odometer', value: `${member.odometer}`, sub: '/100', color: odometerColor(member.odometer, colors) },
@@ -966,6 +1078,20 @@ function MemberStats({ member, rank, colors }: { member: GroupMember; rank: numb
             </View>
           </View>
         ))}
+        {canMakeOwner && (
+          <View style={{ width: '100%', padding: 4 }}>
+            <Pressable
+              onPress={onMakeOwner}
+              accessibilityRole="button"
+              accessibilityLabel={`Make @${member.username} the group owner`}
+              className="flex-row items-center justify-center gap-2 rounded-xl border py-3 active:opacity-80"
+              style={{ borderColor: 'rgba(245,197,24,0.3)', backgroundColor: 'rgba(245,197,24,0.1)' }}
+            >
+              <Crown size={14} color="#F5C518" />
+              <Text className="text-[13px] font-bold text-[#F5C518]">Make group owner</Text>
+            </Pressable>
+          </View>
+        )}
       </View>
     </View>
   )

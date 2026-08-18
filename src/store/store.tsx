@@ -131,6 +131,7 @@ export type Action =
   | { type: 'LEAVE_GROUP'; id: string }
   | { type: 'DELETE_GROUP'; id: string }
   | { type: 'SET_GROUP_GOAL'; id: string; goal: number }
+  | { type: 'TRANSFER_GROUP_OWNER'; id: string; newOwnerUsername: string }
   // Cheers (reaction-only), forgiving streaks, and weekly leagues.
   | { type: 'CHEER_ACTIVITY'; groupId: string; activityId: string }
   | { type: 'USE_STREAK_FREEZE'; dateKey: string }
@@ -774,6 +775,23 @@ function reducer(state: AppState, action: Action): AppState {
         community: {
           ...state.community,
           groups: state.community.groups.map((g) => (g.id === action.id ? { ...g, weeklyGoal: goal } : g)),
+        },
+      }
+    }
+
+    case 'TRANSFER_GROUP_OWNER': {
+      // Owner-only: only the current owner can hand the group to another member.
+      // (Server-authoritative transfer lands with the groups backend; this keeps
+      // the local/preview model consistent.)
+      const target = state.community.groups.find((g) => g.id === action.id)
+      if (!target || target.ownerUsername !== state.community.username) return state
+      const isMember = target.members.some((m) => m.username === action.newOwnerUsername)
+      if (!isMember || action.newOwnerUsername === state.community.username) return state
+      return {
+        ...state,
+        community: {
+          ...state.community,
+          groups: state.community.groups.map((g) => (g.id === action.id ? { ...g, ownerUsername: action.newOwnerUsername } : g)),
         },
       }
     }
