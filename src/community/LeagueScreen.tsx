@@ -10,7 +10,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { View, Text, Pressable, TextInput, ActivityIndicator } from 'react-native'
 import { Trophy, Snowflake, Moon, Info, ChevronRight, ArrowUp, ArrowDown, ShieldCheck, ShieldAlert, Clock, UserPlus, Users } from 'lucide-react-native'
 import { useStore } from '../store/store'
-import { myLeaderStats, streakRisk, buildDayRecords, targetsFrom } from '../store/selectors'
+import { myLeaderStats, buildDayRecords, targetsFrom } from '../store/selectors'
 import { todayKey, deviceTimezone } from '../lib/date'
 import type { DayRecord, ScoringTargets } from './scoring'
 import { shareText } from '../lib/share'
@@ -21,7 +21,7 @@ import { Skeleton } from '../components/Skeleton'
 import { useToast } from '../components/Toast'
 import { RankBadge, StreakFlame } from './ui'
 import { GlobalLeaderboard } from './GlobalLeaderboard'
-import { TIERS, tierOf, weekKey, daysLeftInWeek, simulateLeague, zoneFor, type Tier, type LeagueRow, type Zone } from './league'
+import { TIERS, tierOf, leaguePeriodKey, daysLeftInPeriod, promoteCutoff, simulateLeague, zoneFor, type Tier, type LeagueRow, type Zone } from './league'
 import { COMMUNITY_BACKEND } from './backendConfig'
 
 type LeagueStatus = 'loading' | 'ready' | 'error'
@@ -53,7 +53,7 @@ type SyncPayload = { targets: ScoringTargets; days: DayRecord[]; clientTz?: stri
 function useLeagueData(me: ReturnType<typeof myLeaderStats>, sync: SyncPayload, storedTier: number, enabled: boolean): LeagueData {
   const local = useMemo<LeagueData>(() => {
     const t = tierOf(storedTier)
-    const r = simulateLeague(me, t, weekKey())
+    const r = simulateLeague(me, t, leaguePeriodKey())
     return { rows: r.rows, youRank: r.youRank, zone: r.zone, tier: t, status: 'ready', integrity: 'ok', reload: () => {} }
   }, [me, storedTier])
 
@@ -110,7 +110,7 @@ export function LeagueScreen({ onClaimUsername }: { onClaimUsername: () => void 
 
   // Weekly freeze grant — idempotent, only fires when a new week has started.
   useEffect(() => {
-    dispatch({ type: 'GRANT_WEEKLY_FREEZE', weekKey: weekKey() })
+    dispatch({ type: 'GRANT_WEEKLY_FREEZE', weekKey: leaguePeriodKey() })
   }, [dispatch])
 
   // Hooks must run before any early return.
@@ -350,12 +350,10 @@ function LeagueHero({ tier, rank, points, cohort, zone, onHow }: {
   zone: Zone
   onHow: () => void
 }) {
-  const days = daysLeftInWeek()
+  const days = daysLeftInPeriod()
   const nextTier = TIERS[Math.min(TIERS.length - 1, tier.key + 1)]
-  const status =
-    zone === 'promote' ? { text: `In the promotion zone — hold it to reach ${nextTier.name}!`, color: brand[400] }
-    : zone === 'demote' ? { text: 'In the drop zone — one good session moves you up.', color: '#F5A524' }
-    : { text: `Reach rank ${tier.promote} or better to promote to ${nextTier.name}.`, color: 'rgba(255,255,255,0.6)' }
+  const canPromote = tier.promote > 0
+  const cutoff = promoteCutoff(tier, cohort)
 
   return (
     <View className="overflow-hidden rounded-2xl border p-4" style={{ borderColor: `${tier.color}66`, backgroundColor: `${tier.color}14` }}>
@@ -378,7 +376,20 @@ function LeagueHero({ tier, rank, points, cohort, zone, onHow }: {
           <Text className="mt-1 text-[12px] text-secondary">{points} pts</Text>
         </View>
       </View>
-      <Text className="mt-3 text-[13px] font-semibold" style={{ color: status.color }}>{status.text}</Text>
+      {/* status line — the promotion target tier is coloured to its own tier (design spec) */}
+      {zone === 'promote' ? (
+        <Text className="mt-3 text-[13px] font-semibold" style={{ color: brand[400] }}>
+          In the promotion zone — hold it to reach <Text style={{ color: nextTier.color }}>{nextTier.name}</Text>!
+        </Text>
+      ) : zone === 'demote' ? (
+        <Text className="mt-3 text-[13px] font-semibold" style={{ color: '#F5A524' }}>In the drop zone — one good session moves you up.</Text>
+      ) : canPromote ? (
+        <Text className="mt-3 text-[13px] font-semibold text-secondary">
+          Reach the top {cutoff} to promote to <Text style={{ color: nextTier.color, fontWeight: '700' }}>{nextTier.name}</Text>.
+        </Text>
+      ) : (
+        <Text className="mt-3 text-[13px] font-semibold text-secondary">You're in the top tier — hold your rank to stay in {tier.name}.</Text>
+      )}
       <Pressable onPress={onHow} accessibilityRole="button" accessibilityLabel="How leagues work" className="mt-2 flex-row items-center gap-1 active:opacity-70">
         <Info size={13} color="rgba(255,255,255,0.45)" />
         <Text className="text-[12px] font-semibold text-secondary">How leagues work</Text>
@@ -394,16 +405,15 @@ function StreakCard() {
   const toast = useToast()
   const me = useMemo(() => myLeaderStats(state), [state])
   const tokens = state.community.freezeTokens ?? 0
-  const risk = streakRisk(state)
   const restingToday = (state.community.restDays ?? []).includes(todayKey)
 
-  const protect = () => {
-    dispatch({ type: 'USE_STREAK_FREEZE', dateKey: risk.dayKey })
-    toast('Streak protected — nice save')
-  }
-  const toggleRest = () => {
-    dispatch({ type: 'TOGGLE_REST_DAY', dateKey: todayKey })
-    toast(restingToday ? 'Rest day removed' : 'Rest day banked — recovery is training')
+  // Rest days are schedule-driven (Plan around your life + scheduled rest days pull
+  // through automatically); when today isn't a planned rest day the manual freeze is
+  // the fallback — spend a token to protect today's streak (design spec).
+  const freezeStreak = () => {
+    if (tokens === 0) return
+    dispatch({ type: 'USE_STREAK_FREEZE', dateKey: todayKey })
+    toast('Streak frozen for today')
   }
 
   return (
@@ -420,23 +430,28 @@ function StreakCard() {
         </View>
       </View>
 
-      <View className="mt-3 flex-row gap-2">
-        {risk.atRisk && tokens > 0 && (
-          <Pressable onPress={protect} accessibilityRole="button" accessibilityLabel="Use a freeze to protect yesterday" className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl bg-brand-400 py-2.5 active:opacity-90">
-            <Snowflake size={14} color="#000" />
-            <Text className="text-[13px] font-bold text-black">Protect yesterday</Text>
+      <View className="mt-3">
+        {restingToday ? (
+          // Scheduled rest day → auto-protected, no freeze spent.
+          <View className="flex-row items-center justify-center gap-1.5 rounded-xl bg-brand-400/20 py-2.5">
+            <Moon size={14} color={brand[400]} />
+            <Text className="text-[13px] font-bold text-brand-300">Resting today</Text>
+          </View>
+        ) : (
+          // Manual fallback: spend a freeze (styled in the freeze blue #6AD1E3).
+          <Pressable
+            onPress={freezeStreak}
+            disabled={tokens === 0}
+            accessibilityRole="button"
+            accessibilityLabel="Freeze your streak for today"
+            accessibilityState={{ disabled: tokens === 0 }}
+            className="flex-row items-center justify-center gap-1.5 rounded-xl border py-2.5 active:opacity-90"
+            style={{ borderColor: 'rgba(106,209,227,0.4)', backgroundColor: tokens > 0 ? 'rgba(106,209,227,0.16)' : 'rgba(255,255,255,0.04)', opacity: tokens > 0 ? 1 : 0.6 }}
+          >
+            <Snowflake size={14} color="#6AD1E3" />
+            <Text className="text-[13px] font-bold" style={{ color: '#6AD1E3' }}>{tokens > 0 ? 'Freeze streak' : 'No freezes left'}</Text>
           </Pressable>
         )}
-        <Pressable
-          onPress={toggleRest}
-          accessibilityRole="button"
-          accessibilityLabel={restingToday ? 'Remove rest day' : 'Mark today a rest day'}
-          accessibilityState={{ selected: restingToday }}
-          className={`flex-1 flex-row items-center justify-center gap-1.5 rounded-xl py-2.5 active:opacity-90 ${restingToday ? 'bg-brand-400/20' : 'border border-white/10 bg-white/5'}`}
-        >
-          <Moon size={14} color={restingToday ? brand[400] : 'rgba(255,255,255,0.7)'} />
-          <Text className={`text-[13px] font-bold ${restingToday ? 'text-brand-300' : 'text-white/80'}`}>{restingToday ? 'Resting today' : 'Rest day'}</Text>
-        </Pressable>
       </View>
     </View>
   )
@@ -471,7 +486,7 @@ function LeagueStandings({ rows, tier }: { rows: LeagueRow[]; tier: ReturnType<t
   }
   return (
     <View className="mt-4">
-      <Text className="mb-1 section-title">This week's standings</Text>
+      <Text className="mb-1 section-title">This month's standings</Text>
       {items}
     </View>
   )
@@ -502,10 +517,10 @@ function HowLeaguesSheet({ open, onClose }: { open: boolean; onClose: () => void
   return (
     <Sheet open={open} onClose={onClose} title="How leagues work">
       <View className="gap-3">
-        <HowRow n="1" title="Compete for the week" body="You're placed in a league with others at your level — up to ~25 as it fills. Your score this week is your dashboard odometer — how consistently you hit your goals. It's about showing up, not how much you lift." />
-        <HowRow n="2" title="Climb the ladder" body="Every Monday the league resets. Finish near the top and you promote to the next tier — Bronze, Silver, Gold, Platinum, Diamond. The higher you go, the tougher the climb." />
-        <HowRow n="3" title="Mind the drop zone" body="Finish in the bottom few and you slip down a tier. It's easy to climb straight back — a couple of good days does it." />
-        <HowRow n="4" title="Streaks are forgiving" body="A planned rest day or a freeze token keeps your streak alive through an off day. Rest is part of training — no guilt, no all-or-nothing." />
+        <HowRow n="1" title="Compete each month" body="You're placed in a league with others at your level — up to ~25 as it fills. Your score is your dashboard odometer — how consistently you hit your goals. It's about showing up, not how much you lift." />
+        <HowRow n="2" title="Climb the ladder" body="On the first Monday of every month the league resets. Finish in the top 30% and you promote to the next tier — Bronze, Silver, Gold, Platinum, Diamond. The higher you go, the tougher the climb." />
+        <HowRow n="3" title="Mind the drop zone" body="Finish in the bottom 30% and you slip down a tier. It's easy to climb straight back — a couple of good days does it." />
+        <HowRow n="4" title="Streaks are forgiving" body="A planned rest day or a freeze token keeps your streak alive through an off day. You get 2 fresh freezes at each monthly reset — no guilt, no all-or-nothing." />
       </View>
       <View className="mt-4 flex-row flex-wrap gap-2">
         {TIERS.map((t) => (
