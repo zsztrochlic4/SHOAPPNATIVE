@@ -11,7 +11,7 @@ import {
   Users, Plus, Minus, KeyRound, Copy, Crown, ChevronRight, Trash2,
   LogOut, Search, ShieldCheck, Gauge, ChevronDown, Flame, Dumbbell,
   TrendingUp, ArrowUp, UserPlus, CheckCircle2, Activity, Target,
-  SmilePlus, Info, Check,
+  SmilePlus, Info, Check, Pencil,
 } from 'lucide-react-native'
 import { useStore } from '../store/store'
 import { myLeaderStats, type MyLeaderStats } from '../store/selectors'
@@ -279,7 +279,7 @@ function CreateGroupSheet({ open, onClose, onCreated }: { open: boolean; onClose
         const { groupId, passcode } = await b.createGroupRemote(name.trim(), appearance.icon, appearance.color)
         const group: CommunityGroup = {
           id: groupId, name: name.trim(), passcode, ownerUsername: me.username ?? '',
-          createdAtKey: todayKey, members: [youMember(me)], icon: appearance.icon, color: appearance.color, weeklyGoal: 12,
+          createdAtKey: todayKey, members: [youMember(me)], icon: appearance.icon, color: appearance.color, weeklyGoal: 0,
         }
         setBusy(false)
         dispatch({ type: 'CREATE_GROUP', group })
@@ -564,10 +564,12 @@ function GroupDetailSheet({ open, groupId, onClose }: { open: boolean; groupId: 
   const [pickerFor, setPickerFor] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [volInfoOpen, setVolInfoOpen] = useState(false)
+  const [goalEditing, setGoalEditing] = useState(false)
+  const [goalDraft, setGoalDraft] = useState(20)
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    if (open) { setMetric('odometer'); setConfirmDelete(false); setExpandedId(null); setReactions({}); setPickerFor(null); setCopied(false); setVolInfoOpen(false) }
+    if (open) { setMetric('odometer'); setConfirmDelete(false); setExpandedId(null); setReactions({}); setPickerFor(null); setCopied(false); setVolInfoOpen(false); setGoalEditing(false); setGoalDraft(20) }
   }, [open, groupId])
   useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current) }, [])
 
@@ -610,12 +612,17 @@ function GroupDetailSheet({ open, groupId, onClose }: { open: boolean; groupId: 
   const pulse = useMemo(() => groupPulse(ranked), [ranked])
   const activity = useMemo(() => buildActivity(ranked), [ranked])
   const sessionsDone = ranked.reduce((a, m) => a + (m.sessionsThisWeek ?? 0), 0)
-  const goal = group?.weeklyGoal ?? Math.max(4, ranked.length * 4)
-  const setGoal = (next: number) => {
+  // A group has no goal until the owner sets one (weeklyGoal falsy = unset).
+  const goal = group?.weeklyGoal ?? 0
+  const hasGoal = goal > 0
+  const saveGoal = (next: number) => {
     if (!group) return
-    if (COMMUNITY_BACKEND) { import('./groupsBackend').then((b) => b.setGroupGoalRemote(group.id, next)).catch(() => {}) }
-    dispatch({ type: 'SET_GROUP_GOAL', id: group.id, goal: next })
+    const clamped = Math.max(1, Math.min(200, next))
+    if (COMMUNITY_BACKEND) { import('./groupsBackend').then((b) => b.setGroupGoalRemote(group.id, clamped)).catch(() => {}) }
+    dispatch({ type: 'SET_GROUP_GOAL', id: group.id, goal: clamped })
+    setGoalEditing(false)
   }
+  const openGoalEditor = () => { setGoalDraft(hasGoal ? goal : 20); setGoalEditing(true) }
 
   return (
     <Sheet open={open} onClose={onClose} title={group?.name ?? 'Group'}>
@@ -656,8 +663,23 @@ function GroupDetailSheet({ open, groupId, onClose }: { open: boolean; groupId: 
             )}
           </View>
 
-          {/* shared weekly team goal */}
-          <TeamGoalCard done={sessionsDone} goal={goal} owner={owner} color={groupAppearance(group).color} onAdjust={(d) => setGoal(goal + d)} />
+          {/* shared weekly team goal — owner-set, with member/empty states */}
+          {owner && (!hasGoal || goalEditing) ? (
+            <TeamGoalSetter
+              draft={goalDraft}
+              color={groupAppearance(group).color}
+              onDec={() => setGoalDraft((d) => Math.max(4, d - 2))}
+              onInc={() => setGoalDraft((d) => Math.min(60, d + 2))}
+              onSave={() => saveGoal(goalDraft)}
+            />
+          ) : hasGoal ? (
+            <TeamGoalCard done={sessionsDone} goal={goal} owner={owner} color={groupAppearance(group).color} onEdit={openGoalEditor} />
+          ) : (
+            <View className="mt-3 flex-row items-center gap-2.5 rounded-2xl border border-white/6 bg-white/[0.02] p-3.5">
+              <Target size={16} color="rgba(255,255,255,0.4)" />
+              <Text className="text-[13px] leading-snug text-tertiary">No weekly team goal yet. The group owner can set one.</Text>
+            </View>
+          )}
 
           {/* invite code */}
           <View className="mt-4 rounded-2xl border border-white/8 bg-ink-800 p-3.5">
@@ -802,14 +824,14 @@ function PulseTile({ label, value, sub }: { label: string; value: string; sub: s
 
 /* ------------------------------ team goal card ----------------------------- */
 
-/** Shared weekly objective: combined member sessions vs the group's target. The
- *  owner can nudge the target up/down; everyone sees the same progress. */
-function TeamGoalCard({ done, goal, owner, color, onAdjust }: {
+/** Shared weekly objective: combined member sessions vs the group's target.
+ *  Everyone sees the same progress; the owner gets an Edit affordance. */
+function TeamGoalCard({ done, goal, owner, color, onEdit }: {
   done: number
   goal: number
   owner: boolean
   color: string
-  onAdjust: (delta: number) => void
+  onEdit: () => void
 }) {
   const pct = goal > 0 ? Math.min(100, Math.round((done / goal) * 100)) : 0
   const reached = done >= goal
@@ -820,14 +842,10 @@ function TeamGoalCard({ done, goal, owner, color, onAdjust }: {
         <Target size={16} color={color} />
         <Text className="flex-1 text-[13px] font-bold text-white">Weekly team goal</Text>
         {owner && (
-          <View className="flex-row items-center gap-1.5">
-            <Pressable onPress={() => onAdjust(-1)} accessibilityRole="button" accessibilityLabel="Lower team goal" hitSlop={6} className="h-7 w-7 items-center justify-center rounded-full bg-white/10 active:opacity-70">
-              <Minus size={14} color="#fff" />
-            </Pressable>
-            <Pressable onPress={() => onAdjust(1)} accessibilityRole="button" accessibilityLabel="Raise team goal" hitSlop={6} className="h-7 w-7 items-center justify-center rounded-full bg-white/10 active:opacity-70">
-              <Plus size={14} color="#fff" />
-            </Pressable>
-          </View>
+          <Pressable onPress={onEdit} accessibilityRole="button" accessibilityLabel="Edit team goal" hitSlop={6} className="flex-row items-center gap-1 active:opacity-70">
+            <Pencil size={13} color="rgba(255,255,255,0.5)" />
+            <Text className="text-[12px] font-semibold text-secondary">Edit</Text>
+          </Pressable>
         )}
       </View>
       <View className="mt-2 flex-row items-baseline gap-1.5">
@@ -838,6 +856,43 @@ function TeamGoalCard({ done, goal, owner, color, onAdjust }: {
       <Text className="mt-2 text-[12px] font-semibold" style={{ color: reached ? color : 'rgba(255,255,255,0.5)' }}>
         {reached ? 'Goal smashed — nice work, team!' : `${remaining} more to hit the goal`}
       </Text>
+    </View>
+  )
+}
+
+/** Owner-only card to set (or edit) the weekly team goal — new groups start with
+ *  no goal until this is used. ±2 sessions, 4–60. */
+function TeamGoalSetter({ draft, color, onDec, onInc, onSave }: {
+  draft: number
+  color: string
+  onDec: () => void
+  onInc: () => void
+  onSave: () => void
+}) {
+  return (
+    <View className="mt-3 rounded-2xl border border-dashed border-white/16 bg-ink-800 p-4">
+      <View className="flex-row items-center gap-2">
+        <Target size={16} color={color} />
+        <Text className="flex-1 text-[13px] font-bold text-white">Set a weekly team goal</Text>
+      </View>
+      <Text className="mt-1 text-[12px] leading-snug text-tertiary">
+        Choose how many workouts the group aims to log together each week. There's no goal until you set one.
+      </Text>
+      <View className="mt-3.5 flex-row items-center gap-3.5">
+        <Pressable onPress={onDec} accessibilityRole="button" accessibilityLabel="Lower goal" className="h-10 w-10 items-center justify-center rounded-xl border border-white/12 bg-white/[0.04] active:opacity-70">
+          <Minus size={18} color="#fff" />
+        </Pressable>
+        <View className="flex-1 items-center">
+          <Text className="text-[30px] font-black text-white">{draft}</Text>
+          <Text className="text-[11px] font-semibold uppercase tracking-wide text-tertiary">sessions / week</Text>
+        </View>
+        <Pressable onPress={onInc} accessibilityRole="button" accessibilityLabel="Raise goal" className="h-10 w-10 items-center justify-center rounded-xl border border-white/12 bg-white/[0.04] active:opacity-70">
+          <Plus size={18} color="#fff" />
+        </Pressable>
+      </View>
+      <Pressable onPress={onSave} accessibilityRole="button" accessibilityLabel="Set goal" className="mt-3.5 items-center justify-center rounded-2xl bg-brand-400 py-3.5 active:opacity-90">
+        <Text className="text-[14px] font-bold text-black">Set goal</Text>
+      </Pressable>
     </View>
   )
 }
