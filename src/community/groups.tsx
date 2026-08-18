@@ -5,12 +5,13 @@
  * always live (myLeaderStats) regardless of what's stored on the group.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { View, Text, Pressable, TextInput, ActivityIndicator, Animated } from 'react-native'
+import { View, Text, Pressable, TextInput, ActivityIndicator } from 'react-native'
 import * as Clipboard from 'expo-clipboard'
 import {
-  Users, Plus, Minus, KeyRound, Copy, Share2, Crown, ChevronRight, Trash2,
+  Users, Plus, Minus, KeyRound, Copy, Crown, ChevronRight, Trash2,
   LogOut, Search, ShieldCheck, Gauge, ChevronDown, Flame, Dumbbell,
-  TrendingUp, ArrowUp, UserPlus, CheckCircle2, Activity, Target, Hand,
+  TrendingUp, ArrowUp, UserPlus, CheckCircle2, Activity, Target,
+  SmilePlus, Info, Check, Pencil, AtSign,
 } from 'lucide-react-native'
 import { useStore } from '../store/store'
 import { myLeaderStats, type MyLeaderStats } from '../store/selectors'
@@ -22,8 +23,7 @@ import { Avatar } from '../components/Avatar'
 import { Icon } from '../components/Icon'
 import { ProgressBar } from '../components/ui'
 import { Skeleton } from '../components/Skeleton'
-import { shareText } from '../lib/share'
-import type { CommunityGroup, GroupMember, GroupRankMetric, CheerTally } from '../store/types'
+import type { CommunityGroup, GroupMember, GroupRankMetric } from '../store/types'
 import { RankBadge, StreakFlame, formatKgCompact, odometerColor } from './ui'
 import {
   createGroup, searchGroups, joinGroup,
@@ -108,6 +108,38 @@ function buildActivity(members: GroupMember[]): GroupActivity[] {
   return out
 }
 
+/* --------------------------------- reactions ------------------------------- */
+
+// Positive-only emoji reactions on an activity item (design spec). Client-side
+// prototype state while the backend is off; a server-owned reaction model
+// replaces this when COMMUNITY_BACKEND goes on.
+const REACTION_EMOJIS = ['💪', '🔥', '👏', '🙌', '⚡', '🏆'] as const
+type EmojiTally = { count: number; mine: boolean }
+type ReactionMap = Record<string, EmojiTally> // emoji -> tally
+
+/** Deterministic starting reactions per activity id, so the feed feels alive. */
+function seedReactions(activityId: string): ReactionMap {
+  const m: Record<string, ReactionMap> = {
+    'a-streak': { '🔥': { count: 3, mine: false } },
+    'a-vol': { '💪': { count: 5, mine: false }, '🔥': { count: 2, mine: false } },
+    'a-odo': { '👏': { count: 2, mine: true } },
+    'a-you': {},
+    'a-log': { '🙌': { count: 1, mine: false } },
+    'a-join': { '👏': { count: 4, mine: false } },
+  }
+  return { ...(m[activityId] ?? {}) }
+}
+
+/** Toggle the signed-in user's reaction with `emoji` on one activity. */
+function toggleReaction(map: ReactionMap, emoji: string): ReactionMap {
+  const next = { ...map }
+  const e = next[emoji] ? { ...next[emoji] } : { count: 0, mine: false }
+  if (e.mine) { e.count -= 1; e.mine = false } else { e.count += 1; e.mine = true }
+  if (e.count <= 0) delete next[emoji]
+  else next[emoji] = e
+  return next
+}
+
 /* ---------------------------------- Tab ------------------------------------ */
 
 type ActiveSheet =
@@ -190,6 +222,7 @@ export function GroupsTab({ onClaimUsername }: { onClaimUsername: () => void }) 
         open={sheet?.kind === 'detail'}
         groupId={sheet?.kind === 'detail' ? sheet.id : null}
         onClose={() => setSheet(null)}
+        onClaimUsername={onClaimUsername}
       />
     </View>
   )
@@ -247,7 +280,7 @@ function CreateGroupSheet({ open, onClose, onCreated }: { open: boolean; onClose
         const { groupId, passcode } = await b.createGroupRemote(name.trim(), appearance.icon, appearance.color)
         const group: CommunityGroup = {
           id: groupId, name: name.trim(), passcode, ownerUsername: me.username ?? '',
-          createdAtKey: todayKey, members: [youMember(me)], icon: appearance.icon, color: appearance.color, weeklyGoal: 12,
+          createdAtKey: todayKey, members: [youMember(me)], icon: appearance.icon, color: appearance.color, weeklyGoal: 0,
         }
         setBusy(false)
         dispatch({ type: 'CREATE_GROUP', group })
@@ -392,7 +425,7 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
         onClose()
       } catch {
         setBusy(false)
-        setError("That code doesn't match this group.")
+        setError("That code doesn't match. Double-check with the group owner.")
       }
       return
     }
@@ -435,7 +468,7 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
               autoCapitalize="characters"
               autoCorrect={false}
               maxLength={8}
-              placeholder="6-character code"
+              placeholder="6 character code"
               placeholderTextColor="rgba(255,255,255,0.3)"
               accessibilityLabel="Group passcode"
               className="flex-1 text-[16px] font-bold tracking-[3px] text-white"
@@ -443,7 +476,9 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
             />
           </View>
           <View className="mt-2 min-h-[18px] px-1">
-            {error && <Text className="text-[12px] font-semibold" style={{ color: colors.danger }}>{error}</Text>}
+            {error
+              ? <Text className="text-[12px] font-semibold" style={{ color: colors.danger }}>{error}</Text>
+              : <Text className="text-[12px] text-tertiary">Groups are private. Ask the owner for the code to join.</Text>}
           </View>
           <Pressable
             onPress={submitJoin}
@@ -486,8 +521,8 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
               <View className="items-center rounded-2xl border border-dashed border-white/15 px-6 py-10">
                 <Search size={24} color="rgba(255,255,255,0.35)" />
                 <Text className="mt-2 font-bold text-white">No groups found</Text>
-                <Text className="mt-1 max-w-[230px] text-center text-[13px] text-secondary">
-                  {query.trim() ? 'Try a different name, or ask a friend for their group code.' : 'No public groups to show right now.'}
+                <Text className="mt-1 max-w-[240px] text-center text-[13px] text-secondary">
+                  {query.trim() ? 'No groups match that name. Ask a friend for their group’s invite code.' : 'No public groups to show right now.'}
                 </Text>
               </View>
             ) : (
@@ -519,30 +554,48 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
 
 /* ------------------------------- Group detail ------------------------------ */
 
-function GroupDetailSheet({ open, groupId, onClose }: { open: boolean; groupId: string | null; onClose: () => void }) {
+function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: boolean; groupId: string | null; onClose: () => void; onClaimUsername: () => void }) {
   const { state, dispatch } = useStore()
   const toast = useToast()
   const colors = useColors()
   const me = useMemo(() => myLeaderStats(state), [state])
   const group = state.community.groups.find((g) => g.id === groupId) ?? null
+  // Preview: no claimed identity — hide owner/leave controls, offer to join.
+  const preview = !me.username
   const [metric, setMetric] = useState<GroupRankMetric>('odometer')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [confirmLeave, setConfirmLeave] = useState(false)
+  const [transferMode, setTransferMode] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [reactions, setReactions] = useState<Record<string, ReactionMap>>({})
+  const [pickerFor, setPickerFor] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  const [volInfoOpen, setVolInfoOpen] = useState(false)
+  const [goalEditing, setGoalEditing] = useState(false)
+  const [goalDraft, setGoalDraft] = useState(20)
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  useEffect(() => { if (open) { setMetric('odometer'); setConfirmDelete(false); setExpandedId(null) } }, [open, groupId])
+  useEffect(() => {
+    if (open) { setMetric('odometer'); setConfirmDelete(false); setConfirmLeave(false); setTransferMode(false); setExpandedId(null); setReactions({}); setPickerFor(null); setCopied(false); setVolInfoOpen(false); setGoalEditing(false); setGoalDraft(20) }
+  }, [open, groupId])
+  useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current) }, [])
 
   const owner = !!group && group.ownerUsername === me.username
 
+  const react = (activityId: string, emoji: string) => {
+    setReactions((prev) => ({ ...prev, [activityId]: toggleReaction(prev[activityId] ?? seedReactions(activityId), emoji) }))
+    setPickerFor(null)
+  }
+
   const copyCode = async () => {
     if (!group) return
-    try { await Clipboard.setStringAsync(group.passcode); toast('Passcode copied') }
-    catch { toast("Couldn't copy") }
-  }
-  const shareCode = async () => {
-    if (!group) return
-    const res = await shareText(`Join my group "${group.name}" on StrengthHub — code: ${group.passcode}`, group.name)
-    if (res === 'copied') toast('Invite copied to clipboard')
-    else if (res === 'failed') toast("Couldn't open share")
+    try {
+      await Clipboard.setStringAsync(group.passcode)
+      // Flip the button to "Copied" for ~1.6s (design spec) instead of a toast.
+      setCopied(true)
+      if (copyTimer.current) clearTimeout(copyTimer.current)
+      copyTimer.current = setTimeout(() => setCopied(false), 1600)
+    } catch { toast("Couldn't copy") }
   }
   const leave = async () => {
     if (!group) return
@@ -558,6 +611,24 @@ function GroupDetailSheet({ open, groupId, onClose }: { open: boolean; groupId: 
     toast('Group deleted')
     onClose()
   }
+  // Transfer ownership to another member (owner stays in the group). A server
+  // transfer callable lands with the groups backend (governance is deferred);
+  // this drives the local/preview model.
+  const makeOwner = (username: string) => {
+    if (!group) return
+    dispatch({ type: 'TRANSFER_GROUP_OWNER', id: group.id, newOwnerUsername: username })
+    setExpandedId(null)
+    toast(`@${username} is now the owner`)
+  }
+  // Owner hands the group to a successor and leaves in one step.
+  const makeOwnerAndLeave = (username: string) => {
+    if (!group) return
+    dispatch({ type: 'TRANSFER_GROUP_OWNER', id: group.id, newOwnerUsername: username })
+    dispatch({ type: 'LEAVE_GROUP', id: group.id })
+    toast(`Handed ${group.name} to @${username}`)
+    onClose()
+  }
+  const cancelAction = () => { setConfirmLeave(false); setConfirmDelete(false); setTransferMode(false) }
 
   const ranked = useMemo(
     () => (group ? rankMembers(resolveMembers(group, me), metric) : []),
@@ -566,12 +637,17 @@ function GroupDetailSheet({ open, groupId, onClose }: { open: boolean; groupId: 
   const pulse = useMemo(() => groupPulse(ranked), [ranked])
   const activity = useMemo(() => buildActivity(ranked), [ranked])
   const sessionsDone = ranked.reduce((a, m) => a + (m.sessionsThisWeek ?? 0), 0)
-  const goal = group?.weeklyGoal ?? Math.max(4, ranked.length * 4)
-  const setGoal = (next: number) => {
+  // A group has no goal until the owner sets one (weeklyGoal falsy = unset).
+  const goal = group?.weeklyGoal ?? 0
+  const hasGoal = goal > 0
+  const saveGoal = (next: number) => {
     if (!group) return
-    if (COMMUNITY_BACKEND) { import('./groupsBackend').then((b) => b.setGroupGoalRemote(group.id, next)).catch(() => {}) }
-    dispatch({ type: 'SET_GROUP_GOAL', id: group.id, goal: next })
+    const clamped = Math.max(1, Math.min(200, next))
+    if (COMMUNITY_BACKEND) { import('./groupsBackend').then((b) => b.setGroupGoalRemote(group.id, clamped)).catch(() => {}) }
+    dispatch({ type: 'SET_GROUP_GOAL', id: group.id, goal: clamped })
+    setGoalEditing(false)
   }
+  const openGoalEditor = () => { setGoalDraft(hasGoal ? goal : 20); setGoalEditing(true) }
 
   return (
     <Sheet open={open} onClose={onClose} title={group?.name ?? 'Group'}>
@@ -598,22 +674,52 @@ function GroupDetailSheet({ open, groupId, onClose }: { open: boolean; groupId: 
           {/* group pulse */}
           <PulseHeader pulse={pulse} />
 
-          {/* shared weekly team goal */}
-          <TeamGoalCard done={sessionsDone} goal={goal} owner={owner} color={groupAppearance(group).color} onAdjust={(d) => setGoal(goal + d)} />
+          {/* what the numbers mean */}
+          <View className="mt-2 rounded-xl bg-white/[0.03] px-3 py-2.5">
+            <Pressable onPress={() => setVolInfoOpen((v) => !v)} accessibilityRole="button" accessibilityLabel="What the numbers mean" accessibilityState={{ expanded: volInfoOpen }} className="flex-row items-center gap-2">
+              <Info size={14} color="rgba(255,255,255,0.4)" />
+              <Text className="flex-1 text-[11px] font-bold text-secondary">What the numbers mean</Text>
+              <ChevronDown size={15} color="rgba(255,255,255,0.4)" style={{ transform: [{ rotate: volInfoOpen ? '180deg' : '0deg' }] }} />
+            </Pressable>
+            {volInfoOpen && (
+              <Text className="mt-2 pl-[22px] text-[11px] leading-relaxed text-tertiary">
+                <Text className="font-bold text-secondary">Volume</Text> is the total weight lifted across all workouts (sets × reps × weight). <Text className="font-bold text-secondary">Odometer</Text> is your weekly consistency score out of 100.
+              </Text>
+            )}
+          </View>
 
-          {/* passcode */}
+          {/* shared weekly team goal — owner-set, with member/empty states */}
+          {owner && (!hasGoal || goalEditing) ? (
+            <TeamGoalSetter
+              draft={goalDraft}
+              color={groupAppearance(group).color}
+              onDec={() => setGoalDraft((d) => Math.max(4, d - 2))}
+              onInc={() => setGoalDraft((d) => Math.min(60, d + 2))}
+              onSave={() => saveGoal(goalDraft)}
+            />
+          ) : hasGoal ? (
+            <TeamGoalCard done={sessionsDone} goal={goal} owner={owner} color={groupAppearance(group).color} onEdit={openGoalEditor} />
+          ) : (
+            <View className="mt-3 flex-row items-center gap-2.5 rounded-2xl border border-white/6 bg-white/[0.02] p-3.5">
+              <Target size={16} color="rgba(255,255,255,0.4)" />
+              <Text className="text-[13px] leading-snug text-tertiary">No weekly team goal yet. The group owner can set one.</Text>
+            </View>
+          )}
+
+          {/* invite code */}
           <View className="mt-4 rounded-2xl border border-white/8 bg-ink-800 p-3.5">
             <Text className="text-[11px] font-semibold uppercase tracking-wide text-tertiary">Invite code</Text>
             <View className="mt-1.5 flex-row items-center justify-between">
               <Text className="text-[22px] font-black tracking-[4px] text-white">{group.passcode}</Text>
-              <View className="flex-row gap-2">
-                <Pressable onPress={copyCode} accessibilityRole="button" accessibilityLabel="Copy passcode" hitSlop={8} className="h-9 w-9 items-center justify-center rounded-full bg-white/10 active:opacity-80">
-                  <Copy size={16} color={colors.fg} />
-                </Pressable>
-                <Pressable onPress={shareCode} accessibilityRole="button" accessibilityLabel="Share passcode" hitSlop={8} className="h-9 w-9 items-center justify-center rounded-full bg-brand-400 active:opacity-90">
-                  <Share2 size={16} color="#000" />
-                </Pressable>
-              </View>
+              <Pressable
+                onPress={copyCode}
+                accessibilityRole="button"
+                accessibilityLabel={copied ? 'Copied' : 'Copy invite code'}
+                className="h-9 flex-row items-center gap-1.5 rounded-full bg-brand-400 px-3.5 active:opacity-90"
+              >
+                {copied ? <Check size={15} color="#000" strokeWidth={2.6} /> : <Copy size={15} color="#000" />}
+                <Text className="text-[13px] font-bold text-black">{copied ? 'Copied' : 'Copy'}</Text>
+              </Pressable>
             </View>
           </View>
 
@@ -650,6 +756,8 @@ function GroupDetailSheet({ open, groupId, onClose }: { open: boolean; groupId: 
                 metric={metric}
                 expanded={expandedId === m.id}
                 onToggle={() => setExpandedId((id) => (id === m.id ? null : m.id))}
+                canMakeOwner={owner && !m.isYou}
+                onMakeOwner={() => makeOwner(m.username)}
               />
             ))}
           </View>
@@ -666,55 +774,159 @@ function GroupDetailSheet({ open, groupId, onClose }: { open: boolean; groupId: 
                   <ActivityRow
                     key={a.id}
                     item={a}
-                    tally={group.cheers?.[a.id]}
-                    onCheer={() => {
-                      if (COMMUNITY_BACKEND) { import('./groupsBackend').then((b) => b.cheerRemote(group.id, a.id)).catch(() => {}) }
-                      dispatch({ type: 'CHEER_ACTIVITY', groupId: group.id, activityId: a.id })
-                    }}
+                    reactions={reactions[a.id] ?? seedReactions(a.id)}
+                    pickerOpen={pickerFor === a.id}
+                    onTogglePicker={() => setPickerFor((p) => (p === a.id ? null : a.id))}
+                    onReact={(emoji) => react(a.id, emoji)}
                   />
                 ))}
               </View>
             </>
           )}
 
-          {/* danger zone */}
-          <View className="mt-7 gap-2.5">
-            {owner && (
-              confirmDelete ? (
-                <View className="rounded-2xl border p-3.5" style={{ borderColor: `${colors.danger}55`, backgroundColor: `${colors.danger}12` }}>
-                  <Text className="font-bold text-white">Delete this group?</Text>
-                  <Text className="mt-1 text-[13px] text-secondary">This removes it for everyone and can't be undone.</Text>
-                  <View className="mt-3 flex-row gap-2">
-                    <Pressable onPress={() => setConfirmDelete(false)} accessibilityRole="button" accessibilityLabel="Cancel delete" className="flex-1 items-center rounded-xl border border-white/10 bg-white/5 py-3 active:opacity-80">
-                      <Text className="text-[14px] font-bold text-white/80">Cancel</Text>
-                    </Pressable>
-                    <Pressable onPress={remove} accessibilityRole="button" accessibilityLabel="Confirm delete group" className="flex-1 items-center rounded-xl py-3 active:opacity-90" style={{ backgroundColor: colors.danger }}>
-                      <Text className="text-[14px] font-bold text-white">Delete</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              ) : (
-                <Pressable onPress={() => setConfirmDelete(true)} accessibilityRole="button" accessibilityLabel="Delete group" className="flex-row items-center justify-center gap-2 rounded-2xl border border-white/10 py-3.5 active:opacity-80">
-                  <Trash2 size={16} color={colors.danger} />
-                  <Text className="text-[14px] font-bold" style={{ color: colors.danger }}>Delete group</Text>
+          {/* footer — preview claim CTA, else leave / ownership / delete */}
+          <View className="mt-7">
+            {preview ? (
+              <View>
+                <Pressable
+                  onPress={() => { onClose(); onClaimUsername() }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Claim a username to join"
+                  className="flex-row items-center justify-center gap-2 rounded-2xl bg-brand-400 py-4 active:opacity-90"
+                >
+                  <AtSign size={16} color="#000" />
+                  <Text className="text-[14px] font-bold text-black">Claim a username to join</Text>
                 </Pressable>
-              )
-            )}
-            {!owner && (
-              <Pressable onPress={leave} accessibilityRole="button" accessibilityLabel="Leave group" className="flex-row items-center justify-center gap-2 rounded-2xl border border-white/10 py-3.5 active:opacity-80">
-                <LogOut size={16} color="rgba(255,255,255,0.7)" />
-                <Text className="text-[14px] font-bold text-white/70">Leave group</Text>
-              </Pressable>
-            )}
-            {owner && (
-              <Pressable onPress={leave} accessibilityRole="button" accessibilityLabel="Leave group" className="items-center py-1 active:opacity-70">
-                <Text className="text-[13px] font-semibold text-tertiary">Leave without deleting</Text>
-              </Pressable>
+                <Text className="mt-2 text-center text-[12px] text-tertiary">
+                  You're previewing Community. Claim a name to join groups and appear on leaderboards.
+                </Text>
+              </View>
+            ) : (
+              <OwnershipFooter
+                owner={owner}
+                others={ranked.filter((m) => !m.isYou)}
+                danger={colors.danger}
+                confirmLeave={confirmLeave}
+                confirmDelete={confirmDelete}
+                transferMode={transferMode}
+                onAskLeave={() => (owner ? setTransferMode(true) : setConfirmLeave(true))}
+                onAskDelete={() => setConfirmDelete(true)}
+                onCancel={cancelAction}
+                onLeave={leave}
+                onDelete={remove}
+                onHandOver={makeOwnerAndLeave}
+              />
             )}
           </View>
         </View>
       )}
     </Sheet>
+  )
+}
+
+/* ------------------------------ ownership footer --------------------------- */
+
+/** The leave / delete / transfer controls, which differ by role:
+ *  - member: leave (confirm)
+ *  - owner, only member: leave == delete (confirm)
+ *  - owner with others: leave requires choosing a successor; or delete (confirm) */
+function OwnershipFooter({ owner, others, danger, confirmLeave, confirmDelete, transferMode, onAskLeave, onAskDelete, onCancel, onLeave, onDelete, onHandOver }: {
+  owner: boolean
+  others: GroupMember[]
+  danger: string
+  confirmLeave: boolean
+  confirmDelete: boolean
+  transferMode: boolean
+  onAskLeave: () => void
+  onAskDelete: () => void
+  onCancel: () => void
+  onLeave: () => void
+  onDelete: () => void
+  onHandOver: (username: string) => void
+}) {
+  const CancelBtn = (
+    <Pressable onPress={onCancel} accessibilityRole="button" accessibilityLabel="Cancel" className="items-center py-2.5 active:opacity-70">
+      <Text className="text-[13px] font-bold text-tertiary">Cancel</Text>
+    </Pressable>
+  )
+  const DeleteConfirm = ({ note }: { note: string }) => (
+    <View className="gap-2">
+      <Text className="px-2 pb-0.5 text-center text-[12px] leading-snug text-secondary">{note}</Text>
+      <Pressable onPress={onDelete} accessibilityRole="button" accessibilityLabel="Delete group permanently" className="flex-row items-center justify-center gap-2 rounded-2xl border py-3.5 active:opacity-90" style={{ borderColor: `${danger}80`, backgroundColor: `${danger}29` }}>
+        <Trash2 size={16} color={danger} />
+        <Text className="text-[14px] font-extrabold" style={{ color: danger }}>Delete group permanently</Text>
+      </Pressable>
+      {CancelBtn}
+    </View>
+  )
+
+  // Member
+  if (!owner) {
+    return confirmLeave ? (
+      <View className="gap-2">
+        <Pressable onPress={onLeave} accessibilityRole="button" accessibilityLabel="Confirm leave group" className="flex-row items-center justify-center gap-2 rounded-2xl border py-3.5 active:opacity-90" style={{ borderColor: `${danger}80`, backgroundColor: `${danger}29` }}>
+          <LogOut size={16} color={danger} />
+          <Text className="text-[14px] font-extrabold" style={{ color: danger }}>Are you sure you want to leave group?</Text>
+        </Pressable>
+        {CancelBtn}
+      </View>
+    ) : (
+      <Pressable onPress={onAskLeave} accessibilityRole="button" accessibilityLabel="Leave group" className="flex-row items-center justify-center gap-2 rounded-2xl border border-white/10 py-3.5 active:opacity-80">
+        <LogOut size={16} color="rgba(255,255,255,0.7)" />
+        <Text className="text-[14px] font-bold text-secondary">Leave group</Text>
+      </Pressable>
+    )
+  }
+
+  // Owner, sole member → leaving deletes
+  if (others.length === 0) {
+    return confirmDelete ? (
+      <DeleteConfirm note="You're the only member, so leaving deletes this group for good." />
+    ) : (
+      <Pressable onPress={onAskDelete} accessibilityRole="button" accessibilityLabel="Delete group" className="flex-row items-center justify-center gap-2 rounded-2xl border border-white/10 py-3.5 active:opacity-80">
+        <Trash2 size={16} color={danger} />
+        <Text className="text-[14px] font-bold" style={{ color: danger }}>Delete group</Text>
+      </Pressable>
+    )
+  }
+
+  // Owner with other members
+  if (transferMode) {
+    return (
+      <View>
+        <Text className="text-[13px] font-bold text-white">Choose who takes over</Text>
+        <Text className="mt-0.5 text-[12px] leading-snug text-tertiary">A group always needs an owner. Pick a member to hand the group to, and you'll leave once they take over.</Text>
+        <View className="mt-3 gap-2">
+          {others.map((m) => (
+            <Pressable key={m.id} onPress={() => onHandOver(m.username)} accessibilityRole="button" accessibilityLabel={`Hand over to ${m.username}`} className="flex-row items-center gap-3 rounded-2xl border p-3 active:opacity-90" style={{ borderColor: 'rgba(245,197,24,0.25)', backgroundColor: 'rgba(245,197,24,0.06)' }}>
+              <Avatar name={m.username} size={36} />
+              <View className="min-w-0 flex-1">
+                <Text numberOfLines={1} className="font-bold text-white">@{m.username}</Text>
+                <Text className="text-[12px] text-tertiary">{m.streak}-day streak · {m.odometer}/100</Text>
+              </View>
+              <View className="flex-row items-center gap-1.5 rounded-full px-2.5 py-1" style={{ backgroundColor: 'rgba(245,197,24,0.15)' }}>
+                <Crown size={12} color="#F5C518" />
+                <Text className="text-[11px] font-bold text-[#F5C518]">Hand over</Text>
+              </View>
+            </Pressable>
+          ))}
+        </View>
+        {CancelBtn}
+      </View>
+    )
+  }
+  if (confirmDelete) return <DeleteConfirm note="This deletes the group for all members. This can't be undone." />
+  return (
+    <View className="flex-row gap-2.5">
+      <Pressable onPress={onAskLeave} accessibilityRole="button" accessibilityLabel="Leave group" className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl border border-white/10 py-3.5 active:opacity-80">
+        <LogOut size={16} color="rgba(255,255,255,0.7)" />
+        <Text className="text-[14px] font-bold text-secondary">Leave group</Text>
+      </Pressable>
+      <Pressable onPress={onAskDelete} accessibilityRole="button" accessibilityLabel="Delete group" className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl border py-3.5 active:opacity-80" style={{ borderColor: `${danger}40` }}>
+        <Trash2 size={16} color={danger} />
+        <Text className="text-[14px] font-bold" style={{ color: danger }}>Delete</Text>
+      </Pressable>
+    </View>
   )
 }
 
@@ -744,14 +956,14 @@ function PulseTile({ label, value, sub }: { label: string; value: string; sub: s
 
 /* ------------------------------ team goal card ----------------------------- */
 
-/** Shared weekly objective: combined member sessions vs the group's target. The
- *  owner can nudge the target up/down; everyone sees the same progress. */
-function TeamGoalCard({ done, goal, owner, color, onAdjust }: {
+/** Shared weekly objective: combined member sessions vs the group's target.
+ *  Everyone sees the same progress; the owner gets an Edit affordance. */
+function TeamGoalCard({ done, goal, owner, color, onEdit }: {
   done: number
   goal: number
   owner: boolean
   color: string
-  onAdjust: (delta: number) => void
+  onEdit: () => void
 }) {
   const pct = goal > 0 ? Math.min(100, Math.round((done / goal) * 100)) : 0
   const reached = done >= goal
@@ -762,14 +974,10 @@ function TeamGoalCard({ done, goal, owner, color, onAdjust }: {
         <Target size={16} color={color} />
         <Text className="flex-1 text-[13px] font-bold text-white">Weekly team goal</Text>
         {owner && (
-          <View className="flex-row items-center gap-1.5">
-            <Pressable onPress={() => onAdjust(-1)} accessibilityRole="button" accessibilityLabel="Lower team goal" hitSlop={6} className="h-7 w-7 items-center justify-center rounded-full bg-white/10 active:opacity-70">
-              <Minus size={14} color="#fff" />
-            </Pressable>
-            <Pressable onPress={() => onAdjust(1)} accessibilityRole="button" accessibilityLabel="Raise team goal" hitSlop={6} className="h-7 w-7 items-center justify-center rounded-full bg-white/10 active:opacity-70">
-              <Plus size={14} color="#fff" />
-            </Pressable>
-          </View>
+          <Pressable onPress={onEdit} accessibilityRole="button" accessibilityLabel="Edit team goal" hitSlop={6} className="flex-row items-center gap-1 active:opacity-70">
+            <Pencil size={13} color="rgba(255,255,255,0.5)" />
+            <Text className="text-[12px] font-semibold text-secondary">Edit</Text>
+          </Pressable>
         )}
       </View>
       <View className="mt-2 flex-row items-baseline gap-1.5">
@@ -784,14 +992,53 @@ function TeamGoalCard({ done, goal, owner, color, onAdjust }: {
   )
 }
 
+/** Owner-only card to set (or edit) the weekly team goal — new groups start with
+ *  no goal until this is used. ±2 sessions, 4–60. */
+function TeamGoalSetter({ draft, color, onDec, onInc, onSave }: {
+  draft: number
+  color: string
+  onDec: () => void
+  onInc: () => void
+  onSave: () => void
+}) {
+  return (
+    <View className="mt-3 rounded-2xl border border-dashed border-white/16 bg-ink-800 p-4">
+      <View className="flex-row items-center gap-2">
+        <Target size={16} color={color} />
+        <Text className="flex-1 text-[13px] font-bold text-white">Set a weekly team goal</Text>
+      </View>
+      <Text className="mt-1 text-[12px] leading-snug text-tertiary">
+        Choose how many workouts the group aims to log together each week. There's no goal until you set one.
+      </Text>
+      <View className="mt-3.5 flex-row items-center gap-3.5">
+        <Pressable onPress={onDec} accessibilityRole="button" accessibilityLabel="Lower goal" className="h-10 w-10 items-center justify-center rounded-xl border border-white/12 bg-white/[0.04] active:opacity-70">
+          <Minus size={18} color="#fff" />
+        </Pressable>
+        <View className="flex-1 items-center">
+          <Text className="text-[30px] font-black text-white">{draft}</Text>
+          <Text className="text-[11px] font-semibold uppercase tracking-wide text-tertiary">sessions / week</Text>
+        </View>
+        <Pressable onPress={onInc} accessibilityRole="button" accessibilityLabel="Raise goal" className="h-10 w-10 items-center justify-center rounded-xl border border-white/12 bg-white/[0.04] active:opacity-70">
+          <Plus size={18} color="#fff" />
+        </Pressable>
+      </View>
+      <Pressable onPress={onSave} accessibilityRole="button" accessibilityLabel="Set goal" className="mt-3.5 items-center justify-center rounded-2xl bg-brand-400 py-3.5 active:opacity-90">
+        <Text className="text-[14px] font-bold text-black">Set goal</Text>
+      </Pressable>
+    </View>
+  )
+}
+
 /* --------------------------------- members --------------------------------- */
 
-function MemberRow({ member, rank, metric, expanded, onToggle }: {
+function MemberRow({ member, rank, metric, expanded, onToggle, canMakeOwner, onMakeOwner }: {
   member: GroupMember
   rank: number
   metric: GroupRankMetric
   expanded: boolean
   onToggle: () => void
+  canMakeOwner: boolean
+  onMakeOwner: () => void
 }) {
   const colors = useColors()
   const you = !!member.isYou
@@ -824,12 +1071,12 @@ function MemberRow({ member, rank, metric, expanded, onToggle }: {
         <MetricValue member={member} metric={metric} colors={colors} />
         <ChevronDown size={16} color="rgba(255,255,255,0.3)" style={{ transform: [{ rotate: expanded ? '180deg' : '0deg' }] }} />
       </Pressable>
-      {expanded && <MemberStats member={member} rank={rank} colors={colors} />}
+      {expanded && <MemberStats member={member} rank={rank} colors={colors} canMakeOwner={canMakeOwner} onMakeOwner={onMakeOwner} />}
     </View>
   )
 }
 
-function MemberStats({ member, rank, colors }: { member: GroupMember; rank: number; colors: ReturnType<typeof useColors> }) {
+function MemberStats({ member, rank, colors, canMakeOwner, onMakeOwner }: { member: GroupMember; rank: number; colors: ReturnType<typeof useColors>; canMakeOwner: boolean; onMakeOwner: () => void }) {
   const best = member.bestStreak ?? member.streak
   const tiles: { label: string; value: string; sub?: string; color?: string }[] = [
     { label: 'Odometer', value: `${member.odometer}`, sub: '/100', color: odometerColor(member.odometer, colors) },
@@ -853,6 +1100,20 @@ function MemberStats({ member, rank, colors }: { member: GroupMember; rank: numb
             </View>
           </View>
         ))}
+        {canMakeOwner && (
+          <View style={{ width: '100%', padding: 4 }}>
+            <Pressable
+              onPress={onMakeOwner}
+              accessibilityRole="button"
+              accessibilityLabel={`Make @${member.username} the group owner`}
+              className="flex-row items-center justify-center gap-2 rounded-xl border py-3 active:opacity-80"
+              style={{ borderColor: 'rgba(245,197,24,0.3)', backgroundColor: 'rgba(245,197,24,0.1)' }}
+            >
+              <Crown size={14} color="#F5C518" />
+              <Text className="text-[13px] font-bold text-[#F5C518]">Make group owner</Text>
+            </Pressable>
+          </View>
+        )}
       </View>
     </View>
   )
@@ -888,49 +1149,86 @@ const ACTIVITY_STYLE: Record<ActivityKind, { Glyph: typeof Flame; color: string 
   join: { Glyph: UserPlus, color: '#EC4899' },
 }
 
-function ActivityRow({ item, tally, onCheer }: { item: GroupActivity; tally?: CheerTally; onCheer: () => void }) {
+function ActivityRow({ item, reactions, pickerOpen, onTogglePicker, onReact }: {
+  item: GroupActivity
+  reactions: ReactionMap
+  pickerOpen: boolean
+  onTogglePicker: () => void
+  onReact: (emoji: string) => void
+}) {
   const s = ACTIVITY_STYLE[item.kind]
   const Glyph = s.Glyph
+  // Emojis that have at least one reaction, shown as toggleable count pills.
+  const active = REACTION_EMOJIS.filter((e) => reactions[e] && reactions[e].count > 0)
   return (
-    <View className="flex-row items-center gap-3 rounded-2xl border border-white/5 bg-white/[0.02] p-3">
-      <View className="h-9 w-9 items-center justify-center rounded-full" style={{ backgroundColor: `${s.color}1a` }}>
-        <Glyph size={16} color={s.color} />
+    <View className="rounded-2xl border border-white/5 bg-white/[0.02] p-3">
+      <View className="flex-row items-center gap-3">
+        <View className="h-9 w-9 items-center justify-center rounded-full" style={{ backgroundColor: `${s.color}1a` }}>
+          <Glyph size={16} color={s.color} />
+        </View>
+        <View className="min-w-0 flex-1">
+          <Text className="text-[13px] leading-snug text-white/80">{item.text}</Text>
+          <Text className="text-[11px] text-tertiary">{item.when}</Text>
+        </View>
+        <Pressable
+          onPress={onTogglePicker}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Add a reaction"
+          accessibilityState={{ expanded: pickerOpen }}
+          className="flex-row items-center gap-1 rounded-full bg-white/[0.06] px-2.5 py-1.5 active:opacity-80"
+        >
+          <SmilePlus size={16} color="rgba(255,255,255,0.6)" />
+        </Pressable>
       </View>
-      <View className="min-w-0 flex-1">
-        <Text className="text-[13px] leading-snug text-white/80">{item.text}</Text>
-        <Text className="text-[11px] text-tertiary">{item.when}</Text>
-      </View>
-      <CheerButton tally={tally} onPress={onCheer} />
-    </View>
-  )
-}
 
-/** Reaction-only "cheer" (a high-five). Positive-only, attaches to the action,
- *  never to a person — no free text, nothing to moderate. */
-function CheerButton({ tally, onPress }: { tally?: CheerTally; onPress: () => void }) {
-  const mine = !!tally?.mine
-  const count = tally?.count ?? 0
-  const pop = useRef(new Animated.Value(1)).current
-  const press = () => {
-    onPress()
-    pop.setValue(mine ? 0.85 : 0.68)
-    Animated.spring(pop, { toValue: 1, useNativeDriver: true, speed: 15, bounciness: mine ? 6 : 16 }).start()
-  }
-  return (
-    <Pressable
-      onPress={press}
-      hitSlop={8}
-      accessibilityRole="button"
-      accessibilityLabel={mine ? 'Remove your cheer' : `Cheer this (${count})`}
-      accessibilityState={{ selected: mine }}
-      className="flex-row items-center gap-1 rounded-full px-2.5 py-1.5"
-      style={{ backgroundColor: mine ? `${brand[400]}22` : 'rgba(255,255,255,0.06)' }}
-    >
-      <Animated.View style={{ transform: [{ scale: pop }] }}>
-        <Hand size={14} color={mine ? brand[400] : 'rgba(255,255,255,0.5)'} fill={mine ? brand[400] : 'none'} />
-      </Animated.View>
-      {count > 0 && <Text className="text-[11px] font-bold" style={{ color: mine ? brand[400] : 'rgba(255,255,255,0.5)' }}>{count}</Text>}
-    </Pressable>
+      {/* reaction count pills */}
+      {active.length > 0 && (
+        <View className="mt-2.5 flex-row flex-wrap gap-1.5">
+          {active.map((e) => {
+            const t = reactions[e]
+            return (
+              <Pressable
+                key={e}
+                onPress={() => onReact(e)}
+                accessibilityRole="button"
+                accessibilityLabel={`${t.mine ? 'Remove' : 'Add'} ${e} reaction`}
+                accessibilityState={{ selected: t.mine }}
+                className="flex-row items-center gap-1 rounded-full px-2.5 py-1 active:opacity-80"
+                style={{ borderWidth: 1, borderColor: t.mine ? `${brand[400]}80` : 'transparent', backgroundColor: t.mine ? `${brand[400]}26` : 'rgba(255,255,255,0.06)' }}
+              >
+                <Text className="text-[13px]">{e}</Text>
+                <Text className="text-[12px] font-bold" style={{ color: t.mine ? brand[300] : 'rgba(255,255,255,0.6)' }}>{t.count}</Text>
+              </Pressable>
+            )
+          })}
+        </View>
+      )}
+
+      {/* floating emoji popover */}
+      {pickerOpen && (
+        <>
+          <Pressable onPress={onTogglePicker} accessibilityLabel="Close reactions" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 4 }} />
+          <View
+            className="absolute right-2.5 top-2 z-10 flex-row gap-0.5 rounded-full border border-white/10 bg-ink-700 p-1.5"
+            style={{ shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 26, shadowOffset: { width: 0, height: 10 } }}
+          >
+            {REACTION_EMOJIS.map((e) => (
+              <Pressable
+                key={e}
+                onPress={() => onReact(e)}
+                accessibilityRole="button"
+                accessibilityLabel={`React with ${e}`}
+                className="h-8 w-8 items-center justify-center rounded-full active:opacity-70"
+                style={{ backgroundColor: reactions[e]?.mine ? `${brand[400]}33` : 'transparent' }}
+              >
+                <Text className="text-[18px]">{e}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </>
+      )}
+    </View>
   )
 }
 
