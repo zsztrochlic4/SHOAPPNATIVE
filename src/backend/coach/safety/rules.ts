@@ -457,6 +457,15 @@ const DE_SIGNALS = ['skipping meals', 'skip meals', 'only eating once', 'once a 
 
 function detectDisorderedEating(n: Norm): DetectorHit[] {
   if (has(n, ...DE_SIGNALS)) return [hit('disordered_eating', 'de_signal')]
+  // Compensatory exercise (500-prompt eval #407): training used to make up for / burn off eating, or
+  // extra training framed as a consequence of eating "too much". High precision — requires BOTH an
+  // extra-exercise cue AND a compensation-for-eating cue, so a benign "I overate and skipped my workout"
+  // does not trip it.
+  const compExercise = has(n, 'train twice', 'train again', 'train extra', 'extra session', 'extra workout',
+    'extra cardio', 'more cardio', 'train harder', 'work it off', 'burn it off', 'twice today')
+  const compFood = has(n, 'because i ate', 'since i ate', 'after eating', 'i ate too much', 'ate too much',
+    'to burn off', 'burn off', 'make up for', 'to earn', 'compensate')
+  if (compExercise && compFood) return [hit('disordered_eating', 'compensatory_exercise')]
   return []
 }
 
@@ -519,7 +528,13 @@ function detectSteroidsPED(n: Norm): DetectorHit[] {
   const ped = has(n, 'steroids', 'steroid cycle', 'anabolic', 'sarm', 'sarms', 'testosterone', 'test e',
     'test cyp', 'trenbolone', 'anavar', 'dianabol', 'winstrol', 'clenbuterol', 'peptide', 'peptides',
     'post cycle', 'post cycle therapy', 'pct', 'inject test', 'how much testosterone', 'best cycle', 'safest cycle',
-    'pass a drug test', 'beat a drug test', 'where can i buy sarms', 'buy steroids') ||
+    'pass a drug test', 'beat a drug test', 'where can i buy sarms', 'buy steroids',
+    // 500-prompt eval: definition/education/myth PED questions ("what does TRT mean", "risks of PED use")
+    // were falling to the generic off-topic bucket or an awkward model refusal. Route them to the PED
+    // referral so they get a risk-aware "speak to a doctor" answer, not a generic deflection. The referral
+    // never gives cycles/doses/sourcing, so this only tightens (never loosens) the guardrail.
+    'trt', 'peds', 'ped use', 'ped usage', 'ped cycle', 'performance enhancing', 'performance-enhancing',
+    'performance enhancer', 'gear cycle') ||
     // 'tren' (trenbolone slang) ONLY as a whole word — a bare substring wrongly fired inside common
     // fitness words "s-TREN-gth" and "TREN-d", referring every strength/weight-trend question as a PED.
     hasRe(n, /\btren\b/)
@@ -620,7 +635,14 @@ function detectAiRelationship(n: Norm): DetectorHit[] {
     'do you like me', 'do you actually like me', 'do you really like me', 'do you even like me',
     'are you my friend', 'will you be my friend', 'do you have feelings', 'do you have feelings for me',
     'can we be friends', 'do you care about me', 'are you in love with me', 'do you think about me',
-    'will you always be here for me', 'are you my only friend', 'do you miss me'))
+    'will you always be here for me', 'are you my only friend', 'do you miss me',
+    // 500-prompt eval: identity / clinical-role / diagnosis questions belong here (the ai_relationship
+    // reply already states "not a real person, a therapist, or your doctor" and redirects to training),
+    // not in the generic off-topic bucket they were falling into (#423/#424/#425).
+    'are you a doctor', 'are you a physio', 'are you a physiotherapist', 'are you a nurse',
+    'are you a dietitian', 'are you a psychologist', 'are you a physician', 'are you medically qualified',
+    'are you a qualified', 'are you qualified', 'can you diagnose', 'diagnose injuries', 'diagnose my',
+    'diagnose what', 'tell me what is wrong with', 'what is wrong with my'))
     return [hit('ai_relationship', 'relationship_boundary')]
   return []
 }
@@ -1028,6 +1050,40 @@ const FITNESS_TERMS = [
   // classifier over-flags these; a scoped fatigue suppressor removes that false positive).
   'exhausted', 'run down', 'rundown', 'worn out', 'wrecked', 'drained', 'shattered', 'sluggish',
   'no energy', 'everything feels heavy', 'feels heavy', 'lifts feel heavy', 'feeling flat', 'running on empty',
+  // 500-PROMPT EVAL (2026-08-17): a broad batch of ordinary training / technique / programming / nutrition /
+  // equipment / recovery / beginner vocabulary the classifier was bouncing as "off topic". These ONLY relax
+  // the off-topic net (a real safety category is decided first and never downgraded by an on-topic term).
+  // Curated to avoid short substrings that could match distress words (e.g. no bare "arm" -> "harm").
+  // programming / concepts
+  'amrap', 'emom', 'drop set', 'dropset', 'to failure', 'progressive overload', 'compound', 'isolation',
+  'unilateral', 'range of motion', 'eccentric', 'concentric', 'partial rep', 'partial reps', 'full body',
+  'upper lower', 'push pull legs', 'muscle confusion', 'junk volume', 'time under tension', 'rest between',
+  'rest period', 'between sets', 'how much rest', 'rest too long', 'periodis', 'periodiz', 'overtrain',
+  'over training', 'overreach', 'plateau', 'stalled', 'stalling',
+  // recovery / modalities
+  'foam roll', 'foam roller', 'sauna', 'ice bath', 'cold shower', 'cold plunge', 'massage', 'active recovery',
+  'doing too much', 'too much volume', 'overdoing',
+  // exercises / technique
+  'lats', 'lat pulldown', 'pulldown', 'pull down', 'lunge', 'lunges', 'lateral raise', 'side raise',
+  'chest fly', 'cable fly', 'flyes', 'triceps extension', 'leg extension', 'pushdown', 'dips', 'plank',
+  'crunch', 'hip thrust', 'split squat', 'romanian deadlift', 'mixed grip', 'grip strength', 'my grip',
+  // accessories / equipment
+  'belt', 'lifting belt', 'wrist wrap', 'wrist wraps', 'lifting straps', 'knee sleeve', 'knee sleeves', 'chalk',
+  'equipment', 'no equipment',
+  // body parts (safe forms only)
+  'forearm', 'forearms', 'traps', 'delts', 'left arm', 'right arm', 'weaker', 'imbalance', 'lagging', 'one side',
+  // nutrition education
+  'fats', 'body fat', 'fat loss', 'healthy fats', 'dietary fat', 'salt', 'sodium', 'sugar', 'fibre', 'fiber',
+  'vitamin', 'multivitamin', 'electrolyte', 'electrolytes', 'caffeine', 'beta alanine', 'beta-alanine', 'whey',
+  'casein', 'fat burner', 'fat burners', 'cheat meal', 'takeaway', 'breakfast', 'vegan', 'vegetarian', 'fasted', 'fasting',
+  // beginner / general coaching
+  'beginner', 'beginners', 'novice', 'personal trainer', 'biggest mistake', 'what to track', 'track my',
+  'tracking', 'first session', 'first time at the gym', 'never been to a gym', 'starting out', 'get started',
+  'inconsistent', 'restart', 'back into it', 'off track', 'fell off', 'feel weak', 'feeling weak',
+  // sport / activity (specific, to avoid substring traps)
+  'footy', 'football', 'basketball', 'soccer', 'tennis', 'pickleball', 'climbing', 'martial arts', 'dance class',
+  // time available
+  'an hour', 'one hour', 'half hour', 'hour today', 'quick workout', 'something quick',
 ]
 
 /** Very short in-flow affirmations — allowed only when the whole message is a brief continuation. */
@@ -1044,6 +1100,8 @@ const CONTINUITY = [
  * in isolation. Generalises to phrasing, not to a specific sentence.
  */
 function matchesFitnessIntentPattern(n: Norm): boolean {
+  // Set x rep notation ("3 x 10", "5x5", "4 x 8") is unambiguously a training question.
+  if (hasRe(n, /\b\d{1,3}\s?x\s?\d{1,3}\b/)) return true
   // exams / study / a busy academic period AND its effect on training, time or recovery.
   const examContext = has(n, 'exam', 'exams', 'study', 'studying', 'assignment', 'deadline', 'deadlines',
     'finals', 'midterm', 'midterms', 'placement', 'thesis')
@@ -1062,12 +1120,13 @@ function matchesFitnessIntentPattern(n: Norm): boolean {
     'see results', 'making progress')
   const goalBearing = has(n, 'train', 'training', 'workout', 'program', 'programme', 'progress', 'plan',
     'track', 'reach', 'hit', 'toward', 'towards', 'get to', 'am i', 'making progress', 'how long until',
-    'see results', 'until i see')
+    'see results', 'until i see', 'guarantee', 'guaranteed', 'promise', 'transform', 'definitely')
   if (goalContext && goalBearing) return true
   // time available AND a "what do I do / session" bearing — a session-length question in a coach thread.
-  const timeContext = hasRe(n, /\b\d{1,3}\s?(min|mins|minute|minutes)\b/) || has(n, 'half an hour', 'quick session', 'short session', 'not much time', 'no time', 'limited time')
+  const timeContext = hasRe(n, /\b\d{1,3}\s?(min|mins|minute|minutes)\b/) || has(n, 'half an hour', 'an hour', 'one hour', 'quick session', 'short session', 'not much time', 'no time', 'limited time')
   const sessionBearing = has(n, 'what should i do', 'what do i do', 'what can i do', 'session', 'train', 'training',
-    'workout', 'work out', 'today', 'gym', 'squeeze in', 'fit in')
+    'workout', 'work out', 'today', 'gym', 'squeeze in', 'fit in', 'give me', 'most important', 'things to do',
+    'prioritise', 'prioritize', 'priority', 'something quick')
   if (timeContext && sessionBearing) return true
   return false
 }
