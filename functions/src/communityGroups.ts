@@ -164,7 +164,7 @@ export const joinGroupByPasscode = onCall<JoinInput>({ region: REGION, enforceAp
 
 /** Join by short code alone — the path for PRIVATE groups (not in the directory,
  *  so the client has no groupId to pass). Resolves groupCodes/{code} → group. */
-export const joinGroupByCode = onCall<{ code?: string }>({ region: REGION, enforceAppCheck: APP_CHECK_ENFORCED }, async (req) => {
+export const joinGroupByCode = onCall<{ code?: string }>({ region: REGION, enforceAppCheck: APP_CHECK_ENFORCED, maxInstances: 1 }, async (req) => {
   const uid = requireVerifiedUser(req, 'communityGroups')
   const code = normalizeCode(req.data?.code ?? '')
   if (!code) throw new HttpsError('invalid-argument', 'A code is required.')

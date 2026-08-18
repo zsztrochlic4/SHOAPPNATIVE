@@ -10,22 +10,23 @@ import { setGlobalOptions } from 'firebase-functions/v2'
 // Co-locate with Firestore (australia-southeast2) and cap fan-out to protect the
 // budget while everything scales to zero.
 //
-// maxInstances is 2 (was 3, was 10) because the project's Cloud Run "Total CPU
-// allocation per region" quota (australia-southeast2) is capped at 20,000 milli-vCPU
-// and Google won't self-serve raise it yet (young billing account). Reserved CPU is
-// sum(cpu × maxInstances) across all functions in the region; adding the community
-// moderation/metrics callables pushed the total past the cap at maxInstances=3, so
-// new revisions couldn't get healthcheck headroom and the deploy failed with "Quota
-// exceeded for total allowable CPU per project per region". 2 brings the whole
-// backend (now ~30 functions) back under the cap (30×2 < the 24×3 that last deployed
-// cleanly). Fine at current (pre-launch) traffic; each v2 function here runs 1
-// request/instance, so 2 = 2 concurrent per function.
+// maxInstances is 3 (was 10) because the project's Cloud Run "Total CPU allocation
+// per region" quota (australia-southeast2) is capped and Google won't self-serve
+// raise it yet (young billing account). Reserved CPU is sum(cpu x maxInstances)
+// across all functions in the region.
+//
+// IMPORTANT: this is a GLOBAL default. Changing it re-hashes EVERY function's config
+// and forces the whole backend to redeploy at once, which then trips the SEPARATE
+// "Write requests per minute per region" Cloud Run quota. So do NOT tune this to make
+// room for a few new functions; instead give the new/low-traffic ones a per-function
+// `maxInstances: 1` so only they redeploy and they add minimal reserved CPU (see the
+// community moderation/metrics callables).
 //
 // TODO(scale): once the CPU quota is raised (retry the self-serve increase after the
-// billing account matures, or via Support/Sales), raise this back and add per-function
-// maxInstances overrides on the hot paths — syncCommunityStats, coachMessage,
-// stripeWebhook — before enabling COMMUNITY_BACKEND or onboarding many users.
-setGlobalOptions({ region: 'australia-southeast2', maxInstances: 2 })
+// billing account matures, or via Support/Sales), add per-function maxInstances
+// overrides on the hot paths (syncCommunityStats, coachMessage, stripeWebhook)
+// before enabling COMMUNITY_BACKEND or onboarding many users.
+setGlobalOptions({ region: 'australia-southeast2', maxInstances: 3 })
 
 export { ping } from './ping'
 export { coachMessage } from './coach'

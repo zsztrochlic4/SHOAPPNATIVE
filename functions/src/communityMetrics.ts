@@ -83,14 +83,14 @@ async function writeSnapshot(): Promise<Record<string, unknown>> {
 
 /** Daily community health snapshot (03:00 Sydney). */
 export const computeCommunityMetrics = onSchedule(
-  { schedule: '0 3 * * *', timeZone: 'Australia/Sydney', region: REGION_SCHED, timeoutSeconds: 120, memory: '256MiB' },
+  { schedule: '0 3 * * *', timeZone: 'Australia/Sydney', region: REGION_SCHED, timeoutSeconds: 120, memory: '256MiB', maxInstances: 1 },
   async () => { await writeSnapshot() },
 )
 
 /** Owner-only on-demand refresh (so the owner can pull fresh numbers without
  *  waiting for the daily run). Returns the snapshot it just wrote. */
 export const refreshCommunityMetrics = onCall(
-  { region: REGION_CALL, enforceAppCheck: APP_CHECK_ENFORCED },
+  { region: REGION_CALL, enforceAppCheck: APP_CHECK_ENFORCED, maxInstances: 1 },
   async (req) => {
     requireOwner(req)
     auditAppCheck(req, 'refreshCommunityMetrics')

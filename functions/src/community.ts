@@ -550,7 +550,9 @@ export const syncCommunityStats = onCall<SyncInput>(
  *  (username + streak numbers), never the full profile. Single-field index on `streakCurrent`
  *  (auto-created in prod; unenforced in the emulator) covers the ordered read + the rank count. */
 export const globalStreaks = onCall<{ limit?: number }>(
-  { region: 'australia-southeast2', enforceAppCheck: APP_CHECK_ENFORCED },
+  // maxInstances: 1 — new + low-traffic; keeps the CPU this adds to the region
+  // minimal (the region's total-CPU quota is tight on this young billing account).
+  { region: 'australia-southeast2', enforceAppCheck: APP_CHECK_ENFORCED, maxInstances: 1 },
   async (req) => {
     const uid = requireAuth(req)
     auditAppCheck(req, 'globalStreaks')

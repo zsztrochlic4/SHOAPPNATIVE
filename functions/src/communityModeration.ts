@@ -40,7 +40,7 @@ interface ReportInput {
  *  (reporter, target): a deterministic doc id means re-reporting the same target
  *  refreshes the one report rather than spamming the queue. Rate-limited. */
 export const reportContent = onCall<ReportInput>(
-  { region: REGION, enforceAppCheck: APP_CHECK_ENFORCED },
+  { region: REGION, enforceAppCheck: APP_CHECK_ENFORCED, maxInstances: 1 },
   async (req) => {
     const uid = requireAuth(req)
     auditAppCheck(req, 'reportContent')
@@ -97,7 +97,7 @@ interface ResolveInput {
  *  `actioned` = the owner took the enforcement action (rename/remove) out of band.
  *  Records who/when/why for the audit trail. */
 export const resolveContentReport = onCall<ResolveInput>(
-  { region: REGION, enforceAppCheck: APP_CHECK_ENFORCED },
+  { region: REGION, enforceAppCheck: APP_CHECK_ENFORCED, maxInstances: 1 },
   async (req) => {
     const ownerUid = requireOwner(req)
     auditAppCheck(req, 'resolveContentReport')
