@@ -402,7 +402,9 @@ export async function loadCoachTurnData(
     recentTraining: `${completed.length}/${sessions.length} recent sessions completed. ${lastSessionText(sessions)} Latest ${compact(sessions.slice(0, 4), 1500)}`,
     trainingSummaries: compact(workoutSummaries.slice(0, 8), 1200),
     activity: compact(activities.slice(0, 8), 900),
-    readiness: `habits ${habits.length}/14 days; latest ${compact(habits.slice(0, 7), 1200)}`,
+    // The readiness/odometer window is the last 14 days (design spec), so give the
+    // coach the full 14-day habit sample, not just 7.
+    readiness: `habits ${habits.length}/14 days; latest ${compact(habits.slice(0, 14), 1400)}`,
     weights: compact(weights.slice(0, 8), 700),
     nutrition: `${meals.length} entries; latest ${compact(meals.slice(0, 8), 1000)}`,
     nutritionCheckins: compact(foodReviews.slice(0, 7), 900),

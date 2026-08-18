@@ -13,7 +13,7 @@ import { onSchedule } from 'firebase-functions/v2/scheduler'
 import * as logger from 'firebase-functions/logger'
 import { onCall } from 'firebase-functions/v2/https'
 import { requireOwner, auditAppCheck, APP_CHECK_ENFORCED } from './lib/guards'
-import { mondayKey } from './community'
+import { leaguePeriodKey } from './community'
 
 const REGION_SCHED = 'australia-southeast1'
 const REGION_CALL = 'australia-southeast2'
@@ -33,17 +33,19 @@ const countOf = async (q: Query): Promise<number> => {
 async function computeSnapshot(): Promise<Record<string, unknown>> {
   const db = getFirestore()
   const now = new Date()
-  const weekKey = mondayKey(now)
+  // Leagues are monthly now; a profile's `weekKey` field holds the current league
+  // PERIOD key (first Monday of the month), so "active this period" counts against it.
+  const periodKey = leaguePeriodKey(now)
   const profiles = db.collection('communityProfiles')
   const directory = db.collection('groupDirectory')
 
   const [
-    profilesTotal, streaksActive, activeThisWeek, held, provisional,
+    profilesTotal, streaksActive, activeThisPeriod, held, provisional,
     reportsPending, reviewsPending, groupsTotal, groupsPublic,
   ] = await Promise.all([
     countOf(profiles),
     countOf(profiles.where('streakCurrent', '>', 0)),
-    countOf(profiles.where('weekKey', '==', weekKey)),
+    countOf(profiles.where('weekKey', '==', periodKey)),
     countOf(profiles.where('status', '==', 'held')),
     countOf(profiles.where('status', '==', 'provisional')),
     countOf(db.collection('contentReports').where('status', '==', 'pending')),
@@ -53,10 +55,10 @@ async function computeSnapshot(): Promise<Record<string, unknown>> {
   ])
 
   return {
-    weekKey,
+    periodKey,
     profilesTotal,
     streaksActive,
-    activeThisWeek,
+    activeThisPeriod,
     heldStandings: held,
     provisionalStandings: provisional,
     reportsPending,
@@ -71,7 +73,7 @@ async function computeSnapshot(): Promise<Record<string, unknown>> {
 async function writeSnapshot(): Promise<Record<string, unknown>> {
   const db = getFirestore()
   const snap = await computeSnapshot()
-  const dateKey = String(snap.weekKey) // week-bucketed; a daily key would also work
+  const dateKey = String(snap.periodKey) // league-period-bucketed; the daily doc id below is the real key
   const today = new Date().toISOString().slice(0, 10)
   const batch = db.batch()
   batch.set(db.collection('communityMetrics').doc(today), snap)

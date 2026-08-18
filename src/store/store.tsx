@@ -131,6 +131,7 @@ export type Action =
   | { type: 'LEAVE_GROUP'; id: string }
   | { type: 'DELETE_GROUP'; id: string }
   | { type: 'SET_GROUP_GOAL'; id: string; goal: number }
+  | { type: 'TRANSFER_GROUP_OWNER'; id: string; newOwnerUsername: string }
   // Cheers (reaction-only), forgiving streaks, and weekly leagues.
   | { type: 'CHEER_ACTIVITY'; groupId: string; activityId: string }
   | { type: 'USE_STREAK_FREEZE'; dateKey: string }
@@ -778,6 +779,23 @@ function reducer(state: AppState, action: Action): AppState {
       }
     }
 
+    case 'TRANSFER_GROUP_OWNER': {
+      // Owner-only: only the current owner can hand the group to another member.
+      // (Server-authoritative transfer lands with the groups backend; this keeps
+      // the local/preview model consistent.)
+      const target = state.community.groups.find((g) => g.id === action.id)
+      if (!target || target.ownerUsername !== state.community.username) return state
+      const isMember = target.members.some((m) => m.username === action.newOwnerUsername)
+      if (!isMember || action.newOwnerUsername === state.community.username) return state
+      return {
+        ...state,
+        community: {
+          ...state.community,
+          groups: state.community.groups.map((g) => (g.id === action.id ? { ...g, ownerUsername: action.newOwnerUsername } : g)),
+        },
+      }
+    }
+
     // Cheer / un-cheer a group activity event (reaction-only, positive-only).
     case 'CHEER_ACTIVITY': {
       const groups = state.community.groups.map((g) => {
@@ -810,10 +828,12 @@ function reducer(state: AppState, action: Action): AppState {
 
     // Weekly freeze grant — idempotent per week, capped so tokens can't stockpile.
     case 'GRANT_WEEKLY_FREEZE': {
+      // Each league reset (now the first Monday of the month) tops the user up to
+      // 2 fresh freezes (design spec). Idempotent on the period key so it fires
+      // once per period, not on every render.
       if (state.community.freezeGrantWeek === action.weekKey) return state
       const FREEZE_CAP = 2
-      const tokens = Math.min(FREEZE_CAP, (state.community.freezeTokens ?? 0) + 1)
-      return { ...state, community: { ...state.community, freezeTokens: tokens, freezeGrantWeek: action.weekKey } }
+      return { ...state, community: { ...state.community, freezeTokens: FREEZE_CAP, freezeGrantWeek: action.weekKey } }
     }
 
     // Backend hydration: replace the local group cache with the server's copy.

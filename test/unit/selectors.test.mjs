@@ -123,18 +123,16 @@ test('streakStats: best is the longest run across all history', () => {
 
 /* ------------------------------- weeklyIndex ------------------------------- */
 
-test('weeklyIndex: an empty week is off track, a strong week scores high', () => {
+test('weeklyIndex: an empty fortnight is off track, a strong fortnight scores high', () => {
   const empty = weeklyIndex(st())
   assert.equal(empty.band, 'off')
   assert.equal(empty.score, 0)
 
-  const strongWeek = Array.from({ length: 7 }, (_, d) => goodDay(dayKey(d)))
-  const strong = weeklyIndex(st({ habits: strongWeek, sessions: [
-    { id: 'a', dateKey: dayKey(1), completed: true, volumeKg: 1, exercises: [] },
-    { id: 'b', dateKey: dayKey(3), completed: true, volumeKg: 1, exercises: [] },
-    { id: 'c', dateKey: dayKey(5), completed: true, volumeKg: 1, exercises: [] },
-    { id: 'd', dateKey: dayKey(6), completed: true, volumeKg: 1, exercises: [] },
-  ] }))
+  // The odometer is over 14 days, so sustained consistency across the fortnight
+  // (not just one strong week) is what scores on-track+.
+  const strongFortnight = Array.from({ length: 14 }, (_, d) => goodDay(dayKey(d)))
+  const sessions = Array.from({ length: 10 }, (_, d) => ({ id: `s${d}`, dateKey: dayKey(d), completed: true, volumeKg: 1, exercises: [] }))
+  const strong = weeklyIndex(st({ habits: strongFortnight, sessions }))
   assert.ok(strong.score >= 44, `expected on-track+, got ${strong.score}`)
   assert.ok(['ontrack', 'ahead', 'crushing'].includes(strong.band))
   assert.equal(strong.parts.length, 5)

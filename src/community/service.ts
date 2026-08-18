@@ -192,8 +192,9 @@ export async function createGroup(
       members: [youMember(me)],
       icon: appearance?.icon,
       color: appearance?.color,
-      // A friendly starting target; the owner can adjust it as friends join.
-      weeklyGoal: 12,
+      // New groups start with NO team goal — the owner sets one from the detail
+      // sheet (design spec). 0 = unset.
+      weeklyGoal: 0,
     }
     return { ok: true, group }
   } catch {
