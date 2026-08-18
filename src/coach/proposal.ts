@@ -34,7 +34,7 @@ export function proposalCategory(p: CoachActionProposal): CoachCategory {
   if (p.kind === 'navigation') {
     const overlay = String(p.payload?.overlay ?? '')
     if (overlay === 'progress' || overlay === 'logWeight') return 'progress'
-    if (overlay === 'nutrition' || overlay === 'budgetEats' || overlay === 'logHabit') return 'nutrition'
+    if (overlay === 'nutrition' || overlay === 'budgetEats' || overlay === 'logProgress') return 'nutrition'
     return 'training'
   }
   if (p.kind === 'workout_action') {

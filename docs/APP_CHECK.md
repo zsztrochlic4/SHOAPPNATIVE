@@ -24,6 +24,19 @@ own calls (e.g. the meal scan), because the client isn't attesting yet.
   `sendNotification`, `coachMessage`) sets `enforceAppCheck: APP_CHECK_ENFORCED`
   and calls `auditAppCheck(...)` first, so enabling the env var enforces
   everywhere consistently.
+- **Community hub callables are on the same path** — `claimUsername`,
+  `syncCommunityStats`, `globalStreaks`, `appealStanding`, `resolveStandingReview`
+  (community.ts); `createGroup`, `joinGroupByPasscode`, `joinGroupByCode`,
+  `leaveGroup`, `deleteGroup`, `setGroupGoal`, `cheerGroupActivity`
+  (communityGroups.ts); `reportContent`, `resolveContentReport`
+  (communityModeration.ts); `refreshCommunityMetrics` (communityMetrics.ts) all set
+  `enforceAppCheck: APP_CHECK_ENFORCED`. The scheduled functions (`rolloverLeagues`,
+  `grantStreakFreezes`, `reprocessStandings`, `pruneScoreLog`,
+  `computeCommunityMetrics`) are not client-facing and are correctly exempt.
+- **Regression guard:** `test/unit/appcheckCoverage.test.mjs` fails the unit build
+  if any `onCall` in the community/coach/account/notifications/observability files
+  omits `enforceAppCheck: APP_CHECK_ENFORCED`, so a new callable can't silently ship
+  unprotected.
 - `src/lib/appCheck.ts` — client wiring, invoked at startup from
   `src/lib/firebase.ts` (`initAppCheck(app)`).
   - **Web is fully wired** (reCAPTCHA Enterprise, debug-token support, auto-refresh).

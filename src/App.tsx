@@ -12,6 +12,7 @@ import { StoreProvider, useStore, useStoreMeta, useStoreSelector } from './store
 import type { AppState } from './store/types'
 import { AuthProvider, useAuth } from './auth/AuthProvider'
 import { isEntitled } from './store/selectors'
+import { todayKey } from './lib/date'
 import { CloudSync } from './store/CloudSync'
 import { BillingSync } from './store/BillingSync'
 import { Paywall } from './screens/Paywall'
@@ -40,6 +41,7 @@ import Progress from './screens/Progress'
 import Community from './screens/Community'
 import Onboarding from './screens/Onboarding'
 import ActiveWorkout from './screens/ActiveWorkout'
+import { LogProgressSheet } from './screens/LogProgressSheet'
 import { CoachScreen } from './coach/CoachScreen'
 import {
   AddFoodSheet,
@@ -48,7 +50,6 @@ import {
   SettingsSheet,
   MenuDrawer,
   LogWeightSheet,
-  LogHabitSheet,
   QuickWorkoutsSheet,
   BadgesSheet,
   CoachSheet,
@@ -244,7 +245,7 @@ function Shell() {
       case 'profile': return <ProfileSheet open onClose={nav.close} />
       case 'trainingProfile': return <TrainingProfileSheet open onClose={nav.close} />
       case 'logWeight': return <LogWeightSheet open onClose={nav.close} />
-      case 'logHabit': return <LogHabitSheet open onClose={nav.close} params={params} />
+      case 'logProgress': return <LogProgressSheet open onClose={nav.close} />
       case 'quick': return <QuickWorkoutsSheet open onClose={nav.close} />
       case 'badges': return <BadgesSheet open onClose={nav.close} />
       case 'examMode': return <PlanAroundLifeSheet open onClose={nav.close} />
@@ -373,6 +374,27 @@ function ThemedRoot() {
  * real session exists, independent of which screen shows — so entitlement keeps
  * syncing while the user is on the paywall.
  */
+/**
+ * Central "today's session" materialiser. The generated program's loggable session for TODAY is
+ * created lazily from the matching weekday instance (`START_PROGRAM_DAY`). This used to happen ONLY
+ * on the Workout screen's mount, so a user who landed on the Dashboard first saw "Rest day" until
+ * they opened the Workout tab — the two surfaces disagreed even though both read `todaySession`.
+ * Running it here, once the user is in the app and regardless of which tab shows, guarantees the
+ * Dashboard's today card and the Workout card are ALWAYS the same and always reflect the program.
+ * Idempotent: `START_PROGRAM_DAY` is a no-op if the session already exists, if there are no
+ * instances, or if today is a rest day (no matching weekday instance), so it never clobbers a
+ * logged session and correctly leaves a genuine rest day empty on both surfaces.
+ */
+function ProgramDayMaterialiser(): null {
+  const { state, dispatch } = useStore()
+  const gateOpen = state.programStatus?.ok === true
+  const hasInstances = (state.workoutInstances?.length ?? 0) > 0
+  useEffect(() => {
+    if (gateOpen && hasInstances) dispatch({ type: 'START_PROGRAM_DAY', dateKey: todayKey })
+  }, [gateOpen, hasInstances, dispatch])
+  return null
+}
+
 function AuthGate() {
   const { enabled, loading, user } = useAuth()
   const { state, hydrated } = useStore()
@@ -443,6 +465,7 @@ function AuthGate() {
   return (
     <>
       {services}
+      <ProgramDayMaterialiser />
       <Shell />
     </>
   )

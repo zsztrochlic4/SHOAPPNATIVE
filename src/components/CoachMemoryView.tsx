@@ -114,7 +114,6 @@ export function CoachMemoryView({ onClose, onConsentChanged }: Props) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [memoryChoice, setMemoryChoice] = useState(true)
   const [confirmClear, setConfirmClear] = useState(false)
   const [confirmDisable, setConfirmDisable] = useState(false)
 
@@ -142,7 +141,9 @@ export function CoachMemoryView({ onClose, onConsentChanged }: Props) {
     if (saving) return
     setSaving(true)
     try {
-      const next = await grantCoachConsent(memoryChoice)
+      // Memory is ON by default now; the consent screen no longer carries a toggle.
+      // Users manage or turn it off afterwards in coach settings (memoryEnabled).
+      const next = await grantCoachConsent(true)
       thud()
       setWorkspace(next)
       dispatch({ type: 'SET_SETTINGS', patch: { coachProactiveEnabled: next.proactiveEnabled } })
@@ -150,7 +151,7 @@ export function CoachMemoryView({ onClose, onConsentChanged }: Props) {
     } catch {
       setError(true)
     } finally { setSaving(false) }
-  }, [dispatch, memoryChoice, onConsentChanged, saving])
+  }, [dispatch, onConsentChanged, saving])
 
   const changeMemory = useCallback(async (enabled: boolean) => {
     if (!workspace || saving) return
@@ -292,11 +293,7 @@ export function CoachMemoryView({ onClose, onConsentChanged }: Props) {
         <View className="px-[18px] pt-4"><View className="rounded-3xl border border-brand-400/20 bg-ink-800 p-5">
           <View className="h-12 w-12 items-center justify-center rounded-full bg-brand-400/10"><ShieldCheck size={24} color={colors.brand400} /></View>
           <Text className="mt-4 text-xl font-bold text-white">Let your coach understand you</Text>
-          <Text className="mt-2 text-[14px] leading-5 text-white/65">Relevant profile, training, recovery and nutrition context—and your recent coach messages—will be processed by Google Gemini to answer you. Coach records are stored in Firebase. Operational safety state is stored separately.</Text>
-          <View className="mt-5 flex-row items-center gap-3 rounded-2xl bg-white/5 p-3.5">
-            <View className="flex-1"><Text className="font-bold text-white/85">Remember useful details</Text><Text className="mt-0.5 text-[12px] leading-4 text-secondary">You can inspect, delete or pause memory at any time.</Text></View>
-            <Switch value={memoryChoice} onValueChange={setMemoryChoice} trackColor={{ true: colors.brand500, false: colors.ink600 }} thumbColor={colors.fg} />
-          </View>
+          <Text className="mt-2 text-[14px] leading-5 text-white/65">Relevant profile, training, recovery and nutrition context, and your recent coach messages, will be processed by Google Gemini to answer you. Coach records are stored in Firebase. Operational safety state is stored separately.</Text>
           <Pressable
             disabled={saving || net.isConnected === false}
             onPress={accept}
@@ -305,7 +302,7 @@ export function CoachMemoryView({ onClose, onConsentChanged }: Props) {
           >
             <Text className="font-bold text-ink-900">{saving ? 'Saving…' : 'Continue with coach'}</Text>
           </Pressable>
-          <Text className="mt-3 text-center text-[11px] leading-4 text-tertiary">This consent is required for personalised AI coaching. You can still disable long-term memory separately.</Text>
+          <Text className="mt-3 text-center text-[11px] leading-4 text-tertiary">This consent is required for personalised AI coaching. Long-term memory is on by default. You can inspect, pause or delete it anytime in coach settings.</Text>
         </View></View>
       </View>
     )

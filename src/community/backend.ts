@@ -68,6 +68,21 @@ export async function appealStandingRemote(note?: string): Promise<{ ok: true; s
   return res.data
 }
 
+export type ReportReason = 'offensive_name' | 'harassment' | 'impersonation' | 'cheating' | 'other'
+
+/** File a moderation report against a username or group. Idempotent per
+ *  (reporter, target) server-side. `targetLabel` is what the reporter saw
+ *  (username / group name), passed for the moderator's context. */
+export async function reportContentRemote(input: {
+  targetType: 'user' | 'group'
+  targetId: string
+  targetLabel?: string
+  reason: ReportReason
+  note?: string
+}): Promise<void> {
+  await call<typeof input, { ok: true }>('reportContent')(input)
+}
+
 /* ---------------------------------- reads ---------------------------------- */
 
 export interface RemoteStanding { uid: string; username: string; points: number; isYou: boolean }
@@ -85,6 +100,16 @@ export async function loadLeagueStandingsRemote(weekKey: string, tier: number): 
     points: Number(d.get('points') ?? 0),
     isYou: d.id === myUid,
   }))
+}
+
+export interface RemoteStreakRow { uid: string; username: string; streakCurrent: number; streakBest: number }
+
+/** The GLOBAL consistency-streak board: top-N users by current streak, plus the caller's own row and
+ *  global rank. Server aggregate (communityProfiles is list-forbidden by rules), so this goes through a
+ *  callable rather than a direct Firestore read. */
+export async function loadGlobalStreaksRemote(limit = 50): Promise<{ rows: RemoteStreakRow[]; me: RemoteStreakRow | null; youRank: number | null }> {
+  const res = await call<{ limit: number }, { ok: true; rows: RemoteStreakRow[]; me: RemoteStreakRow | null; youRank: number | null }>('globalStreaks')({ limit })
+  return { rows: res.data.rows ?? [], me: res.data.me ?? null, youRank: res.data.youRank ?? null }
 }
 
 export interface RemoteCommunityProfile {

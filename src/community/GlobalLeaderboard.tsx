@@ -14,6 +14,7 @@ import { Skeleton } from '../components/Skeleton'
 import { useCountUp } from '../lib/useCountUp'
 import { loadGlobalBoard, type LeaderRow } from './service'
 import { RankBadge, StreakFlame } from './ui'
+import { ReportSheet, type ReportTarget } from './ReportSheet'
 
 type Status = 'loading' | 'ready' | 'error'
 
@@ -25,6 +26,7 @@ export function GlobalLeaderboard({ onClaimUsername }: { onClaimUsername: () => 
   const [status, setStatus] = useState<Status>('loading')
   const [rows, setRows] = useState<LeaderRow[]>([])
   const [youRank, setYouRank] = useState<number | null>(null)
+  const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null)
   // Paginate 20 at a time (design spec) — don't render the whole population at
   // once. Maps to a page-size-20 server endpoint when the backend is on.
   const PAGE = 20
@@ -101,7 +103,11 @@ export function GlobalLeaderboard({ onClaimUsername }: { onClaimUsername: () => 
 
       <View className="gap-1.5">
         {rows.slice(0, shown).map((r) => (
-          <LeaderRowView key={r.username} row={r} />
+          <LeaderRowView
+            key={r.username}
+            row={r}
+            onReport={r.uid && !r.isYou ? () => setReportTarget({ type: 'user', id: r.uid!, label: `@${r.username}` }) : undefined}
+          />
         ))}
       </View>
 
@@ -129,6 +135,8 @@ export function GlobalLeaderboard({ onClaimUsername }: { onClaimUsername: () => 
       <Text className="mt-2.5 text-center text-[12px] text-tertiary">
         Showing {Math.min(shown, total)} of {total.toLocaleString('en-US')}
       </Text>
+
+      <ReportSheet open={!!reportTarget} target={reportTarget} onClose={() => setReportTarget(null)} />
     </View>
   )
 }
@@ -191,11 +199,17 @@ function ClaimBanner({ onPress }: { onPress: () => void }) {
   )
 }
 
-function LeaderRowView({ row }: { row: LeaderRow }) {
+function LeaderRowView({ row, onReport }: { row: LeaderRow; onReport?: () => void }) {
   const you = !!row.isYou
   return (
-    <View
-      className="flex-row items-center gap-3 rounded-2xl border p-3"
+    <Pressable
+      onLongPress={onReport}
+      delayLongPress={350}
+      disabled={!onReport}
+      accessibilityRole={onReport ? 'button' : undefined}
+      accessibilityLabel={onReport ? `Report @${row.username}` : undefined}
+      accessibilityHint={onReport ? 'Opens the report options' : undefined}
+      className="flex-row items-center gap-3 rounded-2xl border p-3 active:opacity-90"
       style={
         you
           ? { borderColor: `${brand[400]}66`, backgroundColor: `${brand[400]}12` }
@@ -211,7 +225,7 @@ function LeaderRowView({ row }: { row: LeaderRow }) {
         <Text className="text-[12px] text-tertiary">Best streak {row.streakBest}</Text>
       </View>
       <StreakFlame days={row.streakCurrent} size={16} />
-    </View>
+    </Pressable>
   )
 }
 

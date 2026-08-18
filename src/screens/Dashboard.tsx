@@ -62,7 +62,7 @@ function toneColor(tone: TagTone, c: ReturnType<typeof useColors>): string {
  * (nutrition check-in, workout) are derived from what the user did elsewhere in
  * the app — they can't be ticked here, only jumped to.
  */
-type Goal = {
+export type Goal = {
   id: string
   icon: string
   tile: string // tint colour for the icon tile (and its 15% background)
@@ -175,6 +175,10 @@ export default function Dashboard() {
 
   const [sheetOpen, setSheetOpen] = useState(false)
   const openSheet = () => setSheetOpen(true)
+  // The streak chip + keep-the-streak nudge are about TODAY, so they open the
+  // modern "Update today's progress" editor (selecting today first if the week
+  // strip is on another day) — replacing the retired standalone "Log habits" sheet.
+  const openTodayProgress = () => { if (selDate !== todayKey) setSelDate(todayKey); setSheetOpen(true) }
   // Editor for retro-logging a past day (opened from the summary card's "Update").
   const [pastEditorOpen, setPastEditorOpen] = useState(false)
 
@@ -206,12 +210,12 @@ export default function Dashboard() {
           <Text className="text-[20px] font-extrabold tracking-tight text-white">{greeting}, {state.profile.name}</Text>
           <Text className="mt-0.5 text-[13px] text-secondary">{longDate(todayKey)}</Text>
         </View>
-        {streak.current > 0 && <StreakChip days={streak.current} atRisk={streakAtRisk} onPress={() => nav.open('logHabit')} />}
+        {streak.current > 0 && <StreakChip days={streak.current} atRisk={streakAtRisk} onPress={openTodayProgress} />}
       </View>
 
       {/* Keep-the-streak nudge — only when today isn't logged yet. */}
       {streakAtRisk && (
-        <Pressable onPress={() => nav.open('logHabit')} className="mt-3 flex-row items-center gap-2 rounded-2xl border border-accent-orange/25 bg-accent-orange/10 px-3.5 py-2.5 active:opacity-80">
+        <Pressable onPress={openTodayProgress} className="mt-3 flex-row items-center gap-2 rounded-2xl border border-accent-orange/25 bg-accent-orange/10 px-3.5 py-2.5 active:opacity-80">
           <Flame size={16} color={accent.orange} />
           <Text className="flex-1 text-[13px] font-semibold text-white/80">Log anything today to keep your {streak.current}-day streak alive.</Text>
           <ChevronRight size={16} color={accent.orange} />
@@ -1115,7 +1119,7 @@ function DonePill({ colors, onPress }: { colors: ThemeColors; onPress?: () => vo
   return <PressableScale onPress={onPress} scaleTo={0.96} accessibilityLabel="Tap to undo">{body}</PressableScale>
 }
 
-function UpdateTodaySheet({ open, onClose, goals, doneCount, total, colors }: { open: boolean; onClose: () => void; goals: Goal[]; doneCount: number; total: number; colors: ThemeColors }) {
+export function UpdateTodaySheet({ open, onClose, goals, doneCount, total, colors }: { open: boolean; onClose: () => void; goals: Goal[]; doneCount: number; total: number; colors: ThemeColors }) {
   const win = useWindowDimensions()
   const screenH = IS_WEB ? WEB_SCREEN.height : win.height
   const insets = useSafeAreaInsets()
