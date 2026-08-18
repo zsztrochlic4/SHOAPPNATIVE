@@ -27,7 +27,7 @@ import { screenGroupName } from './_shared/community/contentModeration'
 const REGION = 'australia-southeast2'
 const NAME_MIN = 2
 const NAME_MAX = 30
-const MAX_GROUPS = 50 // per user, matches the sync fan-out cap
+const MAX_GROUPS = 10 // per user: generous for real overlap (gym/dorm/friends), bounds sync fan-out
 
 /** Unambiguous 6-char passcode (no O/0/1/I/L), generated server-side. */
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
