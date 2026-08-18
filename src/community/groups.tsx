@@ -727,8 +727,15 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
     () => (group ? rankMembers(resolveMembers(group, me), metric) : []),
     [group, me, metric],
   )
+  // Local block: hide blocked members from the roster + activity feed, but keep
+  // group-truth aggregates (pulse, team-goal progress) on the full membership.
+  const blocked = useMemo(() => new Set(state.community.blockedUids ?? []), [state.community.blockedUids])
+  const visibleRanked = useMemo(
+    () => (blocked.size ? ranked.filter((m) => m.isYou || !blocked.has(m.username)) : ranked),
+    [ranked, blocked],
+  )
   const pulse = useMemo(() => groupPulse(ranked), [ranked])
-  const activity = useMemo(() => buildActivity(ranked), [ranked])
+  const activity = useMemo(() => buildActivity(visibleRanked), [visibleRanked])
   const sessionsDone = ranked.reduce((a, m) => a + (m.sessionsThisWeek ?? 0), 0)
   // A group has no goal until the owner sets one (weeklyGoal falsy = unset).
   const goal = group?.weeklyGoal ?? 0
@@ -842,11 +849,11 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
 
           {/* members */}
           <View className="mt-4 gap-1.5">
-            {ranked.map((m, i) => (
+            {visibleRanked.map((m) => (
               <MemberRow
                 key={m.id}
                 member={m}
-                rank={i + 1}
+                rank={ranked.findIndex((x) => x.id === m.id) + 1}
                 metric={metric}
                 expanded={expandedId === m.id}
                 onToggle={() => setExpandedId((id) => (id === m.id ? null : m.id))}

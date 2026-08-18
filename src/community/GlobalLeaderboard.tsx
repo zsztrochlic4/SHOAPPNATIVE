@@ -5,7 +5,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { View, Text, Pressable, ActivityIndicator } from 'react-native'
-import { Trophy, Flame, RefreshCw, TrendingUp, ChevronDown } from 'lucide-react-native'
+import { Trophy, Flame, RefreshCw, TrendingUp, ChevronDown, Ban } from 'lucide-react-native'
 import { useStore } from '../store/store'
 import { myLeaderStats } from '../store/selectors'
 import { useColors, brand } from '../theme'
@@ -15,6 +15,7 @@ import { useCountUp } from '../lib/useCountUp'
 import { loadGlobalBoard, type LeaderRow } from './service'
 import { RankBadge, StreakFlame } from './ui'
 import { ReportSheet, type ReportTarget } from './ReportSheet'
+import { BlockedUsersSheet } from './BlockedUsersSheet'
 
 type Status = 'loading' | 'ready' | 'error'
 
@@ -27,6 +28,8 @@ export function GlobalLeaderboard({ onClaimUsername }: { onClaimUsername: () => 
   const [rows, setRows] = useState<LeaderRow[]>([])
   const [youRank, setYouRank] = useState<number | null>(null)
   const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null)
+  const [manageBlocked, setManageBlocked] = useState(false)
+  const blocked = useMemo(() => new Set(state.community.blockedUids ?? []), [state.community.blockedUids])
   // Paginate 20 at a time (design spec) — don't render the whole population at
   // once. Maps to a page-size-20 server endpoint when the backend is on.
   const PAGE = 20
@@ -88,6 +91,8 @@ export function GlobalLeaderboard({ onClaimUsername }: { onClaimUsername: () => 
   }
 
   const total = rows.length
+  // Hide anyone the user has blocked (local moderation). Your own row always stays.
+  const visibleRows = blocked.size ? rows.filter((r) => r.isYou || !blocked.has(r.username)) : rows
 
   return (
     <View>
@@ -102,7 +107,7 @@ export function GlobalLeaderboard({ onClaimUsername }: { onClaimUsername: () => 
       </View>
 
       <View className="gap-1.5">
-        {rows.slice(0, shown).map((r) => (
+        {visibleRows.slice(0, shown).map((r) => (
           <LeaderRowView
             key={r.username}
             row={r}
@@ -111,7 +116,7 @@ export function GlobalLeaderboard({ onClaimUsername }: { onClaimUsername: () => 
         ))}
       </View>
 
-      {shown < total && (
+      {shown < visibleRows.length && (
         <Pressable
           onPress={loadMore}
           disabled={loadingMore}
@@ -133,10 +138,23 @@ export function GlobalLeaderboard({ onClaimUsername }: { onClaimUsername: () => 
         </Pressable>
       )}
       <Text className="mt-2.5 text-center text-[12px] text-tertiary">
-        Showing {Math.min(shown, total)} of {total.toLocaleString('en-US')}
+        Showing {Math.min(shown, visibleRows.length)} of {total.toLocaleString('en-US')}
       </Text>
 
+      {blocked.size > 0 && (
+        <Pressable
+          onPress={() => setManageBlocked(true)}
+          accessibilityRole="button"
+          accessibilityLabel={`Manage blocked users, ${blocked.size} blocked`}
+          className="mt-2 flex-row items-center justify-center gap-1.5 py-2 active:opacity-70"
+        >
+          <Ban size={12} color="rgba(255,255,255,0.45)" />
+          <Text className="text-[12px] font-semibold text-tertiary">Manage blocked ({blocked.size})</Text>
+        </Pressable>
+      )}
+
       <ReportSheet open={!!reportTarget} target={reportTarget} onClose={() => setReportTarget(null)} />
+      <BlockedUsersSheet open={manageBlocked} onClose={() => setManageBlocked(false)} />
     </View>
   )
 }
