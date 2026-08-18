@@ -596,6 +596,10 @@ export interface CommunityState {
   freezeGrantWeek?: string
   /* ---- weekly league (Recommendation 1) ---- */
   league?: LeagueState
+  /* ---- moderation ---- */
+  /** ids (usernames) of users this user has blocked; hidden from every board
+   *  and activity feed locally. Server-side enforcement is deferred to go-live. */
+  blockedUids?: string[]
 }
 
 /** Difficulty tier shown on a quick workout (drives the beginner→advanced order). */

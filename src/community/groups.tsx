@@ -11,7 +11,7 @@ import {
   Users, Plus, Minus, KeyRound, Copy, Crown, ChevronRight, Trash2,
   LogOut, Search, ShieldCheck, Gauge, ChevronDown, Flame, Dumbbell,
   TrendingUp, ArrowUp, UserPlus, CheckCircle2, Activity, Target,
-  SmilePlus, Info, Check, Pencil, AtSign,
+  SmilePlus, Info, Check, Pencil, AtSign, Flag,
 } from 'lucide-react-native'
 import { useStore } from '../store/store'
 import { myLeaderStats, type MyLeaderStats } from '../store/selectors'
@@ -31,6 +31,7 @@ import {
 } from './service'
 import { youMember, DISCOVERABLE_GROUPS } from './simulate'
 import { COMMUNITY_BACKEND } from './backendConfig'
+import { ReportSheet, type ReportTarget } from './ReportSheet'
 
 /* ------------------------------ ranking metrics ---------------------------- */
 
@@ -664,10 +665,11 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
   const [volInfoOpen, setVolInfoOpen] = useState(false)
   const [goalEditing, setGoalEditing] = useState(false)
   const [goalDraft, setGoalDraft] = useState(20)
+  const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null)
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    if (open) { setMetric('odometer'); setConfirmDelete(false); setConfirmLeave(false); setTransferMode(false); setExpandedId(null); setReactions({}); setPickerFor(null); setCopied(false); setVolInfoOpen(false); setGoalEditing(false); setGoalDraft(20) }
+    if (open) { setMetric('odometer'); setConfirmDelete(false); setConfirmLeave(false); setTransferMode(false); setExpandedId(null); setReactions({}); setPickerFor(null); setCopied(false); setVolInfoOpen(false); setGoalEditing(false); setGoalDraft(20); setReportTarget(null) }
   }, [open, groupId])
   useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current) }, [])
 
@@ -725,8 +727,15 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
     () => (group ? rankMembers(resolveMembers(group, me), metric) : []),
     [group, me, metric],
   )
+  // Local block: hide blocked members from the roster + activity feed, but keep
+  // group-truth aggregates (pulse, team-goal progress) on the full membership.
+  const blocked = useMemo(() => new Set(state.community.blockedUids ?? []), [state.community.blockedUids])
+  const visibleRanked = useMemo(
+    () => (blocked.size ? ranked.filter((m) => m.isYou || !blocked.has(m.username)) : ranked),
+    [ranked, blocked],
+  )
   const pulse = useMemo(() => groupPulse(ranked), [ranked])
-  const activity = useMemo(() => buildActivity(ranked), [ranked])
+  const activity = useMemo(() => buildActivity(visibleRanked), [visibleRanked])
   const sessionsDone = ranked.reduce((a, m) => a + (m.sessionsThisWeek ?? 0), 0)
   // A group has no goal until the owner sets one (weeklyGoal falsy = unset).
   const goal = group?.weeklyGoal ?? 0
@@ -741,6 +750,7 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
   const openGoalEditor = () => { setGoalDraft(hasGoal ? goal : 20); setGoalEditing(true) }
 
   return (
+    <>
     <Sheet open={open} onClose={onClose} title={group?.name ?? 'Group'}>
       {!group ? (
         <EmptyDetail />
@@ -839,16 +849,17 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
 
           {/* members */}
           <View className="mt-4 gap-1.5">
-            {ranked.map((m, i) => (
+            {visibleRanked.map((m) => (
               <MemberRow
                 key={m.id}
                 member={m}
-                rank={i + 1}
+                rank={ranked.findIndex((x) => x.id === m.id) + 1}
                 metric={metric}
                 expanded={expandedId === m.id}
                 onToggle={() => setExpandedId((id) => (id === m.id ? null : m.id))}
                 canMakeOwner={owner && !m.isYou}
                 onMakeOwner={() => makeOwner(m.username)}
+                onReport={!preview && !m.isYou ? () => setReportTarget({ type: 'user', id: m.id, label: `@${m.username}` }) : undefined}
               />
             ))}
           </View>
@@ -908,10 +919,24 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
                 onHandOver={makeOwnerAndLeave}
               />
             )}
+            {!preview && !owner && group && (
+              <Pressable
+                onPress={() => setReportTarget({ type: 'group', id: group.id, label: group.name })}
+                accessibilityRole="button"
+                accessibilityLabel={`Report ${group.name}`}
+                accessibilityHint="Opens the report options"
+                className="mt-3 flex-row items-center justify-center gap-1.5 py-2 active:opacity-70"
+              >
+                <Flag size={12} color="rgba(255,255,255,0.45)" />
+                <Text className="text-[12px] font-semibold text-tertiary">Report this group</Text>
+              </Pressable>
+            )}
           </View>
         </View>
       )}
     </Sheet>
+    <ReportSheet open={!!reportTarget} target={reportTarget} onClose={() => setReportTarget(null)} />
+    </>
   )
 }
 
@@ -1122,7 +1147,7 @@ function TeamGoalSetter({ draft, color, onDec, onInc, onSave }: {
 
 /* --------------------------------- members --------------------------------- */
 
-function MemberRow({ member, rank, metric, expanded, onToggle, canMakeOwner, onMakeOwner }: {
+function MemberRow({ member, rank, metric, expanded, onToggle, canMakeOwner, onMakeOwner, onReport }: {
   member: GroupMember
   rank: number
   metric: GroupRankMetric
@@ -1130,6 +1155,7 @@ function MemberRow({ member, rank, metric, expanded, onToggle, canMakeOwner, onM
   onToggle: () => void
   canMakeOwner: boolean
   onMakeOwner: () => void
+  onReport?: () => void
 }) {
   const colors = useColors()
   const you = !!member.isYou
@@ -1140,8 +1166,11 @@ function MemberRow({ member, rank, metric, expanded, onToggle, canMakeOwner, onM
     >
       <Pressable
         onPress={onToggle}
+        onLongPress={onReport}
+        delayLongPress={400}
         accessibilityRole="button"
         accessibilityLabel={`${member.username} stats`}
+        accessibilityHint={onReport ? 'Long press to report this member' : undefined}
         accessibilityState={{ expanded }}
         className="flex-row items-center gap-3 p-3 active:opacity-90"
       >
@@ -1162,12 +1191,12 @@ function MemberRow({ member, rank, metric, expanded, onToggle, canMakeOwner, onM
         <MetricValue member={member} metric={metric} colors={colors} />
         <ChevronDown size={16} color="rgba(255,255,255,0.3)" style={{ transform: [{ rotate: expanded ? '180deg' : '0deg' }] }} />
       </Pressable>
-      {expanded && <MemberStats member={member} rank={rank} colors={colors} canMakeOwner={canMakeOwner} onMakeOwner={onMakeOwner} />}
+      {expanded && <MemberStats member={member} rank={rank} colors={colors} canMakeOwner={canMakeOwner} onMakeOwner={onMakeOwner} onReport={onReport} />}
     </View>
   )
 }
 
-function MemberStats({ member, rank, colors, canMakeOwner, onMakeOwner }: { member: GroupMember; rank: number; colors: ReturnType<typeof useColors>; canMakeOwner: boolean; onMakeOwner: () => void }) {
+function MemberStats({ member, rank, colors, canMakeOwner, onMakeOwner, onReport }: { member: GroupMember; rank: number; colors: ReturnType<typeof useColors>; canMakeOwner: boolean; onMakeOwner: () => void; onReport?: () => void }) {
   const best = member.bestStreak ?? member.streak
   const tiles: { label: string; value: string; sub?: string; color?: string }[] = [
     { label: 'Odometer', value: `${member.odometer}`, sub: '/100', color: odometerColor(member.odometer, colors) },
@@ -1202,6 +1231,20 @@ function MemberStats({ member, rank, colors, canMakeOwner, onMakeOwner }: { memb
             >
               <Crown size={14} color="#F5C518" />
               <Text className="text-[13px] font-bold text-[#F5C518]">Make group owner</Text>
+            </Pressable>
+          </View>
+        )}
+        {onReport && (
+          <View style={{ width: '100%', padding: 4 }}>
+            <Pressable
+              onPress={onReport}
+              accessibilityRole="button"
+              accessibilityLabel={`Report @${member.username}`}
+              accessibilityHint="Opens the report options"
+              className="flex-row items-center justify-center gap-2 rounded-xl border border-white/10 py-3 active:opacity-80"
+            >
+              <Flag size={13} color="rgba(255,255,255,0.5)" />
+              <Text className="text-[13px] font-semibold text-tertiary">Report member</Text>
             </Pressable>
           </View>
         )}
