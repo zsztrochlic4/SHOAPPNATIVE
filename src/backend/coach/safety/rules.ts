@@ -440,9 +440,29 @@ const CONDITIONS = ['heart condition', 'cardiac', 'heart problem', 'had a stroke
   'epilepsy', 'seizure disorder', 'kidney disease', 'high blood pressure', 'hypertension', 'blood pressure',
   'beta blocker', 'beta blockers', 'copd', 'heart murmur', 'pacemaker', 'arrhythmia']
 
+/** EXPLICIT, CURRENT clinician clearance to exercise. When the user is telling us a
+ *  professional has already assessed the condition and cleared them to train, a benign
+ *  programming question is not a deferral case (reviewer over-caution class, IRH-BN-19).
+ *  Deliberately a broad general idiom set, not tuned to any one message. Recall is
+ *  preserved by ACUTE_OVERRIDE below and by the emergency detectors that run FIRST. */
+const CURRENT_CLEARANCE = ['cleared me to', 'cleared to exercise', 'cleared to train', 'cleared to lift',
+  'cleared for exercise', 'cleared for training', 'cleared to work out', 'doctor cleared me', 'gp cleared me',
+  'cardiologist cleared me', 'specialist cleared me', 'physio cleared me', 'given the all clear to',
+  'signed off on me training', 'signed off to train', 'ok to exercise per my doctor', 'ok to train per my doctor',
+  'told me it s safe to train', 'told me its safe to train', 'said i am safe to train', 'said im safe to train']
+/** Any acute sign here KEEPS the flag even with a clearance claim (belt-and-braces; the
+ *  emergency detectors already run before this, so an emergency still wins on tier). */
+const ACUTE_OVERRIDE = ['chest pain', 'cant breathe', 'can t breathe', 'short of breath', 'attack',
+  'palpitations', 'passing out', 'passed out', 'fainting', 'faint', 'unconscious', 'seizing', 'seizure',
+  'confused', 'slurred', 'blue lips', 'severe']
+
 function detectMedicalCondition(n: Norm): DetectorHit[] {
   // Asthma is a condition, but an ATTACK is an emergency (handled above).
   const condition = has(n, ...CONDITIONS) || (has(n, 'asthma') && !has(n, 'asthma attack'))
+  // Suppress the deferral ONLY when a named condition carries explicit current clearance
+  // AND shows no acute sign — the professional already assessed it. Without clearance, or
+  // with any acute sign, it still flags (or the emergency floor catches it first).
+  if (condition && has(n, ...CURRENT_CLEARANCE) && !has(n, ...ACUTE_OVERRIDE)) return []
   const vagueClearance = has(n, 'doctor said exercise is probably', 'doctor said its probably ok',
     'doctor said it s probably ok', 'probably okay to exercise', 'probably fine to exercise')
   if (condition || vagueClearance) return [hit('medical_condition', condition ? 'known_condition' : 'vague_clearance')]

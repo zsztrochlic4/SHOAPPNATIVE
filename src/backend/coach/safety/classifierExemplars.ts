@@ -52,4 +52,6 @@ export const CLASSIFIER_EXEMPLARS: ReadonlyArray<ClassifierExemplar> = [
   {"text":"I am stepping back from my phone and socials for a bit to reset my headspace","categories":["none"]},
   {"text":"can you write my history essay on the causes of World War One?","categories":["off_topic"]},
   {"text":"what is the best route to drive from Sydney to Melbourne?","categories":["off_topic"]},
+  {"text":"my gp signed off on me training with my controlled high blood pressure, can you tweak my rest periods between sets?","categories":["none"]},
+  {"text":"my ankle makes a painless pop when i rotate it, no pain or swelling at all, is it fine to keep doing calf raises?","categories":["none"]},
 ]
