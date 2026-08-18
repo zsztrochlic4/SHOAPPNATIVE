@@ -11,7 +11,7 @@ import {
   Users, Plus, Minus, KeyRound, Copy, Crown, ChevronRight, Trash2,
   LogOut, Search, ShieldCheck, Gauge, ChevronDown, Flame, Dumbbell,
   TrendingUp, ArrowUp, UserPlus, CheckCircle2, Activity, Target,
-  SmilePlus, Info, Check, Pencil,
+  SmilePlus, Info, Check, Pencil, AtSign,
 } from 'lucide-react-native'
 import { useStore } from '../store/store'
 import { myLeaderStats, type MyLeaderStats } from '../store/selectors'
@@ -222,6 +222,7 @@ export function GroupsTab({ onClaimUsername }: { onClaimUsername: () => void }) 
         open={sheet?.kind === 'detail'}
         groupId={sheet?.kind === 'detail' ? sheet.id : null}
         onClose={() => setSheet(null)}
+        onClaimUsername={onClaimUsername}
       />
     </View>
   )
@@ -424,7 +425,7 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
         onClose()
       } catch {
         setBusy(false)
-        setError("That code doesn't match this group.")
+        setError("That code doesn't match. Double-check with the group owner.")
       }
       return
     }
@@ -467,7 +468,7 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
               autoCapitalize="characters"
               autoCorrect={false}
               maxLength={8}
-              placeholder="6-character code"
+              placeholder="6 character code"
               placeholderTextColor="rgba(255,255,255,0.3)"
               accessibilityLabel="Group passcode"
               className="flex-1 text-[16px] font-bold tracking-[3px] text-white"
@@ -475,7 +476,9 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
             />
           </View>
           <View className="mt-2 min-h-[18px] px-1">
-            {error && <Text className="text-[12px] font-semibold" style={{ color: colors.danger }}>{error}</Text>}
+            {error
+              ? <Text className="text-[12px] font-semibold" style={{ color: colors.danger }}>{error}</Text>
+              : <Text className="text-[12px] text-tertiary">Groups are private. Ask the owner for the code to join.</Text>}
           </View>
           <Pressable
             onPress={submitJoin}
@@ -518,8 +521,8 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
               <View className="items-center rounded-2xl border border-dashed border-white/15 px-6 py-10">
                 <Search size={24} color="rgba(255,255,255,0.35)" />
                 <Text className="mt-2 font-bold text-white">No groups found</Text>
-                <Text className="mt-1 max-w-[230px] text-center text-[13px] text-secondary">
-                  {query.trim() ? 'Try a different name, or ask a friend for their group code.' : 'No public groups to show right now.'}
+                <Text className="mt-1 max-w-[240px] text-center text-[13px] text-secondary">
+                  {query.trim() ? 'No groups match that name. Ask a friend for their group’s invite code.' : 'No public groups to show right now.'}
                 </Text>
               </View>
             ) : (
@@ -551,12 +554,14 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
 
 /* ------------------------------- Group detail ------------------------------ */
 
-function GroupDetailSheet({ open, groupId, onClose }: { open: boolean; groupId: string | null; onClose: () => void }) {
+function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: boolean; groupId: string | null; onClose: () => void; onClaimUsername: () => void }) {
   const { state, dispatch } = useStore()
   const toast = useToast()
   const colors = useColors()
   const me = useMemo(() => myLeaderStats(state), [state])
   const group = state.community.groups.find((g) => g.id === groupId) ?? null
+  // Preview: no claimed identity — hide owner/leave controls, offer to join.
+  const preview = !me.username
   const [metric, setMetric] = useState<GroupRankMetric>('odometer')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [confirmLeave, setConfirmLeave] = useState(false)
@@ -779,22 +784,39 @@ function GroupDetailSheet({ open, groupId, onClose }: { open: boolean; groupId: 
             </>
           )}
 
-          {/* leave / ownership / delete */}
+          {/* footer — preview claim CTA, else leave / ownership / delete */}
           <View className="mt-7">
-            <OwnershipFooter
-              owner={owner}
-              others={ranked.filter((m) => !m.isYou)}
-              danger={colors.danger}
-              confirmLeave={confirmLeave}
-              confirmDelete={confirmDelete}
-              transferMode={transferMode}
-              onAskLeave={() => (owner ? setTransferMode(true) : setConfirmLeave(true))}
-              onAskDelete={() => setConfirmDelete(true)}
-              onCancel={cancelAction}
-              onLeave={leave}
-              onDelete={remove}
-              onHandOver={makeOwnerAndLeave}
-            />
+            {preview ? (
+              <View>
+                <Pressable
+                  onPress={() => { onClose(); onClaimUsername() }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Claim a username to join"
+                  className="flex-row items-center justify-center gap-2 rounded-2xl bg-brand-400 py-4 active:opacity-90"
+                >
+                  <AtSign size={16} color="#000" />
+                  <Text className="text-[14px] font-bold text-black">Claim a username to join</Text>
+                </Pressable>
+                <Text className="mt-2 text-center text-[12px] text-tertiary">
+                  You're previewing Community. Claim a name to join groups and appear on leaderboards.
+                </Text>
+              </View>
+            ) : (
+              <OwnershipFooter
+                owner={owner}
+                others={ranked.filter((m) => !m.isYou)}
+                danger={colors.danger}
+                confirmLeave={confirmLeave}
+                confirmDelete={confirmDelete}
+                transferMode={transferMode}
+                onAskLeave={() => (owner ? setTransferMode(true) : setConfirmLeave(true))}
+                onAskDelete={() => setConfirmDelete(true)}
+                onCancel={cancelAction}
+                onLeave={leave}
+                onDelete={remove}
+                onHandOver={makeOwnerAndLeave}
+              />
+            )}
           </View>
         </View>
       )}
