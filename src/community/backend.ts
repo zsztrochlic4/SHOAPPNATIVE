@@ -87,6 +87,16 @@ export async function loadLeagueStandingsRemote(weekKey: string, tier: number): 
   }))
 }
 
+export interface RemoteStreakRow { uid: string; username: string; streakCurrent: number; streakBest: number }
+
+/** The GLOBAL consistency-streak board: top-N users by current streak, plus the caller's own row and
+ *  global rank. Server aggregate (communityProfiles is list-forbidden by rules), so this goes through a
+ *  callable rather than a direct Firestore read. */
+export async function loadGlobalStreaksRemote(limit = 50): Promise<{ rows: RemoteStreakRow[]; me: RemoteStreakRow | null; youRank: number | null }> {
+  const res = await call<{ limit: number }, { ok: true; rows: RemoteStreakRow[]; me: RemoteStreakRow | null; youRank: number | null }>('globalStreaks')({ limit })
+  return { rows: res.data.rows ?? [], me: res.data.me ?? null, youRank: res.data.youRank ?? null }
+}
+
 export interface RemoteCommunityProfile {
   username: string | null
   tier: number

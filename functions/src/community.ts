@@ -578,6 +578,60 @@ export const syncCommunityStats = onCall<SyncInput>(
   },
 )
 
+/* -------------------------------- globalStreaks ---------------------------- */
+
+/** Global consistency-streak leaderboard: top-N users by CURRENT streak, plus the caller's own
+ *  row and global rank. This must be a server aggregate — `communityProfiles` is `list`-forbidden
+ *  in firestore.rules (a client can only read its OWN), so there is no client path to a cross-user
+ *  streak board. The Admin SDK bypasses rules; we return only public leaderboard fields
+ *  (username + streak numbers), never the full profile. Single-field index on `streakCurrent`
+ *  (auto-created in prod; unenforced in the emulator) covers the ordered read + the rank count. */
+export const globalStreaks = onCall<{ limit?: number }>(
+  { region: 'australia-southeast2', enforceAppCheck: APP_CHECK_ENFORCED },
+  async (req) => {
+    const uid = requireAuth(req)
+    auditAppCheck(req, 'globalStreaks')
+    const db = getFirestore()
+    const N = Math.min(Math.max(Math.floor(Number(req.data?.limit ?? 50)) || 50, 1), 100)
+    const snap = await db
+      .collection('communityProfiles')
+      .where('streakCurrent', '>', 0)
+      .orderBy('streakCurrent', 'desc')
+      .limit(N)
+      .get()
+    const rows = snap.docs
+      .filter((d) => d.get('username'))
+      .map((d) => ({
+        uid: d.id,
+        username: String(d.get('username')),
+        streakCurrent: Number(d.get('streakCurrent') ?? 0),
+        streakBest: Number(d.get('streakBest') ?? 0),
+      }))
+    const meSnap = await db.collection('communityProfiles').doc(uid).get()
+    let me: { uid: string; username: string; streakCurrent: number; streakBest: number } | null = null
+    let youRank: number | null = null
+    if (meSnap.exists && meSnap.get('username')) {
+      me = {
+        uid,
+        username: String(meSnap.get('username')),
+        streakCurrent: Number(meSnap.get('streakCurrent') ?? 0),
+        streakBest: Number(meSnap.get('streakBest') ?? 0),
+      }
+      const inTop = rows.findIndex((r) => r.uid === uid)
+      if (inTop >= 0) youRank = inTop + 1
+      else if (me.streakCurrent > 0) {
+        try {
+          const ahead = await db.collection('communityProfiles').where('streakCurrent', '>', me.streakCurrent).count().get()
+          youRank = ahead.data().count + 1
+        } catch {
+          youRank = null // count() unavailable (older emulator) — leave rank unknown rather than fail the board
+        }
+      }
+    }
+    return { ok: true as const, rows, me, youRank }
+  },
+)
+
 /* -------------------------------- rolloverLeagues -------------------------- */
 
 /** Monthly promotion/demotion. Scheduled every Monday but only acts on the FIRST
