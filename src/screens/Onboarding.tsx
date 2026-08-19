@@ -14,8 +14,8 @@
  * The only store integration is the final dispatch, unchanged from the old
  * screen: dispatch({ type: 'COMPLETE_ONBOARDING', profile }).
  */
-import type { ReactNode } from 'react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
+import { forwardRef, useEffect, useMemo, useRef, useState } from 'react'
 import {
   View, Text, Pressable, ScrollView, TextInput, Animated, Easing, PanResponder,
   Platform, useWindowDimensions, ActivityIndicator, Image,
@@ -52,8 +52,24 @@ import { LEGAL_DOCS, LEGAL_DOC_ORDER, type LegalDocKey } from '../content/legal'
 const NATIVE = Platform.OS !== 'web'
 /** Prototype motion curve (cubic-bezier(0.22,0.8,0.28,1)). */
 const EASE = Easing.bezier(0.22, 0.8, 0.28, 1)
-const AnimatedCircle = Animated.createAnimatedComponent(Circle)
-const AnimatedPath = Animated.createAnimatedComponent(Path)
+// Animated.createAnimatedComponent injects React Native's native-only
+// `collapsable` prop. On web, react-native-web forwards it onto the DOM SVG
+// node and React rejects it ("Received `false` for a non-boolean attribute
+// `collapsable`"). On web only, wrap the primitive so that prop is stripped
+// between the Animated wrapper and the SVG element. Native passes the raw
+// primitive to createAnimatedComponent exactly as before (unchanged).
+const WebCircle = forwardRef<Circle, ComponentProps<typeof Circle>>(function WebCircle(props, ref) {
+  const rest = { ...props } as Record<string, unknown>
+  delete rest.collapsable
+  return <Circle ref={ref} {...(rest as ComponentProps<typeof Circle>)} />
+})
+const WebPath = forwardRef<Path, ComponentProps<typeof Path>>(function WebPath(props, ref) {
+  const rest = { ...props } as Record<string, unknown>
+  delete rest.collapsable
+  return <Path ref={ref} {...(rest as ComponentProps<typeof Path>)} />
+})
+const AnimatedCircle = Animated.createAnimatedComponent(NATIVE ? Circle : (WebCircle as unknown as typeof Circle))
+const AnimatedPath = Animated.createAnimatedComponent(NATIVE ? Path : (WebPath as unknown as typeof Path))
 
 /* ─────────────────────────── theme-token helper ──────────────────────────── */
 /**
