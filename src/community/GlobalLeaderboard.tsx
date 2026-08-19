@@ -144,6 +144,7 @@ export function GlobalLeaderboard({ onClaimUsername }: { onClaimUsername: () => 
       {blocked.size > 0 && (
         <Pressable
           onPress={() => setManageBlocked(true)}
+          hitSlop={10}
           accessibilityRole="button"
           accessibilityLabel={`Manage blocked users, ${blocked.size} blocked`}
           className="mt-2 flex-row items-center justify-center gap-1.5 py-2 active:opacity-70"
