@@ -71,6 +71,11 @@ const N = 8
 
 async function seed() {
   await db.collection('users').doc(uid).set(userDoc, { merge: true })
+  // Open the server-authoritative, default-CLOSED release gate for local/internal testing. The coach
+  // now requires BOTH the internal build channel (env) AND config/coach.releaseEnabled === true, so an
+  // env var alone can never open a real deploy; the emulator's Firestore is ephemeral, so this is a
+  // local-only opt-in that must be re-seeded after every restart (see the coach release gate).
+  await db.collection('config').doc('coach').set({ releaseEnabled: true }, { merge: true })
   // Grant coach consent + enable memory server-side so we skip the in-app consent click.
   await db.collection('coachUsers').doc(uid).set({
     schemaVersion: 1, consentVersion: 1, memoryEnabled: true, proactiveEnabled: false, coachingStyle: 'balanced',
