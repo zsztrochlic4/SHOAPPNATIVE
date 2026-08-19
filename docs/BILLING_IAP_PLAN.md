@@ -5,8 +5,9 @@ billing for iOS & Android, keep Stripe for the web app.
 
 ## Why
 
-The paywall (4-week free trial → **$2.99/week AUD**) currently unlocks in-app
-features via **Stripe Checkout**. Apple **Guideline 3.1.1** and Google Play's
+The paywall (weekly: 4-week free trial → **$2.00/week AUD**; or annual: **$90 AUD
+upfront** for 52 weeks) currently unlocks in-app features via **Stripe Checkout**.
+Apple **Guideline 3.1.1** and Google Play's
 Payments policy require **store billing** (Apple IAP / Google Play Billing) for
 digital content consumed in-app — Stripe would be rejected on both stores. Stripe
 stays valid for the **web** build.
@@ -47,12 +48,13 @@ entitlements/{uid} = {
 
 ## Store & RevenueCat setup (owner console tasks)
 
-1. **App Store Connect** — create an **auto-renewable subscription** (group +
-   product id e.g. `sho_weekly`), price **AUD $2.99/week**, with a **4-week free
-   introductory offer**. Generate the **In-App Purchase key** / app-specific
-   shared secret for RevenueCat.
-2. **Google Play Console** — create a **subscription** with a weekly base plan and
-   a **4-week free-trial offer**. Create a **service account** for RevenueCat.
+1. **App Store Connect** — create **auto-renewable subscriptions** (one group):
+   product id `sho_weekly_200` at **AUD $2.00/week** with a **4-week free
+   introductory offer**, and `sho_annual_9000` at **AUD $90.00/year** (no trial).
+   Generate the **In-App Purchase key** / app-specific shared secret for RevenueCat.
+2. **Google Play Console** — create a **subscription** with a weekly base plan
+   (**4-week free-trial offer**) and an annual base plan. Create a **service
+   account** for RevenueCat.
 3. **RevenueCat** — one project, add the iOS and Android apps, paste the store
    credentials, define entitlement **`premium`**, and an **offering** whose
    packages map both store products to `premium`.
@@ -121,8 +123,8 @@ entitlements/{uid} = {
    the Terms/Settings copy accordingly (Terms already say "Stripe or the applicable
    app store" — good).
 6. **Required subscription disclosure** near the CTA (Apple requires it): title,
-   length, **$2.99/week AUD after a 4-week free trial, auto-renews until
-   cancelled**, and links to Terms & Privacy. Add to the Paywall.
+   length, **$2.00/week AUD after a 4-week free trial (or $90/year upfront),
+   auto-renews until cancelled**, and links to Terms & Privacy. Add to the Paywall.
 
 ## Types
 

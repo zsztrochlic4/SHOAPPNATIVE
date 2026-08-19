@@ -485,6 +485,20 @@ function DevSafetyHarnessGate(): React.ReactElement | null {
   return <SafetyHarnessScreen />
 }
 
+/**
+ * DEV-ONLY live preview of the Paywall screen. Guarded the same two ways as the
+ * safety harness so it can NEVER ship:
+ *   1. `__DEV__` — constant-folded away in release builds, dropping the require.
+ *   2. `EXPO_PUBLIC_PAYWALL_PREVIEW === '1'` — off unless explicitly set.
+ * It mounts the real paywall in its own provider stack; it does not change the
+ * entitlement gate.
+ */
+function DevPaywallPreviewGate(): React.ReactElement | null {
+  if (!__DEV__ || process.env.EXPO_PUBLIC_PAYWALL_PREVIEW !== '1') return null
+  const { PaywallPreviewScreen } = require('./dev/PaywallPreviewScreen')
+  return <PaywallPreviewScreen />
+}
+
 // Catch uncaught JS errors + unhandled rejections app-wide (audit F-034) —
 // they flow through the reportError seam into the redacted local diagnostics
 // buffer (and any crash service registered later via setErrorReporter).
@@ -497,6 +511,9 @@ installRemoteErrorReporter()
 export default function App() {
   const devHarness = DevSafetyHarnessGate()
   if (devHarness) return devHarness
+
+  const paywallPreview = DevPaywallPreviewGate()
+  if (paywallPreview) return paywallPreview
 
   return (
     // GestureHandlerRootView must wrap the whole app for react-native-gesture-handler.

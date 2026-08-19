@@ -12,8 +12,9 @@ type SubscriptionStatus = 'none' | 'trialing' | 'active' | 'past_due' | 'cancele
  * Stripe billing — the paywall backend (Checkout redirect model).
  *
  * Three entry points:
- *   - `createCheckoutSession`  (callable) → a hosted Checkout URL for the 4-week
- *     free trial, then $2.99/week AUD.
+ *   - `createCheckoutSession`  (callable) → a hosted Checkout URL for the chosen
+ *     plan: the `weekly` plan (4-week free trial, then $2.00/week AUD) or the
+ *     `annual` plan ($90 AUD upfront for 52 weeks, charged today, no trial).
  *   - `createBillingPortalSession` (callable) → a Billing Portal URL (Restore /
  *     manage / cancel).
  *   - `stripeWebhook` (HTTPS) → the ONLY writer of `entitlements/{uid}`, the
@@ -26,10 +27,22 @@ type SubscriptionStatus = 'none' | 'trialing' | 'active' | 'past_due' | 'cancele
 
 const STRIPE_SECRET_KEY = defineSecret('STRIPE_SECRET_KEY')
 const STRIPE_WEBHOOK_SECRET = defineSecret('STRIPE_WEBHOOK_SECRET')
+/** Recurring weekly price ($2.00/week AUD). Historically the only price id. */
 const STRIPE_PRICE_ID = defineSecret('STRIPE_PRICE_ID')
+/** Recurring yearly price ($90 AUD/year). */
+const STRIPE_PRICE_ID_ANNUAL = defineSecret('STRIPE_PRICE_ID_ANNUAL')
 
-/** 4-week free trial (design: "Your first 4 weeks are on us"). */
+/** The two plans the paywall offers. Mirrors the client's PlanId (src/lib/plans.ts). */
+type PlanId = 'weekly' | 'annual'
+
+/** 4-week free trial for the weekly plan (design: "Your first 4 weeks are on us"). */
 const TRIAL_PERIOD_DAYS = 28
+
+/** Resolve the Stripe price id for a plan (annual falls back to weekly if unset). */
+function priceIdForPlan(plan: PlanId): string {
+  if (plan === 'annual') return STRIPE_PRICE_ID_ANNUAL.value() || STRIPE_PRICE_ID.value()
+  return STRIPE_PRICE_ID.value()
+}
 
 /** Build a Stripe client at request time (secrets are only available then). */
 function stripeClient(): Stripe {
@@ -76,29 +89,35 @@ async function ensureCustomer(stripe: Stripe, uid: string, email?: string): Prom
 }
 
 export const createCheckoutSession = onCall(
-  { enforceAppCheck: APP_CHECK_ENFORCED, secrets: [STRIPE_SECRET_KEY, STRIPE_PRICE_ID] },
+  { enforceAppCheck: APP_CHECK_ENFORCED, secrets: [STRIPE_SECRET_KEY, STRIPE_PRICE_ID, STRIPE_PRICE_ID_ANNUAL] },
   async (req: CallableRequest): Promise<{ url: string }> => {
     auditAppCheck(req, 'createCheckoutSession')
     const uid = requireAuth(req)
     const stripe = stripeClient()
 
+    // Default to the weekly plan for older clients that don't send `plan`.
+    const plan: PlanId = req.data?.plan === 'annual' ? 'annual' : 'weekly'
     const email = typeof req.data?.email === 'string' ? (req.data.email as string) : req.auth?.token?.email
     const successUrl = safeReturnUrl(req.data?.successUrl, 'strengthhub://checkout?status=success')
     const cancelUrl = safeReturnUrl(req.data?.cancelUrl, 'strengthhub://checkout?status=cancel')
 
     const customerId = await ensureCustomer(stripe, uid, typeof email === 'string' ? email : undefined)
 
+    // Only the weekly plan carries the 4-week free trial; the annual plan is
+    // charged today ("Due today $90"), so it starts without a trial.
+    const subscriptionData: Stripe.Checkout.SessionCreateParams.SubscriptionData = {
+      metadata: { firebaseUID: uid },
+      ...(plan === 'weekly' ? { trial_period_days: TRIAL_PERIOD_DAYS } : {}),
+    }
+
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       customer: customerId,
       client_reference_id: uid,
-      line_items: [{ price: STRIPE_PRICE_ID.value(), quantity: 1 }],
-      subscription_data: {
-        trial_period_days: TRIAL_PERIOD_DAYS,
-        metadata: { firebaseUID: uid },
-      },
+      line_items: [{ price: priceIdForPlan(plan), quantity: 1 }],
+      subscription_data: subscriptionData,
       // Stamp the uid on the session too, for a belt-and-suspenders webhook lookup.
-      metadata: { firebaseUID: uid },
+      metadata: { firebaseUID: uid, plan },
       allow_promotion_codes: true,
       success_url: successUrl,
       cancel_url: cancelUrl,

@@ -12,10 +12,10 @@ guarantee "won't be rejected" in advance; these steps are what make approval lik
 
 ## What's already implemented in the repo
 - **`react-native-purchases` is installed** (RevenueCat SDK, v10).
-- `src/lib/iap.ts` — real RevenueCat client: `initIap`, `purchaseWeekly`, `restorePurchases`,
+- `src/lib/iap.ts` — real RevenueCat client: `initIap`, `purchasePlan`, `restorePurchases`,
   `iapIsEntitled`, `iapActive()`. The native module is imported **lazily**, so the Expo Go / web
   build still loads today; `IAP_ENABLED = false` keeps it inert. Entitlement id `premium`, product
-  id `sho_weekly_299`.
+  ids `sho_weekly_200` (weekly) and `sho_annual_9000` (annual) — see `IAP_PRODUCTS` in `src/lib/plans.ts`.
 - `src/screens/Paywall.tsx` — the purchase + restore buttons **already route**: native → RevenueCat,
   web (and while gated) → Stripe.
 - `src/store/BillingSync.tsx` — calls `initIap(uid)` on sign-in (no-op until enabled).
@@ -27,11 +27,14 @@ guarantee "won't be rejected" in advance; these steps are what make approval lik
 ## Steps to go live (what only you can do)
 
 1. **Developer accounts** — Apple Developer Program ($99/yr) and Google Play Console ($25 one-off).
-2. **Create the subscription product in BOTH stores** — id **`sho_weekly_299`** (see `IAP_WEEKLY_PRODUCT`):
-   AUD $2.99 / week with a 4-week free trial. (Match the Stripe offer exactly.)
+2. **Create the subscription products in BOTH stores** — ids **`sho_weekly_200`** and
+   **`sho_annual_9000`** (see `IAP_PRODUCTS`):
+   - `sho_weekly_200` — AUD $2.00 / week with a 4-week free trial.
+   - `sho_annual_9000` — AUD $90.00 / year, no trial.
+   (Match the Stripe offer exactly.)
 3. **RevenueCat** — create a project (<https://www.revenuecat.com>), connect the App Store and
-   Play Store apps, create an **entitlement** named **`premium`**, and an **offering** containing the
-   weekly package. Set `app_user_id = <Firebase UID>` (the client already passes it).
+   Play Store apps, create an **entitlement** named **`premium`**, and an **offering** containing
+   both the weekly and annual packages. Set `app_user_id = <Firebase UID>` (the client already passes it).
 4. **Native build + keys** — add the RevenueCat config plugin per their Expo guide if required, set
    `EXPO_PUBLIC_RC_IOS_KEY` / `EXPO_PUBLIC_RC_ANDROID_KEY` via **EAS env** (never commit real keys),
    then `eas build --profile development`. (Expo Go cannot run store billing.)

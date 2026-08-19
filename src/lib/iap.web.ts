@@ -12,7 +12,8 @@ export const IAP_ENABLED = false as boolean
 
 export const RC_ENTITLEMENT = 'premium'
 
-export const IAP_WEEKLY_PRODUCT = 'sho_weekly_299'
+export { IAP_PRODUCTS } from './plans'
+import type { PlanId } from './plans'
 
 /** Always false on web — the Stripe paywall handles billing here. */
 export function iapActive(): boolean {
@@ -30,7 +31,7 @@ export async function iapIsEntitled(): Promise<boolean> {
 }
 
 /** Store purchases are unavailable on web. */
-export async function purchaseWeekly(): Promise<{ ok: boolean; entitled: boolean; cancelled?: boolean }> {
+export async function purchasePlan(_plan: PlanId): Promise<{ ok: boolean; entitled: boolean; cancelled?: boolean }> {
   return { ok: false, entitled: false }
 }
 
