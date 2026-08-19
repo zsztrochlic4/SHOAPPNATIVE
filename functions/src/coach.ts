@@ -28,15 +28,16 @@ import {
 // SINGLE SOURCE: the guardrails run here are the exact same code the app runs,
 // copied verbatim into _shared by scripts/sync-shared.mjs (never hand-edited).
 import { COACH_ENABLED } from './_shared/backend/coach/coachGate'
-import { APPROVED_KNOWLEDGE_SOURCES, buildCoachSystemPrompt, buildConversationTurnHint } from './_shared/backend/coach/operatingRules'
+import { APPROVED_KNOWLEDGE_SOURCES, APP_NAV_MAP, buildCoachSystemPrompt, buildConversationTurnHint } from './_shared/backend/coach/operatingRules'
 import { selectCoachContext, summarizeRecentTurns, type CoachContextSnapshot } from './_shared/backend/coach/contextSelection'
 import { recordCoachTelemetry, recordCoachTurn } from './_shared/backend/coach/coachTelemetry'
 import {
   STRUCTURED_COACH_RESPONSE_SCHEMA,
   validateStructuredCoachReply,
 } from './_shared/backend/coach/structuredResponse'
-import { synthesizeBoundedActionProposal, synthesizeWellnessGoalProposal, synthesizeGoalWeightProposal, synthesizeSwapProposal, synthesizeDayMoveProposal, synthesizeScheduleGroundedReply, synthesizeMemoryFromMessage, synthesizeExerciseDetailNav, synthesizeTechniqueAnswer, synthesizeDepthFactAnswer, synthesizeMealPlanReview, proposalSurfacingIssue, fabricatedExerciseIdInMessage, FABRICATED_EXERCISE_ID_LINE, isDayRescheduleIntent, dayRescheduleAsk } from './_shared/backend/coach/workoutActions'
+import { synthesizeBoundedActionProposal, synthesizeWellnessGoalProposal, synthesizeGoalWeightProposal, synthesizeSwapProposal, synthesizeDayMoveProposal, synthesizeScheduleGroundedReply, synthesizeMemoryFromMessage, synthesizeExerciseDetailNav, synthesizeTechniqueAnswer, synthesizeDepthFactAnswer, synthesizeMealPlanReview, proposalSurfacingIssue, proposalDestinationIssue, fabricatedExerciseIdInMessage, FABRICATED_EXERCISE_ID_LINE, isDayRescheduleIntent, dayRescheduleAsk } from './_shared/backend/coach/workoutActions'
 import { isOwnPlanReview, normalize as normalizeCoachText } from './_shared/backend/coach/safety/rules'
+import { synthesizeAppHelpAnswer, verifiedRouteAnswer, APP_ROUTE_MENU } from './_shared/backend/coach/appRoutes'
 import type {
   CoachActionProposal,
   CoachAnswerMode,
@@ -262,6 +263,13 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
     buildCoachSystemPrompt({ allowWorkoutActions: allowActions }),
     '',
     selectedContext,
+    // App-help turns get the verified app-navigation map so the model gives correct paths instead of
+    // inventing them; attached only on this intent to keep other turns lean.
+    ...(pre.decision.intent === 'app_help' ? ['', APP_NAV_MAP] : []),
+    // Constrained route classifier (always attached): lets the model pick the real destination id for
+    // ANY phrasing of an app-navigation question, regardless of the router's intent guess. The coach
+    // then relays the VERIFIED route for that id, so this generalises without letting the model invent.
+    '', APP_ROUTE_MENU,
     ...(turnHint ? ['', turnHint] : []),
     '',
     // Delimited as DATA (audit F-029): prior turns are verbatim user/coach text
@@ -287,6 +295,10 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
   let replyMessage = structured.message
   let replyProposal = structured.proposal
   let suppressMemory = false
+  // True once a schedule/day-reschedule deterministic backstop has authored the reply this turn. These
+  // are more specific, program-data-grounded answers (they name the user's real training days), so the
+  // generic app-route grounding below must NOT overwrite them with a "go to Settings" route relay.
+  let scheduleReplyOwned = false
   // GROUNDING FIRST (correctness over agreeableness): if the user asks about, or asserts, what is
   // trained on a given day ("why the rest day today", "I don't like chest on Monday"), answer from the
   // REAL program schedule and correct a false premise, instead of letting the small model play along or
@@ -297,6 +309,7 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
     replyMessage = scheduleGrounded
     replyProposal = { kind: 'none' }
     suppressMemory = true
+    scheduleReplyOwned = true
   }
   if (allowActions && !scheduleGrounded) {
     const emittedAction = replyProposal.kind === 'workout_action' ? String(replyProposal.payload?.action ?? '') : ''
@@ -322,15 +335,9 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
         replyProposal = { kind: 'none' }
         replyMessage = dayRescheduleAsk(turnData.trainingDays)
         suppressMemory = true
+        scheduleReplyOwned = true
       }
     }
-  }
-  // BUDGET-EATS MIS-FIRE GUARD: the small model sometimes attaches an "open Budget Eats" (a food
-  // feature) card to a non-food answer, e.g. a squat or bench technique question. Drop it unless the
-  // message is actually about food, so a wrong food card never rides along on an exercise reply.
-  if (replyProposal.kind === 'workout_action' && String(replyProposal.payload?.action ?? '') === 'open_budget_eats' &&
-    !/\b(budget eats|eat|eating|food|meal|meals|recipe|recipes|snack|snacks|hungry|protein|carb|carbs|breakfast|lunch|dinner|nutrition|diet)\b/i.test(message)) {
-    replyProposal = { kind: 'none' }
   }
   // Exercise-detail navigation backstop (not action-gated): when the user asks how to do a lift and the
   // model under-emitted, synthesise the form-guide nav. The client resolves the exercise and suppresses
@@ -369,6 +376,26 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
     if (phantom) replyMessage = "I can set that up for you. Tell me exactly what you'd like to change and I'll put it through for you to confirm."
   }
 
+  // Deterministic app-route grounding: the model recalls app navigation at ~22% accuracy (it invents
+  // tabs like "Log" and controls like "Quick Toggles", or points to the wrong screen), and instruction
+  // alone does not fix it. So when the turn is a navigation question that confidently matches a REAL
+  // destination, relay that verified route verbatim instead of the model's guess. synthesizeAppHelpAnswer
+  // self-gates (navigation phrasing + a clear route match), so it is safe to call on any turn — an
+  // advice/training/nutrition turn returns null and keeps the model's answer. A correct route beats a
+  // fluent wrong one. Not gated on the app_help intent, so it also grounds app questions the router
+  // keyed as ordinary coaching. Skipped when the model proposed an ACTION (e.g. set_training_days) —
+  // a confirm card is better UX than "go to Settings", and the card's own destination guard applies.
+  // Two stages: the deterministic substring resolver first (fast, 100% precise but only common
+  // phrasings), then the model's constrained route classification (structured.appRouteId) for anything
+  // it missed — the model maps any wording to a real id and we relay the VERIFIED route for it, so this
+  // generalises to unseen phrasings without letting the model invent a path.
+  // Deferred when a schedule/day-reschedule backstop already owns the reply: those name the user's real
+  // training days and are the more specific answer, so a generic route relay must not clobber them.
+  if (replyProposal.kind !== 'workout_action' && !scheduleReplyOwned) {
+    const routeAnswer = synthesizeAppHelpAnswer(message) ?? verifiedRouteAnswer((structured as { appRouteId?: string }).appRouteId)
+    if (routeAnswer) replyMessage = routeAnswer
+  }
+
   const approved = new Map<string, string>(APPROVED_KNOWLEDGE_SOURCES.map((s) => [s.key, s.title]))
   const citations = structured.citations
     .filter((c) => approved.get(c.sourceKey) === c.title)
@@ -399,6 +426,15 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
       replyProposal = { kind: 'none' }
       safe = issue.coachLine
     }
+  }
+
+  // Destination allow-list (hardening step 1): drop any card whose destination is not a real app screen
+  // or does not fit this turn — an action the model invented or that was removed from the app, a
+  // navigation to an overlay that does not exist, or a technique guide whose exercise resolves to no real
+  // lift. Drops the CARD only; the honest text answer is unchanged. Runs last so it also catches a card
+  // the model emitted directly (not just the deterministic synths).
+  if (replyProposal.kind !== 'none' && proposalDestinationIssue(replyProposal, message)) {
+    replyProposal = { kind: 'none' }
   }
 
   // AD09 conversational-path guard: the proposal guard above only fires on a structured workout_action.

@@ -19,7 +19,7 @@
  */
 
 import type { ConversationalIntent } from './types'
-import { normalize, type Norm } from './rules'
+import { normalize, isAppHelp, type Norm } from './rules'
 
 const has = (n: Norm, ...frags: string[]): boolean =>
   frags.some((f) => n.p.includes(` ${f} `) || n.p.includes(f))
@@ -128,6 +128,11 @@ export function classifyConversationalIntent(text: string): Exclude<Conversation
   const n = normalize(text)
   if (isRelational(n)) return 'relational'
   if (isCapability(n)) return 'capability'
+  // App help ("how do I use the app / change a setting / manage coach memory") is a benign, in-scope
+  // request the system prompt already permits; recognise it here so refer-by-default stops bouncing it
+  // as off_topic. Placed after capability (which handles the generic "how does the app work") and
+  // before the softer greeting/continuation catches.
+  if (isAppHelp(text)) return 'app_help'
   if (isWellbeingAmbiguous(n)) return 'wellbeing_ambiguous'
   if (isGreeting(n)) return 'greeting'
   if (isContinuation(n)) return 'continuation'

@@ -17,8 +17,13 @@
  * The coach proposal payload is a flat `Record<string, string | number | boolean>`
  * (see contracts.ts) — it CANNOT carry arrays or nested objects. List params (training
  * days) are therefore encoded as a comma-separated string and re-validated token by token.
+ *
+ * The one permitted import is `resolveExerciseRefStrict` from `../data` — pure static exercise data (no
+ * firebase, no generator/engine), already synced into `_shared` and used server-side elsewhere. It
+ * lets the deterministic backstops verify a real, confidently-named lift before proposing a card.
  */
 
+import { resolveExerciseRefStrict } from '../data'
 import type { CoachMemoryCandidate } from './contracts'
 
 /* ------------------------------------------------------------------ */
@@ -84,7 +89,6 @@ export type WorkoutAction =
   | { action: 'planned_absence'; mode: AbsenceModeLit; startDate: string; endDate: string }
   | { action: 'exam_mode'; startDate: string; endDate: string }
   | { action: 'start_session'; variant: StartVariantLit }
-  | { action: 'open_budget_eats'; recipeId?: string }
   | { action: 'nudge_log'; kind: NudgeKindLit }
   | { action: 'share_pr'; prExerciseId: string; prValue: number }
   | { action: 'set_wellness_goal'; metric: WellnessMetricLit; value: number }
@@ -96,7 +100,7 @@ export type WorkoutActionName = WorkoutAction['action']
 export const WORKOUT_ACTION_NAMES: readonly WorkoutActionName[] = [
   'swap', 'change_goal', 'set_training_days', 'set_session_length', 'deload',
   'catch_up', 'reschedule_days', 'planned_absence', 'exam_mode', 'start_session',
-  'open_budget_eats', 'nudge_log', 'share_pr', 'set_wellness_goal', 'set_goal_weight',
+  'nudge_log', 'share_pr', 'set_wellness_goal', 'set_goal_weight',
 ] as const
 
 export type WorkoutActionValidation =
@@ -245,13 +249,6 @@ export function validateWorkoutActionPayload(payload: Record<string, string | nu
       const variant = inSet(payload.variant, START_VARIANTS)
       if (!variant) return fail('start_bad_variant')
       return { ok: true, action: { action, variant } }
-    }
-    case 'open_budget_eats': {
-      if (!onlyKeys(payload, ['action', 'recipeId'])) return fail('recipe_extra_keys')
-      if (payload.recipeId == null) return { ok: true, action: { action } }
-      const recipeId = asString(payload.recipeId)
-      if (!recipeId || !SAFE_ID.test(recipeId)) return fail('recipe_bad_id')
-      return { ok: true, action: { action, recipeId } }
     }
     case 'nudge_log': {
       if (!onlyKeys(payload, ['action', 'kind'])) return fail('nudge_extra_keys')
@@ -405,9 +402,6 @@ export function synthesizeBoundedActionProposal(userMessage: string, now = new D
   if (!m) return null
   void ACTION_VERB
 
-  if (/\bbudget eats\b/.test(m) && /\b(open|show|take me|go to)\b/.test(m)) {
-    return actionProposal({ action: 'open_budget_eats' }, 'Open Budget Eats', 'Opens budget-friendly food ideas in StrengthHub.', 'Ready to open Budget Eats? Tap confirm to continue.')
-  }
   if (/\b(deload|recovery week|easy week)\b/.test(m) && /\b(give|set|schedule|start|make|put|take)\b/.test(m)) {
     return actionProposal({ action: 'deload' }, 'Schedule a deload week', 'Reduces training stress for one week while keeping your plan structure.', "Want me to schedule a deload week? Tap confirm and I'll apply it safely.")
   }
@@ -902,17 +896,74 @@ const _EXERCISE_HELP_INTENT =
  * to a real lift (`resolveExerciseRef`) and only renders the card if it matches — so a non‑exercise
  * how‑to ("how do i log a workout") simply shows no card. Returns null when there's no how‑to intent.
  */
+/** App-surface nouns that mark a message as an app/navigation/settings question, not a lift how-to.
+ *  Guards against `resolveExerciseRef`'s loose fuzzy match firing on a stray common token (e.g. "side
+ *  menu" → "Side Plank"): if the turn is about the app, it is never an exercise-technique request. */
+const _APP_SURFACE_HINT =
+  /\b(menu|dashboard|settings?|screen|sheet|tab|notifications?|reminders?|sync|export|account|consent|privacy|profile|badges?|league|leaderboard|username|community|onboarding|language|theme)\b/i
+
 export function synthesizeExerciseDetailNav(userMessage: string): SynthExerciseNavProposal | null {
   if (typeof userMessage !== 'string') return null
   const m = userMessage.trim()
   if (!m || !_EXERCISE_HELP_INTENT.test(m)) return null
+  if (_APP_SURFACE_HINT.test(m)) return null // an app/navigation question is never an exercise how-to
+  // HARDENING: resolve to a REAL lift HERE (the server owns the exercise DB), and fire ONLY on a match.
+  // The old version passed the raw message through and let the client suppress an unresolvable card —
+  // but the "technique guide" MESSAGE was already set and shown, so "show me user u_9999's plan" and
+  // "show me how to change my dashboard" (both match the how-to intent) surfaced a technique guide for a
+  // lift that doesn't exist. Resolving here means a non-exercise how-to emits no card AND no message; the
+  // honest model answer stands. `exercise` now carries the canonical id, so the client opens the right sheet.
+  const exId = resolveExerciseRefStrict(m)
+  if (!exId) return null
   return {
     overlay: 'exerciseDetail',
-    exercise: m.slice(0, 120),
+    exercise: exId,
     title: 'Open the technique guide',
     summary: 'Opens the step-by-step cues, the common mistake to avoid and a form clip for this lift.',
     message: "Here's the technique guide. Open it for the step-by-step cues and a form clip.",
   }
+}
+
+/**
+ * The app's real navigation destinations — mirrors the `Overlay` union in src/nav.tsx. A synthetic or
+ * model-emitted navigation proposal to anything outside this set is a fabricated destination and must
+ * never be surfaced. KEEP IN SYNC with src/nav.tsx (a unit test asserts the anchors below still exist).
+ */
+export const VALID_OVERLAYS: ReadonlySet<string> = new Set([
+  'notifications', 'settings', 'addFood', 'profile', 'trainingProfile', 'activeWorkout', 'createSession',
+  'customize', 'logWeight', 'logProgress', 'logActivity', 'quick', 'badges', 'examMode', 'coach',
+  'coachChat', 'beginner', 'exerciseDetail', 'prCelebration',
+])
+
+/**
+ * DESTINATION ALLOW-LIST gate (hardening step 1). Decides whether a finalised action/navigation card may
+ * be SURFACED: a card is shown only when its destination is a real app screen AND it fits what the user
+ * asked. Returns null when surfacing is fine, or a reason string when the card must be DROPPED. It never
+ * rewrites the answer — it only suppresses a card that points somewhere the turn never asked to go (an
+ * action the model invented, a nav to a non-existent overlay, or a technique guide whose "exercise"
+ * resolves to no real lift). The honest text answer is unaffected.
+ */
+export function proposalDestinationIssue(
+  proposal: { kind?: string; payload?: Record<string, unknown> | null } | null | undefined,
+  userMessage: string,
+): string | null {
+  if (!proposal || !proposal.kind || proposal.kind === 'none') return null
+  void userMessage // reserved for future intent-aware destination checks
+  const payload = proposal.payload && typeof proposal.payload === 'object' ? proposal.payload : {}
+  if (proposal.kind === 'navigation') {
+    const overlay = String((payload as Record<string, unknown>).overlay ?? '')
+    if (!VALID_OVERLAYS.has(overlay)) return 'nav_unknown_overlay'
+    if (overlay === 'exerciseDetail' && !resolveExerciseRefStrict(String((payload as Record<string, unknown>).exercise ?? ''))) {
+      return 'nav_exercise_unresolved'
+    }
+    return null
+  }
+  if (proposal.kind === 'workout_action') {
+    const action = String((payload as Record<string, unknown>).action ?? '')
+    if (!(WORKOUT_ACTION_NAMES as readonly string[]).includes(action)) return 'action_unknown'
+    return null
+  }
+  return null
 }
 
 /** A program lift with its app-reviewed technique, for the deterministic technique answer. */

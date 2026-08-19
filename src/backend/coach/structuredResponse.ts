@@ -156,6 +156,9 @@ export function validateStructuredCoachReply(raw: unknown): StructuredReplyValid
     const message = cleanShort(parsed.message, MESSAGE_MAX)
     if (!message) return { ok: false, fallback: STRUCTURED_COACH_FALLBACK, reason: 'bad_message' }
 
+    // Constrained app-route id the model classified this turn to (validated for existence at relay time).
+    const appRouteId = cleanShort(parsed.appRouteId, 60) || undefined
+
     const citations: CoachCitation[] = []
     if (!Array.isArray(parsed.citations) || parsed.citations.length > 5) {
       return { ok: false, fallback: STRUCTURED_COACH_FALLBACK, reason: 'bad_citations' }
@@ -211,7 +214,7 @@ export function validateStructuredCoachReply(raw: unknown): StructuredReplyValid
           droppedReason: 'completed_claim_without_action',
         }
       }
-      return { ok: true, reply: { mode: mode as CoachAnswerMode, message, citations, memory, proposal: parsedProposal.proposal } }
+      return { ok: true, reply: { mode: mode as CoachAnswerMode, message, citations, memory, proposal: parsedProposal.proposal, ...(appRouteId ? { appRouteId } : {}) } }
     }
     // The proposal is dropped, so NOTHING will apply this turn. If the model's kept text ALSO claims
     // the change already happened ("I've swapped…"), the user would see a false "done" with no confirm
@@ -230,7 +233,7 @@ export function validateStructuredCoachReply(raw: unknown): StructuredReplyValid
     }
     return {
       ok: true,
-      reply: { mode: mode as CoachAnswerMode, message, citations, memory, proposal: { kind: 'none' } },
+      reply: { mode: mode as CoachAnswerMode, message, citations, memory, proposal: { kind: 'none' }, ...(appRouteId ? { appRouteId } : {}) },
       proposalDropped: true,
       droppedReason: parsedProposal.reason,
     }
@@ -273,6 +276,9 @@ export const STRUCTURED_COACH_RESPONSE_SCHEMA = {
       },
       required: ['kind'],
     },
+    // Constrained app-route classification (optional): the id of the real destination this turn maps to,
+    // chosen from APP_ROUTE_MENU. Omitted for non-navigation turns. The coach relays the verified route.
+    appRouteId: { type: 'string', nullable: true },
   },
   required: ['mode', 'message', 'citations', 'memory', 'proposal'],
 } as const

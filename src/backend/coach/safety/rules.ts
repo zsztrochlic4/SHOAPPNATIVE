@@ -946,6 +946,18 @@ export function scopeClassifierHits(text: string, hits: DetectorHit[], ctx?: Coa
     scoped.hits = scoped.hits.filter((h) => h.category !== 'meal_plan')
     scoped.suppressions.push({ category: 'meal_plan', rule: 'own_plan_review' })
   }
+  // App-help override: flash-lite intermittently flags a genuine "how do I use the app / change a
+  // setting / manage coach memory" question as off_topic, which would refer the user away instead of
+  // answering (the system prompt already permits app help). When the deterministic app-surface
+  // allowlist recognises the message as app help, drop the classifier `off_topic` hit so the message
+  // reaches refer-by-default and is tagged `app_help`. This ONLY ever removes `off_topic` — the lowest,
+  // non-safety tier — and every safety category the classifier emitted is left untouched, so it can
+  // never soften a crisis/medical/DE route. `isAppHelp` deliberately excludes system-prompt/API-key
+  // exfiltration, so those stay off_topic.
+  if (isAppHelp(text) && scoped.hits.some((h) => h.category === 'off_topic')) {
+    scoped.hits = scoped.hits.filter((h) => h.category !== 'off_topic')
+    scoped.suppressions.push({ category: 'off_topic', rule: 'app_help' })
+  }
   return scoped
 }
 
@@ -1037,7 +1049,7 @@ const FITNESS_TERMS = [
   'energy', 'fatigue', 'focus', 'confidence', 'gym anxiety', 'mental wellbeing', 'physical activity',
   'anatomy', 'adaptation', 'detraining', 'heart health', 'bone health', 'posture', 'sedentary',
   // First-class coach modes/actions. These are bounded by the deterministic action schema downstream.
-  'exam mode', 'budget eats', 'planned absence',
+  'exam mode', 'planned absence',
   // Scheduling frequency, planned time away, consistency, supplements and alcohol are all on-topic coach
   // conversations (previously bounced as off-topic). Adding them only relaxes the off-topic net; a real
   // safety category is still decided first and is never downgraded by an on-topic term.
@@ -1166,4 +1178,78 @@ export function isOnTopicFitness(text: string): boolean {
   const words = n.p.trim().split(/\s+/).filter(Boolean)
   // Word-boundaried so a continuity token can't match INSIDE another word ("ok" in "joke").
   return words.length <= 4 && CONTINUITY.some((c) => new RegExp(`\\b${c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(n.p))
+}
+
+/**
+ * App-surface vocabulary: the StrengthHub app's real screens, settings, account/data controls,
+ * community features, and the coach's own meta-controls (memory / consent / style / limits). These
+ * are legitimate "how do I use the app" questions that otherwise fall through refer-by-default and get
+ * bounced as off_topic. Safety runs UPSTREAM of the layer that consults this (it is checked only on an
+ * already-`allow` turn, after `isOnTopicFitness`), so a crisis never reaches here — a genuine crisis
+ * does not contain "how do I export my data". Deliberately excludes bare generic words (data, help,
+ * back, page, share, plan) that would over-match ordinary coaching. Verified against the real UI in
+ * src/overlays/index.tsx, src/components/CoachMemoryView.tsx and src/screens/*.
+ */
+const APP_HELP_TERMS = [
+  // navigation / structure
+  'the app', 'this app', 'the menu', 'side menu', 'main menu', 'settings', 'setting screen',
+  'dashboard', 'home screen', 'which tab', 'the tab', 'navigate', 'go back to', 'detail sheet',
+  // display & preferences
+  'units', 'metric', 'imperial', 'kilograms or pounds', 'kg or lb', 'language', 'translation',
+  'dark mode', 'light mode', 'theme', 'appearance', 'text size', 'accessibility', 'haptics',
+  'sound effect', 'sounds off', 'sounds on',
+  // notifications
+  'notification', 'notifications', 'reminder', 'reminders', 'push notification',
+  // account / data / sync
+  'my account', 'log out', 'logout', 'sign out', 'export', 'download my data', 'my data',
+  'delete my account', 'delete account', 'sync', 'syncing', 'cloud backup', 'offline', 'new phone',
+  'another device', 'restore my',
+  // coach meta / memory / consent / privacy / style / limits
+  'coach memory', 'coach remember', 'you remember', 'remembered about me', 'what do you remember',
+  'forget', 'saved memory', 'stored memory', 'memories', 'consent', 'privacy', 'coaching style',
+  'coach style', 'more direct', 'more supportive', 'daily limit', 'message limit', 'coach profile',
+  // community
+  'community', 'leaderboard', 'league', 'leagues', 'challenge', 'challenges', 'friend group',
+  'group', 'groups', 'invite code', 'invite friends', 'streak', 'badge', 'badges', 'username',
+  'sharing',
+  // in-app tools
+  'rest timer', 'log a set', 'meal planner', 'plan your week', 'barcode', 'meal scan', 'food log',
+  'training profile', 'confirmation card', 'confirm card', 'onboarding', 'quick workout',
+  'exercise library',
+  // social / sharing surfaces
+  'share', 'sharing', 'share text', 'post my', 'post publicly', 'posting', 'kudos', 'likes',
+  'comment', 'comments', 'bookmark', 'bookmarks', 'react to', 'cheer', 'the feed',
+  // onboarding / profile edits
+  'equipment option', 'onboarding answer', 'onboarding question', 'my profile', 'update my profile',
+  'profile updated', 'external sport', 'changed university', 'change university', 'switch universities',
+  // display / accessibility
+  'reduce motion', 'screen reader', 'follow my phone', 'phone theme', 'light and dark', 'dark theme',
+  'light theme', 'quiet hours', 'switch between metric', 'metric and imperial',
+  // integrations
+  'health connect', 'connected app', 'connected-app', 'apple health', 'google fit', 'integration',
+  'expo go',
+  // sync / data / account
+  'force a sync', 'force sync', 'changes are pending', 'sync conflict', 'two devices',
+  'clearing app data', 'clear app data', 'restore all', 'download a copy', 'clearing app',
+  // troubleshooting
+  'stuck loading', 'stuck showing loading', 'reverted after', 'after a restart', 'after restart',
+  'failed to save', 'submitted twice', 'button twice', 'tapped a button twice', 'no confirmation',
+  'plain-language error', 'retry does nothing', 'stuck on loading',
+  // app-settings phrasings that carry no obvious app-surface noun (mirror the classifier exemplars).
+  // These only ever suppress the lowest, non-safety off_topic tier, so they cannot affect real routing.
+  'night mode', 'app dark', 'the app dark', 'in pounds', 'in lbs', 'in kilograms', 'show weights',
+  'weights in pounds', 'pinging me', 'stop pinging', 'buzzing when', 'mute the app', 'mute the sounds',
+  'garmin', 'fitbit', 'apple health', 'google fit', 'unlock trophies', 'my achievements', 'ranking system',
+  'charging my card', 'stop being charged', 'be more blunt', 'keep notes on me', 'notes on me',
+]
+
+/**
+ * Whether a message is a benign "how do I use the app" request — app navigation, settings, account /
+ * data controls, community features, or the coach's own memory / consent / style / limits. Consulted
+ * by the conversational layer AFTER `isOnTopicFitness` and only on an already-`allow` turn, so it
+ * never sees a safety-flagged message and never widens the safety surface. It only relaxes the
+ * off-topic bounce for genuine app help (final plan Phase 1 refer-by-default carve-out).
+ */
+export function isAppHelp(text: string): boolean {
+  return has(normalize(text), ...APP_HELP_TERMS)
 }

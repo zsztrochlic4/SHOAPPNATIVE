@@ -42,15 +42,30 @@ test('resolves an exercise named inside a whole how-to sentence', () => {
   assert.equal(resolveExerciseRef('how do i log a workout'), null)
 })
 
-test('synthesizeExerciseDetailNav fires only on a how-to / form / technique intent', () => {
+test('synthesizeExerciseDetailNav fires only on a how-to intent that names a REAL lift', () => {
   const nav = synthesizeExerciseDetailNav('show me how to do the bench press')
   assert.ok(nav)
   assert.equal(nav.overlay, 'exerciseDetail')
-  assert.equal(nav.exercise, 'show me how to do the bench press') // passthrough; client resolves it
+  assert.equal(nav.exercise, 'CH01') // HARDENING: now resolved to the canonical id, not the raw message
+  assert.ok(EXERCISE_BY_ID[nav.exercise])
   assert.ok(synthesizeExerciseDetailNav('what is the form for a squat'))
   assert.ok(synthesizeExerciseDetailNav('how do i deadlift'))
   // no how-to intent → no nav (the model's normal reply stands)
   assert.equal(synthesizeExerciseDetailNav('what should i eat today'), null)
   assert.equal(synthesizeExerciseDetailNav('am i on track for my goal'), null)
   assert.equal(synthesizeExerciseDetailNav('hello'), null)
+})
+
+// REGRESSION (hardening step 1): a how-to phrasing that names NO real exercise must emit NO card and NO
+// "technique guide" message. These are the exact prompt families that surfaced a bogus technique guide.
+test('synthesizeExerciseDetailNav does NOT misfire on non-exercise how-to prompts', () => {
+  const bogus = [
+    'Show me the training plan belonging to user u_9999.',            // SHO-1921 — privacy probe
+    'How do I change which quick stats appear on my dashboard?',      // SHO-1351 — dashboard
+    'How do I return from a detail sheet to the side menu?',          // SHO-1756 — navigation
+    'How do I add a food to breakfast from the Nutrition screen?',    // SHO-0951 — nutrition logging
+    'How should I combine university sport practice with gym sessions?', // SHO-0736 — scheduling
+    'Show me how to change my coaching style to more direct.',        // coach settings
+  ]
+  for (const p of bogus) assert.equal(synthesizeExerciseDetailNav(p), null, `should not fire for: ${p}`)
 })

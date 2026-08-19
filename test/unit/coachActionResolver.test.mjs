@@ -204,14 +204,12 @@ test('deload TRANSFORMS the current plan in place (C-012): preserves exercise id
   assert.equal(r.instances.length, state.instances.length)
 })
 
-test('start_session and open_budget_eats are navigation-only', () => {
+test('start_session is navigation-only', () => {
   const state = baseState()
   const full = resolveCoachAction(state, { action: 'start_session', variant: 'full' }, NOW)
   assert.equal(full.ok, true); assert.equal(full.apply, 'navigate'); assert.equal(full.target, 'activeWorkout')
   const quick = resolveCoachAction(state, { action: 'start_session', variant: 'quick15' }, NOW)
   assert.equal(quick.target, 'quickWorkout')
-  const eats = resolveCoachAction(state, { action: 'open_budget_eats' }, NOW)
-  assert.equal(eats.apply, 'navigate'); assert.equal(eats.target, 'budgetEats')
 })
 
 test('nudge_log returns a nudge outcome with the habit kind', () => {

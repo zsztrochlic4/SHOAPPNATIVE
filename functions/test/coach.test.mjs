@@ -128,7 +128,6 @@ for (const [message, action] of [
   ['Start a quick workout for me now, I only have 15 minutes.', 'start_session'],
   ['Change my training days to Tuesday, Thursday and Saturday.', 'set_training_days'],
   ['Make my workouts fit into 30 minutes.', 'set_session_length'],
-  ['Open Budget Eats for me.', 'open_budget_eats'],
   ['Change my goal to build muscle.', 'change_goal'],
   ['Put me in exam mode for the next two weeks.', 'exam_mode'],
   ['I missed today. Mark it as an exempt no-penalty rest day.', 'catch_up'],

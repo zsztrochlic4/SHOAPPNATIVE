@@ -84,6 +84,7 @@ export type ConversationalIntent =
   | 'coaching'
   | 'greeting'
   | 'capability'
+  | 'app_help'
   | 'wellbeing_ambiguous'
   | 'relational'
   | 'continuation'

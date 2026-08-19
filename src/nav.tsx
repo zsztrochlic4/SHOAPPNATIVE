@@ -18,7 +18,6 @@ export type Overlay =
   | 'coach'
   | 'coachChat'
   | 'beginner'
-  | 'budgetEats'
   | 'exerciseDetail'
   | 'prCelebration'
 

@@ -1,0 +1,703 @@
+{
+  "_meta": {
+    "purpose": "GENERATED from src/backend/coach/appRoutes.ts by scripts/gen-app-paths.mjs — do not hand-edit. The runtime route table is the single source of truth; this is the eval catalogue the app-path lint/judge score against. Regenerate with `npm run gen:app-paths` after changing appRoutes.ts.",
+    "generated": true,
+    "version": 3
+  },
+  "tabs": [
+    "Dashboard",
+    "Workout",
+    "Coach",
+    "Nutrition",
+    "Community"
+  ],
+  "overlays": [
+    "menu",
+    "settings.units",
+    "settings.appearance",
+    "settings.goals",
+    "trainingProfile",
+    "settings.language",
+    "settings.connected",
+    "settings.pushNotifs",
+    "settings.sound",
+    "settings.haptics",
+    "settings.cloudBackup",
+    "settings.export",
+    "settings.delete",
+    "settings.subscription",
+    "settings.legal",
+    "logout",
+    "coach",
+    "coachSettings",
+    "coach.memoryToggle",
+    "coach.style",
+    "coach.forget",
+    "notifications",
+    "badges",
+    "examMode",
+    "beginner",
+    "customize",
+    "logProgress",
+    "workout.library",
+    "activeWorkout.skip",
+    "activeWorkout.finish",
+    "createSession",
+    "quick",
+    "logActivity",
+    "nutrition.planner",
+    "addFood",
+    "nutrition.savedMeals",
+    "community.username",
+    "community.leagues",
+    "community.groups",
+    "community"
+  ],
+  "destinations": [
+    {
+      "id": "menu",
+      "label": "menu",
+      "route": "Dashboard › menu button (top left); tap the back arrow to return to the side menu",
+      "serves": [
+        "side menu",
+        "the main menu",
+        "detail sheet",
+        "back to the menu",
+        "return to the menu",
+        "return to the side menu",
+        "open the menu"
+      ]
+    },
+    {
+      "id": "settings.units",
+      "label": "Units",
+      "route": "Menu › Settings › Units",
+      "serves": [
+        "units",
+        "metric",
+        "imperial",
+        "kilograms",
+        "pounds",
+        "kg",
+        "lb",
+        "switch between metric"
+      ]
+    },
+    {
+      "id": "settings.appearance",
+      "label": "Appearance",
+      "route": "Menu › Settings › Appearance",
+      "serves": [
+        "appearance",
+        "theme",
+        "dark mode",
+        "light mode",
+        "follow my phone",
+        "phone theme",
+        "light and dark",
+        "system default",
+        "reduce motion",
+        "reduce animations"
+      ]
+    },
+    {
+      "id": "settings.goals",
+      "label": "Goals",
+      "route": "Menu › Settings › Goals",
+      "serves": [
+        "goal weight",
+        "sleep goal",
+        "step goal",
+        "water goal",
+        "daily targets",
+        "update my goals",
+        "change my goals"
+      ]
+    },
+    {
+      "id": "trainingProfile",
+      "label": "Training profile",
+      "route": "Menu › Settings › Goals › Training profile",
+      "serves": [
+        "training profile",
+        "change my goal",
+        "change gym days",
+        "training days",
+        "session length",
+        "equipment",
+        "equipment option",
+        "wrong equipment",
+        "experience level",
+        "days per week",
+        "regenerate program",
+        "change my split",
+        "custom split",
+        "onboarding",
+        "onboarding answer",
+        "skipped an optional",
+        "optional onboarding",
+        "date of birth",
+        "update my profile",
+        "changed university",
+        "changed universities",
+        "change university",
+        "switch universities",
+        "external sport",
+        "external sport commitment",
+        "favourite exercises",
+        "excluded exercises",
+        "update an external"
+      ]
+    },
+    {
+      "id": "settings.language",
+      "label": "Language",
+      "route": "Menu › Settings › Language",
+      "serves": [
+        "language",
+        "translation",
+        "change the language"
+      ]
+    },
+    {
+      "id": "settings.connected",
+      "label": "Connected apps",
+      "route": "Menu › Settings › Connected apps",
+      "serves": [
+        "connected apps",
+        "connected app",
+        "integration",
+        "health connect",
+        "apple health",
+        "google fit",
+        "connect an app",
+        "connect health",
+        "expo go"
+      ]
+    },
+    {
+      "id": "settings.pushNotifs",
+      "label": "Push notifications",
+      "route": "Menu › Settings › Preferences › Push notifications",
+      "serves": [
+        "push notifications",
+        "notification",
+        "notifications",
+        "reminders",
+        "a reminder",
+        "quiet hours",
+        "turn off notifications",
+        "reminder to log",
+        "remind me about",
+        "nutrition reminder",
+        "streak reminder",
+        "notifications blocked",
+        "workout reminder",
+        "reminder during quiet"
+      ]
+    },
+    {
+      "id": "settings.sound",
+      "label": "Sound",
+      "route": "Menu › Settings › Preferences › Sound",
+      "serves": [
+        "sound",
+        "sound effects",
+        "turn off sound"
+      ]
+    },
+    {
+      "id": "settings.haptics",
+      "label": "Haptics",
+      "route": "Menu › Settings › Preferences › Haptics",
+      "serves": [
+        "haptics",
+        "haptic feedback",
+        "vibration"
+      ]
+    },
+    {
+      "id": "settings.cloudBackup",
+      "label": "Cloud backup",
+      "route": "Menu › Settings › Cloud backup (Sync now)",
+      "serves": [
+        "sync",
+        "sync now",
+        "force a sync",
+        "cloud backup",
+        "changes are pending",
+        "backup",
+        "sync conflict",
+        "data looks empty",
+        "looks empty after",
+        "new phone",
+        "on a new phone",
+        "two devices",
+        "a conflict"
+      ]
+    },
+    {
+      "id": "settings.export",
+      "label": "Download my data",
+      "route": "Menu › Settings › Download my data",
+      "serves": [
+        "download my data",
+        "export",
+        "export my data",
+        "download a copy",
+        "download a copy of my profile"
+      ]
+    },
+    {
+      "id": "settings.delete",
+      "label": "Delete account",
+      "route": "Menu › Settings › Delete account",
+      "serves": [
+        "delete account",
+        "delete my account",
+        "close my account"
+      ]
+    },
+    {
+      "id": "settings.subscription",
+      "label": "Contact support",
+      "route": "Menu › Settings › Legal & support › Contact support (subscription changes are handled by email/your app store, not in-app)",
+      "serves": [
+        "subscription",
+        "cancel my subscription",
+        "manage subscription",
+        "billing",
+        "account management"
+      ]
+    },
+    {
+      "id": "settings.legal",
+      "label": "Legal & support",
+      "route": "Menu › Settings › Legal & support",
+      "serves": [
+        "terms of service",
+        "privacy policy",
+        "health and safety",
+        "contact support",
+        "legal"
+      ]
+    },
+    {
+      "id": "logout",
+      "label": "Log out",
+      "route": "Menu › Log out",
+      "serves": [
+        "log out",
+        "logout",
+        "sign out"
+      ]
+    },
+    {
+      "id": "coach",
+      "label": "Your coach",
+      "route": "Menu › Your coach",
+      "serves": [
+        "find the coach",
+        "coach from the menu",
+        "coach from the main menu",
+        "where is the coach",
+        "open the coach",
+        "daily-limit message",
+        "daily limit message",
+        "no confirmation card",
+        "confirmation card appeared",
+        "coach action failed",
+        "action failed to save",
+        "proposed a change but"
+      ]
+    },
+    {
+      "id": "coachSettings",
+      "label": "Coach profile & memory",
+      "route": "Menu › Your coach › Coach profile & memory",
+      "serves": [
+        "coach profile",
+        "what the coach remembers",
+        "what do you remember",
+        "what has the coach remembered",
+        "remembered about me",
+        "coach memory"
+      ]
+    },
+    {
+      "id": "coach.memoryToggle",
+      "label": "Memory",
+      "route": "Menu › Your coach › Coach profile & memory › Memory",
+      "serves": [
+        "turn off memory",
+        "stop saving memories",
+        "saving memories",
+        "saving long term memories",
+        "coach saving",
+        "coach memory",
+        "memory setting",
+        "withdraw consent",
+        "consent for coach",
+        "clear the coach workspace",
+        "coach workspace",
+        "stop the coach saving",
+        "stop saving long term"
+      ]
+    },
+    {
+      "id": "coach.style",
+      "label": "Coaching style",
+      "route": "Menu › Your coach › Coach profile & memory › Coaching style (Supportive, Balanced, Direct)",
+      "serves": [
+        "coaching style",
+        "more direct",
+        "more supportive",
+        "coach style"
+      ]
+    },
+    {
+      "id": "coach.forget",
+      "label": "Forget",
+      "route": "Menu › Your coach › Coach profile & memory › Forget (on the saved memory)",
+      "serves": [
+        "forget a memory",
+        "delete a memory",
+        "delete one saved coach memory",
+        "saved coach memory",
+        "one saved coach memory",
+        "a saved memory",
+        "saved memory deleted",
+        "remove a memory"
+      ]
+    },
+    {
+      "id": "notifications",
+      "label": "Notifications",
+      "route": "Menu › Notifications",
+      "serves": [
+        "notifications screen",
+        "notification centre",
+        "my notifications",
+        "reminders and streaks",
+        "mark all notifications",
+        "mark notifications as read",
+        "notifications as read",
+        "notification list"
+      ]
+    },
+    {
+      "id": "badges",
+      "label": "Badges",
+      "route": "Menu › Profile › Badges",
+      "serves": [
+        "badges",
+        "a badge",
+        "earned a badge",
+        "earn a badge",
+        "badge count",
+        "how to earn badges",
+        "achievements",
+        "what makes a badge"
+      ]
+    },
+    {
+      "id": "examMode",
+      "label": "Plan Around Your Life",
+      "route": "Menu › Profile › Plan Around Your Life",
+      "serves": [
+        "plan around your life",
+        "exams",
+        "travel",
+        "busy period",
+        "planned absence",
+        "exam mode",
+        "away for"
+      ]
+    },
+    {
+      "id": "beginner",
+      "label": "New to the gym",
+      "route": "Menu › New to the gym",
+      "serves": [
+        "new to the gym",
+        "beginner guide",
+        "first 90 days",
+        "beginner bodyweight"
+      ]
+    },
+    {
+      "id": "customize",
+      "label": "Change window and customise stats",
+      "route": "Dashboard › Change window and customise stats",
+      "serves": [
+        "quick stats",
+        "which stats",
+        "dashboard stats",
+        "customise dashboard",
+        "customize dashboard",
+        "change stats",
+        "progress view",
+        "which lifts appear",
+        "featured stat",
+        "ranked lifts",
+        "edit which lifts",
+        "choose which lifts"
+      ]
+    },
+    {
+      "id": "logProgress",
+      "label": "Update",
+      "route": "Dashboard › Update",
+      "serves": [
+        "log my water",
+        "log water",
+        "log sleep",
+        "log steps",
+        "log my habits",
+        "log today",
+        "mindset minutes",
+        "update my habits",
+        "log daily"
+      ]
+    },
+    {
+      "id": "workout.library",
+      "label": "Exercises",
+      "route": "Workout › Exercises (Search + muscle Filter)",
+      "serves": [
+        "exercise library",
+        "search exercises",
+        "filter exercises",
+        "filter by muscle",
+        "muscle group",
+        "find an exercise"
+      ]
+    },
+    {
+      "id": "activeWorkout.skip",
+      "label": "Skip",
+      "route": "Workout › active session › Skip (rest timer)",
+      "serves": [
+        "skip rest",
+        "skip the rest",
+        "ready before the timer",
+        "rest timer"
+      ]
+    },
+    {
+      "id": "activeWorkout.finish",
+      "label": "Finish workout",
+      "route": "Workout › active session › Finish workout",
+      "serves": [
+        "finish workout",
+        "end session",
+        "end the workout",
+        "workout still looks incomplete",
+        "finish the session"
+      ]
+    },
+    {
+      "id": "createSession",
+      "label": "New workout",
+      "route": "Workout › New workout",
+      "serves": [
+        "create a session",
+        "new workout",
+        "custom session",
+        "custom workout",
+        "build a session"
+      ]
+    },
+    {
+      "id": "quick",
+      "label": "Quick workouts",
+      "route": "Workout › quick workout",
+      "serves": [
+        "quick workout",
+        "15 minute workout",
+        "short workout",
+        "quick bodyweight"
+      ]
+    },
+    {
+      "id": "logActivity",
+      "label": "Log an activity",
+      "route": "Workout › Log an activity",
+      "serves": [
+        "log an activity",
+        "log activity",
+        "log a run",
+        "other activity",
+        "log a sport"
+      ]
+    },
+    {
+      "id": "nutrition.planner",
+      "label": "Plan your week",
+      "route": "Nutrition › Plan your week",
+      "serves": [
+        "meal planner",
+        "plan your week",
+        "plan my meals",
+        "weekly meal plan",
+        "assign a meal"
+      ]
+    },
+    {
+      "id": "addFood",
+      "label": "Add food",
+      "route": "Nutrition › Add food",
+      "serves": [
+        "add a food",
+        "add food",
+        "log a meal",
+        "log food",
+        "meal scan",
+        "barcode",
+        "food to breakfast",
+        "add breakfast"
+      ]
+    },
+    {
+      "id": "nutrition.savedMeals",
+      "label": "Save meal",
+      "route": "Nutrition › My meals › Save meal (or Save changes to edit)",
+      "serves": [
+        "save a meal",
+        "save meals i cook",
+        "saved meal",
+        "edit a recipe",
+        "edit a meal",
+        "meal i eat regularly"
+      ]
+    },
+    {
+      "id": "community.username",
+      "label": "Set username",
+      "route": "Community › Set username",
+      "serves": [
+        "set a username",
+        "claim a username",
+        "choose a username",
+        "change my username"
+      ]
+    },
+    {
+      "id": "community.leagues",
+      "label": "Leagues",
+      "route": "Community › Leagues (How leagues work)",
+      "serves": [
+        "leagues",
+        "how leagues work",
+        "monthly league",
+        "league scoring"
+      ]
+    },
+    {
+      "id": "community.groups",
+      "label": "Groups",
+      "route": "Community › Groups (Create group, Join group, Invite friends)",
+      "serves": [
+        "a group",
+        "friend group",
+        "create a group",
+        "join a group",
+        "community group",
+        "invite friends",
+        "invite code",
+        "leave a group"
+      ]
+    },
+    {
+      "id": "community",
+      "label": "Community",
+      "route": "Community tab",
+      "serves": [
+        "leaderboard",
+        "global leaderboard",
+        "view the leaderboard",
+        "community scope",
+        "campus",
+        "dorm",
+        "society",
+        "wrong community scope",
+        "wrong scope",
+        "kudos",
+        "likes",
+        "comments",
+        "bookmarks",
+        "how kudos",
+        "share a personal record",
+        "personal record with the community",
+        "with the community",
+        "share a pr",
+        "post a pr",
+        "share with the community",
+        "a challenge",
+        "join a challenge",
+        "streak disappeared",
+        "my streak",
+        "difference between campus",
+        "my league rank",
+        "league rank",
+        "my rank changed",
+        "rank changed",
+        "posted something to the wrong"
+      ]
+    }
+  ],
+  "knownControls": [
+    "Add food",
+    "Appearance",
+    "Badges",
+    "Change window and customise stats",
+    "Cloud backup",
+    "Coach",
+    "Coach profile & memory",
+    "Coaching style",
+    "Community",
+    "Community tab",
+    "Connected apps",
+    "Contact support",
+    "Dashboard",
+    "Delete account",
+    "Download my data",
+    "Exercises",
+    "Finish workout",
+    "Forget",
+    "Goals",
+    "Groups",
+    "Haptics",
+    "Language",
+    "Leagues",
+    "Legal & support",
+    "Log an activity",
+    "Log out",
+    "Memory",
+    "Menu",
+    "My meals",
+    "New to the gym",
+    "New workout",
+    "Notifications",
+    "Nutrition",
+    "Plan Around Your Life",
+    "Plan your week",
+    "Preferences",
+    "Profile",
+    "Push notifications",
+    "Quick workouts",
+    "Save meal",
+    "Set username",
+    "Settings",
+    "Skip",
+    "Sound",
+    "Training profile",
+    "Units",
+    "Update",
+    "Workout",
+    "Your coach",
+    "active session",
+    "menu",
+    "quick workout"
+  ]
+}

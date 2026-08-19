@@ -95,7 +95,7 @@ const hasAny = (hay: string, ...needles: string[]): boolean => needles.some((x) 
  * fitness talk falls back to `general` (light profile only), never the whole snapshot.
  */
 export function classifyContextTopic(message: string, intent?: string): ContextTopic {
-  if (intent && ['greeting', 'capability', 'relational', 'continuation', 'wellbeing_ambiguous'].includes(intent)) {
+  if (intent && ['greeting', 'capability', 'app_help', 'relational', 'continuation', 'wellbeing_ambiguous'].includes(intent)) {
     return 'conversational'
   }
   const m = lc(message)

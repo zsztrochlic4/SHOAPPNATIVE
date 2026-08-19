@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { View, Text, Pressable, Image, TextInput, Animated, Easing, ScrollView, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
-  Sparkles, Check, CheckCheck, ChevronRight, ChevronDown, ChevronLeft, Salad, Trophy, Flame,
-  GraduationCap, Dumbbell, Lightbulb, ShieldQuestion, Share2, Plus, MapPin, Phone,
+  Sparkles, Check, CheckCheck, ChevronRight, ChevronDown, ChevronLeft, Trophy, Flame,
+  GraduationCap, Dumbbell, ShieldQuestion, Share2, Plus, MapPin, Phone,
   Send, Video, Lock, Crown, Clock, Repeat, Heart, MessageCircle, Award, Swords, Users, X,
   Search, Minus, Trash2, Play, Activity, Reply, Brain, Ban,
 } from 'lucide-react-native'
@@ -16,7 +16,6 @@ import { useDispatch, useStore } from '../store/store'
 import { useToast } from '../components/Toast'
 import { useNav } from '../nav'
 import { BEGINNER_LESSONS, exerciseDetail, REP_TARGETS, BASE_WEIGHTS, SET_TARGETS, ACTIVITY_PRESETS, activityPreset, INTENSITY_MULT, EXERCISES, exById } from '../data/catalog'
-import { useBudgetMeals } from '../data/recipes'
 import { useExerciseInfo } from '../data/exerciseInfo'
 import { fmtWeight } from '../lib/format'
 import { ActivityIcon } from '../components/ActivityIcon'
@@ -203,66 +202,6 @@ export function BeginnerSheet({ open, onClose }: Props) {
       </View>
 
       <Text className="mt-5 px-3 text-center text-[12px] leading-[1.55] text-tertiary">Nobody is watching you as closely as you think. Take these one at a time.</Text>
-    </Sheet>
-  )
-}
-
-/* ======================== Budget eats ============================= */
-export function BudgetEatsSheet({ open, onClose }: Props) {
-  const [openId, setOpenId] = useState<string | null>(null)
-  const BUDGET_MEALS = useBudgetMeals()
-
-  return (
-    <Sheet open={open} onClose={onClose} title="Easy recipes">
-      <View className="rounded-3xl border border-white/8 bg-ink-800 p-5">
-        <Salad size={26} color={brand[400]} />
-        <Text className="mt-2 text-xl font-extrabold tracking-tight text-white">Tasty, simple, cheap</Text>
-        <Text className="mt-1 text-[14px] leading-snug text-secondary">Easy meals with every step laid out. Pick one and cook along.</Text>
-      </View>
-
-      <View className="mt-4 gap-2.5">
-        {BUDGET_MEALS.map((m) => {
-          const isOpen = openId === m.id
-          return (
-            <View key={m.id} className="overflow-hidden rounded-2xl border border-white/5 bg-ink-800">
-              <Pressable onPress={() => setOpenId(isOpen ? null : m.id)} className="w-full flex-row items-center gap-3 p-3 active:opacity-80">
-                <Image source={{ uri: m.image }} resizeMode="cover" className="h-14 w-14 rounded-xl" />
-                <View className="min-w-0 flex-1">
-                  <Text className="font-bold leading-tight text-white">{m.name}</Text>
-                  <Text className="text-[12px] text-secondary">{m.minutes} min · serves {m.serves}</Text>
-                  <View className="mt-1 flex-row flex-wrap gap-1">{m.tags.slice(0, 2).map((t) => <Chip key={t} color="green">{t}</Chip>)}</View>
-                </View>
-                <ChevronDown size={18} color="rgba(255,255,255,0.3)" style={{ flexShrink: 0, transform: [{ rotate: isOpen ? '180deg' : '0deg' }] }} />
-              </Pressable>
-              {isOpen && (
-                <View className="gap-3 border-t border-white/5 px-4 py-3">
-                  <View>
-                    <Text className="mb-1 text-[12px] font-bold uppercase tracking-wide text-tertiary">Ingredients</Text>
-                    <View className="gap-1">
-                      {m.ingredients.map((ing) => (
-                        <View key={ing} className="flex-row items-start gap-2">
-                          <View className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-brand-400" />
-                          <Text className="flex-1 text-[14px] text-white/70">{ing}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  </View>
-                  <View>
-                    <Text className="mb-1 text-[12px] font-bold uppercase tracking-wide text-tertiary">Method</Text>
-                    <View className="gap-1 pl-1">{m.steps.map((s, i) => <Text key={i} className="text-[14px] text-white/70">{i + 1}. {s}</Text>)}</View>
-                  </View>
-                  {m.cookOnce && (
-                    <View className="flex-row gap-2 rounded-xl bg-brand-400/10 p-3">
-                      <Lightbulb size={16} color={brand[400]} style={{ flexShrink: 0 }} />
-                      <Text className="flex-1 text-[13px] text-white/70">{m.cookOnce}</Text>
-                    </View>
-                  )}
-                </View>
-              )}
-            </View>
-          )
-        })}
-      </View>
     </Sheet>
   )
 }

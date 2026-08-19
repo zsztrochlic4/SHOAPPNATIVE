@@ -34,7 +34,7 @@ export function proposalCategory(p: CoachActionProposal): CoachCategory {
   if (p.kind === 'navigation') {
     const overlay = String(p.payload?.overlay ?? '')
     if (overlay === 'progress' || overlay === 'logWeight') return 'progress'
-    if (overlay === 'nutrition' || overlay === 'budgetEats' || overlay === 'logProgress') return 'nutrition'
+    if (overlay === 'nutrition' || overlay === 'logProgress') return 'nutrition'
     return 'training'
   }
   if (p.kind === 'workout_action') {
@@ -48,7 +48,6 @@ export function proposalCategory(p: CoachActionProposal): CoachCategory {
       case 'share_pr':
         return 'progress'
       case 'set_wellness_goal':
-      case 'open_budget_eats':
       case 'nudge_log':
         return 'nutrition'
       default:
