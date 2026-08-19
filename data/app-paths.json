@@ -14,7 +14,7 @@
     { "id": "menu", "label": "Menu", "route": "Dashboard › menu button (top left)", "serves": ["menu", "side menu", "main menu"], "verb": "navigate" },
     { "id": "settings", "label": "Settings", "route": "Menu › Settings", "serves": ["settings", "preferences"], "verb": "navigate" },
     { "id": "settings.units", "label": "Units", "route": "Menu › Settings › Units", "serves": ["units", "metric", "imperial", "kilograms", "pounds", "kg", "lb"], "verb": "navigate" },
-    { "id": "settings.appearance", "label": "Appearance", "route": "Menu › Settings › Appearance", "serves": ["appearance", "theme", "dark mode", "light mode", "auto", "follow phone", "phone theme"], "verb": "navigate" },
+    { "id": "settings.appearance", "label": "Appearance", "route": "Menu › Settings › Appearance", "serves": ["appearance", "theme", "dark mode", "light mode", "auto", "follow phone", "phone theme", "system default", "reduce motion", "reduce animations"], "verb": "navigate" },
     { "id": "settings.goals", "label": "Goals", "route": "Menu › Settings › Goals", "serves": ["goals", "sleep goal", "step goal", "water goal", "goal weight", "targets"], "verb": "navigate" },
     { "id": "trainingProfile", "label": "Training profile", "route": "Menu › Settings › Goals › Training profile", "serves": ["training profile", "change goal", "experience", "days per week", "session length", "equipment", "regenerate program"], "verb": "navigate" },
     { "id": "settings.language", "label": "Language", "route": "Menu › Settings › Language", "serves": ["language", "translation", "translations"], "verb": "navigate" },
@@ -38,7 +38,10 @@
     { "id": "examMode", "label": "Plan Around Your Life", "route": "Menu › Profile › Plan Around Your Life", "serves": ["plan around your life", "exams", "travel", "busy period", "planned absence", "exam mode"], "verb": "navigate" },
     { "id": "beginner", "label": "New to the gym", "route": "Menu › New to the gym", "serves": ["new to the gym", "beginner guide", "first 90 days"], "verb": "navigate" },
     { "id": "profile", "label": "Profile", "route": "Menu › profile header", "serves": ["profile", "my profile", "update profile"], "verb": "navigate" },
-    { "id": "customize", "label": "Change window and customise stats", "route": "Dashboard › Change window and customise stats", "serves": ["dashboard stats", "quick stats", "which stats", "customise dashboard", "customize dashboard", "change stats", "dashboard window", "timeframe"], "verb": "navigate" },
+    { "id": "customize", "label": "Change window and customise stats", "route": "Dashboard › Change window and customise stats", "serves": ["dashboard stats", "quick stats", "which stats", "customise dashboard", "customize dashboard", "change stats", "dashboard window", "timeframe", "progress view", "which lifts", "featured stat", "ranked lifts", "progress overview", "tracked stats"], "verb": "navigate" },
+    { "id": "workout.library", "label": "exercise library", "route": "Workout › Exercises (Search + muscle Filter)", "serves": ["exercise library", "search exercises", "filter", "muscle group", "muscle filter", "find an exercise"], "verb": "navigate" },
+    { "id": "activeWorkout.controls", "label": "workout controls", "route": "Workout › active session (Skip rest, Finish workout / End workout early)", "serves": ["skip rest", "skip the rest", "finish workout", "end workout", "end session", "end workout early", "log a set", "edit sets"], "verb": "navigate" },
+    { "id": "nutrition.savedMeals", "label": "Save meal", "route": "Nutrition › My meals › Save meal / Save changes; Copy recipe", "serves": ["save meal", "save a meal", "saved meal", "save changes", "edit a meal", "edit recipe", "copy recipe", "assign a saved meal"], "verb": "navigate" },
     { "id": "logProgress", "label": "Log progress", "route": "Dashboard › Update (log habits/progress)", "serves": ["log water", "log sleep", "log steps", "log habits", "update habits", "mindset minutes"], "verb": "navigate" },
     { "id": "logWeight", "label": "Log weight", "route": "Progress › log weight", "serves": ["log weight", "add weight", "record weight"], "verb": "navigate" },
     { "id": "logActivity", "label": "Log an activity", "route": "Workout › Log an activity", "serves": ["log an activity", "log activity", "other activities", "log a run"], "verb": "navigate" },
@@ -72,6 +75,8 @@
     "technique guide", "Plan your week", "Add food", "My meals", "Copy recipe",
     "Set username", "Leagues", "How leagues work", "Groups", "Create group", "Join group",
     "Invite friends", "Invite code", "Leave group", "Delete group",
-    "Campus", "Dorm", "Society", "Global"
+    "Campus", "Dorm", "Society", "Global",
+    "Search", "Filter", "Exercises", "Save meal", "Save changes", "Copy recipe",
+    "Skip", "Finish workout", "End workout early", "Auto", "Reduce Motion", "Progress overview"
   ]
 }
