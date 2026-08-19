@@ -71,6 +71,7 @@
     "sweep": "tsc -p tsconfig.sweep.json && node .sweep-out/backend/generator/runSweep.js",
     "lint": "eslint \"src/**/*.{ts,tsx}\" --max-warnings=0",
     "lint:fix": "eslint \"src/**/*.{ts,tsx}\" --fix",
+    "lint:app-paths": "node scripts/lint-app-paths.mjs",
     "format:scripts": "prettier --check \"scripts/**/*.{mjs,js}\"",
     "format:scripts:fix": "prettier --write \"scripts/**/*.{mjs,js}\"",
     "holdouts:build": "node scripts/build-holdouts.mjs",
