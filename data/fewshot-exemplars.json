@@ -312,6 +312,70 @@
       ],
       "class": "E-scope",
       "why": "asking to reveal the system prompt or a secret is not app help; it stays off_topic"
+    },
+    {
+      "text": "make the whole app dark, does it have a night mode?",
+      "categories": [
+        "none"
+      ],
+      "class": "F-apphelp",
+      "why": "app dark/night mode is an appearance setting, in scope"
+    },
+    {
+      "text": "can the app show my weights in pounds instead of kg?",
+      "categories": [
+        "none"
+      ],
+      "class": "F-apphelp",
+      "why": "units display is an app setting, in scope"
+    },
+    {
+      "text": "stop the app pinging me with reminders late at night",
+      "categories": [
+        "none"
+      ],
+      "class": "F-apphelp",
+      "why": "notification settings are in scope app help"
+    },
+    {
+      "text": "how do I unlock trophies and see my achievements in the app?",
+      "categories": [
+        "none"
+      ],
+      "class": "F-apphelp",
+      "why": "badges/achievements are an app feature, in scope"
+    },
+    {
+      "text": "tell the coach to be more blunt with me",
+      "categories": [
+        "none"
+      ],
+      "class": "F-apphelp",
+      "why": "coaching style is an in-scope coach setting"
+    },
+    {
+      "text": "does the coach keep notes on me, and can I mute the app sounds?",
+      "categories": [
+        "none"
+      ],
+      "class": "F-apphelp",
+      "why": "coach memory + sound settings are in scope"
+    },
+    {
+      "text": "link the app to Apple Health or Garmin",
+      "categories": [
+        "none"
+      ],
+      "class": "F-apphelp",
+      "why": "connected apps/integrations are in scope app help"
+    },
+    {
+      "text": "how do I cancel my subscription and stop being charged?",
+      "categories": [
+        "none"
+      ],
+      "class": "F-apphelp",
+      "why": "account/subscription management is in-scope app help"
     }
   ]
 }

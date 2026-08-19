@@ -1115,6 +1115,12 @@ const APP_HELP_TERMS = [
   'stuck loading', 'stuck showing loading', 'reverted after', 'after a restart', 'after restart',
   'failed to save', 'submitted twice', 'button twice', 'tapped a button twice', 'no confirmation',
   'plain-language error', 'retry does nothing', 'stuck on loading',
+  // app-settings phrasings that carry no obvious app-surface noun (mirror the classifier exemplars).
+  // These only ever suppress the lowest, non-safety off_topic tier, so they cannot affect real routing.
+  'night mode', 'app dark', 'the app dark', 'in pounds', 'in lbs', 'in kilograms', 'show weights',
+  'weights in pounds', 'pinging me', 'stop pinging', 'buzzing when', 'mute the app', 'mute the sounds',
+  'garmin', 'fitbit', 'apple health', 'google fit', 'unlock trophies', 'my achievements', 'ranking system',
+  'charging my card', 'stop being charged', 'be more blunt', 'keep notes on me', 'notes on me',
 ]
 
 /**
