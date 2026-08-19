@@ -71,7 +71,7 @@
     {
       "id": "settings.units",
       "label": "Units",
-      "route": "Menu › Settings › Units",
+      "route": "Menu › Units",
       "serves": [
         "units",
         "metric",
@@ -86,7 +86,7 @@
     {
       "id": "settings.appearance",
       "label": "Appearance",
-      "route": "Menu › Settings › Appearance",
+      "route": "Menu › Appearance",
       "serves": [
         "appearance",
         "theme",
@@ -102,8 +102,8 @@
     },
     {
       "id": "settings.goals",
-      "label": "Goals",
-      "route": "Menu › Settings › Goals",
+      "label": "Your goals",
+      "route": "Menu › Your goals",
       "serves": [
         "goal weight",
         "sleep goal",
@@ -117,7 +117,7 @@
     {
       "id": "trainingProfile",
       "label": "Training profile",
-      "route": "Menu › Settings › Goals › Training profile",
+      "route": "Menu › Your goals › Training profile",
       "serves": [
         "training profile",
         "change my goal",
@@ -152,7 +152,7 @@
     {
       "id": "settings.language",
       "label": "Language",
-      "route": "Menu › Settings › Language",
+      "route": "Menu › Language",
       "serves": [
         "language",
         "translation",
@@ -162,7 +162,7 @@
     {
       "id": "settings.connected",
       "label": "Connected apps",
-      "route": "Menu › Settings › Connected apps",
+      "route": "Menu › Connected apps",
       "serves": [
         "connected apps",
         "connected app",
@@ -178,7 +178,7 @@
     {
       "id": "settings.pushNotifs",
       "label": "Push notifications",
-      "route": "Menu › Settings › Preferences › Push notifications",
+      "route": "Menu › Preferences › Push notifications",
       "serves": [
         "push notifications",
         "notification",
@@ -198,18 +198,20 @@
     },
     {
       "id": "settings.sound",
-      "label": "Sound",
-      "route": "Menu › Settings › Preferences › Sound",
+      "label": "Sounds & cues",
+      "route": "Menu › Preferences › Sounds & cues",
       "serves": [
         "sound",
+        "sounds",
         "sound effects",
-        "turn off sound"
+        "turn off sound",
+        "cues"
       ]
     },
     {
       "id": "settings.haptics",
       "label": "Haptics",
-      "route": "Menu › Settings › Preferences › Haptics",
+      "route": "Menu › Preferences › Haptics",
       "serves": [
         "haptics",
         "haptic feedback",
@@ -219,7 +221,7 @@
     {
       "id": "settings.cloudBackup",
       "label": "Cloud backup",
-      "route": "Menu › Settings › Cloud backup (Sync now)",
+      "route": "Menu › Data › Cloud backup (Sync now)",
       "serves": [
         "sync",
         "sync now",
@@ -239,7 +241,7 @@
     {
       "id": "settings.export",
       "label": "Download my data",
-      "route": "Menu › Settings › Download my data",
+      "route": "Menu › Data › Download my data",
       "serves": [
         "download my data",
         "export",
@@ -251,7 +253,7 @@
     {
       "id": "settings.delete",
       "label": "Delete account",
-      "route": "Menu › Settings › Delete account",
+      "route": "Menu › Data › Delete account",
       "serves": [
         "delete account",
         "delete my account",
@@ -261,7 +263,7 @@
     {
       "id": "settings.subscription",
       "label": "Contact support",
-      "route": "Menu › Settings › Legal & support › Contact support (subscription changes are handled by email/your app store, not in-app)",
+      "route": "Menu › Legal & support › Contact support (billing and cancellations by email; a Manage or cancel subscription button also appears under the Subscription section once you have an active plan)",
       "serves": [
         "subscription",
         "cancel my subscription",
@@ -273,7 +275,7 @@
     {
       "id": "settings.legal",
       "label": "Legal & support",
-      "route": "Menu › Settings › Legal & support",
+      "route": "Menu › Legal & support",
       "serves": [
         "terms of service",
         "privacy policy",
@@ -326,8 +328,8 @@
     },
     {
       "id": "coach.memoryToggle",
-      "label": "Memory",
-      "route": "Menu › Your coach › Coach profile & memory › Memory",
+      "label": "Long-term coach memory",
+      "route": "Menu › Your coach › Coach profile & memory › Long-term coach memory",
       "serves": [
         "turn off memory",
         "stop saving memories",
@@ -510,13 +512,16 @@
     },
     {
       "id": "quick",
-      "label": "Quick workouts",
-      "route": "Workout › quick workout",
+      "label": "12-Minute Bodyweight Exercises",
+      "route": "Workout › Today › 12-Minute Bodyweight Exercises",
       "serves": [
         "quick workout",
+        "12 minute workout",
         "15 minute workout",
         "short workout",
-        "quick bodyweight"
+        "quick bodyweight",
+        "bodyweight workout",
+        "no equipment workout"
       ]
     },
     {
@@ -534,7 +539,7 @@
     {
       "id": "nutrition.planner",
       "label": "Plan your week",
-      "route": "Nutrition › Plan your week",
+      "route": "Nutrition › Meal Plan › Plan your week",
       "serves": [
         "meal planner",
         "plan your week",
@@ -561,7 +566,7 @@
     {
       "id": "nutrition.savedMeals",
       "label": "Save meal",
-      "route": "Nutrition › My meals › Save meal (or Save changes to edit)",
+      "route": "Nutrition › Recipes › My meals › Add a meal › Save meal (or Save changes when editing)",
       "serves": [
         "save a meal",
         "save meals i cook",
@@ -584,10 +589,11 @@
     },
     {
       "id": "community.leagues",
-      "label": "Leagues",
-      "route": "Community › Leagues (How leagues work)",
+      "label": "League",
+      "route": "Community › League tab › How leagues work",
       "serves": [
         "leagues",
+        "league",
         "how leagues work",
         "monthly league",
         "league scoring"
@@ -596,7 +602,7 @@
     {
       "id": "community.groups",
       "label": "Groups",
-      "route": "Community › Groups (Create group, Join group, Invite friends)",
+      "route": "Community › Groups tab (Create group, Join group; invite with the group's Copy invite code)",
       "serves": [
         "a group",
         "friend group",
@@ -611,42 +617,25 @@
     {
       "id": "community",
       "label": "Community",
-      "route": "Community tab",
+      "route": "Community tab (League and Groups; Global streaks leaderboard)",
       "serves": [
         "leaderboard",
         "global leaderboard",
+        "global streaks",
         "view the leaderboard",
-        "community scope",
-        "campus",
-        "dorm",
-        "society",
-        "wrong community scope",
-        "wrong scope",
-        "kudos",
-        "likes",
-        "comments",
-        "bookmarks",
-        "how kudos",
-        "share a personal record",
-        "personal record with the community",
-        "with the community",
-        "share a pr",
-        "post a pr",
-        "share with the community",
-        "a challenge",
-        "join a challenge",
+        "streak leaderboard",
         "streak disappeared",
         "my streak",
-        "difference between campus",
         "my league rank",
         "league rank",
         "my rank changed",
-        "rank changed",
-        "posted something to the wrong"
+        "rank changed"
       ]
     }
   ],
   "knownControls": [
+    "12-Minute Bodyweight Exercises",
+    "Add a meal",
     "Add food",
     "Appearance",
     "Badges",
@@ -660,20 +649,24 @@
     "Connected apps",
     "Contact support",
     "Dashboard",
+    "Data",
     "Delete account",
     "Download my data",
     "Exercises",
     "Finish workout",
     "Forget",
-    "Goals",
     "Groups",
+    "Groups tab",
     "Haptics",
+    "How leagues work",
     "Language",
-    "Leagues",
+    "League",
+    "League tab",
     "Legal & support",
     "Log an activity",
     "Log out",
-    "Memory",
+    "Long-term coach memory",
+    "Meal Plan",
     "Menu",
     "My meals",
     "New to the gym",
@@ -685,19 +678,19 @@
     "Preferences",
     "Profile",
     "Push notifications",
-    "Quick workouts",
+    "Recipes",
     "Save meal",
     "Set username",
-    "Settings",
     "Skip",
-    "Sound",
+    "Sounds & cues",
+    "Today",
     "Training profile",
     "Units",
     "Update",
     "Workout",
     "Your coach",
+    "Your goals",
     "active session",
-    "menu",
-    "quick workout"
+    "menu"
   ]
 }

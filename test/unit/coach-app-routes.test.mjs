@@ -33,7 +33,7 @@ for (const [msg, id] of cases) {
 
 test('the relayed answer contains the verified route path', () => {
   const a = synthesizeAppHelpAnswer('How do I switch to pounds?')
-  assert.match(a, /Menu . Settings . Units/)
+  assert.match(a, /Menu . Units/)
 })
 
 test('ambiguous / non-app turns do NOT match (model keeps the turn)', () => {
