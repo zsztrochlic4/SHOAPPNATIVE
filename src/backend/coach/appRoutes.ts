@@ -119,9 +119,36 @@ const NAV_QUESTION =
  * ~22% accuracy). Self-gating: safe to call on any turn — a training/nutrition/advice turn either has no
  * navigation phrasing or no route match, and returns null.
  */
+/** The verified answer text for a route — a real path, phrased once, so the source is a single place. */
+function routeAnswerText(route: AppRoute): string {
+  return `In StrengthHub you'll find that under ${route.route}. If you don't see it straight away, it's on that screen; nothing changes until you make the change there yourself.`
+}
+
 export function synthesizeAppHelpAnswer(message: string): string | null {
   if (typeof message !== 'string' || !NAV_QUESTION.test(message) || NOT_NAV.test(message)) return null
   const route = resolveAppRoute(message)
-  if (!route) return null
-  return `In StrengthHub you'll find that under ${route.route}. If you don't see it straight away, it's on that screen; nothing changes until you make the change there yourself.`
+  return route ? routeAnswerText(route) : null
 }
+
+const ROUTE_BY_ID: ReadonlyMap<string, AppRoute> = new Map(APP_ROUTES.map((r) => [r.id, r]))
+
+/**
+ * The verified answer for a route the MODEL classified into (constrained classification). Given a route
+ * id the model picked from the menu, returns the real path text — or null if the id is not real (the
+ * model can only ever relay a route that exists). This is what generalises beyond the substring resolver:
+ * the model maps any phrasing to an id; we relay the trusted route, never the model's recollection.
+ */
+export function verifiedRouteAnswer(id: unknown): string | null {
+  const route = typeof id === 'string' ? ROUTE_BY_ID.get(id.trim()) : undefined
+  return route ? routeAnswerText(route) : null
+}
+
+/**
+ * The route menu injected into the prompt: one compact line per real destination, `id — label (hints)`,
+ * so the model can pick the matching id for ANY phrasing. Built from APP_ROUTES so it can never list a
+ * route that does not exist.
+ */
+export const APP_ROUTE_MENU: string = [
+  'APP ROUTE CLASSIFIER — the app\'s real destinations (id — what it is). If, AND ONLY IF, the user is asking WHERE or HOW to find, change, open, log, or manage something IN THE STRENGTHHUB APP (its screens, settings, account/data, community, or the coach\'s own memory/consent/style), set the top-level field "appRouteId" to the single best-matching id below. For anything else (training, nutrition, advice, general chat, a bug report, a concept question) OMIT appRouteId. Never invent an id; pick one only if it clearly fits.',
+  ...APP_ROUTES.map((r) => `- ${r.id} — ${r.label} (${r.serves.slice(0, 3).join(', ')})`),
+].join('\n')

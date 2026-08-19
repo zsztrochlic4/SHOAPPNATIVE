@@ -36,7 +36,7 @@ import {
 } from './_shared/backend/coach/structuredResponse'
 import { synthesizeBoundedActionProposal, synthesizeWellnessGoalProposal, synthesizeGoalWeightProposal, synthesizeSwapProposal, synthesizeExerciseDetailNav, synthesizeTechniqueAnswer, synthesizeMealPlanReview, proposalSurfacingIssue, proposalDestinationIssue } from './_shared/backend/coach/workoutActions'
 import { isOwnPlanReview, normalize as normalizeCoachText } from './_shared/backend/coach/safety/rules'
-import { synthesizeAppHelpAnswer } from './_shared/backend/coach/appRoutes'
+import { synthesizeAppHelpAnswer, verifiedRouteAnswer, APP_ROUTE_MENU } from './_shared/backend/coach/appRoutes'
 import type {
   CoachActionProposal,
   CoachAnswerMode,
@@ -261,6 +261,10 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
     // App-help turns get the verified app-navigation map so the model gives correct paths instead of
     // inventing them; attached only on this intent to keep other turns lean.
     ...(pre.decision.intent === 'app_help' ? ['', APP_NAV_MAP] : []),
+    // Constrained route classifier (always attached): lets the model pick the real destination id for
+    // ANY phrasing of an app-navigation question, regardless of the router's intent guess. The coach
+    // then relays the VERIFIED route for that id, so this generalises without letting the model invent.
+    '', APP_ROUTE_MENU,
     ...(turnHint ? ['', turnHint] : []),
     '',
     // Delimited as DATA (audit F-029): prior turns are verbatim user/coach text
@@ -324,8 +328,14 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
   // fluent wrong one. Not gated on the app_help intent, so it also grounds app questions the router
   // keyed as ordinary coaching. Skipped when the model proposed an ACTION (e.g. set_training_days) —
   // a confirm card is better UX than "go to Settings", and the card's own destination guard applies.
-  const routeAnswer = replyProposal.kind !== 'workout_action' ? synthesizeAppHelpAnswer(message) : null
-  if (routeAnswer) replyMessage = routeAnswer
+  // Two stages: the deterministic substring resolver first (fast, 100% precise but only common
+  // phrasings), then the model's constrained route classification (structured.appRouteId) for anything
+  // it missed — the model maps any wording to a real id and we relay the VERIFIED route for it, so this
+  // generalises to unseen phrasings without letting the model invent a path.
+  if (replyProposal.kind !== 'workout_action') {
+    const routeAnswer = synthesizeAppHelpAnswer(message) ?? verifiedRouteAnswer((structured as { appRouteId?: string }).appRouteId)
+    if (routeAnswer) replyMessage = routeAnswer
+  }
 
   const approved = new Map<string, string>(APPROVED_KNOWLEDGE_SOURCES.map((s) => [s.key, s.title]))
   const citations = structured.citations

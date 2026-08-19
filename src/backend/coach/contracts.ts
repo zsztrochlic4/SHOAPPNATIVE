@@ -71,4 +71,8 @@ export interface StructuredCoachReply {
     summary?: string
     payload?: Record<string, string | number | boolean>
   }
+  /** Constrained app-route classification: the id of the real destination the model matched this turn
+   *  to (from APP_ROUTE_MENU), or absent when the turn is not app navigation. The coach relays the
+   *  VERIFIED route text for this id, never the model's own recollection. */
+  appRouteId?: string
 }
