@@ -922,6 +922,7 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
             {!preview && !owner && group && (
               <Pressable
                 onPress={() => setReportTarget({ type: 'group', id: group.id, label: group.name })}
+                hitSlop={10}
                 accessibilityRole="button"
                 accessibilityLabel={`Report ${group.name}`}
                 accessibilityHint="Opens the report options"

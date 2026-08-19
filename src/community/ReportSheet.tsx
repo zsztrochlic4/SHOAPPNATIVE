@@ -36,8 +36,11 @@ export function ReportSheet({ open, target, onClose }: { open: boolean; target: 
   const [submitting, setSubmitting] = useState(false)
 
   const blockName = usernameOf(target)
-  // Default "also block" on for user reports; reset each time the sheet opens.
-  useEffect(() => { if (open) { setBlock(true) } }, [open, target?.id])
+  // Start every report from a clean form — resetting on open (and whenever the
+  // target changes) so an abandoned draft never bleeds into the next report.
+  useEffect(() => {
+    if (open) { setReason('offensive_name'); setNote(''); setBlock(true) }
+  }, [open, target?.id])
 
   const submit = async () => {
     if (submitting || !target) return

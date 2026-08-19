@@ -6,7 +6,7 @@
  */
 import { View, Text, Pressable } from 'react-native'
 import { Ban } from 'lucide-react-native'
-import { Sheet } from '../components/Sheet'
+import { Sheet, EmptyState } from '../components/Sheet'
 import { useToast } from '../components/Toast'
 import { useStore } from '../store/store'
 import { Avatar } from '../components/Avatar'
@@ -24,13 +24,11 @@ export function BlockedUsersSheet({ open, onClose }: { open: boolean; onClose: (
   return (
     <Sheet open={open} onClose={onClose} title="Blocked users">
       {blocked.length === 0 ? (
-        <View className="items-center px-6 py-10">
-          <Ban size={26} color="rgba(255,255,255,0.35)" />
-          <Text className="mt-3 font-bold text-white">No one blocked</Text>
-          <Text className="mt-1 max-w-[260px] text-center text-[13px] text-secondary">
-            Blocked users are hidden from your leaderboards and group feeds.
-          </Text>
-        </View>
+        <EmptyState
+          icon={<Ban size={32} color="#fff" />}
+          title="No one blocked"
+          body="People you block are hidden from your leaderboards and group feeds."
+        />
       ) : (
         <>
           <Text className="text-[13px] leading-snug text-secondary">
@@ -46,6 +44,7 @@ export function BlockedUsersSheet({ open, onClose }: { open: boolean; onClose: (
                 <Text numberOfLines={1} className="min-w-0 flex-1 font-bold text-white">@{uid}</Text>
                 <Pressable
                   onPress={() => unblock(uid)}
+                  hitSlop={10}
                   accessibilityRole="button"
                   accessibilityLabel={`Unblock @${uid}`}
                   className="rounded-full border border-white/15 bg-white/5 px-4 py-2 active:opacity-80"
