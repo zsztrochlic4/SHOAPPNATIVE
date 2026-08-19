@@ -18,7 +18,9 @@ import { myLeaderStats, type MyLeaderStats } from '../store/selectors'
 import { todayKey } from '../lib/date'
 import { useColors, brand } from '../theme'
 import { useToast } from '../components/Toast'
-import { Sheet } from '../components/Sheet'
+import { Sheet, EmptyState } from '../components/Sheet'
+import { PressableScale } from '../components/PressableScale'
+import { tick, thud } from '../lib/haptics'
 import { Avatar } from '../components/Avatar'
 import { Icon } from '../components/Icon'
 import { ProgressBar } from '../components/ui'
@@ -95,7 +97,7 @@ function buildActivity(members: GroupMember[]): GroupActivity[] {
   const ts = byStreak[0]
   if (ts && ts.streak > 0) out.push({ id: 'a-streak', kind: 'streak', text: `${handleOf(ts)} ${ts.isYou ? 'are' : 'is'} on a ${ts.streak}-day streak`, when: 'Today' })
   const tv = byVol[0]
-  if (tv) out.push({ id: 'a-vol', kind: 'volume', text: `${handleOf(tv)} lifted the most this week — ${formatKgCompact(tv.volume7)} kg`, when: 'Today' })
+  if (tv) out.push({ id: 'a-vol', kind: 'volume', text: `${handleOf(tv)} lifted the most this week, ${formatKgCompact(tv.volume7)} kg`, when: 'Today' })
   const to = byOdo[0]
   if (to) out.push({ id: 'a-odo', kind: 'odometer', text: `${handleOf(to)} ${to.isYou ? 'are' : 'is'} ahead of pace at ${to.odometer}/100`, when: 'Yesterday' })
 
@@ -177,7 +179,8 @@ export function GroupsTab({ onClaimUsername }: { onClaimUsername: () => void }) 
   return (
     <View>
       <View className="flex-row gap-2.5">
-        <Pressable
+        <PressableScale
+          containerStyle={{ flex: 1 }}
           onPress={guarded(() => setSheet({ kind: 'create' }))}
           accessibilityRole="button"
           accessibilityLabel="Create a group"
@@ -185,8 +188,9 @@ export function GroupsTab({ onClaimUsername }: { onClaimUsername: () => void }) 
         >
           <Plus size={18} color="#000" />
           <Text className="text-[14px] font-bold text-black">Create group</Text>
-        </Pressable>
-        <Pressable
+        </PressableScale>
+        <PressableScale
+          containerStyle={{ flex: 1 }}
           onPress={guarded(() => setSheet({ kind: 'join' }))}
           accessibilityRole="button"
           accessibilityLabel="Join a group"
@@ -194,16 +198,16 @@ export function GroupsTab({ onClaimUsername }: { onClaimUsername: () => void }) 
         >
           <KeyRound size={18} color={brand[400]} />
           <Text className="text-[14px] font-bold text-white">Join group</Text>
-        </Pressable>
+        </PressableScale>
       </View>
 
       {groups.length === 0 ? (
-        <View className="mt-4 items-center rounded-2xl border border-dashed border-white/15 px-6 py-12">
-          <Users size={28} color="rgba(255,255,255,0.35)" />
-          <Text className="mt-3 font-bold text-white">No groups yet</Text>
-          <Text className="mt-1 max-w-[240px] text-center text-[13px] text-secondary">
-            Create a group and share the code with friends, or join one you've been invited to.
-          </Text>
+        <View className="mt-4">
+          <EmptyState
+            icon={<Users size={32} color="#fff" />}
+            title="No groups yet"
+            body="Create a group and share the code with friends, or join one you've been invited to."
+          />
         </View>
       ) : (
         <View className="mt-4 gap-2.5">
@@ -235,7 +239,7 @@ function GroupCard({ group, me, onOpen }: { group: CommunityGroup; me: MyLeaderS
   const owner = group.ownerUsername === me.username
   const { icon, color } = groupAppearance(group)
   return (
-    <Pressable
+    <PressableScale
       onPress={onOpen}
       accessibilityRole="button"
       accessibilityLabel={`Open ${group.name}`}
@@ -252,7 +256,7 @@ function GroupCard({ group, me, onOpen }: { group: CommunityGroup; me: MyLeaderS
         <Text className="text-[12px] text-secondary">{ranked.length} member{ranked.length === 1 ? '' : 's'} · you're #{yourRank}</Text>
       </View>
       <ChevronRight size={18} color="rgba(255,255,255,0.3)" />
-    </Pressable>
+    </PressableScale>
   )
 }
 
@@ -285,8 +289,9 @@ function CreateGroupSheet({ open, onClose, onCreated }: { open: boolean; onClose
           createdAtKey: todayKey, members: [youMember(me)], icon: appearance.icon, color: appearance.color, weeklyGoal: 0,
         }
         setBusy(false)
+        thud()
         dispatch({ type: 'CREATE_GROUP', group })
-        toast('Group created — share the code')
+        toast('Group created, share the code')
         onClose()
         onCreated(groupId)
       } catch {
@@ -298,8 +303,9 @@ function CreateGroupSheet({ open, onClose, onCreated }: { open: boolean; onClose
     const res = await createGroup(name, me, todayKey, state.community.groups, appearance)
     setBusy(false)
     if (!res.ok) { setError(res.message); return }
+    thud()
     dispatch({ type: 'CREATE_GROUP', group: res.group })
-    toast('Group created — share the code')
+    toast('Group created, share the code')
     onClose()
     onCreated(res.group.id)
   }
@@ -338,7 +344,7 @@ function CreateGroupSheet({ open, onClose, onCreated }: { open: boolean; onClose
           return (
             <Pressable
               key={g.icon}
-              onPress={() => setPick(i)}
+              onPress={() => { tick(); setPick(i) }}
               accessibilityRole="button"
               accessibilityLabel={`Icon ${g.icon}`}
               accessibilityState={{ selected: active }}
@@ -361,9 +367,9 @@ function CreateGroupSheet({ open, onClose, onCreated }: { open: boolean; onClose
           return (
             <Pressable
               key={opt.value}
-              onPress={() => setVisibility(opt.value)}
+              onPress={() => { tick(); setVisibility(opt.value) }}
               accessibilityRole="button"
-              accessibilityLabel={`${opt.label} — ${opt.hint}`}
+              accessibilityLabel={`${opt.label}, ${opt.hint}`}
               accessibilityState={{ selected: active }}
               className={`flex-1 rounded-2xl border-2 px-3.5 py-3 active:opacity-90 ${active ? 'border-brand-400 bg-brand-400/10' : 'border-white/10 bg-ink-700'}`}
             >
@@ -374,7 +380,7 @@ function CreateGroupSheet({ open, onClose, onCreated }: { open: boolean; onClose
         })}
       </View>
 
-      <Pressable
+      <PressableScale
         onPress={submit}
         disabled={!canSubmit}
         accessibilityRole="button"
@@ -384,7 +390,7 @@ function CreateGroupSheet({ open, onClose, onCreated }: { open: boolean; onClose
       >
         {busy && <ActivityIndicator size="small" color="#000" />}
         <Text className={`text-[15px] font-bold ${canSubmit ? 'text-black' : 'text-disabled'}`}>{busy ? 'Creating…' : 'Create group'}</Text>
-      </Pressable>
+      </PressableScale>
     </Sheet>
   )
 }
@@ -427,6 +433,7 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
         const full = await b.loadGroupRemote(groupId)
         setDirectBusy(false)
         if (full) dispatch({ type: 'JOIN_GROUP_BY_CODE', group: full })
+        thud()
         toast(`Joined ${name}`)
         onClose()
       } catch {
@@ -442,6 +449,7 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
     setDirectBusy(false)
     if (!res.ok) { if (res.reason === 'duplicate') { toast(res.message); onClose(); return } setDirectError(res.message); return }
     dispatch({ type: 'JOIN_GROUP_BY_CODE', group: res.group })
+    thud()
     toast(`Joined ${res.group.name}`)
     onClose()
   }
@@ -481,6 +489,7 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
         const full = await b.loadGroupRemote(groupId)
         setBusy(false)
         if (full) dispatch({ type: 'JOIN_GROUP_BY_CODE', group: full })
+        thud()
         toast(`Joined ${name}`)
         onClose()
       } catch {
@@ -497,6 +506,7 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
       return
     }
     dispatch({ type: 'JOIN_GROUP_BY_CODE', group: res.group })
+    thud()
     toast(`Joined ${res.group.name}`)
     onClose()
   }
@@ -540,7 +550,7 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
               ? <Text className="text-[12px] font-semibold" style={{ color: colors.danger }}>{error}</Text>
               : <Text className="text-[12px] text-tertiary">Groups are private. Ask the owner for the code to join.</Text>}
           </View>
-          <Pressable
+          <PressableScale
             onPress={submitJoin}
             disabled={busy || code.trim().length < 4}
             accessibilityRole="button"
@@ -550,7 +560,7 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
           >
             {busy && <ActivityIndicator size="small" color="#000" />}
             <Text className={`text-[15px] font-bold ${!busy && code.trim().length >= 4 ? 'text-black' : 'text-disabled'}`}>{busy ? 'Joining…' : 'Join group'}</Text>
-          </Pressable>
+          </PressableScale>
         </View>
       ) : (
         <View>
@@ -587,7 +597,7 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
                 style={{ color: colors.fg }}
               />
             </View>
-            <Pressable
+            <PressableScale
               onPress={submitDirectCode}
               disabled={directBusy || directCode.trim().length < 4}
               accessibilityRole="button"
@@ -597,7 +607,7 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
               style={{ height: 50 }}
             >
               {directBusy ? <ActivityIndicator size="small" color="#000" /> : <Text className={`text-[14px] font-bold ${directCode.trim().length >= 4 ? 'text-black' : 'text-disabled'}`}>Join</Text>}
-            </Pressable>
+            </PressableScale>
           </View>
           {directError && <Text className="mt-1.5 px-1 text-[12px] font-semibold" style={{ color: colors.danger }}>{directError}</Text>}
 
@@ -619,7 +629,7 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
               </View>
             ) : (
               results.map((g) => (
-                <Pressable
+                <PressableScale
                   key={g.id}
                   onPress={() => { setSelected(g); setError(null) }}
                   accessibilityRole="button"
@@ -634,7 +644,7 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
                     <Text className="text-[12px] text-secondary">{g.memberCount} members · code required</Text>
                   </View>
                   <ChevronRight size={18} color="rgba(255,255,255,0.3)" />
-                </Pressable>
+                </PressableScale>
               ))
             )}
           </View>
@@ -676,6 +686,7 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
   const owner = !!group && group.ownerUsername === me.username
 
   const react = (activityId: string, emoji: string) => {
+    tick()
     setReactions((prev) => ({ ...prev, [activityId]: toggleReaction(prev[activityId] ?? seedReactions(activityId), emoji) }))
     setPickerFor(null)
   }
@@ -684,6 +695,7 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
     if (!group) return
     try {
       await Clipboard.setStringAsync(group.passcode)
+      tick()
       // Flip the button to "Copied" for ~1.6s (design spec) instead of a toast.
       setCopied(true)
       if (copyTimer.current) clearTimeout(copyTimer.current)
@@ -692,6 +704,7 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
   }
   const leave = async () => {
     if (!group) return
+    thud()
     if (COMMUNITY_BACKEND) { try { const b = await import('./groupsBackend'); await b.leaveGroupRemote(group.id) } catch { /* optimistic */ } }
     dispatch({ type: 'LEAVE_GROUP', id: group.id })
     toast(`Left ${group.name}`)
@@ -699,6 +712,7 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
   }
   const remove = async () => {
     if (!group) return
+    thud()
     if (COMMUNITY_BACKEND) { try { const b = await import('./groupsBackend'); await b.deleteGroupRemote(group.id) } catch { /* optimistic */ } }
     dispatch({ type: 'DELETE_GROUP', id: group.id })
     toast('Group deleted')
@@ -709,6 +723,7 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
   // this drives the local/preview model.
   const makeOwner = (username: string) => {
     if (!group) return
+    thud()
     dispatch({ type: 'TRANSFER_GROUP_OWNER', id: group.id, newOwnerUsername: username })
     setExpandedId(null)
     toast(`@${username} is now the owner`)
@@ -716,6 +731,7 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
   // Owner hands the group to a successor and leaves in one step.
   const makeOwnerAndLeave = (username: string) => {
     if (!group) return
+    thud()
     dispatch({ type: 'TRANSFER_GROUP_OWNER', id: group.id, newOwnerUsername: username })
     dispatch({ type: 'LEAVE_GROUP', id: group.id })
     toast(`Handed ${group.name} to @${username}`)
@@ -742,6 +758,7 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
   const hasGoal = goal > 0
   const saveGoal = (next: number) => {
     if (!group) return
+    thud()
     const clamped = Math.max(1, Math.min(200, next))
     if (COMMUNITY_BACKEND) { import('./groupsBackend').then((b) => b.setGroupGoalRemote(group.id, clamped)).catch(() => {}) }
     dispatch({ type: 'SET_GROUP_GOAL', id: group.id, goal: clamped })
@@ -812,15 +829,16 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
             <Text className="text-[11px] font-semibold uppercase tracking-wide text-tertiary">Invite code</Text>
             <View className="mt-1.5 flex-row items-center justify-between">
               <Text className="text-[22px] font-black tracking-[4px] text-white">{group.passcode}</Text>
-              <Pressable
+              <PressableScale
                 onPress={copyCode}
+                haptic={false}
                 accessibilityRole="button"
                 accessibilityLabel={copied ? 'Copied' : 'Copy invite code'}
                 className="h-9 flex-row items-center gap-1.5 rounded-full bg-brand-400 px-3.5 active:opacity-90"
               >
                 {copied ? <Check size={15} color="#000" strokeWidth={2.6} /> : <Copy size={15} color="#000" />}
                 <Text className="text-[13px] font-bold text-black">{copied ? 'Copied' : 'Copy'}</Text>
-              </Pressable>
+              </PressableScale>
             </View>
           </View>
 
@@ -835,7 +853,7 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
               return (
                 <Pressable
                   key={m.key}
-                  onPress={() => setMetric(m.key)}
+                  onPress={() => { tick(); setMetric(m.key) }}
                   accessibilityRole="button"
                   accessibilityLabel={`Rank by ${m.label}`}
                   accessibilityState={{ selected: active }}
@@ -890,7 +908,7 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
           <View className="mt-7">
             {preview ? (
               <View>
-                <Pressable
+                <PressableScale
                   onPress={() => { onClose(); onClaimUsername() }}
                   accessibilityRole="button"
                   accessibilityLabel="Claim a username to join"
@@ -898,7 +916,7 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
                 >
                   <AtSign size={16} color="#000" />
                   <Text className="text-[14px] font-bold text-black">Claim a username to join</Text>
-                </Pressable>
+                </PressableScale>
                 <Text className="mt-2 text-center text-[12px] text-tertiary">
                   You're previewing Community. Claim a name to join groups and appear on leaderboards.
                 </Text>
@@ -969,10 +987,10 @@ function OwnershipFooter({ owner, others, danger, confirmLeave, confirmDelete, t
   const DeleteConfirm = ({ note }: { note: string }) => (
     <View className="gap-2">
       <Text className="px-2 pb-0.5 text-center text-[12px] leading-snug text-secondary">{note}</Text>
-      <Pressable onPress={onDelete} accessibilityRole="button" accessibilityLabel="Delete group permanently" className="flex-row items-center justify-center gap-2 rounded-2xl border py-3.5 active:opacity-90" style={{ borderColor: `${danger}80`, backgroundColor: `${danger}29` }}>
+      <PressableScale onPress={onDelete} accessibilityRole="button" accessibilityLabel="Delete group permanently" className="flex-row items-center justify-center gap-2 rounded-2xl border py-3.5 active:opacity-90" style={{ borderColor: `${danger}80`, backgroundColor: `${danger}29` }}>
         <Trash2 size={16} color={danger} />
         <Text className="text-[14px] font-extrabold" style={{ color: danger }}>Delete group permanently</Text>
-      </Pressable>
+      </PressableScale>
       {CancelBtn}
     </View>
   )
@@ -981,17 +999,17 @@ function OwnershipFooter({ owner, others, danger, confirmLeave, confirmDelete, t
   if (!owner) {
     return confirmLeave ? (
       <View className="gap-2">
-        <Pressable onPress={onLeave} accessibilityRole="button" accessibilityLabel="Confirm leave group" className="flex-row items-center justify-center gap-2 rounded-2xl border py-3.5 active:opacity-90" style={{ borderColor: `${danger}80`, backgroundColor: `${danger}29` }}>
+        <PressableScale onPress={onLeave} accessibilityRole="button" accessibilityLabel="Confirm leave group" className="flex-row items-center justify-center gap-2 rounded-2xl border py-3.5 active:opacity-90" style={{ borderColor: `${danger}80`, backgroundColor: `${danger}29` }}>
           <LogOut size={16} color={danger} />
           <Text className="text-[14px] font-extrabold" style={{ color: danger }}>Are you sure you want to leave group?</Text>
-        </Pressable>
+        </PressableScale>
         {CancelBtn}
       </View>
     ) : (
-      <Pressable onPress={onAskLeave} accessibilityRole="button" accessibilityLabel="Leave group" className="flex-row items-center justify-center gap-2 rounded-2xl border border-white/10 py-3.5 active:opacity-80">
+      <PressableScale onPress={onAskLeave} accessibilityRole="button" accessibilityLabel="Leave group" className="flex-row items-center justify-center gap-2 rounded-2xl border border-white/10 py-3.5 active:opacity-80">
         <LogOut size={16} color="rgba(255,255,255,0.7)" />
         <Text className="text-[14px] font-bold text-secondary">Leave group</Text>
-      </Pressable>
+      </PressableScale>
     )
   }
 
@@ -1000,10 +1018,10 @@ function OwnershipFooter({ owner, others, danger, confirmLeave, confirmDelete, t
     return confirmDelete ? (
       <DeleteConfirm note="You're the only member, so leaving deletes this group for good." />
     ) : (
-      <Pressable onPress={onAskDelete} accessibilityRole="button" accessibilityLabel="Delete group" className="flex-row items-center justify-center gap-2 rounded-2xl border border-white/10 py-3.5 active:opacity-80">
+      <PressableScale onPress={onAskDelete} accessibilityRole="button" accessibilityLabel="Delete group" className="flex-row items-center justify-center gap-2 rounded-2xl border border-white/10 py-3.5 active:opacity-80">
         <Trash2 size={16} color={danger} />
         <Text className="text-[14px] font-bold" style={{ color: danger }}>Delete group</Text>
-      </Pressable>
+      </PressableScale>
     )
   }
 
@@ -1015,7 +1033,7 @@ function OwnershipFooter({ owner, others, danger, confirmLeave, confirmDelete, t
         <Text className="mt-0.5 text-[12px] leading-snug text-tertiary">A group always needs an owner. Pick a member to hand the group to, and you'll leave once they take over.</Text>
         <View className="mt-3 gap-2">
           {others.map((m) => (
-            <Pressable key={m.id} onPress={() => onHandOver(m.username)} accessibilityRole="button" accessibilityLabel={`Hand over to ${m.username}`} className="flex-row items-center gap-3 rounded-2xl border p-3 active:opacity-90" style={{ borderColor: 'rgba(245,197,24,0.25)', backgroundColor: 'rgba(245,197,24,0.06)' }}>
+            <PressableScale key={m.id} onPress={() => onHandOver(m.username)} accessibilityRole="button" accessibilityLabel={`Hand over to ${m.username}`} className="flex-row items-center gap-3 rounded-2xl border p-3 active:opacity-90" style={{ borderColor: 'rgba(245,197,24,0.25)', backgroundColor: 'rgba(245,197,24,0.06)' }}>
               <Avatar name={m.username} size={36} />
               <View className="min-w-0 flex-1">
                 <Text numberOfLines={1} className="font-bold text-white">@{m.username}</Text>
@@ -1025,7 +1043,7 @@ function OwnershipFooter({ owner, others, danger, confirmLeave, confirmDelete, t
                 <Crown size={12} color="#F5C518" />
                 <Text className="text-[11px] font-bold text-[#F5C518]">Hand over</Text>
               </View>
-            </Pressable>
+            </PressableScale>
           ))}
         </View>
         {CancelBtn}
@@ -1035,14 +1053,14 @@ function OwnershipFooter({ owner, others, danger, confirmLeave, confirmDelete, t
   if (confirmDelete) return <DeleteConfirm note="This deletes the group for all members. This can't be undone." />
   return (
     <View className="flex-row gap-2.5">
-      <Pressable onPress={onAskLeave} accessibilityRole="button" accessibilityLabel="Leave group" className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl border border-white/10 py-3.5 active:opacity-80">
+      <PressableScale containerStyle={{ flex: 1 }} onPress={onAskLeave} accessibilityRole="button" accessibilityLabel="Leave group" className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl border border-white/10 py-3.5 active:opacity-80">
         <LogOut size={16} color="rgba(255,255,255,0.7)" />
         <Text className="text-[14px] font-bold text-secondary">Leave group</Text>
-      </Pressable>
-      <Pressable onPress={onAskDelete} accessibilityRole="button" accessibilityLabel="Delete group" className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl border py-3.5 active:opacity-80" style={{ borderColor: `${danger}40` }}>
+      </PressableScale>
+      <PressableScale containerStyle={{ flex: 1 }} onPress={onAskDelete} accessibilityRole="button" accessibilityLabel="Delete group" className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl border py-3.5 active:opacity-80" style={{ borderColor: `${danger}40` }}>
         <Trash2 size={16} color={danger} />
         <Text className="text-[14px] font-bold" style={{ color: danger }}>Delete</Text>
-      </Pressable>
+      </PressableScale>
     </View>
   )
 }
@@ -1103,7 +1121,7 @@ function TeamGoalCard({ done, goal, owner, color, onEdit }: {
       </View>
       <ProgressBar value={pct} color={color} className="mt-2.5" height={9} />
       <Text className="mt-2 text-[12px] font-semibold" style={{ color: reached ? color : 'rgba(255,255,255,0.5)' }}>
-        {reached ? 'Goal smashed — nice work, team!' : `${remaining} more to hit the goal`}
+        {reached ? 'Goal smashed! Nice work, team!' : `${remaining} more to hit the goal`}
       </Text>
     </View>
   )
@@ -1128,20 +1146,20 @@ function TeamGoalSetter({ draft, color, onDec, onInc, onSave }: {
         Choose how many workouts the group aims to log together each week. There's no goal until you set one.
       </Text>
       <View className="mt-3.5 flex-row items-center gap-3.5">
-        <Pressable onPress={onDec} accessibilityRole="button" accessibilityLabel="Lower goal" className="h-10 w-10 items-center justify-center rounded-xl border border-white/12 bg-white/[0.04] active:opacity-70">
+        <PressableScale onPress={onDec} accessibilityRole="button" accessibilityLabel="Lower goal" className="h-10 w-10 items-center justify-center rounded-xl border border-white/12 bg-white/[0.04] active:opacity-70">
           <Minus size={18} color="#fff" />
-        </Pressable>
+        </PressableScale>
         <View className="flex-1 items-center">
           <Text className="text-[30px] font-black text-white">{draft}</Text>
           <Text className="text-[11px] font-semibold uppercase tracking-wide text-tertiary">sessions / week</Text>
         </View>
-        <Pressable onPress={onInc} accessibilityRole="button" accessibilityLabel="Raise goal" className="h-10 w-10 items-center justify-center rounded-xl border border-white/12 bg-white/[0.04] active:opacity-70">
+        <PressableScale onPress={onInc} accessibilityRole="button" accessibilityLabel="Raise goal" className="h-10 w-10 items-center justify-center rounded-xl border border-white/12 bg-white/[0.04] active:opacity-70">
           <Plus size={18} color="#fff" />
-        </Pressable>
+        </PressableScale>
       </View>
-      <Pressable onPress={onSave} accessibilityRole="button" accessibilityLabel="Set goal" className="mt-3.5 items-center justify-center rounded-2xl bg-brand-400 py-3.5 active:opacity-90">
+      <PressableScale onPress={onSave} accessibilityRole="button" accessibilityLabel="Set goal" className="mt-3.5 items-center justify-center rounded-2xl bg-brand-400 py-3.5 active:opacity-90">
         <Text className="text-[14px] font-bold text-black">Set goal</Text>
-      </Pressable>
+      </PressableScale>
     </View>
   )
 }
@@ -1223,7 +1241,7 @@ function MemberStats({ member, rank, colors, canMakeOwner, onMakeOwner, onReport
         ))}
         {canMakeOwner && (
           <View style={{ width: '100%', padding: 4 }}>
-            <Pressable
+            <PressableScale
               onPress={onMakeOwner}
               accessibilityRole="button"
               accessibilityLabel={`Make @${member.username} the group owner`}
@@ -1232,12 +1250,12 @@ function MemberStats({ member, rank, colors, canMakeOwner, onMakeOwner, onReport
             >
               <Crown size={14} color="#F5C518" />
               <Text className="text-[13px] font-bold text-[#F5C518]">Make group owner</Text>
-            </Pressable>
+            </PressableScale>
           </View>
         )}
         {onReport && (
           <View style={{ width: '100%', padding: 4 }}>
-            <Pressable
+            <PressableScale
               onPress={onReport}
               accessibilityRole="button"
               accessibilityLabel={`Report @${member.username}`}
@@ -1246,7 +1264,7 @@ function MemberStats({ member, rank, colors, canMakeOwner, onMakeOwner, onReport
             >
               <Flag size={13} color="rgba(255,255,255,0.5)" />
               <Text className="text-[13px] font-semibold text-tertiary">Report member</Text>
-            </Pressable>
+            </PressableScale>
           </View>
         )}
       </View>

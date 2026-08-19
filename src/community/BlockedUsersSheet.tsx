@@ -4,11 +4,13 @@
  * `blocked` filters in GlobalLeaderboard and groups). Unblocking restores them.
  * Server-side enforcement is deferred to the community backend go-live.
  */
-import { View, Text, Pressable } from 'react-native'
+import { View, Text } from 'react-native'
 import { Ban } from 'lucide-react-native'
 import { Sheet, EmptyState } from '../components/Sheet'
+import { PressableScale } from '../components/PressableScale'
 import { useToast } from '../components/Toast'
 import { useStore } from '../store/store'
+import { tick } from '../lib/haptics'
 import { Avatar } from '../components/Avatar'
 
 export function BlockedUsersSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -17,6 +19,7 @@ export function BlockedUsersSheet({ open, onClose }: { open: boolean; onClose: (
   const blocked = state.community.blockedUids ?? []
 
   const unblock = (uid: string) => {
+    tick()
     dispatch({ type: 'UNBLOCK_USER', uid })
     toast(`Unblocked @${uid}`)
   }
@@ -42,7 +45,7 @@ export function BlockedUsersSheet({ open, onClose }: { open: boolean; onClose: (
               >
                 <Avatar name={uid} size={36} />
                 <Text numberOfLines={1} className="min-w-0 flex-1 font-bold text-white">@{uid}</Text>
-                <Pressable
+                <PressableScale
                   onPress={() => unblock(uid)}
                   hitSlop={10}
                   accessibilityRole="button"
@@ -50,7 +53,7 @@ export function BlockedUsersSheet({ open, onClose }: { open: boolean; onClose: (
                   className="rounded-full border border-white/15 bg-white/5 px-4 py-2 active:opacity-80"
                 >
                   <Text className="text-[13px] font-bold text-secondary">Unblock</Text>
-                </Pressable>
+                </PressableScale>
               </View>
             ))}
           </View>
