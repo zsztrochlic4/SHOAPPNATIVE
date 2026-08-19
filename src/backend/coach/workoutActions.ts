@@ -17,7 +17,13 @@
  * The coach proposal payload is a flat `Record<string, string | number | boolean>`
  * (see contracts.ts) — it CANNOT carry arrays or nested objects. List params (training
  * days) are therefore encoded as a comma-separated string and re-validated token by token.
+ *
+ * The one permitted import is `resolveExerciseRefStrict` from `../data` — pure static exercise data (no
+ * firebase, no generator/engine), already synced into `_shared` and used server-side elsewhere. It
+ * lets the deterministic backstops verify a real, confidently-named lift before proposing a card.
  */
+
+import { resolveExerciseRefStrict } from '../data'
 
 /* ------------------------------------------------------------------ */
 /*  Value domains — MIRROR the engine enums (kept in sync by test)     */
@@ -583,17 +589,82 @@ const _EXERCISE_HELP_INTENT =
  * to a real lift (`resolveExerciseRef`) and only renders the card if it matches — so a non‑exercise
  * how‑to ("how do i log a workout") simply shows no card. Returns null when there's no how‑to intent.
  */
+/** App-surface nouns that mark a message as an app/navigation/settings question, not a lift how-to.
+ *  Guards against `resolveExerciseRef`'s loose fuzzy match firing on a stray common token (e.g. "side
+ *  menu" → "Side Plank"): if the turn is about the app, it is never an exercise-technique request. */
+const _APP_SURFACE_HINT =
+  /\b(menu|dashboard|settings?|screen|sheet|tab|notifications?|reminders?|sync|export|account|consent|privacy|profile|badges?|league|leaderboard|username|community|onboarding|language|theme)\b/i
+
 export function synthesizeExerciseDetailNav(userMessage: string): SynthExerciseNavProposal | null {
   if (typeof userMessage !== 'string') return null
   const m = userMessage.trim()
   if (!m || !_EXERCISE_HELP_INTENT.test(m)) return null
+  if (_APP_SURFACE_HINT.test(m)) return null // an app/navigation question is never an exercise how-to
+  // HARDENING: resolve to a REAL lift HERE (the server owns the exercise DB), and fire ONLY on a match.
+  // The old version passed the raw message through and let the client suppress an unresolvable card —
+  // but the "technique guide" MESSAGE was already set and shown, so "show me user u_9999's plan" and
+  // "show me how to change my dashboard" (both match the how-to intent) surfaced a technique guide for a
+  // lift that doesn't exist. Resolving here means a non-exercise how-to emits no card AND no message; the
+  // honest model answer stands. `exercise` now carries the canonical id, so the client opens the right sheet.
+  const exId = resolveExerciseRefStrict(m)
+  if (!exId) return null
   return {
     overlay: 'exerciseDetail',
-    exercise: m.slice(0, 120),
+    exercise: exId,
     title: 'Open the technique guide',
     summary: 'Opens the step-by-step cues, the common mistake to avoid and a form clip for this lift.',
     message: "Here's the technique guide. Open it for the step-by-step cues and a form clip.",
   }
+}
+
+/**
+ * The app's real navigation destinations — mirrors the `Overlay` union in src/nav.tsx. A synthetic or
+ * model-emitted navigation proposal to anything outside this set is a fabricated destination and must
+ * never be surfaced. KEEP IN SYNC with src/nav.tsx (a unit test asserts the anchors below still exist).
+ */
+export const VALID_OVERLAYS: ReadonlySet<string> = new Set([
+  'notifications', 'settings', 'addFood', 'profile', 'trainingProfile', 'activeWorkout', 'createSession',
+  'customize', 'logWeight', 'logProgress', 'logActivity', 'quick', 'badges', 'examMode', 'coach',
+  'coachChat', 'beginner', 'budgetEats', 'exerciseDetail', 'prCelebration',
+])
+
+/** The single intent Budget Eats serves — cheap/affordable/student eating. Used to gate the spuriously
+ *  model-emitted `open_budget_eats` action so it can't ride along on unrelated turns. */
+const BUDGET_FOOD_INTENT =
+  /\b(budget|cheap|cheaper|afford|affordable|save money|saving money|low[ -]?cost|broke|tight (?:on )?(?:money|budget|cash)|student meals?|cheap eats?|grocer(?:y|ies))\b/i
+
+/**
+ * DESTINATION ALLOW-LIST gate (hardening step 1). Decides whether a finalised action/navigation card may
+ * be SURFACED: a card is shown only when its destination is a real app screen AND it fits what the user
+ * asked. Returns null when surfacing is fine, or a reason string when the card must be DROPPED. It never
+ * rewrites the answer — it only suppresses a card that points somewhere the turn never asked to go (a
+ * Budget Eats card on a squat-technique question, a nav to a non-existent overlay, or a technique guide
+ * whose "exercise" resolves to no real lift). The honest text answer is unaffected.
+ */
+export function proposalDestinationIssue(
+  proposal: { kind?: string; payload?: Record<string, unknown> | null } | null | undefined,
+  userMessage: string,
+): string | null {
+  if (!proposal || !proposal.kind || proposal.kind === 'none') return null
+  const msg = typeof userMessage === 'string' ? userMessage : ''
+  const payload = proposal.payload && typeof proposal.payload === 'object' ? proposal.payload : {}
+  if (proposal.kind === 'navigation') {
+    const overlay = String((payload as Record<string, unknown>).overlay ?? '')
+    if (!VALID_OVERLAYS.has(overlay)) return 'nav_unknown_overlay'
+    if (overlay === 'exerciseDetail' && !resolveExerciseRefStrict(String((payload as Record<string, unknown>).exercise ?? ''))) {
+      return 'nav_exercise_unresolved'
+    }
+    return null
+  }
+  if (proposal.kind === 'workout_action') {
+    const action = String((payload as Record<string, unknown>).action ?? '')
+    if (!(WORKOUT_ACTION_NAMES as readonly string[]).includes(action)) return 'action_unknown'
+    // `open_budget_eats` is emitted spuriously by flash-lite on unrelated turns; only surface it when the
+    // user is actually asking about budget/cheap eating — the one thing that screen is for.
+    if (action === 'open_budget_eats' && !BUDGET_FOOD_INTENT.test(msg)) return 'budget_eats_intent_mismatch'
+    return null
+  }
+  return null
 }
 
 /** A program lift with its app-reviewed technique, for the deterministic technique answer. */

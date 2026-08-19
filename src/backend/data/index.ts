@@ -76,6 +76,42 @@ export function resolveExerciseRef(raw: string): string | null {
   return best
 }
 
+/**
+ * STRICT variant of resolveExerciseRef for deterministic backstops that must not fire on a stray common
+ * word. It accepts an exact id/name, a FOCUSED reference (every significant input token is part of the
+ * lift's name, e.g. "how do i deadlift"), or a match sharing >= 2 significant name tokens (e.g. "bench
+ * press"). It REJECTS a lone common-word overlap that the looser resolver accepts via half-name coverage
+ * — "side" (Side Plank), "next step" (Step Up), "in a row" (Barbell Row). Used by the exercise-detail nav
+ * backstop + the destination allow-list, so a non-exercise how-to never surfaces a technique guide.
+ */
+export function resolveExerciseRefStrict(raw: string): string | null {
+  if (typeof raw !== 'string') return null
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+  if (EXERCISE_BY_ID[trimmed]) return trimmed
+  const target = normalizeName(trimmed)
+  if (target.length < 3) return null
+  for (const ex of EXERCISES) if (normalizeName(ex.name) === target) return ex.id
+  const input = new Set(sigTokens(trimmed))
+  if (input.size === 0) return null
+  let best: string | null = null
+  let bestScore = 0
+  for (const ex of EXERCISES) {
+    const nameToks = sigTokens(ex.name)
+    if (nameToks.length === 0) continue
+    const shared = nameToks.filter((t) => input.has(t)).length
+    if (shared === 0) continue
+    const inputCoverage = shared / input.size
+    // STRICT: accept only a focused query (every input token is this lift's name) OR >= 2 corroborating
+    // tokens. A single shared token from a long sentence (e.g. "side", "step") is rejected.
+    if (!(inputCoverage === 1 || shared >= 2)) continue
+    const nameCoverage = shared / nameToks.length
+    const score = shared + nameCoverage + inputCoverage
+    if (score > bestScore) { bestScore = score; best = ex.id }
+  }
+  return best
+}
+
 /** Substitutes for each exercise, best-first (priority ascending). */
 export const SUBSTITUTIONS_BY_EXERCISE: Readonly<Record<string, Substitution[]>> = Object.freeze(
   SUBSTITUTIONS.reduce<Record<string, Substitution[]>>((acc, s) => {

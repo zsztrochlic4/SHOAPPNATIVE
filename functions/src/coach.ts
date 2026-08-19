@@ -34,7 +34,7 @@ import {
   STRUCTURED_COACH_RESPONSE_SCHEMA,
   validateStructuredCoachReply,
 } from './_shared/backend/coach/structuredResponse'
-import { synthesizeBoundedActionProposal, synthesizeWellnessGoalProposal, synthesizeGoalWeightProposal, synthesizeSwapProposal, synthesizeExerciseDetailNav, synthesizeTechniqueAnswer, synthesizeMealPlanReview, proposalSurfacingIssue } from './_shared/backend/coach/workoutActions'
+import { synthesizeBoundedActionProposal, synthesizeWellnessGoalProposal, synthesizeGoalWeightProposal, synthesizeSwapProposal, synthesizeExerciseDetailNav, synthesizeTechniqueAnswer, synthesizeMealPlanReview, proposalSurfacingIssue, proposalDestinationIssue } from './_shared/backend/coach/workoutActions'
 import { isOwnPlanReview, normalize as normalizeCoachText } from './_shared/backend/coach/safety/rules'
 import type {
   CoachActionProposal,
@@ -344,6 +344,15 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
       replyProposal = { kind: 'none' }
       safe = issue.coachLine
     }
+  }
+
+  // Destination allow-list (hardening step 1): drop any card whose destination is not a real app screen
+  // or does not fit this turn — a spuriously model-emitted Budget Eats card on an unrelated question, a
+  // navigation to an overlay that does not exist, or a technique guide whose exercise resolves to no real
+  // lift. Drops the CARD only; the honest text answer is unchanged. Runs last so it also catches a card
+  // the model emitted directly (not just the deterministic synths).
+  if (replyProposal.kind !== 'none' && proposalDestinationIssue(replyProposal, message)) {
+    replyProposal = { kind: 'none' }
   }
 
   let memory: CoachMemory | null = null
