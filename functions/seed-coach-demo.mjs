@@ -40,6 +40,7 @@ const userDoc = {
   },
   backendUser: {
     goal: 'hypertrophy', experience_level: 'beginner', days_per_week: 4, session_length_min: 60,
+    days_available: ['Monday', 'Wednesday', 'Friday', 'Sunday'],
     equipment: 'full_gym', trains_alone: 'usually', date_of_birth: '2006-01-01',
     affected_regions: [], excluded_exercise_ids: [],
   },
