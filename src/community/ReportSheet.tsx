@@ -8,9 +8,11 @@ import { useEffect, useState } from 'react'
 import { View, Text, Pressable, TextInput, ActivityIndicator } from 'react-native'
 import { Check } from 'lucide-react-native'
 import { Sheet } from '../components/Sheet'
+import { PressableScale } from '../components/PressableScale'
 import { useToast } from '../components/Toast'
 import { useColors, brand } from '../theme'
 import { useStore } from '../store/store'
+import { tick, thud } from '../lib/haptics'
 import { reportContent, REPORT_REASONS, type ReportReason } from './service'
 
 export interface ReportTarget {
@@ -54,6 +56,7 @@ export function ReportSheet({ open, target, onClose }: { open: boolean; target: 
         note: note.trim() || undefined,
       })
       if (res.ok) {
+        thud()
         if (blockName && block) {
           dispatch({ type: 'BLOCK_USER', uid: blockName })
           toast(`Reported and blocked @${blockName}`)
@@ -86,7 +89,7 @@ export function ReportSheet({ open, target, onClose }: { open: boolean; target: 
           return (
             <Pressable
               key={r.value}
-              onPress={() => setReason(r.value)}
+              onPress={() => { tick(); setReason(r.value) }}
               accessibilityRole="button"
               accessibilityState={{ selected: active }}
               accessibilityLabel={r.label}
@@ -116,7 +119,7 @@ export function ReportSheet({ open, target, onClose }: { open: boolean; target: 
 
       {blockName && (
         <Pressable
-          onPress={() => setBlock((b) => !b)}
+          onPress={() => { tick(); setBlock((b) => !b) }}
           accessibilityRole="checkbox"
           accessibilityState={{ checked: block }}
           accessibilityLabel={`Also block @${blockName}`}
@@ -135,7 +138,7 @@ export function ReportSheet({ open, target, onClose }: { open: boolean; target: 
         </Pressable>
       )}
 
-      <Pressable
+      <PressableScale
         onPress={submit}
         disabled={submitting || !target}
         accessibilityRole="button"
@@ -145,7 +148,7 @@ export function ReportSheet({ open, target, onClose }: { open: boolean; target: 
         style={submitting ? { opacity: 0.7 } : undefined}
       >
         {submitting ? <ActivityIndicator size="small" color="#000" /> : <Text className="text-[15px] font-bold text-black">Submit report</Text>}
-      </Pressable>
+      </PressableScale>
     </Sheet>
   )
 }

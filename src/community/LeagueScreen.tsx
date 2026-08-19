@@ -17,8 +17,10 @@ import { shareText } from '../lib/share'
 import { useColors, brand } from '../theme'
 import { Avatar } from '../components/Avatar'
 import { Sheet } from '../components/Sheet'
+import { PressableScale } from '../components/PressableScale'
 import { Skeleton } from '../components/Skeleton'
 import { useToast } from '../components/Toast'
+import { tick, thud } from '../lib/haptics'
 import { RankBadge, StreakFlame } from './ui'
 import { GlobalLeaderboard } from './GlobalLeaderboard'
 import { TIERS, tierOf, leaguePeriodKey, daysLeftInPeriod, promoteCutoff, simulateLeague, zoneFor, type Tier, type LeagueRow, type Zone } from './league'
@@ -132,7 +134,7 @@ export function LeagueScreen({ onClaimUsername }: { onClaimUsername: () => void 
           return (
             <Pressable
               key={v}
-              onPress={() => setView(v)}
+              onPress={() => { tick(); setView(v) }}
               accessibilityRole="button"
               accessibilityLabel={v === 'league' ? 'My league' : 'Global streaks'}
               accessibilityState={{ selected: active }}
@@ -192,9 +194,9 @@ function LeagueError({ onRetry }: { onRetry: () => void }) {
     <View className="mt-6 items-center rounded-2xl border border-dashed border-white/15 px-6 py-12">
       <Text className="font-bold text-white">Couldn't load your league</Text>
       <Text className="mt-1 max-w-[240px] text-center text-[13px] text-secondary">Check your connection and try again.</Text>
-      <Pressable onPress={onRetry} accessibilityRole="button" accessibilityLabel="Retry loading league" className="btn-primary mt-4 px-5 py-2.5 active:opacity-90">
+      <PressableScale onPress={onRetry} accessibilityRole="button" accessibilityLabel="Retry loading league" className="btn-primary mt-4 px-5 py-2.5 active:opacity-90">
         <Text className="text-sm font-semibold text-black">Try again</Text>
-      </Pressable>
+      </PressableScale>
     </View>
   )
 }
@@ -217,12 +219,12 @@ function ReviewBanner({ integrity, onAppeal }: { integrity: Exclude<Integrity, '
           <Text className="mt-0.5 text-[13px] leading-snug text-secondary">
             {held
               ? "Something in this week's activity looked unusual, so your rank is paused while we take a closer look. If this looks wrong, ask us to check again."
-              : "Your rank is paused while we double-check this week's activity. It usually clears on its own — keep logging as normal."}
+              : "Your rank is paused while we double-check this week's activity. It usually clears on its own, so keep logging as normal."}
           </Text>
         </View>
       </View>
       {held && (
-        <Pressable
+        <PressableScale
           onPress={onAppeal}
           accessibilityRole="button"
           accessibilityLabel="Ask for another look at your standing"
@@ -230,7 +232,7 @@ function ReviewBanner({ integrity, onAppeal }: { integrity: Exclude<Integrity, '
         >
           <Text className="text-[14px] font-bold text-white/90">Ask for another look</Text>
           <ChevronRight size={16} color="rgba(255,255,255,0.6)" />
-        </Pressable>
+        </PressableScale>
       )}
     </View>
   )
@@ -250,7 +252,8 @@ function AppealSheet({ open, onClose, onDone }: { open: boolean; onClose: () => 
     try {
       const backend = await import('./backend')
       const res = await backend.appealStandingRemote(note.trim())
-      toast(res.status === 'ok' ? "You're back in the running" : "Thanks — we'll take another look")
+      thud()
+      toast(res.status === 'ok' ? "You're back in the running" : "Thanks, we'll take another look")
       setNote('')
       onClose()
       onDone()
@@ -272,7 +275,7 @@ function AppealSheet({ open, onClose, onDone }: { open: boolean; onClose: () => 
           onChangeText={setNote}
           multiline
           maxLength={500}
-          placeholder="Add a note (optional) — e.g. I trained twice on Saturday"
+          placeholder="Add a note (optional), e.g. I trained twice on Saturday"
           placeholderTextColor="rgba(255,255,255,0.3)"
           accessibilityLabel="Appeal note"
           textAlignVertical="top"
@@ -281,7 +284,7 @@ function AppealSheet({ open, onClose, onDone }: { open: boolean; onClose: () => 
         />
       </View>
       <Text className="mt-1.5 px-1 text-[11px] text-tertiary">{note.length}/500</Text>
-      <Pressable
+      <PressableScale
         onPress={submit}
         disabled={submitting}
         accessibilityRole="button"
@@ -291,7 +294,7 @@ function AppealSheet({ open, onClose, onDone }: { open: boolean; onClose: () => 
         style={submitting ? { opacity: 0.7 } : undefined}
       >
         {submitting ? <ActivityIndicator size="small" color="#000" /> : <Text className="text-[15px] font-bold text-black">Send appeal</Text>}
-      </Pressable>
+      </PressableScale>
     </Sheet>
   )
 }
@@ -310,10 +313,10 @@ function LeagueFillingCard({ count }: { count: number }) {
   const toast = useToast()
   const invite = async () => {
     const res = await shareText(
-      "I'm competing on StrengthHub — join my league and let's climb together.",
+      "I'm competing on StrengthHub. Join my league and let's climb together.",
       'StrengthHub',
     )
-    if (res === 'copied') toast('Invite copied to clipboard')
+    if (res === 'copied') { tick(); toast('Invite copied to clipboard') }
     else if (res === 'failed') toast("Couldn't open share")
   }
   return (
@@ -326,12 +329,12 @@ function LeagueFillingCard({ count }: { count: number }) {
           <Text className="font-bold text-white">Your league is filling up</Text>
           <Text className="mt-0.5 text-[13px] leading-snug text-secondary">
             {count <= 1
-              ? "You're first in — new lifters land here every day. Invite a friend and climb together."
+              ? "You're first in. New lifters land here every day. Invite a friend and climb together."
               : `${count} lifters so far. More join your league as StrengthHub grows.`}
           </Text>
         </View>
       </View>
-      <Pressable
+      <PressableScale
         onPress={invite}
         accessibilityRole="button"
         accessibilityLabel="Invite friends to StrengthHub"
@@ -339,7 +342,7 @@ function LeagueFillingCard({ count }: { count: number }) {
       >
         <UserPlus size={16} color="#000" />
         <Text className="text-[14px] font-bold text-black">Invite friends</Text>
-      </Pressable>
+      </PressableScale>
     </View>
   )
 }
@@ -383,16 +386,16 @@ function LeagueHero({ tier, rank, points, cohort, zone, onHow }: {
       {/* status line — the promotion target tier is coloured to its own tier (design spec) */}
       {zone === 'promote' ? (
         <Text className="mt-3 text-[13px] font-semibold" style={{ color: brand[400] }}>
-          In the promotion zone — hold it to reach <Text style={{ color: nextTier.color }}>{nextTier.name}</Text>!
+          In the promotion zone. Hold it to reach <Text style={{ color: nextTier.color }}>{nextTier.name}</Text>!
         </Text>
       ) : zone === 'demote' ? (
-        <Text className="mt-3 text-[13px] font-semibold" style={{ color: '#F5A524' }}>In the drop zone — one good session moves you up.</Text>
+        <Text className="mt-3 text-[13px] font-semibold" style={{ color: '#F5A524' }}>In the drop zone. One good session moves you up.</Text>
       ) : canPromote ? (
         <Text className="mt-3 text-[13px] font-semibold text-secondary">
           Reach the top {cutoff} to promote to <Text style={{ color: nextTier.color, fontWeight: '700' }}>{nextTier.name}</Text>.
         </Text>
       ) : (
-        <Text className="mt-3 text-[13px] font-semibold text-secondary">You're in the top tier — hold your rank to stay in {tier.name}.</Text>
+        <Text className="mt-3 text-[13px] font-semibold text-secondary">You're in the top tier. Hold your rank to stay in {tier.name}.</Text>
       )}
       <Pressable onPress={onHow} accessibilityRole="button" accessibilityLabel="How leagues work" className="mt-2 flex-row items-center gap-1 active:opacity-70">
         <Info size={13} color="rgba(255,255,255,0.45)" />
@@ -416,6 +419,7 @@ function StreakCard() {
   // the fallback — spend a token to protect today's streak (design spec).
   const freezeStreak = () => {
     if (tokens === 0) return
+    thud()
     dispatch({ type: 'USE_STREAK_FREEZE', dateKey: todayKey })
     toast('Streak frozen for today')
   }
@@ -443,7 +447,7 @@ function StreakCard() {
           </View>
         ) : (
           // Manual fallback: spend a freeze (styled in the freeze blue #6AD1E3).
-          <Pressable
+          <PressableScale
             onPress={freezeStreak}
             disabled={tokens === 0}
             accessibilityRole="button"
@@ -454,7 +458,7 @@ function StreakCard() {
           >
             <Snowflake size={14} color="#6AD1E3" />
             <Text className="text-[13px] font-bold" style={{ color: '#6AD1E3' }}>{tokens > 0 ? 'Freeze streak' : 'No freezes left'}</Text>
-          </Pressable>
+          </PressableScale>
         )}
       </View>
     </View>
@@ -521,10 +525,10 @@ function HowLeaguesSheet({ open, onClose }: { open: boolean; onClose: () => void
   return (
     <Sheet open={open} onClose={onClose} title="How leagues work">
       <View className="gap-3">
-        <HowRow n="1" title="Compete each month" body="You're placed in a league with others at your level — up to ~25 as it fills. Your score is your dashboard odometer — how consistently you hit your goals. It's about showing up, not how much you lift." />
-        <HowRow n="2" title="Climb the ladder" body="On the first Monday of every month the league resets. Finish in the top 30% and you promote to the next tier — Bronze, Silver, Gold, Platinum, Diamond. The higher you go, the tougher the climb." />
-        <HowRow n="3" title="Mind the drop zone" body="Finish in the bottom 30% and you slip down a tier. It's easy to climb straight back — a couple of good days does it." />
-        <HowRow n="4" title="Streaks are forgiving" body="A planned rest day or a freeze token keeps your streak alive through an off day. You get 2 fresh freezes at each monthly reset — no guilt, no all-or-nothing." />
+        <HowRow n="1" title="Compete each month" body="You're placed in a league with others at your level, up to ~25 as it fills. Your score is your dashboard odometer, how consistently you hit your goals. It's about showing up, not how much you lift." />
+        <HowRow n="2" title="Climb the ladder" body="On the first Monday of every month the league resets. Finish in the top 30% and you promote to the next tier: Bronze, Silver, Gold, Platinum, Diamond. The higher you go, the tougher the climb." />
+        <HowRow n="3" title="Mind the drop zone" body="Finish in the bottom 30% and you slip down a tier. It's easy to climb straight back, a couple of good days does it." />
+        <HowRow n="4" title="Streaks are forgiving" body="A planned rest day or a freeze token keeps your streak alive through an off day. You get 2 fresh freezes at each monthly reset, no guilt, no all-or-nothing." />
       </View>
       <View className="mt-4 flex-row flex-wrap gap-2">
         {TIERS.map((t) => (

@@ -16,6 +16,7 @@ import { loadGlobalBoard, type LeaderRow } from './service'
 import { RankBadge, StreakFlame } from './ui'
 import { ReportSheet, type ReportTarget } from './ReportSheet'
 import { BlockedUsersSheet } from './BlockedUsersSheet'
+import { PressableScale } from '../components/PressableScale'
 
 type Status = 'loading' | 'ready' | 'error'
 
@@ -83,9 +84,9 @@ export function GlobalLeaderboard({ onClaimUsername }: { onClaimUsername: () => 
         <RefreshCw size={26} color="rgba(255,255,255,0.4)" />
         <Text className="mt-3 font-bold text-white">Couldn't load the leaderboard</Text>
         <Text className="mt-1 max-w-[240px] text-center text-[13px] text-secondary">Check your connection and try again.</Text>
-        <Pressable onPress={load} accessibilityRole="button" accessibilityLabel="Retry loading leaderboard" className="btn-primary mt-4 px-5 py-2.5 active:opacity-90">
+        <PressableScale onPress={load} accessibilityRole="button" accessibilityLabel="Retry loading leaderboard" className="btn-primary mt-4 px-5 py-2.5 active:opacity-90">
           <Text className="text-sm font-semibold text-black">Try again</Text>
-        </Pressable>
+        </PressableScale>
       </View>
     )
   }
@@ -117,7 +118,7 @@ export function GlobalLeaderboard({ onClaimUsername }: { onClaimUsername: () => 
       </View>
 
       {shown < visibleRows.length && (
-        <Pressable
+        <PressableScale
           onPress={loadMore}
           disabled={loadingMore}
           accessibilityRole="button"
@@ -135,7 +136,7 @@ export function GlobalLeaderboard({ onClaimUsername }: { onClaimUsername: () => 
               <Text className="text-[14px] font-bold text-secondary">Load 20 more</Text>
             </>
           )}
-        </Pressable>
+        </PressableScale>
       )}
       <Text className="mt-2.5 text-center text-[12px] text-tertiary">
         Showing {Math.min(shown, visibleRows.length)} of {total.toLocaleString('en-US')}
@@ -211,9 +212,9 @@ function ClaimBanner({ onPress }: { onPress: () => void }) {
         <Text className="font-bold text-white">Join the leaderboard</Text>
         <Text className="text-[12px] text-secondary">Claim a username to appear and compete on your streak.</Text>
       </View>
-      <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel="Claim a username" className="rounded-full bg-brand-400 px-3.5 py-2 active:opacity-90">
+      <PressableScale onPress={onPress} accessibilityRole="button" accessibilityLabel="Claim a username" className="rounded-full bg-brand-400 px-3.5 py-2 active:opacity-90">
         <Text className="text-[13px] font-bold text-black">Claim</Text>
-      </Pressable>
+      </PressableScale>
     </View>
   )
 }
