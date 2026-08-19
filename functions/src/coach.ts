@@ -27,7 +27,7 @@ import {
 // SINGLE SOURCE: the guardrails run here are the exact same code the app runs,
 // copied verbatim into _shared by scripts/sync-shared.mjs (never hand-edited).
 import { COACH_ENABLED } from './_shared/backend/coach/coachGate'
-import { APPROVED_KNOWLEDGE_SOURCES, buildCoachSystemPrompt, buildConversationTurnHint } from './_shared/backend/coach/operatingRules'
+import { APPROVED_KNOWLEDGE_SOURCES, APP_NAV_MAP, buildCoachSystemPrompt, buildConversationTurnHint } from './_shared/backend/coach/operatingRules'
 import { selectCoachContext, summarizeRecentTurns, type CoachContextSnapshot } from './_shared/backend/coach/contextSelection'
 import { recordCoachTelemetry, recordCoachTurn } from './_shared/backend/coach/coachTelemetry'
 import {
@@ -257,6 +257,9 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
     buildCoachSystemPrompt({ allowWorkoutActions: allowActions }),
     '',
     selectedContext,
+    // App-help turns get the verified app-navigation map so the model gives correct paths instead of
+    // inventing them; attached only on this intent to keep other turns lean.
+    ...(pre.decision.intent === 'app_help' ? ['', APP_NAV_MAP] : []),
     ...(turnHint ? ['', turnHint] : []),
     '',
     // Delimited as DATA (audit F-029): prior turns are verbatim user/coach text

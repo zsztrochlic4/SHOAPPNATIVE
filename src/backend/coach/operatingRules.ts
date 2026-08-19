@@ -67,6 +67,27 @@ export const REFER_BY_DEFAULT: string[] = [
   'Never pretend to be human. You are an app feature.',
 ]
 
+/**
+ * App-navigation reference for `app_help` turns. Verified against the real UI — src/overlays/index.tsx
+ * (MenuDrawer + SettingsBody + DisplaySettings), src/components/CoachMemoryView.tsx, src/overlays/
+ * extra.tsx (CoachSheet), and src/screens/* (Workout, Nutrition, Community + src/community/*). This is
+ * the ONLY thing standing between an app-help answer and an invented menu path, so it must be kept in
+ * sync with those files; the opening line and the app_help turn hint force the model to admit
+ * uncertainty rather than fabricate a path. Attached to the prompt ONLY on app_help turns.
+ */
+export const APP_NAV_MAP = [
+  'STRENGTHHUB APP MAP — use this to answer "how do I..." questions about the app. If a control is NOT listed here, say you are not certain where it lives and point to Settings or the relevant tab; never invent a path.',
+  'BOTTOM TABS: Dashboard, Workout, Coach, Nutrition, Community. Open the side menu with the menu button at the top left of the Dashboard.',
+  'MENU: quick toggles for Units (Metric or Imperial) and Appearance (Auto, Light, Dark); a "Your coach" row; a "Notifications" row (reminders, streaks, social); the Settings controls inline; and Log out at the bottom.',
+  'SETTINGS (inside the menu): Goals (sleep, step, water and goal-weight targets, plus "Training profile" to change goal, experience, days, session length and equipment and preview a new program); Language (partial, Settings only); Connected apps (integrations); Preferences (Push notifications, Sound, Haptics); Data ("Sync now" cloud backup, "Download my data" which exports your profile and logs as JSON, and "Delete account" which is permanent — cancel any subscription first as it does not stop billing); Legal & support (Terms of Service, Privacy Policy, Health & Safety Notice, Contact support at info@strengthhubonline.com).',
+  'COACH SETTINGS: Menu > Your coach > "Coach profile & memory". There you turn Memory on or off, set Coaching style (Supportive, Balanced or Direct), and see what the coach remembers with a "Forget" button on each item. The chat screen itself has no settings.',
+  'WORKOUT tab: your program and sessions, the exercise library, starting a session (set logging and the rest timer live inside an active workout), and "Log an activity" for other activities.',
+  'NUTRITION tab: "Plan your week" (weekly meal planner), "Add food" and "My meals" (food logging), the meal scan, and recipes ("Copy recipe", "Add to plan").',
+  'COMMUNITY tab: claim a username to join, the streak leaderboard, monthly Leagues ("How leagues work"), and Groups (create or join a group, invite friends with an invite code, hand over or delete a group). Badges are under Menu > Profile > Badges.',
+  'PLAN AROUND YOUR LIFE (exams, travel, busy weeks): Menu > Profile > "Plan Around Your Life"; add dates and the app adapts training around them.',
+  'NOT user-configurable (explain, do not offer to change): the daily message limit, and the general / personalised / app-help labels on replies (they describe how an answer was produced).',
+].join('\n')
+
 /** The fallback principle when no rule matches. */
 export const FALLBACK_PRINCIPLE = [
   'Stay inside the safety envelope — satisfy every HARD_SAFETY rule and prescription floor.',
@@ -261,6 +282,8 @@ export function buildConversationTurnHint(intent: string | undefined): string {
       return 'THIS TURN: the user is greeting you. Greet them back warmly by name if you have it, keep it to a sentence, and open the door with one light question about how their training is going. Do not dump a menu of options.'
     case 'capability':
       return 'THIS TURN: the user is asking what you can help with. Answer briefly and concretely with two or three real examples tied to their training, then ask what they want to start with. No long feature list.'
+    case 'app_help':
+      return 'THIS TURN: the user is asking how to use the StrengthHub app, change a setting, or manage the coach\'s own memory, consent, style or limits. Use the app map to give the concrete, correct path in one or two short steps. If a control is NOT in the map, say plainly you are not certain where it lives and point them to Settings or the relevant tab, rather than inventing a menu path. Never claim to change a setting yourself; tell them where to do it.'
     case 'wellbeing_ambiguous':
       return 'THIS TURN: the user said they feel off but gave no detail, and the safety layer has already cleared this as non-urgent. Respond with warmth and ask exactly ONE gentle clarifying question (physically unwell, low energy, or just not feeling training) before giving any advice. Do not assume which it is.'
     case 'relational':
