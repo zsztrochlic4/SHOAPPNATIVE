@@ -4,11 +4,15 @@
  * triage queue live; accepted locally with the backend off). Shared by the global
  * leaderboard (report a user) and the group screens (report a group / member).
  */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { View, Text, Pressable, TextInput, ActivityIndicator } from 'react-native'
+import { Check } from 'lucide-react-native'
 import { Sheet } from '../components/Sheet'
+import { PressableScale } from '../components/PressableScale'
 import { useToast } from '../components/Toast'
-import { useColors } from '../theme'
+import { useColors, brand } from '../theme'
+import { useStore } from '../store/store'
+import { tick, thud } from '../lib/haptics'
 import { reportContent, REPORT_REASONS, type ReportReason } from './service'
 
 export interface ReportTarget {
@@ -17,12 +21,28 @@ export interface ReportTarget {
   label: string
 }
 
+/** Both report call sites pass a user's label as `@username`; blocks are keyed by
+ *  that username (unique app-wide, and the only id group members carry). */
+function usernameOf(target: ReportTarget | null): string | null {
+  if (!target || target.type !== 'user') return null
+  return target.label.replace(/^@/, '') || null
+}
+
 export function ReportSheet({ open, target, onClose }: { open: boolean; target: ReportTarget | null; onClose: () => void }) {
   const colors = useColors()
   const toast = useToast()
+  const { dispatch } = useStore()
   const [reason, setReason] = useState<ReportReason>('offensive_name')
   const [note, setNote] = useState('')
+  const [block, setBlock] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+
+  const blockName = usernameOf(target)
+  // Start every report from a clean form — resetting on open (and whenever the
+  // target changes) so an abandoned draft never bleeds into the next report.
+  useEffect(() => {
+    if (open) { setReason('offensive_name'); setNote(''); setBlock(true) }
+  }, [open, target?.id])
 
   const submit = async () => {
     if (submitting || !target) return
@@ -35,11 +55,19 @@ export function ReportSheet({ open, target, onClose }: { open: boolean; target: 
         reason,
         note: note.trim() || undefined,
       })
-      toast(res.ok ? 'Thanks — our team will review this' : "Couldn't send that. Try again.")
       if (res.ok) {
+        thud()
+        if (blockName && block) {
+          dispatch({ type: 'BLOCK_USER', uid: blockName })
+          toast(`Reported and blocked @${blockName}`)
+        } else {
+          toast('Thanks, our team will review this')
+        }
         setNote('')
         setReason('offensive_name')
         onClose()
+      } else {
+        toast("Couldn't send that. Try again.")
       }
     } catch {
       toast("Couldn't send that. Try again.")
@@ -61,7 +89,7 @@ export function ReportSheet({ open, target, onClose }: { open: boolean; target: 
           return (
             <Pressable
               key={r.value}
-              onPress={() => setReason(r.value)}
+              onPress={() => { tick(); setReason(r.value) }}
               accessibilityRole="button"
               accessibilityState={{ selected: active }}
               accessibilityLabel={r.label}
@@ -89,7 +117,28 @@ export function ReportSheet({ open, target, onClose }: { open: boolean; target: 
       </View>
       <Text className="mt-1.5 px-1 text-[11px] text-tertiary">{note.length}/500</Text>
 
-      <Pressable
+      {blockName && (
+        <Pressable
+          onPress={() => { tick(); setBlock((b) => !b) }}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: block }}
+          accessibilityLabel={`Also block @${blockName}`}
+          className="mt-3 flex-row items-center gap-3 rounded-2xl border border-white/10 bg-ink-700 px-3.5 py-3 active:opacity-90"
+        >
+          <View
+            className="h-5 w-5 items-center justify-center rounded-md border"
+            style={block ? { backgroundColor: brand[400], borderColor: brand[400] } : { borderColor: 'rgba(255,255,255,0.3)' }}
+          >
+            {block ? <Check size={14} color="#000" /> : null}
+          </View>
+          <View className="flex-1">
+            <Text className="text-[13px] font-semibold text-white" style={{ color: colors.fg }}>Also block @{blockName}</Text>
+            <Text className="text-[12px] leading-snug text-tertiary">Hides them from your leaderboards and group feeds.</Text>
+          </View>
+        </Pressable>
+      )}
+
+      <PressableScale
         onPress={submit}
         disabled={submitting || !target}
         accessibilityRole="button"
@@ -99,7 +148,7 @@ export function ReportSheet({ open, target, onClose }: { open: boolean; target: 
         style={submitting ? { opacity: 0.7 } : undefined}
       >
         {submitting ? <ActivityIndicator size="small" color="#000" /> : <Text className="text-[15px] font-bold text-black">Submit report</Text>}
-      </Pressable>
+      </PressableScale>
     </Sheet>
   )
 }

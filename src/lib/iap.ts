@@ -1,5 +1,6 @@
 import { Platform } from 'react-native'
 import type { CustomerInfo, PurchasesPackage } from 'react-native-purchases'
+import { IAP_PRODUCTS, type PlanId } from './plans'
 
 /**
  * Native in-app purchases (Apple StoreKit / Google Play Billing) via RevenueCat.
@@ -24,8 +25,8 @@ export const IAP_ENABLED = false as boolean
 /** RevenueCat "entitlement" identifier that grants premium (configure this in RevenueCat). */
 export const RC_ENTITLEMENT = 'premium'
 
-/** Store product id for the weekly plan — must match App Store Connect / Play Console. */
-export const IAP_WEEKLY_PRODUCT = 'sho_weekly_299'
+/** Store product ids per plan (weekly / annual) — must match App Store Connect / Play Console. */
+export { IAP_PRODUCTS } from './plans'
 
 /** RevenueCat public SDK keys, per platform. Set via EAS env (never commit real keys). */
 const RC_API_KEY = Platform.select({
@@ -67,14 +68,14 @@ export async function iapIsEntitled(): Promise<boolean> {
   return isEntitled(await Purchases.getCustomerInfo())
 }
 
-/** Buy the weekly subscription. Returns { ok, entitled, cancelled }. Never throws on user-cancel. */
-export async function purchaseWeekly(): Promise<{ ok: boolean; entitled: boolean; cancelled?: boolean }> {
+/** Buy the selected plan. Returns { ok, entitled, cancelled }. Never throws on user-cancel. */
+export async function purchasePlan(plan: PlanId): Promise<{ ok: boolean; entitled: boolean; cancelled?: boolean }> {
   if (!iapActive()) throw new Error('IAP not active')
   const Purchases = await getPurchases()
   const offerings = await Purchases.getOfferings()
   const packages: PurchasesPackage[] = offerings.current?.availablePackages ?? []
   const pkg =
-    packages.find((p) => p.product.identifier === IAP_WEEKLY_PRODUCT) ?? packages[0]
+    packages.find((p) => p.product.identifier === IAP_PRODUCTS[plan]) ?? packages[0]
   if (!pkg) return { ok: false, entitled: false }
   try {
     const { customerInfo } = await Purchases.purchasePackage(pkg)

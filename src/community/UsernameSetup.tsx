@@ -11,7 +11,9 @@ import { useStore } from '../store/store'
 import { useColors, brand } from '../theme'
 import { useToast } from '../components/Toast'
 import { Sheet } from '../components/Sheet'
+import { PressableScale } from '../components/PressableScale'
 import { AppModal } from '../components/WebFrame'
+import { thud } from '../lib/haptics'
 import {
   checkUsernameAvailable,
   validateUsername,
@@ -161,12 +163,13 @@ export function UsernameSheet({ open, onClose }: { open: boolean; onClose: () =>
           await backend.claimUsernameRemote(field.canonical)
         } catch {
           setBusy(false)
-          toast('That username was just taken — try another')
+          toast('That username was just taken, try another')
           return
         }
         setBusy(false)
       }
     }
+    thud()
     dispatch({ type: 'SET_USERNAME', username: field.canonical })
     toast(isFirst ? `Welcome, @${field.canonical}` : 'Username updated')
     onClose()
@@ -189,7 +192,7 @@ export function UsernameSheet({ open, onClose }: { open: boolean; onClose: () =>
         </Text>
       )}
       <UsernameField value={value} field={field} onChange={onChange} autoFocus />
-      <Pressable
+      <PressableScale
         onPress={save}
         disabled={!canSave}
         accessibilityRole="button"
@@ -198,7 +201,7 @@ export function UsernameSheet({ open, onClose }: { open: boolean; onClose: () =>
         className={`mt-3 items-center rounded-2xl py-4 ${canSave ? 'bg-brand-400 active:opacity-90' : 'bg-white/10'}`}
       >
         <Text className={`text-[15px] font-bold ${canSave ? 'text-black' : 'text-disabled'}`}>{busy ? 'Saving…' : isFirst ? 'Continue' : 'Save'}</Text>
-      </Pressable>
+      </PressableScale>
     </Sheet>
   )
 }
@@ -283,12 +286,13 @@ export function CommunitySetupGate({ onPreview, onClaimed }: { onPreview: () => 
           await backend.claimUsernameRemote(name)
         } catch {
           setBusy(false)
-          toast('That username was just taken — try another')
+          toast('That username was just taken, try another')
           return
         }
         setBusy(false)
       }
     }
+    thud()
     dispatch({ type: 'SET_USERNAME', username: name })
     onClaimed(name)
   }
@@ -312,7 +316,7 @@ export function CommunitySetupGate({ onPreview, onClaimed }: { onPreview: () => 
       </View>
       <View className="mt-4">
         <UsernameField value={value} field={field} onChange={onChange} autoFocus />
-        <Pressable
+        <PressableScale
           onPress={claim}
           disabled={!canContinue}
           accessibilityRole="button"
@@ -321,8 +325,8 @@ export function CommunitySetupGate({ onPreview, onClaimed }: { onPreview: () => 
           className={`mt-3.5 min-h-[52px] items-center justify-center rounded-2xl py-4 ${canContinue ? 'bg-brand-400 active:opacity-90' : 'bg-white/10'}`}
         >
           <Text className={`text-[15px] font-bold ${canContinue ? 'text-black' : 'text-disabled'}`}>{busy ? 'Claiming…' : 'Continue'}</Text>
-        </Pressable>
-        <Pressable
+        </PressableScale>
+        <PressableScale
           onPress={onPreview}
           accessibilityRole="button"
           accessibilityLabel="Preview Community without registering"
@@ -330,7 +334,7 @@ export function CommunitySetupGate({ onPreview, onClaimed }: { onPreview: () => 
         >
           <Eye size={16} color="rgba(255,255,255,0.7)" />
           <Text className="text-[14px] font-bold text-secondary">Preview Community</Text>
-        </Pressable>
+        </PressableScale>
       </View>
     </View>
   )
@@ -383,9 +387,9 @@ export function CommunityWelcomeModal({ open, onClose, name }: { open: boolean; 
             <Settings2Placeholder />
             <Text className="flex-1 text-[12px] leading-snug text-tertiary">Change your username any time from the settings icon in the top corner.</Text>
           </View>
-          <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Explore Community" className="mt-4 items-center justify-center rounded-2xl bg-brand-400/15 py-4 active:opacity-90">
+          <PressableScale onPress={onClose} accessibilityRole="button" accessibilityLabel="Explore Community" className="mt-4 items-center justify-center rounded-2xl bg-brand-400/15 py-4 active:opacity-90">
             <Text className="text-[15px] font-bold text-brand-300">Explore Community</Text>
-          </Pressable>
+          </PressableScale>
         </View>
       </View>
     </AppModal>

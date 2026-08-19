@@ -24,6 +24,7 @@
  */
 
 import { resolveExerciseRefStrict } from '../data'
+import type { CoachMemoryCandidate } from './contracts'
 
 /* ------------------------------------------------------------------ */
 /*  Value domains — MIRROR the engine enums (kept in sync by test)     */
@@ -308,7 +309,7 @@ function actionProposal(payload: Record<string, string | number | boolean>, titl
 function mentionedDays(message: string): WeekdayLit[] {
   const found = new Set<WeekdayLit>()
   for (const token of message.toLowerCase().match(/[a-z]+/g) ?? []) {
-    const day = DAY_ALIASES[token]
+    const day = DAY_ALIASES[token] ?? DAY_ALIASES[token.replace(/s$/, '')] // accept plurals: "Tuesdays"
     if (day) found.add(day)
   }
   return WEEKDAY_LITS.filter((day) => found.has(day))
@@ -342,6 +343,51 @@ function explicitDateKeys(message: string): string[] {
   return out
 }
 
+/** Goal synonyms mapped to the four canonical program goals. */
+const GOAL_MAP: [RegExp, BackendGoalLit][] = [
+  [/\b(build(?:ing)?\s+muscle|muscle\s+building|gain(?:ing)?\s+muscle|put\s+on\s+(?:muscle|size)|get\s+bigger|bulk(?:ing)?|hypertroph\w*|more\s+muscle|muscle\s+mass)\b/, 'Hypertrophy'],
+  [/\b(los\w*\s+fat|fat\s+loss|los\w*\s+weight|weight\s+loss|lean\s+out|get\s+lean|shred|cut\s+(?:fat|weight|down))\b/, 'Fat Loss'],
+  [/\b(get(?:ting)?\s+stronger|build\s+strength|more\s+strength|\bstronger\b|strength\s+focus|powerlift\w*)\b/, 'Strength'],
+  [/\b(stay\s+healthy|get\s+healthy|general\s+fitness|stay\s+fit|keep\s+fit|overall\s+health|just\s+(?:stay\s+)?healthy|maintain(?:ing)?\s+(?:my\s+)?(?:health|fitness))\b/, 'General Fitness'],
+]
+
+/**
+ * A change of the whole-program GOAL (Fat Loss, Hypertrophy, Strength, General Fitness). Requires an
+ * explicit goal/plan/program context so a training aside ("I want to build muscle in my legs today")
+ * cannot silently re-point the program, and reads the target BEFORE any "instead of / not" clause so
+ * "focus on losing fat instead of building muscle" resolves to Fat Loss, not the thing being dropped.
+ */
+export function synthesizeGoalChangeProposal(userMessage: string): SynthActionProposal | null {
+  if (typeof userMessage !== 'string') return null
+  const m = userMessage.toLowerCase()
+  const ctx = /\bmy\s+(goal|plan|program|programme)\b|\b(change|switch|update|set|make)\s+(?:my\s+)?(?:goal|plan|program|programme)\b|\bfocus\s+(?:on|now)\b|\binstead\s+of\b|\bnot\s+bulk\b|\bchange\s+that\b/.test(m)
+  if (!ctx) return null
+  if (/\b(after|once|when)\s+(?:my\s+|the\s+)?exams?\b|\blater\b|\bnext\s+(?:month|year|block)\b/.test(m)) return null // deferred, not a change now
+  const primary = m.replace(/\b(instead of|rather than|,?\s*not)\b[\s\S]*$/, '')
+  let goal: BackendGoalLit | null = null
+  for (const [re, g] of GOAL_MAP) { if (re.test(primary)) { goal = g; break } }
+  if (!goal) return null
+  return actionProposal({ action: 'change_goal', newGoal: goal }, `Change goal to ${goal}`, `Regenerates your program around ${goal} after confirmation.`, `Want me to change your training goal to ${goal}? Tap confirm and I'll update your program.`)
+}
+
+/** Parse an in-month day range like "the 20th to the 30th" into [startKey, endKey], rolling a past
+ *  start day into next month. Used only in the exam-mode branch, so the surrounding context is bounded. */
+function parseDayOfMonthRange(m: string, now: Date): [string, string] | null {
+  const mt = m.match(/(?:from\s+)?(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)?\s+(?:to|until|through|till)\s+(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)?\b/)
+  if (!mt) return null
+  const d1 = Number(mt[1]), d2 = Number(mt[2])
+  if (!(d1 >= 1 && d1 <= 31 && d2 >= 1 && d2 <= 31)) return null
+  const mk = (yy: number, mm: number, dd: number): string | null => { const dt = new Date(yy, mm, dd); return dt.getMonth() === ((mm % 12) + 12) % 12 ? dateKeyLocal(dt) : null }
+  let sy = now.getFullYear(), sm = now.getMonth()
+  if (d1 < now.getDate()) { sm += 1; if (sm > 11) { sm = 0; sy += 1 } }
+  const s = mk(sy, sm, d1)
+  if (!s) return null
+  let ey = sy, em = sm
+  if (d2 < d1) { em += 1; if (em > 11) { em = 0; ey += 1 } }
+  const e = mk(ey, em, d2)
+  return e ? [s, e] : null
+}
+
 /**
  * Deterministic proposal synthesis for bounded, high-confidence action intents. The model may phrase
  * the answer, but is never trusted to decide whether a real product action exists. Ambiguous or
@@ -350,12 +396,17 @@ function explicitDateKeys(message: string): string[] {
 export function synthesizeBoundedActionProposal(userMessage: string, now = new Date()): SynthActionProposal | null {
   if (typeof userMessage !== 'string') return null
   const m = userMessage.trim().toLowerCase()
-  if (!m || !ACTION_VERB.test(m)) return null
+  // No blanket action-verb gate: it wrongly rejected everyday phrasings (cut, bump, trim, "turn on",
+  // "changed"). Each branch below carries its own specific noun+intent test, so it cannot over-fire on
+  // a plain question. ACTION_VERB is kept only for callers that want a cheap pre-check.
+  if (!m) return null
+  void ACTION_VERB
 
   if (/\b(deload|recovery week|easy week)\b/.test(m) && /\b(give|set|schedule|start|make|put|take)\b/.test(m)) {
     return actionProposal({ action: 'deload' }, 'Schedule a deload week', 'Reduces training stress for one week while keeping your plan structure.', "Want me to schedule a deload week? Tap confirm and I'll apply it safely.")
   }
-  if (/\b(start|begin)\b/.test(m) && /\b(workout|session|training)\b/.test(m)) {
+  const startIntent = /\b(start|begin|kick off|get going on)\b/.test(m) || /\blet'?s\s+(do|train|go|smash|get\s+going|get\s+into|crack)\b/.test(m) || /\bdo\s+(today'?s|my|the)\s+(workout|session|training)\b/.test(m)
+  if (startIntent && /\b(workout|session|train|training)\b/.test(m)) {
     const quick = /\b(15|quick|short)\b/.test(m)
     return actionProposal(
       { action: 'start_session', variant: quick ? 'quick15' : 'full' },
@@ -364,31 +415,44 @@ export function synthesizeBoundedActionProposal(userMessage: string, now = new D
       quick ? 'Ready for a 15-minute workout? Tap confirm to start it.' : "Ready to train? Tap confirm to start today's full workout.",
     )
   }
-  if (/\b(sessions?|workouts?)\b/.test(m) && /\b(minutes?|mins?|duration|length|fit into)\b/.test(m)) {
-    const n = Number(m.match(/\b(30|45|60|75|90)\b/)?.[1])
-    if (Number.isFinite(n)) return actionProposal({ action: 'set_session_length', sessionLengthMin: n }, `Set sessions to ${n} minutes`, `Regenerates future sessions around a ${n}-minute target after confirmation.`, `Want me to set your session length to ${n} minutes? Tap confirm and I'll update it.`)
+  if (/\b(sessions?|workouts?)\b/.test(m)) {
+    // Accept a plain number with a minute unit, "to/into 45", or an "hour" phrase, so cut/bump/trim
+    // phrasings all resolve. Requires a real time unit so "30 reps" cannot be read as a length.
+    let n = Number((m.match(/\b(30|45|60|75|90)\s*(?:minute|min)s?\b/) || m.match(/\b(?:to|into|around|about|of|at)\s+(30|45|60|75|90)\b/))?.[1])
+    if (!Number.isFinite(n)) {
+      if (/\bhour and a half\b/.test(m)) n = 90
+      else if (/\bhalf an hour\b|\bhalf hour\b/.test(m)) n = 30
+      else if (/\b(?:an|one|1)\s+hour\b/.test(m)) n = 60
+    }
+    if ([30, 45, 60, 75, 90].includes(n)) return actionProposal({ action: 'set_session_length', sessionLengthMin: n }, `Set sessions to ${n} minutes`, `Regenerates future sessions around a ${n}-minute target after confirmation.`, `Want me to set your session length to ${n} minutes? Tap confirm and I'll update it.`)
   }
-  if (!/\b(reschedule|move)\b/.test(m) && /\b(training|workout|gym)\s+days?\b|\bdays?\s+(?:i\s+)?train\b/.test(m)) {
+  // Training-day SET: two or more weekdays named in a scheduling context become the full week. A single
+  // "move day A to day B" is handled earlier by synthesizeDayMoveProposal; "reschedule/move" lists fall
+  // through to the reschedule branch below; and a clear set context is required so a recount ("I trained
+  // Monday and Wednesday") cannot fire.
+  if (!/\b(reschedule|move)\b/.test(m)) {
     const days = mentionedDays(m)
-    if (days.length >= 2 && days.length <= 6) {
+    const setCtx = /\b(training|workout|gym)\s+days?\b/.test(m) || /\bdays?\s+(?:i\s+)?train\b/.test(m) || /\bdays?\s+a\s+week\b/.test(m) || /\b(set|change|switch|update|adjust|make|only\s+train|train\s+on)\b/.test(m) || /\bi\s+train\b/.test(m)
+    // "day A to day B" (exactly two weekdays joined by "to") is a single-day MOVE, handled by
+    // synthesizeDayMoveProposal, not a request to set the whole week to just those two days.
+    const twoDayToMove = days.length === 2 && /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b\s+to\s+\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/.test(m)
+    if (days.length >= 2 && days.length <= 6 && setCtx && !twoDayToMove) {
       const list = days.join(', ')
-      return actionProposal({ action: 'set_training_days', days: days.join(',') }, 'Change training days', `Moves your weekly training schedule to ${list}.`, `Want me to set your training days to ${list}? Tap confirm and I'll update the schedule.`)
+      return actionProposal({ action: 'set_training_days', days: days.join(',') }, 'Set training days', `Sets your weekly training schedule to ${list}.`, `Want me to set your training days to ${list}? Tap confirm and I'll update the schedule.`)
     }
   }
-  const goalMatch = m.match(/\b(?:goal|focus)\b(?:\s+to|\s+is|:)?\s+(build muscle|hypertrophy|lose weight|fat loss|get stronger|strength|general fitness|healthy|fitness)\b/)
-  if (goalMatch) {
-    // The action contract changes a goal now; it cannot schedule a future goal transition. Asking
-    // for a concrete date is safer than silently applying "after exams" immediately.
-    if (/\b(after|once|when)\s+(?:my\s+|the\s+)?exams?\b|\blater\b/.test(m)) return null
-    const token = goalMatch[1]
-    const newGoal: BackendGoalLit = /build|hypertrophy/.test(token) ? 'Hypertrophy' : /lose|fat/.test(token) ? 'Fat Loss' : /strong|strength/.test(token) ? 'Strength' : 'General Fitness'
-    return actionProposal({ action: 'change_goal', newGoal }, `Change goal to ${newGoal}`, `Regenerates your program around ${newGoal} after confirmation.`, `Want me to change your training goal to ${newGoal}? Tap confirm and I'll update your program.`)
-  }
-  if (/\bexam mode\b/.test(m)) {
-    const weeks = Math.min(52, Math.max(1, Number(m.match(/\b(?:next|for)\s+(\d+)\s+weeks?\b/)?.[1] ?? 2)))
-    const startDate = dateKeyLocal(now)
-    const endDate = dateKeyLocal(addDays(now, weeks * 7 - 1))
-    return actionProposal({ action: 'exam_mode', startDate, endDate }, `Use exam mode for ${weeks} week${weeks === 1 ? '' : 's'}`, `Reduces training to a maintenance schedule from ${startDate} to ${endDate}.`, `Want me to use exam mode from ${startDate} to ${endDate}? Tap confirm and I'll adapt the schedule.`)
+  const goal = synthesizeGoalChangeProposal(m)
+  if (goal) return goal
+  if (/\bexam mode\b/.test(m) || (/\bexam/.test(m) && /\b(mode|lighten|reduce|ease|survival)\b/.test(m))) {
+    // Prefer explicit "the Nth to the Mth" day-of-month dates; else a "for N weeks" span; else 2 weeks.
+    const range = parseDayOfMonthRange(m, now)
+    let startDate: string, endDate: string
+    if (range) { startDate = range[0]; endDate = range[1] } else {
+      const weeks = Math.min(52, Math.max(1, Number(m.match(/\b(?:next|for)\s+(\d+)\s+weeks?\b/)?.[1] ?? 2)))
+      startDate = dateKeyLocal(now)
+      endDate = dateKeyLocal(addDays(now, weeks * 7 - 1))
+    }
+    return actionProposal({ action: 'exam_mode', startDate, endDate }, `Use exam mode (${startDate} to ${endDate})`, `Reduces training to a maintenance schedule from ${startDate} to ${endDate}.`, `Want me to use exam mode from ${startDate} to ${endDate}? Tap confirm and I'll adapt the schedule.`)
   }
   if (/\b(away|absence|holiday|vacation|pause training|pause my training)\b/.test(m)) {
     const dates = explicitDateKeys(m)
@@ -397,10 +461,12 @@ export function synthesizeBoundedActionProposal(userMessage: string, now = new D
       return actionProposal({ action: 'planned_absence', mode, startDate: dates[0], endDate: dates[1] }, 'Schedule planned time away', `${mode === 'full_pause' ? 'Pauses' : 'Adapts'} training from ${dates[0]} to ${dates[1]}.`, `Want me to ${mode === 'full_pause' ? 'pause' : 'adapt'} training from ${dates[0]} to ${dates[1]}? Tap confirm and I'll update the schedule.`)
     }
   }
-  if (/\b(missed|skip(?:ped)?)\b/.test(m) && /\b(today|workout|session|training)\b/.test(m)) {
-    // Only the no-penalty exemption is genuinely implemented. Shift/fold/replan remain prose-only
-    // so the coach cannot offer a confirm button for a resolver path that would later refuse it.
-    if (!/\b(exempt|no[- ]penalty|rest day)\b/.test(m)) return null
+  const wantsExemptRest = (/\b(missed|skip(?:ped)?)\b/.test(m) && /\b(today|workout|session|training)\b/.test(m) && /\b(exempt|no[- ]penalty|rest day)\b/.test(m)) ||
+    (/\b(mark|set|make|log)\b[\s\S]{0,20}\b(today|it)\b[\s\S]{0,20}\b(rest day|no.?penalty|exempt)\b/.test(m)) ||
+    (/\b(rest day|no.?penalty)\b/.test(m) && /\b(doesn'?t count|does not count|not count against|without.*penalty)\b/.test(m))
+  if (wantsExemptRest) {
+    // Only the no-penalty exemption is genuinely implemented (shift/fold/replan stay prose-only so the
+    // coach never offers a confirm button for a resolver path that would later refuse it).
     const label = 'Mark today as a no-penalty rest day'
     return actionProposal({ action: 'catch_up', mode: 'exempt' }, label, 'Marks today as planned rest without inventing extra training.', `Want me to ${label.toLowerCase()}? Tap confirm and I'll update the week.`)
   }
@@ -412,6 +478,242 @@ export function synthesizeBoundedActionProposal(userMessage: string, now = new D
     }
   }
   return null
+}
+
+/** The coach's redirect when it drops a mis-routed exercise swap for a day-reschedule request. */
+export const DAY_RESCHEDULE_LINE =
+  'To rearrange your training days, just tell me which days you’d like to train, for example Monday, Wednesday, Friday, and I’ll update your schedule. I won’t change your exercises.'
+
+/** Natural-language weekday list in canonical order: ['Friday','Monday'] -> 'Monday and Friday'. */
+export function joinWeekdays(days: readonly string[]): string {
+  const list = WEEKDAY_LITS.filter((d) => days.includes(d))
+  if (list.length === 0) return ''
+  if (list.length === 1) return list[0]
+  return `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}`
+}
+
+/**
+ * To-the-point reply for a day-reschedule request that has NOT named the target days yet. It goes
+ * straight to the one thing that moves it forward: it states the days the user trains now, so they can
+ * decide in a single turn, and asks once which days they want, without first re-confirming an intent
+ * they already stated and without making them ask what their current days are. Falls back to the
+ * generic line when the current schedule is not in view. Dash-free per the app-wide output rule.
+ */
+export function dayRescheduleAsk(currentDays: readonly string[] = []): string {
+  const current = joinWeekdays(currentDays)
+  if (!current) return DAY_RESCHEDULE_LINE
+  return `Right now you train ${current}. Which days would you like instead? Tell me the days and I'll move your schedule and keep your exercises the same.`
+}
+
+const DAY_TOKENS = 'monday|tuesday|wednesday|thursday|friday|saturday|sunday'
+const DAY_MOVE_RE = new RegExp(
+  `\\b(?:move|change|switch|shift|swap)\\b[^.?!]*?\\b(${DAY_TOKENS})\\b[^.?!]{0,30}?\\b(?:to|for|and|onto|into|over to|across to|with)\\b[^.?!]{0,10}?\\b(${DAY_TOKENS})\\b`,
+  'i',
+)
+
+/**
+ * Move ONE training day to another weekday, e.g. "change monday to saturday" or "move my monday session
+ * to saturday". The user names one day they train now and one day to move it to; we compute the resulting
+ * full week and emit a `set_training_days` proposal for it, so the change flows through the SAME validated
+ * resolver (no new engine action) and stays confirm-gated. Deliberately narrow: it needs the current
+ * schedule in view, the "from" day must be one they actually train, and the "to" day must be free, so an
+ * ambiguous request (target already a training day, unknown schedule) returns null and the coach asks
+ * rather than guessing. Dash-free per the app-wide output rule.
+ */
+export function synthesizeDayMoveProposal(userMessage: string, currentDays: readonly string[] = []): SynthActionProposal | null {
+  if (typeof userMessage !== 'string') return null
+  // Three or more weekdays named is a FULL-SET request ("move my days to Mon, Wed, Fri and Sat"), not a
+  // single-day move; leave it to the set/reschedule branch so the whole set is applied, not one day.
+  if ((userMessage.toLowerCase().match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/g) || []).length > 2) return null
+  const match = userMessage.toLowerCase().match(DAY_MOVE_RE)
+  if (!match) return null
+  const cap = (t: string): WeekdayLit => (t[0].toUpperCase() + t.slice(1)) as WeekdayLit
+  const from = cap(match[1])
+  const to = cap(match[2])
+  if (from === to) return null
+  const current = WEEKDAY_LITS.filter((d) => currentDays.includes(d))
+  if (current.length < 2) return null // no known schedule to move within
+  if (!current.includes(from)) return null // cannot move a day they do not train
+  if (current.includes(to)) return null // target already trained: ambiguous, let the coach clarify
+  const next = WEEKDAY_LITS.filter((d) => (current.includes(d) && d !== from) || d === to)
+  if (next.length < 2 || next.length > 6) return null
+  const list = joinWeekdays(next)
+  return actionProposal(
+    { action: 'set_training_days', days: next.join(',') },
+    `Move ${from} training to ${to}`,
+    `Moves your ${from} session to ${to}. Your training days become ${list}.`,
+    `Want me to move your ${from} training to ${to}? Your week becomes ${list}. Tap confirm and I'll update the schedule.`,
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Schedule grounding — correct a false premise about what is trained  */
+/*  on a given day, from the REAL program, instead of playing along.    */
+/* ------------------------------------------------------------------ */
+
+/** One weekday of the user's real program: its type, its lifts, and the muscle groups it trains. */
+export interface DaySchedule { weekday: string; dayType: string; exercises: string[]; muscles: string[] }
+
+/** User words → the canonical muscleGroup labels used in the exercise database. */
+const MUSCLE_ALIASES: Record<string, string[]> = {
+  chest: ['Chest'], pecs: ['Chest'], pec: ['Chest'],
+  back: ['Back'], lats: ['Back'], lat: ['Back'],
+  legs: ['Quads', 'Hamstrings & Glutes', 'Calves'], leg: ['Quads', 'Hamstrings & Glutes', 'Calves'],
+  quads: ['Quads'], quad: ['Quads'], thighs: ['Quads'],
+  hamstrings: ['Hamstrings & Glutes'], hams: ['Hamstrings & Glutes'], glutes: ['Hamstrings & Glutes'], glute: ['Hamstrings & Glutes'],
+  calves: ['Calves'], calf: ['Calves'],
+  shoulders: ['Shoulders'], shoulder: ['Shoulders'], delts: ['Shoulders'], delt: ['Shoulders'],
+  arms: ['Biceps', 'Triceps'], arm: ['Biceps', 'Triceps'],
+  biceps: ['Biceps'], bicep: ['Biceps'], triceps: ['Triceps'], tricep: ['Triceps'],
+  core: ['Core'], abs: ['Core'], ab: ['Core'],
+}
+
+function namedMuscle(m: string): { word: string; groups: string[] } | null {
+  for (const [word, groups] of Object.entries(MUSCLE_ALIASES)) {
+    if (new RegExp(`\\b${word}\\b`, 'i').test(m)) return { word, groups }
+  }
+  return null
+}
+
+function weekdayIn(m: string): WeekdayLit | null {
+  const match = m.toLowerCase().match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/)
+  return match ? ((match[1][0].toUpperCase() + match[1].slice(1)) as WeekdayLit) : null
+}
+
+function naturalList(items: readonly string[]): string {
+  const list = items.filter(Boolean)
+  if (list.length === 0) return ''
+  if (list.length === 1) return list[0]
+  return `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}`
+}
+
+/**
+ * Answer a schedule fact or CORRECT a false premise about a training day, grounded entirely in the real
+ * program. Returns dash-free reply text, or null when the message is not a schedule fact/claim (so it
+ * does not hijack ordinary turns). This is what stops the coach being "sucked in" to a wrong premise
+ * ("why the rest day today" when today is a training day; "chest on Monday" when Monday is Legs): the
+ * answer is computed from the program, never from the model. A two-weekday move request is left to
+ * synthesizeDayMoveProposal.
+ */
+export function synthesizeScheduleGroundedReply(userMessage: string, schedule: readonly DaySchedule[] = [], todayWeekday = ''): string | null {
+  if (typeof userMessage !== 'string' || !Array.isArray(schedule) || schedule.length === 0) return null
+  const m = userMessage.toLowerCase()
+  // Leave an explicit day-to-day move ("change monday to saturday") to the move synth.
+  if (/\b(move|change|switch|shift|swap)\b/.test(m) && (m.match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/g) || []).length >= 2) return null
+  // Do NOT hijack a motivation, "start/do today's workout" or "is it worth it" turn with a dry day
+  // listing; those go to the start-session action or a motivational reply.
+  if (/\b(can'?t be bothered|cant be bothered|do not want to|dont want to|don'?t want to|not feeling|no motivation|lost .*motivation|talk me into|worth it|be bothered|too lazy|unmotivated|let'?s (do|go|train)|do (today'?s|my|the) (workout|session)|quick session|15 min)\b/.test(m)) return null
+  // A "mark/set today as a rest day" is an ACTION request; let the catch-up action handle it.
+  if (/\b(mark|set|make|log)\b[\s\S]{0,20}\b(rest day|no.?penalty|exempt|doesn'?t count|does not count)\b/.test(m)) return null
+  // 500-prompt eval (#388/#407/#146): do NOT ground (list the day's workout) when the message carries an
+  // intoxication or compensatory / disordered-eating signal, or is a training-frequency question. Those
+  // need alcohol/recovery coaching, a disordered-eating referral, or a direct frequency answer, never a
+  // dry exercise listing. Suppressing the synth here lets the safety router / coaching model handle it.
+  if (/\b(hungover|hangover|big night|drunk|tipsy|wasted|hammered|had (a few )?(beers?|drinks?|wines?)|been drinking|smoked weed|stoned)\b/.test(m)) return null
+  if (/\b(ate too much|over ?ate|because i ate|to burn (it |that |the )?off|burn off (what|everything|the)|make up for|punish (myself|my body)|compensate)\b/.test(m)) return null
+  if (/\b(is that enough|is this enough|enough to (make|see|build|get|progress)|how many (days|times)|days? (a|per) week|times? (a|per) week)\b/.test(m)) return null
+
+  const byDay = new Map(schedule.map((d) => [d.weekday, d]))
+  const trainsGroup = (groups: string[]): WeekdayLit[] =>
+    WEEKDAY_LITS.filter((wd) => { const d = byDay.get(wd); return !!d && d.muscles.some((mg: string) => groups.includes(mg)) })
+
+  const muscle = namedMuscle(m)
+  const explicitDay = weekdayIn(m)
+  const saysToday = /\b(today|todays|today's|tonight|this (morning|afternoon|evening))\b/.test(m)
+  const scheduleCue = /\b(rest day|train|training|trained|gym|gymming|workout|work out|working out|session|schedule|split|do i|what do i|why|is it|meant to|supposed to|on)\b/.test(m) || !!muscle
+  const dislike = /\b(don'?t|do not|dont|hate|rather not|sick of|tired of|not a fan|not keen)\b/.test(m)
+
+  // Only engage a genuine schedule fact/claim: a named weekday, or a "today ..." schedule question.
+  const targetDay: WeekdayLit | null = explicitDay ?? (saysToday && WEEKDAY_LITS.includes(todayWeekday as WeekdayLit) ? (todayWeekday as WeekdayLit) : null)
+  if (!targetDay || !scheduleCue) return null
+
+  const day = byDay.get(targetDay)
+  const isRest = !day
+  const dayNoun = (saysToday && targetDay === todayWeekday) ? `Today (${targetDay})` : targetDay
+
+  // Muscle premise: "chest on Monday", "why legs on Friday", "I don't like chest on Monday".
+  if (muscle) {
+    const onDays = trainsGroup(muscle.groups)
+    const dayHasIt = !isRest && day!.muscles.some((mg: string) => muscle.groups.includes(mg))
+    if (dayHasIt) {
+      return `Yes, ${dayNoun} is your ${day!.dayType} day and it trains ${muscle.word}: ${naturalList(day!.exercises)}.`
+    }
+    // The claimed muscle is NOT on that day: correct it plainly and point to the real day(s).
+    const where = onDays.length ? `Your ${muscle.word} work is on ${naturalList(onDays)}.` : `Your program does not have a dedicated ${muscle.word} day right now.`
+    const what = isRest ? `${dayNoun} is a rest day, so there is no training then.` : `${dayNoun} is your ${day!.dayType} day: ${naturalList(day!.exercises)}.`
+    return `You do not train ${muscle.word} on ${targetDay}. ${what} ${where}`
+  }
+
+  // No muscle named: a plain "what/why do I train on <day>" or a "don't want to train on <day>".
+  if (isRest) {
+    return `${dayNoun} is a rest day in your program, so nothing is scheduled then. Recovery is part of the plan, not a gap in it.`
+  }
+  const lifts = naturalList(day!.exercises)
+  if (/\brest day\b/.test(m)) {
+    return `${dayNoun} is not a rest day, it's your ${day!.dayType} day: ${lifts}.`
+  }
+  if (dislike) {
+    return `${dayNoun} is your ${day!.dayType} day: ${lifts}. Want to move it to another day? Tell me which day and I'll update your schedule.`
+  }
+  return `${dayNoun} is your ${day!.dayType} day: ${lifts}.`
+}
+
+/* ------------------------------------------------------------------ */
+/*  Memory learning — reliably capture durable facts the model misses  */
+/* ------------------------------------------------------------------ */
+
+/** Equipment nouns we can recognise with confidence in a durable-setup statement. */
+const EQUIP_NOUN = /\b(dumbbells?|barbell|kettlebells?|resistance bands?|bands?|bench|squat rack|power rack|rack|pull[ -]?up bar|machines?|cables?|smith machine|leg press)\b/gi
+
+/**
+ * Capture a HIGH-CONFIDENCE durable training fact the small model routinely fails to store: where the
+ * user trains and what equipment they have. Returns a memory candidate whose evidenceQuote is an exact
+ * slice of the message (the save path re-checks that), or null. Deliberately narrow, a wrong memory is
+ * worse than none, so only unambiguous setup statements match. Non-sensitive, stable scope. This is the
+ * app "learning" the user, done in our code, never by changing the model.
+ */
+export function synthesizeMemoryFromMessage(userMessage: string): CoachMemoryCandidate | null {
+  if (typeof userMessage !== 'string') return null
+  const m = userMessage.trim()
+  const lower = m.toLowerCase()
+
+  // Trains at home.
+  const home = lower.match(/\b(?:i|we)\s+(?:train|work\s?out|lift|exercise)\s+(?:at|from)\s+home\b/) ||
+    lower.match(/\b(?:i|we)\s+(?:have|have got|got)\s+a\s+home\s+gym\b/) || lower.match(/\bhome\s+gym\b/)
+  if (home) return { category: 'Training location', value: 'Trains at home', evidenceQuote: home[0], scope: 'stable', sensitivity: 'ordinary' }
+
+  // Equipment they do NOT have.
+  const missing = lower.match(/\b(?:no|don'?t have|do not have|dont have|without)\s+(?:a\s+|an\s+|any\s+)?(dumbbells?|barbell|kettlebells?|bench|squat rack|power rack|rack|pull[ -]?up bar|machines?|cables?|gym access|equipment)\b/)
+  if (missing) return { category: 'Equipment', value: `Does not have a ${missing[1]}`, evidenceQuote: missing[0], scope: 'stable', sensitivity: 'ordinary' }
+
+  // A constrained "I only have …" setup.
+  if (/\bonly\b/.test(lower) && /\b(?:i|we)\s+(?:only\s+)?(?:have|have got|got|own)\b/.test(lower)) {
+    const nouns = [...new Set((lower.match(EQUIP_NOUN) || []).map((x) => x.toLowerCase().trim()))]
+    if (nouns.length) {
+      const idx = lower.indexOf('only')
+      const quote = m.slice(idx, Math.min(m.length, idx + 60)).trim()
+      return { category: 'Equipment', value: `Only has ${nouns.join(', ')}`, evidenceQuote: quote, scope: 'stable', sensitivity: 'ordinary' }
+    }
+  }
+  return null
+}
+
+/**
+ * A request to "swap / rearrange / move my (training/exercise) DAYS" is a training-DAY reschedule, NOT
+ * an exercise swap. flash-lite sometimes latches onto "swap"/"exercise" and emits an exercise `swap`
+ * proposal for it (e.g. "swap Barbell Back Squat for Front Squat" when the user asked to move their
+ * days around). This detects the day-scheduling intent — in the current message, OR in a bare
+ * affirmation ("yes") following such a request in the recent turns — so the coach turn can drop the
+ * wrong swap and ask which days. Requires the PLURAL "days" so "swap the bench on my leg day" (a real
+ * exercise swap) does NOT match.
+ */
+export function isDayRescheduleIntent(message: string, recentTurns: readonly string[] = []): boolean {
+  const DAY = /\b(swap|switch|rearrang\w*|reorder|shuffle|move|change|shift)\b[^.?!]{0,40}\bdays\b/i
+  const AFFIRM = /^\s*(yes|yeah|yep|yup|sure|ok(?:ay)?|please|do it|go ahead|sounds good|confirm|correct|that'?s right)\b/i
+  if (typeof message !== 'string') return false
+  if (DAY.test(message)) return true
+  if (AFFIRM.test(message)) return recentTurns.slice(-3).some((t) => typeof t === 'string' && DAY.test(t))
+  return false
 }
 
 export interface SynthProfileGoalProposal {
@@ -427,7 +729,6 @@ export interface SynthProfileGoalProposal {
 export type SynthWellnessGoalProposal = SynthProfileGoalProposal
 
 const _WELLNESS_SET_INTENT = /\b(set|change|adjust|make|update|raise|lower|increase|decrease|bump|move|put|lift|drop)\b/i
-const _WELLNESS_GOAL_WORD = /\b(goal|target)\b/i
 
 function roundForMetric(metric: WellnessMetricLit, value: number): number {
   return metric === 'steps' ? Math.round(value) : Math.round(value * 10) / 10
@@ -444,16 +745,28 @@ function roundForMetric(metric: WellnessMetricLit, value: number): number {
  */
 interface SwapCandidateExercise { id: string; name: string; topSwap?: { id: string; name: string } }
 const SWAP_INTENT = /\b(don'?t\s+(?:like|enjoy|want)|do\s+not\s+(?:like|enjoy|want)|dislike|hate|swap|replace|change|switch|drop|remove|sick\s+of|bored\s+(?:of|with)|tired\s+of|get\s+rid\s+of)\b/i
+/** Generic position, anatomy, equipment and filler tokens that must NOT drive an exercise match (stems,
+ *  final "s" already stripped). Distinctive movement nouns like row, press, curl, squat, lunge stay. */
+const SWAP_STOP = new Set([
+  'back', 'front', 'upper', 'lower', 'seated', 'standing', 'incline', 'decline', 'barbell', 'dumbbell',
+  'kettlebell', 'cable', 'machine', 'bar', 'smith', 'weighted', 'band', 'the', 'and', 'for', 'with',
+  'exercise', 'workout', 'different', 'something', 'anything', 'please', 'want', 'like', 'dont', 'hate',
+  'program', 'programme', 'plan', 'week', 'day', 'out', 'that', 'this', 'some', 'give', 'another',
+  'option', 'instead', 'need', 'stuff', 'thing', 'one', 'can', 'you', 'every', 'same', 'bored',
+])
 export function synthesizeSwapProposal(userMessage: string, exercises: SwapCandidateExercise[]): SynthActionProposal | null {
   if (typeof userMessage !== 'string' || !Array.isArray(exercises) || !exercises.length) return null
   const m = userMessage.trim().toLowerCase()
   if (!m || !SWAP_INTENT.test(m)) return null
-  // Match the named exercise by token overlap (equipment words rarely appear, so they just score 0).
-  const msgTokens = new Set(m.replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).map((w) => w.replace(/s$/, '')).filter((w) => w.length >= 3))
+  // Match the named exercise by DISTINCTIVE token overlap. Generic position, anatomy and equipment
+  // words (back, front, upper, lower, seated, barbell, dumbbell...) are excluded, otherwise "my lower
+  // back is sore" would match "Barbell Back Squat" and "a different back exercise" would swap the squat.
+  const tokenize = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).map((w) => w.replace(/s$/, '')).filter((w) => w.length >= 3 && !SWAP_STOP.has(w))
+  const msgTokens = new Set(tokenize(m))
   let best: { ex: SwapCandidateExercise; score: number } | null = null
   for (const ex of exercises) {
     if (!ex || typeof ex.id !== 'string' || !SAFE_ID.test(ex.id) || typeof ex.name !== 'string') continue
-    const nameTokens = ex.name.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).map((w) => w.replace(/s$/, '')).filter((w) => w.length >= 3)
+    const nameTokens = tokenize(ex.name)
     const score = nameTokens.reduce((n, t) => n + (msgTokens.has(t) ? 1 : 0), 0)
     if (score > 0 && (!best || score > best.score)) best = { ex, score }
   }
@@ -491,8 +804,10 @@ export function synthesizeSwapProposal(userMessage: string, exercises: SwapCandi
  */
 export function synthesizeWellnessGoalProposal(userMessage: string): SynthWellnessGoalProposal | null {
   if (typeof userMessage !== 'string') return null
-  const m = userMessage.toLowerCase()
-  if (!_WELLNESS_SET_INTENT.test(m) || !_WELLNESS_GOAL_WORD.test(m)) return null
+  const m = userMessage.toLowerCase().replace(/(\d),(\d)/g, '$1$2') // "10,000" -> "10000"
+  // A set/change verb OR an intent to hit/aim for a value, so "I want to hit 8 hours of sleep, set that"
+  // works even without the literal word "goal". The metric + absolute number are still required.
+  if (!(_WELLNESS_SET_INTENT.test(m) || /\b(hit|aim(?:ing)?\s+for|get\s+to|reach|do)\b/.test(m))) return null
   if (/\bby\s+\d/.test(m)) return null // relative change ("increase by 1") — needs the current value; let the model handle it
   const metric: WellnessMetricLit | null =
     /\b(water|hydration|fluid)\b/.test(m) ? 'water'
@@ -567,8 +882,11 @@ export interface SynthExerciseNavProposal {
   message: string
 }
 
+// A genuine "how to PERFORM this lift" / form / technique request. Deliberately excludes non-exercise
+// "how do i (know|get|get past|feel|fix)…" questions (overtraining, a plateau, motivation) which must
+// not trigger an exercise technique guide. A bare "how do i <movement>" (squat, deadlift…) still counts.
 const _EXERCISE_HELP_INTENT =
-  /\b(how (?:do (?:i|you)|to|should i)|show me|teach me|demonstrate|walk me through|what(?:'s| is) the (?:form|technique)|form for|technique for|cues? for)\b/i
+  /\b(form|technique|proper\s+form|cues?\s+for|form\s+cues?|show\s+me\s+how|demonstrate|walk\s+me\s+through|teach\s+me\s+(?:how|to)|how\s+(?:do\s+i|to|should\s+i|can\s+i)\s+(?:do|perform|execute|squat|deadlift|bench|press|row|curl|lunge|hinge))\b/i
 
 /**
  * Deterministic backstop for "show me how to do the bench press" (Capability Plan §7 — open the
@@ -688,6 +1006,19 @@ export function synthesizeTechniqueAnswer(userMessage: string, exercises: Techni
   if (ex.commonMistake) lines.push(`Common mistake to avoid: ${ex.commonMistake}`)
   lines.push('Open the guide below for the full walkthrough and a form clip.')
   return lines.join(' ')
+}
+
+/**
+ * A tiny deterministic answer for the common "how low / how deep should I squat" depth question, which
+ * the small model tends to misread as a reps-in-reserve question. Dash-free. Returns null otherwise.
+ */
+export function synthesizeDepthFactAnswer(userMessage: string): string | null {
+  if (typeof userMessage !== 'string') return null
+  const t = userMessage.toLowerCase()
+  if (/\bhow\s+(?:low|deep|far\s+down)\b/.test(t) && /\bsquat/.test(t)) {
+    return 'For squats, aim to break at least to parallel, where your hip crease drops to about the top of your knees, and go deeper if you can keep a neutral spine and your heels flat. A full, controlled range of motion builds more than piling on weight with a shallow one.'
+  }
+  return null
 }
 
 /* ------------------------------------------------------------------ */
@@ -813,6 +1144,42 @@ export function proposalSurfacingIssue(
     const implausible = Number.isFinite(prValue) && (prValue > loggedMax * 1.5 + 20 || prValue > 500)
     if (noLoggedPRs || implausible) {
       return { reason: 'pr_unbacked', coachLine: "I can only celebrate a personal record you've actually logged, and I don't see that one in your recent sessions, so I won't post it. Log the lift and I'll help you share a real PR." }
+    }
+  }
+  return null
+}
+
+/** The coach's fixed refusal for a fabricated exercise id (AD09), shared so the conversational-path
+ *  guard and any future caller stay identical. */
+export const FABRICATED_EXERCISE_ID_LINE =
+  "I don't recognise an exercise with that id, so I won't swap it in. Tell me the exercise by name and I'll match it to a real, safe option from your program."
+
+/**
+ * AD09 conversational-path guard. Real exercise ids have the shape `[A-Z]{2}\d{2}` (e.g. CH01), so a
+ * fabricated id like `ZZ99` is *shaped* like a real one and can only be caught by checking it against
+ * the real exercise set. `proposalSurfacingIssue` above only fires when the model emits a structured
+ * `workout_action`; when the model answers CONVERSATIONALLY (no proposal) it can still offer to "swap
+ * in ZZ99". This catches an id-shaped token that is NOT a real exercise when the user frames it as an
+ * exercise or as a swap/replace/sub-in target — regardless of whether a proposal was emitted — so the
+ * coach never treats a made-up id as real.
+ *
+ * `validExerciseIds` is the GLOBAL exercise universe (every real id — see `VALID_EXERCISE_IDS`), so a
+ * real exercise the user does not currently have still swaps in fine; only ids that exist in NO
+ * exercise are refused. Returns the offending upper-cased token, or null. Bare `id`/`sub`/`add` and
+ * digit-led training notation (`3x5`, `5RM`, `80kg`) deliberately do NOT match.
+ */
+export function fabricatedExerciseIdInMessage(message: string, validExerciseIds: ReadonlySet<string>): string | null {
+  if (validExerciseIds.size === 0) return null // no-snapshot path (tests / empty context)
+  const notReal = (tok: string): boolean => !validExerciseIds.has(tok.toUpperCase())
+  // (a) framed as an exercise, in ANY context: "exercise ZZ99", "movement AB12", "lift ZZ01".
+  const framed = message.match(/\b(?:exercise|movement|lift)\s+(?:number\s+|id\s+)?([A-Za-z]{2}\d{2})\b/i)
+  if (framed && notReal(framed[1])) return framed[1].toUpperCase()
+  // (b) in an exercise-SWAP context, ANY id-shaped token that is not a real exercise is fabricated —
+  // this covers both the swapped-in and the swapped-for target ("swap out CH01 for QZ77"). Bare
+  // `use`/`add` and digit-led notation (`3x5`, `5RM`, `80kg`) do not qualify.
+  if (/\b(?:swap\w*|replac\w*|substitut\w*|sub\s+in|sub\s+out|put\s+in)\b/i.test(message)) {
+    for (const tok of message.match(/\b[A-Za-z]{2}\d{2}\b/g) ?? []) {
+      if (notReal(tok)) return tok.toUpperCase()
     }
   }
   return null

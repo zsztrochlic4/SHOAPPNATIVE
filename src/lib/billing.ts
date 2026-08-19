@@ -2,6 +2,7 @@ import { Platform } from 'react-native'
 import * as WebBrowser from 'expo-web-browser'
 import { httpsCallable } from 'firebase/functions'
 import { functions, firebaseEnabled } from './firebase'
+import { DEFAULT_PLAN, type PlanId } from './plans'
 
 /**
  * Client side of the Stripe paywall. Asks the trusted backend
@@ -31,7 +32,7 @@ function returnUrls(): { successUrl: string; cancelUrl: string } {
 /** Result of a checkout attempt: whether the user came back via success. */
 export type CheckoutOutcome = 'opened' | 'success' | 'cancel' | 'dismiss'
 
-export async function startCheckout(email?: string): Promise<CheckoutOutcome> {
+export async function startCheckout(plan: PlanId = DEFAULT_PLAN, email?: string): Promise<CheckoutOutcome> {
   if (!firebaseEnabled || !functions) throw new Error('Billing is not configured')
   const { successUrl, cancelUrl } = returnUrls()
   const isWeb = Platform.OS === 'web' && typeof window !== 'undefined'
@@ -46,10 +47,10 @@ export async function startCheckout(email?: string): Promise<CheckoutOutcome> {
 
   try {
     const call = httpsCallable<
-      { email?: string; successUrl: string; cancelUrl: string },
+      { plan: PlanId; email?: string; successUrl: string; cancelUrl: string },
       { url: string }
     >(functions, 'createCheckoutSession', { timeout: 30_000 })
-    const { data } = await call({ email, successUrl, cancelUrl })
+    const { data } = await call({ plan, email, successUrl, cancelUrl })
 
     if (isWeb) {
       if (win && !win.closed) {

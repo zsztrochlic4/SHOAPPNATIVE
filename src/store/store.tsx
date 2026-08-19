@@ -138,6 +138,9 @@ export type Action =
   | { type: 'TOGGLE_REST_DAY'; dateKey: string }
   | { type: 'GRANT_WEEKLY_FREEZE'; weekKey: string }
   | { type: 'SET_LEAGUE'; tier: number; weekKey: string; seasonWins?: number }
+  // Moderation: block/unblock a user (hidden from boards + feeds locally).
+  | { type: 'BLOCK_USER'; uid: string }
+  | { type: 'UNBLOCK_USER'; uid: string }
   // Replace the local group cache with the server's copy (backend hydration).
   | { type: 'SET_COMMUNITY_GROUPS'; groups: CommunityGroup[] }
   | { type: 'MARK_NOTIF_READ'; id: string }
@@ -839,6 +842,22 @@ function reducer(state: AppState, action: Action): AppState {
     // Backend hydration: replace the local group cache with the server's copy.
     case 'SET_COMMUNITY_GROUPS':
       return { ...state, community: { ...state.community, groups: action.groups } }
+
+    // Moderation: block a user. Their rows/activity are filtered out of every
+    // board and feed locally (see communitySelectors). Can't block yourself.
+    case 'BLOCK_USER': {
+      const uid = action.uid
+      if (!uid || uid === state.community.username) return state
+      const current = state.community.blockedUids ?? []
+      if (current.includes(uid)) return state
+      return { ...state, community: { ...state.community, blockedUids: [...current, uid] } }
+    }
+
+    case 'UNBLOCK_USER':
+      return {
+        ...state,
+        community: { ...state.community, blockedUids: (state.community.blockedUids ?? []).filter((u) => u !== action.uid) },
+      }
 
     // Commit the user's league placement (client simulation now; server on rollover later).
     case 'SET_LEAGUE':

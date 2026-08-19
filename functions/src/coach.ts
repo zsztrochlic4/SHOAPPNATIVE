@@ -3,6 +3,7 @@ import { defineSecret } from 'firebase-functions/params'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { getFirestore } from 'firebase-admin/firestore'
 import { requireVerifiedUser, APP_CHECK_ENFORCED } from './lib/guards'
+import { stripDashPunctuation } from './_shared/lib/sanitize'
 import { enforceDailyLimit, enforceBurstLimit, enforceGlobalDailyLimit } from './lib/rateLimit'
 import { coachKillSwitch, coachActionsSwitch } from './killSwitchRemote'
 import { callWithResilience } from './lib/providerResilience'
@@ -34,7 +35,7 @@ import {
   STRUCTURED_COACH_RESPONSE_SCHEMA,
   validateStructuredCoachReply,
 } from './_shared/backend/coach/structuredResponse'
-import { synthesizeBoundedActionProposal, synthesizeWellnessGoalProposal, synthesizeGoalWeightProposal, synthesizeSwapProposal, synthesizeExerciseDetailNav, synthesizeTechniqueAnswer, synthesizeMealPlanReview, proposalSurfacingIssue, proposalDestinationIssue } from './_shared/backend/coach/workoutActions'
+import { synthesizeBoundedActionProposal, synthesizeWellnessGoalProposal, synthesizeGoalWeightProposal, synthesizeSwapProposal, synthesizeDayMoveProposal, synthesizeScheduleGroundedReply, synthesizeMemoryFromMessage, synthesizeExerciseDetailNav, synthesizeTechniqueAnswer, synthesizeDepthFactAnswer, synthesizeMealPlanReview, proposalSurfacingIssue, proposalDestinationIssue, fabricatedExerciseIdInMessage, FABRICATED_EXERCISE_ID_LINE, isDayRescheduleIntent, dayRescheduleAsk } from './_shared/backend/coach/workoutActions'
 import { isOwnPlanReview, normalize as normalizeCoachText } from './_shared/backend/coach/safety/rules'
 import { synthesizeAppHelpAnswer, verifiedRouteAnswer, APP_ROUTE_MENU } from './_shared/backend/coach/appRoutes'
 import type {
@@ -145,7 +146,8 @@ export interface CoachTurnDeps {
 }
 
 const asResponse = (r: { text: string; buttons: ContactButton[] }): CoachTurnResult => ({
-  text: r.text,
+  text: stripDashPunctuation(r.text), // owner rule: no dashes in any coach output, incl. fixed safety replies
+
   buttons: r.buttons,
   blocked: true,
   mode: 'safety',
@@ -206,6 +208,9 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
         memoryEnabled: false,
         coachingStyle: 'balanced' as const,
         programExercises: [],
+        trainingDays: [],
+        programSchedule: [],
+        todayWeekday: '',
         validExerciseIds: new Set<string>(),
       }
   const ctx = turnData.context
@@ -290,15 +295,47 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
   let replyMessage = structured.message
   let replyProposal = structured.proposal
   let suppressMemory = false
-  if (allowActions) {
+  // True once a schedule/day-reschedule deterministic backstop has authored the reply this turn. These
+  // are more specific, program-data-grounded answers (they name the user's real training days), so the
+  // generic app-route grounding below must NOT overwrite them with a "go to Settings" route relay.
+  let scheduleReplyOwned = false
+  // GROUNDING FIRST (correctness over agreeableness): if the user asks about, or asserts, what is
+  // trained on a given day ("why the rest day today", "I don't like chest on Monday"), answer from the
+  // REAL program schedule and correct a false premise, instead of letting the small model play along or
+  // fabricate a justification. This overrides the model text and suppresses any action for the turn, so
+  // the coach never swaps a lift on a day the user is simply wrong about.
+  const scheduleGrounded = synthesizeScheduleGroundedReply(message, turnData.programSchedule, turnData.todayWeekday)
+  if (scheduleGrounded) {
+    replyMessage = scheduleGrounded
+    replyProposal = { kind: 'none' }
+    suppressMemory = true
+    scheduleReplyOwned = true
+  }
+  if (allowActions && !scheduleGrounded) {
     const emittedAction = replyProposal.kind === 'workout_action' ? String(replyProposal.payload?.action ?? '') : ''
     const alreadyAction = emittedAction.length > 0
     if (!alreadyAction) {
-      const synth = synthesizeWellnessGoalProposal(message) ?? synthesizeGoalWeightProposal(message) ?? synthesizeSwapProposal(message, turnData.programExercises) ?? synthesizeBoundedActionProposal(message, new Date(`${deps.todayKey}T12:00:00`))
+      const synth = synthesizeWellnessGoalProposal(message) ?? synthesizeGoalWeightProposal(message) ?? synthesizeDayMoveProposal(message, turnData.trainingDays) ?? synthesizeSwapProposal(message, turnData.programExercises) ?? synthesizeBoundedActionProposal(message, new Date(`${deps.todayKey}T12:00:00`))
       if (synth) {
         replyProposal = { kind: 'workout_action', title: synth.title, summary: synth.summary, payload: synth.payload }
         replyMessage = synth.message
         suppressMemory = true // never also store the requested value as a memory
+      }
+    }
+    // Day-reschedule misroute + redundancy guard: "swap/rearrange/change my (training) DAYS" is a
+    // training-DAY change, not an exercise swap. When the intent is a day reschedule but this turn has
+    // no concrete day-set proposal (the model mis-emitted an exercise swap, OR just asked in prose
+    // whether they'd like to change days), skip straight to the single question that moves it forward:
+    // name the days they train now and ask which days they want, in one reply. This removes the
+    // re-confirm, then ask, then make-the-user-ask loop; when they DO name days the synth above already
+    // produced the confirm card, so that path is left untouched.
+    if (isDayRescheduleIntent(message, recent)) {
+      const emitted = replyProposal.kind === 'workout_action' ? String(replyProposal.payload?.action ?? '') : ''
+      if (emitted !== 'set_training_days' && emitted !== 'reschedule_days') {
+        replyProposal = { kind: 'none' }
+        replyMessage = dayRescheduleAsk(turnData.trainingDays)
+        suppressMemory = true
+        scheduleReplyOwned = true
       }
     }
   }
@@ -315,9 +352,29 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
   // Deterministic technique answer (coach actionability): the small model unreliably picks the RIGHT
   // lift's cues from a multi-exercise context (it gave squat cues for a bench-press question), so when
   // the user asks how to do a SPECIFIC program lift, answer straight from that lift's reviewed fields.
-  // Correct exercise guaranteed; the guide card (nav backstop above) still offers the full walkthrough.
+  // Correct exercise guaranteed. It ALSO owns the card for this turn: attach the technique guide (or
+  // nothing), so a stray model action can never sit under a technique answer.
   const techAnswer = synthesizeTechniqueAnswer(message, turnData.programExercises)
-  if (techAnswer) replyMessage = techAnswer
+  if (techAnswer) {
+    replyMessage = techAnswer
+    const navSynth = synthesizeExerciseDetailNav(message)
+    replyProposal = navSynth ? { kind: 'navigation', title: navSynth.title, summary: navSynth.summary, payload: { overlay: navSynth.overlay, exercise: navSynth.exercise } } : { kind: 'none' }
+  }
+  // Deterministic depth answer: "how low should I squat" is about range of motion, not reps in reserve.
+  const depthAnswer = synthesizeDepthFactAnswer(message)
+  if (depthAnswer) replyMessage = depthAnswer
+
+  // PHANTOM CONFIRM-CARD GUARD: the small model sometimes PARROTS a confirm-card lead-in it saw earlier
+  // in the thread ("Want me to move your Monday training to Saturday? Tap confirm…") WITHOUT emitting the
+  // structured action, so the reply promises a button that never renders. When there is no real proposal
+  // this turn but the text imitates a confirm offer, replace it with an honest clarifier so the coach
+  // never dangles a confirm it cannot deliver.
+  if (replyProposal.kind === 'none') {
+    const t = replyMessage.toLowerCase()
+    const phantom = /\btap confirm\b/.test(t) || /\byour week becomes\b/.test(t) ||
+      (/\bwant me to\b/.test(t) && /\b(swap|move|change|update|set|reschedule|adjust)\b/.test(t) && /\bconfirm\b/.test(t))
+    if (phantom) replyMessage = "I can set that up for you. Tell me exactly what you'd like to change and I'll put it through for you to confirm."
+  }
 
   // Deterministic app-route grounding: the model recalls app navigation at ~22% accuracy (it invents
   // tabs like "Log" and controls like "Quick Toggles", or points to the wrong screen), and instruction
@@ -332,7 +389,9 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
   // phrasings), then the model's constrained route classification (structured.appRouteId) for anything
   // it missed — the model maps any wording to a real id and we relay the VERIFIED route for it, so this
   // generalises to unseen phrasings without letting the model invent a path.
-  if (replyProposal.kind !== 'workout_action') {
+  // Deferred when a schedule/day-reschedule backstop already owns the reply: those name the user's real
+  // training days and are the more specific answer, so a generic route relay must not clobber them.
+  if (replyProposal.kind !== 'workout_action' && !scheduleReplyOwned) {
     const routeAnswer = synthesizeAppHelpAnswer(message) ?? verifiedRouteAnswer((structured as { appRouteId?: string }).appRouteId)
     if (routeAnswer) replyMessage = routeAnswer
   }
@@ -378,9 +437,24 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
     replyProposal = { kind: 'none' }
   }
 
+  // AD09 conversational-path guard: the proposal guard above only fires on a structured workout_action.
+  // When the model answers conversationally it can still offer to "swap in ZZ99" (a fabricated but
+  // real-SHAPED id). This checks the USER MESSAGE so it fires whether or not a proposal was emitted —
+  // the coach never treats a made-up exercise id as real.
+  if (turnData.validExerciseIds.size > 0 && fabricatedExerciseIdInMessage(message, turnData.validExerciseIds)) {
+    replyProposal = { kind: 'none' }
+    safe = FABRICATED_EXERCISE_ID_LINE
+  }
+
+  // Memory learning: prefer the model's extracted fact (unless this turn stored an action value), and
+  // fall back to a deterministic high-confidence capture of durable setup facts (trains at home, only
+  // has dumbbells) that the small model routinely misses. The save path re-checks the evidence quote,
+  // dedups and caps, and the user can see/edit/clear everything in the coach memory settings.
   let memory: CoachMemory | null = null
-  if (!suppressMemory && turnData.memoryEnabled && structured.memory && deps.saveMemory) {
-    memory = await deps.saveMemory(uid, message, structured.memory)
+  const modelMemory = suppressMemory ? null : structured.memory
+  const memoryToSave = modelMemory ?? synthesizeMemoryFromMessage(message)
+  if (turnData.memoryEnabled && memoryToSave && deps.saveMemory) {
+    memory = await deps.saveMemory(uid, message, memoryToSave)
   }
   let proposal: CoachActionProposal | null = null
   // Defence in depth: a workout_action is only ever surfaced when the client opted into
@@ -389,8 +463,8 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
   if (proposalAllowed && replyProposal.kind !== 'none' && replyProposal.title && replyProposal.summary && deps.saveProposal) {
     proposal = await deps.saveProposal(uid, {
       kind: replyProposal.kind,
-      title: replyProposal.title,
-      summary: replyProposal.summary,
+      title: stripDashPunctuation(replyProposal.title), // no dashes on the confirm card either
+      summary: stripDashPunctuation(replyProposal.summary),
       payload: replyProposal.payload ?? {},
     })
   }
@@ -401,7 +475,7 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
     memoryId: memory?.id ?? null,
     proposalId: proposal?.id ?? null,
   })
-  return { text: safe, blocked: false, buttons: [], mode: structured.mode, citations, memory, proposal }
+  return { text: stripDashPunctuation(safe), blocked: false, buttons: [], mode: structured.mode, citations, memory, proposal }
 }
 
 /** Read the caller's stored DOB from the canonical backendUser record. Missing/unreadable stays null (fail-closed). */

@@ -22,6 +22,7 @@ import {
   readCachedCoachWorkspace,
   respondToCoachProposal,
   recordCoachActionOutcome,
+  recordCoachFeedback,
   flushCoachActionOutcomeOutbox,
 } from '../lib/coachWorkspace'
 import { writeBackendUser } from '../backend/repo/userRepo'
@@ -91,6 +92,7 @@ export function useCoachChat({ active }: { active: boolean }) {
   const [replyingTo, setReplyingTo] = useState<{ role: 'user' | 'coach'; text: string } | null>(null)
   const [coachConsented, setCoachConsented] = useState<boolean | null>(null)
   const [retryMsg, setRetryMsg] = useState<string | null>(null)
+  const [feedbackGiven, setFeedbackGiven] = useState(false)
 
   const sendSeqRef = useRef(0)
   const requestKeyRef = useRef<string | null>(null)
@@ -102,6 +104,16 @@ export function useCoachChat({ active }: { active: boolean }) {
   const hasHistory = messages.some((m) => m.role === 'user')
   const hasText = text.trim().length > 0
   const coachName = coachDisplayName(state.profile.coachName)
+
+  // One end-of-chat rating (live coach only): shown once the user has exchanged messages and a coach
+  // reply exists, recorded best-effort, then dismissed for the rest of this session. A "not helpful"
+  // rating is what the review pass turns into a new coach eval case (the accuracy flywheel).
+  const showFeedback = hasHistory && messages.some((m) => m.role === 'coach') && !feedbackGiven && !typing && !COACH_SCRIPTED
+  const submitFeedback = useCallback((helpful: boolean) => {
+    setFeedbackGiven(true)
+    void recordCoachFeedback(helpful ? 'helpful' : 'not_helpful')
+    toast('Thanks, that helps me improve.')
+  }, [toast])
 
   // Session-scoped affordances drop when the surface is dismissed. A confirmed action left
   // unresolved is terminalised as failed so its journal entry can't sit at pending forever.
@@ -497,5 +509,7 @@ export function useCoachChat({ active }: { active: boolean }) {
     shareDraft,
     applyingProposalId,
     failedApply,
+    showFeedback,
+    submitFeedback,
   }
 }

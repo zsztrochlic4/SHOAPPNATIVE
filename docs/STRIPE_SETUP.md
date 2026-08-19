@@ -1,11 +1,15 @@
 # Stripe paywall setup
 
-The paywall (4-week free trial → **$2.99/week AUD**) uses **Stripe Checkout**
-(hosted redirect) plus three Cloud Functions in `functions/src/billing.ts`:
+The paywall sells **two plans** via **Stripe Checkout** (hosted redirect):
+
+- **Weekly** — 4-week free trial, then **$2.00/week AUD**.
+- **Annual** — **$90 AUD upfront** for 52 weeks (~$1.73/week), charged today (no trial).
+
+Backed by three Cloud Functions in `functions/src/billing.ts`:
 
 | Function | Type | Purpose |
 |---|---|---|
-| `createCheckoutSession` | callable | Returns a hosted Checkout URL (starts the trial). |
+| `createCheckoutSession` | callable | Returns a hosted Checkout URL for the chosen plan (`plan: 'weekly' \| 'annual'`). |
 | `createBillingPortalSession` | callable | Returns a Billing Portal URL (Restore / manage / cancel). |
 | `stripeWebhook` | HTTPS | The **only** writer of `entitlements/{uid}` — the authoritative paid record the app reads. |
 
@@ -15,23 +19,27 @@ via `src/store/BillingSync.tsx`; the paywall gate is `isEntitled` in
 `src/store/selectors.ts`. Nothing here changes demo mode — with Firebase off,
 `isEntitled` is always true and the paywall never shows.
 
-## 1. Create the product & price (Stripe Dashboard, **Test mode** first)
+## 1. Create the product & prices (Stripe Dashboard, **Test mode** first)
 
 1. Dashboard → **Products** → **Add product**: name it e.g. "StrengthHub Online".
-2. Add a **recurring** price: **AUD 2.99 / week**. Save.
-3. Copy the **price id** (`price_…`). This is `STRIPE_PRICE_ID` below.
-   (The 28-day free trial is applied in code via `trial_period_days`, not on the
-   price — so you don't configure the trial in the Dashboard.)
+2. Add **two recurring prices** on that product:
+   - **AUD 2.00 / week** → its price id is `STRIPE_PRICE_ID` (weekly).
+   - **AUD 90.00 / year** → its price id is `STRIPE_PRICE_ID_ANNUAL` (annual).
+3. Copy both **price ids** (`price_…`).
+   (The 28-day free trial for the weekly plan is applied in code via
+   `trial_period_days`, not on the price — so you don't configure the trial in
+   the Dashboard. The annual plan is charged today, with no trial.)
 
 ## 2. Set the backend secrets
 
-The secret key, webhook secret and price id are **Function secrets** — never in
-`.env`, never committed:
+The secret key, webhook secret and both price ids are **Function secrets** —
+never in `.env`, never committed:
 
 ```bash
-firebase functions:secrets:set STRIPE_SECRET_KEY        # sk_test_… (then sk_live_… for prod)
+firebase functions:secrets:set STRIPE_SECRET_KEY         # sk_test_… (then sk_live_… for prod)
 firebase functions:secrets:set STRIPE_WEBHOOK_SECRET     # whsec_… (from step 4)
-firebase functions:secrets:set STRIPE_PRICE_ID           # price_… (from step 1)
+firebase functions:secrets:set STRIPE_PRICE_ID           # price_… weekly (from step 1)
+firebase functions:secrets:set STRIPE_PRICE_ID_ANNUAL    # price_… annual (from step 1)
 ```
 
 ## 3. Set the client publishable key
