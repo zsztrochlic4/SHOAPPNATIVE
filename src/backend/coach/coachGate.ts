@@ -15,6 +15,13 @@
  * `EXPO_PUBLIC_COACH_RELEASE_CHANNEL=internal` (client). Every unconfigured and shipping build
  * defaults to disabled.
  *
+ * DEFENCE IN DEPTH — this env flag is NOT the only server gate. `runCoachTurn` (functions/src/coach.ts)
+ * ALSO requires a server-authoritative, default-CLOSED Firestore flag `config/coach.releaseEnabled`
+ * (see `coachReleaseGate` in functions/src/killSwitchRemote.ts). Both must be true for the server to
+ * serve a turn, so a build whose env accidentally carried `internal` can never open production on the
+ * env var alone — the Firestore flag defaults closed and is set/revoked live, no redeploy, like the
+ * kill switch. This closes the "an internal-testing deploy silently opens prod" gap.
+ *
  * ⚠️ THIS IS NOT A LAUNCH DECISION. The original release gates are STILL OUTSTANDING and MUST be
  * satisfied before this build is distributed to any real user:
  *   (a) the independent §23 professional/clinical review is completed and recorded,

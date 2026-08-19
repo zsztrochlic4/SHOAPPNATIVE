@@ -6,6 +6,8 @@ const manifest = JSON.parse(read('config/coach-release.json'))
 const gate = read('src/backend/coach/coachGate.ts')
 const workflow = read('.github/workflows/web-preview.yml')
 const releaseDoc = read('docs/COACH_RELEASE_STATE.md')
+const coachFn = read('functions/src/coach.ts')
+const remoteGate = read('functions/src/killSwitchRemote.ts')
 
 const failures = []
 const prod = manifest.production ?? {}
@@ -22,6 +24,12 @@ if (!gate.includes("EXPO_PUBLIC_COACH_RELEASE_CHANNEL === 'internal'") || !gate.
   failures.push('coach gate is not environment-scoped and default-off')
 if (/EXPO_PUBLIC_COACH_RELEASE_CHANNEL:\s*internal/.test(workflow))
   failures.push('web deploy must not promote the internal coach channel')
+// Defence in depth: the server must ALSO require an explicit, default-closed Firestore flag, so a build
+// whose release-channel env leaked `internal` cannot open production on the env var alone.
+if (!coachFn.includes('releaseEnabledFresh') || !/if\s*\(!releaseEnabled\)/.test(coachFn))
+  failures.push('server-authoritative release gate is not enforced in runCoachTurn')
+if (!remoteGate.includes('fetchCoachReleaseEnabled') || !remoteGate.includes("get('releaseEnabled') === true"))
+  failures.push('default-closed release gate (config/coach.releaseEnabled) is missing from killSwitchRemote')
 if (!/Current release state:\s*DISABLED/i.test(releaseDoc))
   failures.push('release record does not declare production disabled')
 

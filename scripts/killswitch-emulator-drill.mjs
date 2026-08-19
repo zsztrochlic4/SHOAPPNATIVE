@@ -32,11 +32,19 @@ try {
   if (!/already exists/i.test(String(e?.message))) throw e
 }
 const { runCoachTurn } = require('../functions/lib/coach.js')
-const { coachKillSwitch } = require('../functions/lib/killSwitchRemote.js')
+const { coachKillSwitch, coachReleaseGate } = require('../functions/lib/killSwitchRemote.js')
 
 async function setKill(v) {
   await getFirestore().doc('config/coach').set({ killSwitch: v }, { merge: true })
   await coachKillSwitch.refresh() // pull the new value into the cached reader (what production does on its TTL)
+}
+
+// Open the server-authoritative release gate for the drill (defence in depth: the coach requires
+// config/coach.releaseEnabled === true in ADDITION to the internal build channel). Without this the
+// turn would be refused with coach_disabled before it ever reached the kill-switch check.
+async function setReleaseEnabled(v) {
+  await getFirestore().doc('config/coach').set({ releaseEnabled: v }, { merge: true })
+  await coachReleaseGate.refresh()
 }
 
 async function turn() {
@@ -46,6 +54,7 @@ async function turn() {
     generateReply: async () => '',
     enforceLimit: async () => {},
     killSwitchEngaged: () => coachKillSwitch.engaged(), // the REAL reader, bound to the emulator field
+    releaseEnabledFresh: () => coachReleaseGate.enabledFresh(), // the REAL default-closed release gate
     todayKey: '2026-08-16',
     loadTurnData: async () => {
       throw new Error('GATE_PASSED')
@@ -64,6 +73,7 @@ const line = (s) => process.stdout.write(s + '\n')
 line('')
 line('Kill-switch drill (Firestore emulator, real runCoachTurn gate)')
 line('─'.repeat(60))
+await setReleaseEnabled(true) // open the default-closed release gate so the kill switch is what we exercise
 await setKill(false)
 line(`killSwitch=false → ${await turn()}`)
 await setKill(true)

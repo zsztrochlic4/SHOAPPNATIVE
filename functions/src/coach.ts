@@ -5,7 +5,7 @@ import { getFirestore } from 'firebase-admin/firestore'
 import { requireVerifiedUser, APP_CHECK_ENFORCED } from './lib/guards'
 import { stripDashPunctuation } from './_shared/lib/sanitize'
 import { enforceDailyLimit, enforceBurstLimit, enforceGlobalDailyLimit } from './lib/rateLimit'
-import { coachKillSwitch, coachActionsSwitch } from './killSwitchRemote'
+import { coachKillSwitch, coachActionsSwitch, coachReleaseGate } from './killSwitchRemote'
 import { callWithResilience } from './lib/providerResilience'
 import { FieldValue, Timestamp } from 'firebase-admin/firestore'
 import {
@@ -128,6 +128,12 @@ export interface CoachTurnDeps {
   enforceLimit: (uid: string) => Promise<void>
   /** Remote kill switch (spec §20) — true ⇒ coach off regardless of the model. */
   killSwitchEngaged: () => boolean
+  /** Server-authoritative, default-CLOSED release gate (freshness-bound). true ⇒ the coach has been
+   *  DELIBERATELY enabled server-side (config/coach.releaseEnabled === true); every other state
+   *  (missing flag, cold cache, Firestore error) is false ⇒ coach off. This is defence in depth so a
+   *  build whose release-channel env leaked `internal` can never open production on its own. Optional
+   *  in tests; production always supplies it. When absent, the gate is treated as CLOSED (fail-safe). */
+  releaseEnabledFresh?: () => Promise<boolean>
   /** Server-owned action capability (audit C-006) — true ⇒ plan-mutating actions are disabled
    *  regardless of the client's allowActions payload. Advisory chat still works. Optional in
    *  tests; production always supplies the remote switch. */
@@ -164,7 +170,15 @@ const asResponse = (r: { text: string; buttons: ContactButton[] }): CoachTurnRes
  */
 export async function runCoachTurn(uid: string, input: CoachMessageInput, deps: CoachTurnDeps): Promise<CoachTurnResult> {
   // THE flip point — nothing below runs while the coach is gated off.
+  // (1) BUILD-CHANNEL gate: the shipping default resolves to 'disabled'; only an internal build opts in.
   if (!COACH_ENABLED) throw new HttpsError('failed-precondition', 'coach_disabled')
+  // (2) SERVER-AUTHORITATIVE, DEFAULT-CLOSED release gate (defence in depth). Even if the build's
+  // release-channel env leaked `internal`, production stays OFF until config/coach.releaseEnabled === true
+  // is deliberately set. Fail-CLOSED: a missing flag, cold cache, or Firestore read error keeps it off,
+  // and an absent dep (tests) is treated as closed. This is what stops an accidental internal-channel
+  // deploy from silently opening prod on the env var alone.
+  const releaseEnabled = deps.releaseEnabledFresh ? await deps.releaseEnabledFresh() : false
+  if (!releaseEnabled) throw new HttpsError('failed-precondition', 'coach_disabled')
   if (deps.killSwitchEngaged()) throw new HttpsError('unavailable', 'coach_unavailable')
   try {
     return await coachTurnCore(uid, input, deps)
@@ -501,6 +515,7 @@ function geminiModel(systemInstruction?: string) {
 // serves a fresh value.
 void coachKillSwitch.refresh()
 void coachActionsSwitch.refresh()
+void coachReleaseGate.refresh()
 
 export const coachMessage = onCall<CoachMessageInput>(
   // App Check is enforced consistently with every other callable via APP_CHECK_ENFORCED (currently
@@ -599,6 +614,7 @@ export const coachMessage = onCall<CoachMessageInput>(
         await enforceDailyLimit('coach', u, DAILY_COACH_LIMIT)
       },
       killSwitchEngaged: () => coachKillSwitch.engaged(), // remote source: config/coach.killSwitch (Firestore)
+      releaseEnabledFresh: () => coachReleaseGate.enabledFresh(), // server-authoritative, default-closed: config/coach.releaseEnabled (Firestore)
       // Freshness-bound + fail-closed for plan-mutating actions (audit U-003).
       actionsDisabledFresh: () => coachActionsSwitch.engagedFresh(true), // remote source: config/coach.actionsDisabled (Firestore)
       todayKey: new Date().toISOString().slice(0, 10),

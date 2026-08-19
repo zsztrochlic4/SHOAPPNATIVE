@@ -3,7 +3,7 @@
 //   npm --prefix functions run build && node --test functions/test/killSwitch.test.mjs
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { makeRemoteKillSwitch } from '../lib/killSwitchRemote.js'
+import { makeRemoteKillSwitch, makeRemoteEnableGate } from '../lib/killSwitchRemote.js'
 
 test('default before any read is OFF (fail-safe: coach stays available)', () => {
   const ks = makeRemoteKillSwitch(async () => true)
@@ -77,4 +77,47 @@ test('the cached value is served within the TTL; an explicit refresh picks up a 
   await ks.refresh()
   assert.equal(ks.engaged(), false) // explicit refresh sees the change
   assert.equal(calls, 2)
+})
+
+/* ---- Server-authoritative, default-CLOSED release gate (inverse polarity) ---- */
+
+test('release gate: default before any read is CLOSED (coach off until explicitly enabled)', () => {
+  const g = makeRemoteEnableGate(async () => true)
+  assert.equal(g.enabled(), false) // never trust an unpopulated cache
+})
+
+test('release gate: cold-start enabledFresh awaits a read and reflects the flag', async () => {
+  const gOn = makeRemoteEnableGate(async () => true)
+  assert.equal(await gOn.enabledFresh(), true)
+  const gOff = makeRemoteEnableGate(async () => false)
+  assert.equal(await gOff.enabledFresh(), false)
+})
+
+test('release gate: a read error fails CLOSED (never opens the coach on its own)', async () => {
+  const g = makeRemoteEnableGate(async () => { throw new Error('firestore blip') })
+  assert.equal(await g.enabledFresh(), false)
+  assert.equal(g.enabled(), false)
+})
+
+test('release gate: a value that goes stale reports CLOSED until a fresh read', async () => {
+  let clock = 1_000_000
+  let value = true
+  const g = makeRemoteEnableGate(async () => value, 30_000, () => clock)
+  await g.refresh()
+  assert.equal(g.enabled(), true) // fresh + true
+  clock += 60_000 // now stale
+  assert.equal(g.enabled(), false) // stale ⇒ CLOSED, even though the last read was true
+  assert.equal(await g.enabledFresh(), true) // enabledFresh refreshes and confirms true again
+})
+
+test('release gate: once a read fails, freshness cannot be confirmed and it stays CLOSED', async () => {
+  let clock = 1_000_000
+  let mode = 'ok-true'
+  const g = makeRemoteEnableGate(async () => (mode === 'throw' ? (() => { throw new Error('x') })() : mode === 'ok-true'), 30_000, () => clock)
+  await g.refresh()
+  assert.equal(await g.enabledFresh(), true)
+  clock += 60_000; mode = 'throw'
+  assert.equal(await g.enabledFresh(), false) // stale + failed refresh ⇒ CLOSED
+  clock += 1_000; mode = 'ok-true'
+  assert.equal(await g.enabledFresh(), true) // fresh success re-opens
 })
