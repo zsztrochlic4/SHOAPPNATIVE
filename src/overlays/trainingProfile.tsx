@@ -10,6 +10,8 @@ import { writeBackendUser } from '../backend/repo/userRepo'
 import { writeActiveProgram } from '../backend/repo/programRepo'
 import { thud, tick } from '../lib/haptics'
 import { brand } from '../theme'
+import { mapEquipmentTags, EQUIPMENT_TAG_MAP } from '../backend/mapping/onboardingContract'
+import { deriveLocalProfile } from '../backend/mapping/projection'
 import type { BackendExperience, BackendGoal, EquipmentTier, UserDoc, Weekday } from '../backend/schema'
 import type { Profile } from '../store/types'
 
@@ -43,6 +45,17 @@ const TIERS: { v: EquipmentTier; label: string }[] = [
   { v: 'Basic Gym', label: 'Basic gym / home' },
   { v: 'Bodyweight', label: 'Bodyweight' },
 ]
+// A tier change alone does not tell us WHAT a home / basic-gym user actually owns, so — exactly like
+// onboarding's "Do you have any of these?" step — we re-ask when the tier is Basic Gym. Each chip maps to
+// generator equipment tags via EQUIPMENT_TAG_MAP; on save we recompute `equipment_tags` with the same
+// canonical mapping onboarding uses, so the plan can never keep stale full-gym equipment after a switch.
+const HOME_EQUIPMENT = ['Squat rack', 'Barbell', 'Dumbbells', 'Bench or chair', 'Pull-up bar', 'Resistance bands', 'Kettlebell']
+const TIER_ENV: Record<EquipmentTier, 'gym' | 'home' | 'bodyweight'> = { 'Full Gym': 'gym', 'Basic Gym': 'home', Bodyweight: 'bodyweight' }
+/** Pre-select the home-equipment chips from a saved tag set: a chip is "owned" if any of its tags are present. */
+const chipsFromTags = (tags: string[]): string[] => {
+  const owned = new Set(tags)
+  return HOME_EQUIPMENT.filter((chip) => (EQUIPMENT_TAG_MAP[chip] ?? []).some((t) => owned.has(t)))
+}
 
 type Props = { open: boolean; onClose: () => void }
 
@@ -57,6 +70,7 @@ export function TrainingProfileSheet({ open, onClose }: Props) {
   const [days, setDays] = useState<Weekday[]>(backendUser?.days_available ?? [])
   const [sessionLen, setSessionLen] = useState<number>(backendUser?.session_length_min ?? 60)
   const [tier, setTier] = useState<EquipmentTier>(backendUser?.equipment_tier ?? 'Full Gym')
+  const [equipChips, setEquipChips] = useState<string[]>(chipsFromTags(backendUser?.equipment_tags ?? []))
   const [preview, setPreview] = useState<ReturnType<typeof activateProgram> | null>(null)
   const [applying, setApplying] = useState(false)
 
@@ -68,9 +82,18 @@ export function TrainingProfileSheet({ open, onClose }: Props) {
     setDays(backendUser.days_available)
     setSessionLen(backendUser.session_length_min)
     setTier(backendUser.equipment_tier)
+    setEquipChips(chipsFromTags(backendUser.equipment_tags ?? []))
     setPreview(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
+
+  // Recompute the granular equipment inventory from the tier (+ the home chips) using the SAME
+  // canonical mapper onboarding uses, so a tier/chip change always yields a consistent tag set and
+  // never leaves stale gear behind. Full Gym / Bodyweight need no chips (known defaults).
+  const equipmentTags = useMemo(
+    () => mapEquipmentTags(TIER_ENV[tier], tier === 'Basic Gym' ? equipChips : []),
+    [tier, equipChips],
+  )
 
   const dirty = useMemo(() => {
     if (!backendUser) return false
@@ -79,7 +102,8 @@ export function TrainingProfileSheet({ open, onClose }: Props) {
       || sessionLen !== backendUser.session_length_min
       || tier !== backendUser.equipment_tier
       || days.slice().sort().join() !== backendUser.days_available.slice().sort().join()
-  }, [backendUser, goal, experience, days, sessionLen, tier])
+      || equipmentTags.slice().sort().join() !== (backendUser.equipment_tags ?? []).slice().sort().join()
+  }, [backendUser, goal, experience, days, sessionLen, tier, equipmentTags])
 
   const daysValid = days.length >= 2 && days.length <= 6
 
@@ -100,6 +124,7 @@ export function TrainingProfileSheet({ open, onClose }: Props) {
     days_available: days,
     session_length_min: sessionLen,
     equipment_tier: tier,
+    equipment_tags: equipmentTags,
   })
 
   function toggleDay(d: Weekday) {
@@ -124,10 +149,13 @@ export function TrainingProfileSheet({ open, onClose }: Props) {
     setApplying(true)
     try {
       const doc = nextUser()
-      const local = GOALS.find((g) => g.v === goal)
+      // Re-project the WHOLE local profile from the new backend doc (same as the coach action path),
+      // so experience, session length and equipment stay in sync for the coach and every profile
+      // surface — not just goal + day count. A hand-built patch left those stale (the coach kept
+      // reasoning from old values after an edit).
       dispatch({
         type: 'APPLY_TRAINING_PROFILE',
-        profilePatch: { goal: local?.local ?? state.profile.goal, daysPerWeek: days.length },
+        profilePatch: deriveLocalProfile(doc),
         backendUser: doc,
         generatedProgram: preview.program,
         programStatus: preview.status,
@@ -207,6 +235,30 @@ export function TrainingProfileSheet({ open, onClose }: Props) {
           </Pressable>
         ))}
       </View>
+
+      {tier === 'Basic Gym' && (
+        <>
+          <Text className="mb-2 mt-4 text-[11px] font-bold uppercase tracking-wide text-tertiary">What can you use?</Text>
+          <View className="flex-row flex-wrap gap-2">
+            {HOME_EQUIPMENT.map((item) => {
+              const on = equipChips.includes(item)
+              return (
+                <Pressable
+                  key={item}
+                  onPress={() => { tick(); setPreview(null); setEquipChips((cur) => (cur.includes(item) ? cur.filter((x) => x !== item) : [...cur, item])) }}
+                  accessibilityRole="checkbox"
+                  accessibilityLabel={item}
+                  accessibilityState={{ checked: on }}
+                  className={seg(on)}
+                >
+                  <Text className={segText(on)}>{item}</Text>
+                </Pressable>
+              )
+            })}
+          </View>
+          <Text className="mt-1.5 text-[11px] leading-4 text-tertiary">Only exercises your kit supports get programmed. Leave all off for bodyweight-only at home.</Text>
+        </>
+      )}
 
       {/* Preview panel — what the deterministic generator proposes. */}
       {preview && (
