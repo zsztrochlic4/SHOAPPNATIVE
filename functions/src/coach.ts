@@ -36,6 +36,7 @@ import {
 } from './_shared/backend/coach/structuredResponse'
 import { synthesizeBoundedActionProposal, synthesizeWellnessGoalProposal, synthesizeGoalWeightProposal, synthesizeSwapProposal, synthesizeExerciseDetailNav, synthesizeTechniqueAnswer, synthesizeMealPlanReview, proposalSurfacingIssue, proposalDestinationIssue } from './_shared/backend/coach/workoutActions'
 import { isOwnPlanReview, normalize as normalizeCoachText } from './_shared/backend/coach/safety/rules'
+import { synthesizeAppHelpAnswer } from './_shared/backend/coach/appRoutes'
 import type {
   CoachActionProposal,
   CoachAnswerMode,
@@ -313,6 +314,18 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
   // Correct exercise guaranteed; the guide card (nav backstop above) still offers the full walkthrough.
   const techAnswer = synthesizeTechniqueAnswer(message, turnData.programExercises)
   if (techAnswer) replyMessage = techAnswer
+
+  // Deterministic app-route grounding: the model recalls app navigation at ~22% accuracy (it invents
+  // tabs like "Log" and controls like "Quick Toggles", or points to the wrong screen), and instruction
+  // alone does not fix it. So when the turn is a navigation question that confidently matches a REAL
+  // destination, relay that verified route verbatim instead of the model's guess. synthesizeAppHelpAnswer
+  // self-gates (navigation phrasing + a clear route match), so it is safe to call on any turn — an
+  // advice/training/nutrition turn returns null and keeps the model's answer. A correct route beats a
+  // fluent wrong one. Not gated on the app_help intent, so it also grounds app questions the router
+  // keyed as ordinary coaching. Skipped when the model proposed an ACTION (e.g. set_training_days) —
+  // a confirm card is better UX than "go to Settings", and the card's own destination guard applies.
+  const routeAnswer = replyProposal.kind !== 'workout_action' ? synthesizeAppHelpAnswer(message) : null
+  if (routeAnswer) replyMessage = routeAnswer
 
   const approved = new Map<string, string>(APPROVED_KNOWLEDGE_SOURCES.map((s) => [s.key, s.title]))
   const citations = structured.citations

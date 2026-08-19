@@ -34,6 +34,9 @@ const ENTRIES = [
   'backend/coach/structuredResponse.ts',
   'backend/coach/contextSelection.ts',
   'backend/coach/coachTelemetry.ts',
+  // Deterministic app-route grounding — the verified route table the coach relays on app-help turns
+  // (closes the ~22% app path-accuracy gap; the model recalls navigation unreliably).
+  'backend/coach/appRoutes.ts',
   // Exercise database (id + name + reviewed technique: whatItDoes, steps, commonMistake, safetyNote)
   // so the server coach can ground technical how-to answers in the app's own reviewed cues.
   'backend/data/exercises.ts',
