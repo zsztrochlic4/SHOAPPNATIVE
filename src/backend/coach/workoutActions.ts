@@ -88,7 +88,6 @@ export type WorkoutAction =
   | { action: 'planned_absence'; mode: AbsenceModeLit; startDate: string; endDate: string }
   | { action: 'exam_mode'; startDate: string; endDate: string }
   | { action: 'start_session'; variant: StartVariantLit }
-  | { action: 'open_budget_eats'; recipeId?: string }
   | { action: 'nudge_log'; kind: NudgeKindLit }
   | { action: 'share_pr'; prExerciseId: string; prValue: number }
   | { action: 'set_wellness_goal'; metric: WellnessMetricLit; value: number }
@@ -100,7 +99,7 @@ export type WorkoutActionName = WorkoutAction['action']
 export const WORKOUT_ACTION_NAMES: readonly WorkoutActionName[] = [
   'swap', 'change_goal', 'set_training_days', 'set_session_length', 'deload',
   'catch_up', 'reschedule_days', 'planned_absence', 'exam_mode', 'start_session',
-  'open_budget_eats', 'nudge_log', 'share_pr', 'set_wellness_goal', 'set_goal_weight',
+  'nudge_log', 'share_pr', 'set_wellness_goal', 'set_goal_weight',
 ] as const
 
 export type WorkoutActionValidation =
@@ -250,13 +249,6 @@ export function validateWorkoutActionPayload(payload: Record<string, string | nu
       if (!variant) return fail('start_bad_variant')
       return { ok: true, action: { action, variant } }
     }
-    case 'open_budget_eats': {
-      if (!onlyKeys(payload, ['action', 'recipeId'])) return fail('recipe_extra_keys')
-      if (payload.recipeId == null) return { ok: true, action: { action } }
-      const recipeId = asString(payload.recipeId)
-      if (!recipeId || !SAFE_ID.test(recipeId)) return fail('recipe_bad_id')
-      return { ok: true, action: { action, recipeId } }
-    }
     case 'nudge_log': {
       if (!onlyKeys(payload, ['action', 'kind'])) return fail('nudge_extra_keys')
       const kind = inSet(payload.kind, NUDGE_KINDS)
@@ -360,9 +352,6 @@ export function synthesizeBoundedActionProposal(userMessage: string, now = new D
   const m = userMessage.trim().toLowerCase()
   if (!m || !ACTION_VERB.test(m)) return null
 
-  if (/\bbudget eats\b/.test(m) && /\b(open|show|take me|go to)\b/.test(m)) {
-    return actionProposal({ action: 'open_budget_eats' }, 'Open Budget Eats', 'Opens budget-friendly food ideas in StrengthHub.', 'Ready to open Budget Eats? Tap confirm to continue.')
-  }
   if (/\b(deload|recovery week|easy week)\b/.test(m) && /\b(give|set|schedule|start|make|put|take)\b/.test(m)) {
     return actionProposal({ action: 'deload' }, 'Schedule a deload week', 'Reduces training stress for one week while keeping your plan structure.', "Want me to schedule a deload week? Tap confirm and I'll apply it safely.")
   }
@@ -625,28 +614,23 @@ export function synthesizeExerciseDetailNav(userMessage: string): SynthExerciseN
 export const VALID_OVERLAYS: ReadonlySet<string> = new Set([
   'notifications', 'settings', 'addFood', 'profile', 'trainingProfile', 'activeWorkout', 'createSession',
   'customize', 'logWeight', 'logProgress', 'logActivity', 'quick', 'badges', 'examMode', 'coach',
-  'coachChat', 'beginner', 'budgetEats', 'exerciseDetail', 'prCelebration',
+  'coachChat', 'beginner', 'exerciseDetail', 'prCelebration',
 ])
-
-/** The single intent Budget Eats serves — cheap/affordable/student eating. Used to gate the spuriously
- *  model-emitted `open_budget_eats` action so it can't ride along on unrelated turns. */
-const BUDGET_FOOD_INTENT =
-  /\b(budget|cheap|cheaper|afford|affordable|save money|saving money|low[ -]?cost|broke|tight (?:on )?(?:money|budget|cash)|student meals?|cheap eats?|grocer(?:y|ies))\b/i
 
 /**
  * DESTINATION ALLOW-LIST gate (hardening step 1). Decides whether a finalised action/navigation card may
  * be SURFACED: a card is shown only when its destination is a real app screen AND it fits what the user
  * asked. Returns null when surfacing is fine, or a reason string when the card must be DROPPED. It never
- * rewrites the answer — it only suppresses a card that points somewhere the turn never asked to go (a
- * Budget Eats card on a squat-technique question, a nav to a non-existent overlay, or a technique guide
- * whose "exercise" resolves to no real lift). The honest text answer is unaffected.
+ * rewrites the answer — it only suppresses a card that points somewhere the turn never asked to go (an
+ * action the model invented, a nav to a non-existent overlay, or a technique guide whose "exercise"
+ * resolves to no real lift). The honest text answer is unaffected.
  */
 export function proposalDestinationIssue(
   proposal: { kind?: string; payload?: Record<string, unknown> | null } | null | undefined,
   userMessage: string,
 ): string | null {
   if (!proposal || !proposal.kind || proposal.kind === 'none') return null
-  const msg = typeof userMessage === 'string' ? userMessage : ''
+  void userMessage // reserved for future intent-aware destination checks
   const payload = proposal.payload && typeof proposal.payload === 'object' ? proposal.payload : {}
   if (proposal.kind === 'navigation') {
     const overlay = String((payload as Record<string, unknown>).overlay ?? '')
@@ -659,9 +643,6 @@ export function proposalDestinationIssue(
   if (proposal.kind === 'workout_action') {
     const action = String((payload as Record<string, unknown>).action ?? '')
     if (!(WORKOUT_ACTION_NAMES as readonly string[]).includes(action)) return 'action_unknown'
-    // `open_budget_eats` is emitted spuriously by flash-lite on unrelated turns; only surface it when the
-    // user is actually asking about budget/cheap eating — the one thing that screen is for.
-    if (action === 'open_budget_eats' && !BUDGET_FOOD_INTENT.test(msg)) return 'budget_eats_intent_mismatch'
     return null
   }
   return null

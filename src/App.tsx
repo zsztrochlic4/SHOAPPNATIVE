@@ -55,7 +55,6 @@ import {
   CoachSheet,
   CoachChatSheet,
   BeginnerSheet,
-  BudgetEatsSheet,
   ExerciseDetailSheet,
   PRCelebrationSheet,
   LogActivitySheet,
@@ -252,7 +251,6 @@ function Shell() {
       case 'coach': return <CoachSheet open onClose={nav.close} />
       case 'coachChat': return <CoachChatSheet open onClose={nav.close} />
       case 'beginner': return <BeginnerSheet open onClose={nav.close} />
-      case 'budgetEats': return <BudgetEatsSheet open onClose={nav.close} />
       case 'exerciseDetail': return <ExerciseDetailSheet open onClose={nav.close} params={params} />
       case 'prCelebration': return <PRCelebrationSheet open onClose={nav.close} params={params} />
       case 'logActivity': return <LogActivitySheet open onClose={nav.close} />

@@ -7,7 +7,6 @@ const cases = [
   ['Start my full workout for today.', { action: 'start_session', variant: 'full' }],
   ['Change my training days to Tuesday, Thursday and Saturday.', { action: 'set_training_days', days: 'Tuesday,Thursday,Saturday' }],
   ['Make my workouts fit into 30 minutes.', { action: 'set_session_length', sessionLengthMin: 30 }],
-  ['Open Budget Eats for me.', { action: 'open_budget_eats' }],
   ['Give me a deload week.', { action: 'deload' }],
   ['Change my goal to build muscle.', { action: 'change_goal', newGoal: 'Hypertrophy' }],
   ['I missed today. Mark it as an exempt no-penalty rest day.', { action: 'catch_up', mode: 'exempt' }],
@@ -44,5 +43,6 @@ for (const message of [
   'Change my goal to build muscle after exams.',
   'I missed a session. Shift every remaining workout forward.',
   'I missed a workout. Fold it into my next session.',
+  'Open Budget Eats for me.', // Budget Eats was removed from the app; this must never produce an action.
   'Tell me about Budget Eats.',
 ]) test(`ambiguous/non-action stays prose-only: ${message}`, () => assert.equal(synthesizeBoundedActionProposal(message), null))

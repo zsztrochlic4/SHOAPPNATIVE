@@ -998,7 +998,7 @@ const FITNESS_TERMS = [
   'energy', 'fatigue', 'focus', 'confidence', 'gym anxiety', 'mental wellbeing', 'physical activity',
   'anatomy', 'adaptation', 'detraining', 'heart health', 'bone health', 'posture', 'sedentary',
   // First-class coach modes/actions. These are bounded by the deterministic action schema downstream.
-  'exam mode', 'budget eats', 'planned absence',
+  'exam mode', 'planned absence',
 ]
 
 /** Very short in-flow affirmations — allowed only when the whole message is a brief continuation. */

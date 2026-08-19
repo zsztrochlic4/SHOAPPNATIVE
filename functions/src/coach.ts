@@ -347,7 +347,7 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
   }
 
   // Destination allow-list (hardening step 1): drop any card whose destination is not a real app screen
-  // or does not fit this turn — a spuriously model-emitted Budget Eats card on an unrelated question, a
+  // or does not fit this turn — an action the model invented or that was removed from the app, a
   // navigation to an overlay that does not exist, or a technique guide whose exercise resolves to no real
   // lift. Drops the CARD only; the honest text answer is unchanged. Runs last so it also catches a card
   // the model emitted directly (not just the deterministic synths).

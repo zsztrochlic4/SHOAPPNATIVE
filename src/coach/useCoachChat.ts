@@ -344,7 +344,7 @@ export function useCoachChat({ active }: { active: boolean }) {
   const handleProposalConfirmed = useCallback((proposal: CoachActionProposal, actionId?: string) => {
     if (proposal.kind === 'navigation') {
       const overlay = proposal.payload.overlay
-      const allowed = ['activeWorkout', 'workout', 'nutrition', 'progress', 'logProgress', 'logWeight', 'logActivity', 'budgetEats', 'beginner', 'exerciseDetail']
+      const allowed = ['activeWorkout', 'workout', 'nutrition', 'progress', 'logProgress', 'logWeight', 'logActivity', 'beginner', 'exerciseDetail']
       if (typeof overlay !== 'string' || !allowed.includes(overlay)) return
       if (overlay === 'exerciseDetail') {
         const defId = resolveNavExerciseId(proposal.payload)
@@ -353,7 +353,7 @@ export function useCoachChat({ active }: { active: boolean }) {
         return
       }
       if (overlay === 'workout' || overlay === 'nutrition' || overlay === 'progress') nav.goTab(overlay)
-      else nav.open(overlay as 'activeWorkout' | 'logProgress' | 'logWeight' | 'logActivity' | 'budgetEats' | 'beginner')
+      else nav.open(overlay as 'activeWorkout' | 'logProgress' | 'logWeight' | 'logActivity' | 'beginner')
       return
     }
 

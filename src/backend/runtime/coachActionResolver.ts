@@ -60,8 +60,8 @@ export type CoachActionOutcome =
   | { ok: true; apply: 'choose_swap'; fromExerciseId: string; reason: string; options: SwapOption[]; message: string }
   /** Declare a busy period / exam mode — the UI creates the PlannedPeriod and saves it. */
   | { ok: true; apply: 'period'; mode: AbsenceMode; startDate: string; endDate: string; label: string; message: string }
-  /** Navigation-only action (start a session, open Budget Eats). */
-  | { ok: true; apply: 'navigate'; target: 'activeWorkout' | 'quickWorkout' | 'budgetEats'; message: string }
+  /** Navigation-only action (start a session). */
+  | { ok: true; apply: 'navigate'; target: 'activeWorkout' | 'quickWorkout'; message: string }
   /** A gentle nudge to log a habit — the UI opens the relevant logger. */
   | { ok: true; apply: 'nudge'; kind: NudgeKindLit; message: string }
   /** OUTWARD: draft a PR post — the UI grounds it in a real logged PR and requires a
@@ -370,10 +370,6 @@ export function resolveCoachAction(
       return action.variant === 'quick15'
         ? { ok: true, apply: 'navigate', target: 'quickWorkout', message: "Starting a 15-minute quick session — let's move." }
         : { ok: true, apply: 'navigate', target: 'activeWorkout', message: "Let's get today's session going." }
-    }
-
-    case 'open_budget_eats': {
-      return { ok: true, apply: 'navigate', target: 'budgetEats', message: 'Opening Budget Eats so you can find something that fits.' }
     }
 
     case 'nudge_log': {
