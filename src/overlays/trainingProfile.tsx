@@ -12,7 +12,7 @@ import { thud, tick } from '../lib/haptics'
 import { brand } from '../theme'
 import { mapEquipmentTags, EQUIPMENT_TAG_MAP } from '../backend/mapping/onboardingContract'
 import { deriveLocalProfile } from '../backend/mapping/projection'
-import type { BackendExperience, BackendGoal, EquipmentTier, UserDoc, Weekday } from '../backend/schema'
+import type { BackendExperience, BackendGoal, EquipmentTier, FocalPoint, TrainsAlone, UserDoc, Weekday } from '../backend/schema'
 import type { Profile } from '../store/types'
 
 /**
@@ -56,6 +56,10 @@ const chipsFromTags = (tags: string[]): string[] => {
   const owned = new Set(tags)
   return HOME_EQUIPMENT.filter((chip) => (EQUIPMENT_TAG_MAP[chip] ?? []).some((t) => owned.has(t)))
 }
+const FOCAL_POINTS: FocalPoint[] = ['Chest', 'Back', 'Shoulders', 'Quads', 'Hamstrings & Glutes', 'Biceps', 'Triceps', 'Core', 'Calves']
+const ALONE_OPTIONS: { v: TrainsAlone; label: string }[] = [
+  { v: 'always', label: 'Always' }, { v: 'usually', label: 'Usually' }, { v: 'sometimes', label: 'Sometimes' }, { v: 'never', label: 'Never' },
+]
 
 type Props = { open: boolean; onClose: () => void }
 
@@ -71,6 +75,8 @@ export function TrainingProfileSheet({ open, onClose }: Props) {
   const [sessionLen, setSessionLen] = useState<number>(backendUser?.session_length_min ?? 60)
   const [tier, setTier] = useState<EquipmentTier>(backendUser?.equipment_tier ?? 'Full Gym')
   const [equipChips, setEquipChips] = useState<string[]>(chipsFromTags(backendUser?.equipment_tags ?? []))
+  const [focus, setFocus] = useState<FocalPoint[]>(backendUser?.focal_points ?? [])
+  const [alone, setAlone] = useState<TrainsAlone>(backendUser?.trains_alone ?? 'sometimes')
   const [preview, setPreview] = useState<ReturnType<typeof activateProgram> | null>(null)
   const [applying, setApplying] = useState(false)
 
@@ -83,6 +89,8 @@ export function TrainingProfileSheet({ open, onClose }: Props) {
     setSessionLen(backendUser.session_length_min)
     setTier(backendUser.equipment_tier)
     setEquipChips(chipsFromTags(backendUser.equipment_tags ?? []))
+    setFocus(backendUser.focal_points ?? [])
+    setAlone(backendUser.trains_alone ?? 'sometimes')
     setPreview(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
@@ -103,7 +111,9 @@ export function TrainingProfileSheet({ open, onClose }: Props) {
       || tier !== backendUser.equipment_tier
       || days.slice().sort().join() !== backendUser.days_available.slice().sort().join()
       || equipmentTags.slice().sort().join() !== (backendUser.equipment_tags ?? []).slice().sort().join()
-  }, [backendUser, goal, experience, days, sessionLen, tier, equipmentTags])
+      || focus.slice().sort().join() !== (backendUser.focal_points ?? []).slice().sort().join()
+      || alone !== (backendUser.trains_alone ?? 'sometimes')
+  }, [backendUser, goal, experience, days, sessionLen, tier, equipmentTags, focus, alone])
 
   const daysValid = days.length >= 2 && days.length <= 6
 
@@ -125,6 +135,8 @@ export function TrainingProfileSheet({ open, onClose }: Props) {
     session_length_min: sessionLen,
     equipment_tier: tier,
     equipment_tags: equipmentTags,
+    focal_points: focus,
+    trains_alone: alone,
   })
 
   function toggleDay(d: Weekday) {
@@ -259,6 +271,34 @@ export function TrainingProfileSheet({ open, onClose }: Props) {
           <Text className="mt-1.5 text-[11px] leading-4 text-tertiary">Only exercises your kit supports get programmed. Leave all off for bodyweight-only at home.</Text>
         </>
       )}
+
+      <Text className="mb-2 mt-5 text-[11px] font-bold uppercase tracking-wide text-tertiary">Focus areas ({focus.length}/2)</Text>
+      <View className="flex-row flex-wrap gap-2">
+        {FOCAL_POINTS.map((f) => {
+          const on = focus.includes(f)
+          return (
+            <Pressable
+              key={f}
+              onPress={() => { tick(); setPreview(null); setFocus((cur) => cur.includes(f) ? cur.filter((x) => x !== f) : (cur.length >= 2 ? cur : [...cur, f])) }}
+              accessibilityRole="checkbox" accessibilityLabel={f} accessibilityState={{ checked: on }}
+              className={seg(on)}
+            >
+              <Text className={segText(on)}>{f}</Text>
+            </Pressable>
+          )
+        })}
+      </View>
+      <Text className="mt-1.5 text-[11px] leading-4 text-tertiary">We add a little extra volume to up to two areas you pick.</Text>
+
+      <Text className="mb-2 mt-5 text-[11px] font-bold uppercase tracking-wide text-tertiary">Do you train alone?</Text>
+      <View className="flex-row gap-2">
+        {ALONE_OPTIONS.map((o) => (
+          <Pressable key={o.v} onPress={() => { tick(); setPreview(null); setAlone(o.v) }} accessibilityRole="radio" accessibilityLabel={o.label} accessibilityState={{ selected: alone === o.v, checked: alone === o.v }} className={`flex-1 ${seg(alone === o.v)}`}>
+            <Text className={`${segText(alone === o.v)} text-center`}>{o.label}</Text>
+          </Pressable>
+        ))}
+      </View>
+      <Text className="mt-1.5 text-[11px] leading-4 text-tertiary">If you train alone we add a safe-setup cue to spotter lifts.</Text>
 
       {/* Preview panel — what the deterministic generator proposes. */}
       {preview && (
