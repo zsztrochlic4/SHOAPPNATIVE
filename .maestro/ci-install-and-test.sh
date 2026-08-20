@@ -33,7 +33,9 @@ rc=$?
 # (e.g. Onboarding because demo mode is off) from a release-build crash.
 if [ "$rc" != "0" ]; then
   echo "===== logcat (RN / crashes / app) ====="
-  adb logcat -d -t 4000 2>/dev/null | grep -iE "ReactNativeJS|AndroidRuntime|FATAL|ExpoModules|zaggy887|strengthhub|Unable to load|bundle|Firebase" | tail -150 || true
+  # `timeout` guards against a wedged emulator: `adb logcat -d` normally dumps and
+  # exits, but on an unresponsive device it can block until the job timeout.
+  timeout 60 adb logcat -d -t 4000 2>/dev/null | grep -iE "ReactNativeJS|AndroidRuntime|FATAL|ExpoModules|zaggy887|strengthhub|Unable to load|bundle|Firebase" | tail -150 || true
 fi
 
 exit "$rc"

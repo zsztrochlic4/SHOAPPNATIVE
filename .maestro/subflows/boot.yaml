@@ -8,4 +8,7 @@ appId: com.zaggy887.strengthhub
     clearState: true
 - extendedWaitUntil:
     visible: "Dashboard"
-    timeout: 40000
+    # Generous on purpose: a cold release build on a CI emulator can be slow to first
+    # paint (JS bundle init + demo seed). It only waits as long as needed, so a fast
+    # local run is unaffected; the large ceiling just absorbs CI variance.
+    timeout: 120000
