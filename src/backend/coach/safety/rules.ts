@@ -1279,6 +1279,28 @@ const APP_HELP_TERMS = [
   // confirmation / action outcomes
   'the confirm', 'confirm button', 'tap confirm', 'confirmation', 'action failed', 'action did not',
   'the proposal', 'proposed a change', 'did the change', 'did it save', 'apply the change',
+  // Second calibration pass — long-tail app phrasings from the 2000-prompt re-run (off_topic tier only).
+  // exercise-library search
+  'search for an exercise', 'search for an exersise', 'search returns', 'no result for', 'search using',
+  'common nickname', 'nickname', 'the exercise library', 'find an exercise',
+  // quick workouts
+  'quick circuit', 'easiest quick', 'the quick workout', 'quick workout is', 'shortest workout',
+  // barcode / scanning
+  'scanning a', 'scanning an', 'scan a barcode', 'barcode scan', 'camera permission', 'imported product',
+  'sticker over', 'scanning will not', 'scan will not', 'scanner',
+  // coach memory
+  'long-term memory', 'long term memory', 'turn memory off', 'not saved as', 'saved as a long',
+  'keeping consent', 'keeping other', 'memory off while',
+  // coach action / outcome
+  'do not apply', 'apply it yet', 'action switch', 'action card', 'i tapped confirm', 'actually saved',
+  'retry once', 'says failed', 'card says failed', 'action outcome', 'goal change but do not',
+  // plan around your life
+  'busy period', 'end an active', 'the period early', 'end the period', 'travel dates', 'active busy',
+  // settings
+  'reduced motion', 'battery saver', 'reduce animations', 'reduced-motion',
+  // paywall / billing
+  'restore an existing', 'existing purchase', 'restore my purchase', 'restore purchases',
+  'never subscribed', 'restore a purchase', 'previous purchase',
 ]
 
 /**
