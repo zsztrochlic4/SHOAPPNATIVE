@@ -26,6 +26,7 @@ import { useQuickWorkouts } from '../data/quickWorkouts'
 import type { QuickWorkout, UserMeal } from '../store/types'
 import { buildCustomSession, imageForMuscle } from '../store/programSession'
 import { collectUserExport } from '../store/cloudRepo'
+import { writeBackendUser } from '../backend/repo/userRepo'
 import { canOfferDemoReset } from '../store/resetGuards'
 import { serializeUserExport, splitLocalState, buildExportFilename } from '../lib/dataExport'
 import { deliverExport } from '../lib/exportDeliver'
@@ -109,6 +110,8 @@ export function NotificationsSheet({ open, onClose }: Props) {
  */
 export function GoalsSettings() {
   const { state, dispatch } = useStore()
+  const { user } = useAuth()
+  const uid = user?.uid
   const toast = useToast()
   const units = state.settings.units
   const p = state.profile
@@ -136,17 +139,29 @@ export function GoalsSettings() {
   }, [units, p.goalWeightKg, p.waterTargetL])
 
   function saveGoals() {
+    const goalWeightKg = Math.round(toKg(parseFloat(goalW) || weightVal(p.goalWeightKg, units), units) * 10) / 10
+    const heightCmVal = Math.max(0, Math.min(260, Math.round(Number(heightCm) || 0)))
+    // Mirror the three fields the coach reads from backendUser (goal_weight_kg /
+    // sex / height_cm) so a Settings edit reaches the coach's context instead of
+    // living only in the local profile (field-drift guard).
+    const backendPatch = state.backendUser
+      ? { goal_weight_kg: goalWeightKg, sex, height_cm: heightCmVal }
+      : undefined
     dispatch({
       type: 'SET_PROFILE',
       patch: {
-        goalWeightKg: Math.round(toKg(parseFloat(goalW) || weightVal(p.goalWeightKg, units), units) * 10) / 10,
+        goalWeightKg,
         stepTarget: Math.max(0, Math.round(Number(steps) || 0)),
         sleepTargetH: Math.max(0, Math.min(14, Number(sleep) || 0)),
         waterTargetL: Math.max(0, units === 'imperial' ? (Number(water) || 0) / L_TO_OZ : Number(water) || 0),
         sex,
-        heightCm: Math.max(0, Math.min(260, Math.round(Number(heightCm) || 0))),
+        heightCm: heightCmVal,
       },
+      backendPatch,
     })
+    if (uid && backendPatch && state.backendUser) {
+      void writeBackendUser(uid, { ...state.backendUser, ...backendPatch }).catch(() => { /* retried by CloudSync */ })
+    }
     toast('Goals updated')
   }
 
