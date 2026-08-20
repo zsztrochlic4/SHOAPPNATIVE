@@ -1,0 +1,32 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "//": "Starting-point config. This repo has patterns knip can't trace automatically: (1) src/backend/** is a SHARED library copied to functions/src/_shared by sync-shared.mjs and consumed there, so it is marked as entry; (2) the app renders tabs/overlays through dynamic routing in App.tsx, so screen roots are entry; (3) sweep/check/eval run via their own tsconfig outputs. Tune before treating 'unused files' as authoritative; 'unused exports' within traced files is the more reliable signal.",
+  "entry": [
+    "src/App.tsx",
+    "index.ts",
+    "src/screens/**/*.tsx",
+    "src/coach/**/*.tsx",
+    "src/community/**/*.tsx",
+    "src/overlays/**/*.tsx",
+    "src/backend/**/*.ts",
+    "functions/src/index.ts",
+    "scripts/**/*.mjs",
+    "test/**/*.test.mjs",
+    "functions/test/**/*.test.mjs"
+  ],
+  "project": [
+    "src/**/*.{ts,tsx}",
+    "functions/src/**/*.ts"
+  ],
+  "ignore": [
+    "functions/src/_shared/**",
+    "functions/lib/**",
+    ".sweep-out/**",
+    ".check-out/**",
+    "src/dev/**",
+    "**/*.generated.ts",
+    "**/*.d.ts"
+  ],
+  "ignoreDependencies": ["expo", "expo-router", "babel-preset-expo", "eslint-config-expo"],
+  "ignoreExportsUsedInFile": true
+}
