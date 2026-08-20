@@ -64,9 +64,19 @@ jobs:
   maestro:
     needs: build-apk
     runs-on: ubuntu-latest
-    # Non-blocking until confirmed green in CI (emulator stability on the standard
-    # runner is the remaining risk). Promote back to a REQUIRED check once the flows
-    # pass reliably.
+    # NON-BLOCKING BY DESIGN. The workflow itself is correct: the release APK builds,
+    # the emulator boots (KVM), the app installs and — when the emulator stays up —
+    # launches demo mode and 01_smoke_boot_tabs passes in ~7s (verified). The residual
+    # failure is INFRASTRUCTURE: the GitHub-hosted Android emulator dies intermittently
+    # ~50s after boot ("device offline / emulator-5554 not found"), independent of the
+    # app, and even a fresh-emulator retry doesn't guarantee a clean run. Every
+    # code-level lever has been applied (release build, split build/test jobs, KVM,
+    # committed script, .env.local demo inlining, ram-size/cores/API-34, 2× retry).
+    # DO NOT make this a required check on the standard runner — it would red genuine
+    # PRs on emulator crashes. Promote to required only after moving native E2E to a
+    # stable environment (a larger/self-hosted runner, or a device farm such as
+    # Firebase Test Lab) — an infra/owner decision. Real code gates: sweep, e2e, rules,
+    # community-backend, build-apk.
     continue-on-error: true
     timeout-minutes: 30
     steps:
@@ -89,28 +99,64 @@ jobs:
           name: app-release-apk
       - name: Install Maestro
         run: curl -Ls "https://get.maestro.mobile.dev" | bash
-      - name: Boot emulator + run native smoke suite
+      # The GitHub-hosted emulator dies INTERMITTENTLY mid-test ("device offline /
+      # emulator-5554 not found") — flow 01 passes cleanly when the emulator holds up
+      # and everything fails when it crashes. Since it's random, boot a FRESH emulator
+      # and retry: attempt 1 is non-fatal; attempt 2 only runs if attempt 1 failed.
+      - name: Boot emulator + run smoke suite (attempt 1)
+        id: e2e1
+        continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
         env:
-          # The Maestro instrumentation driver can be slow to come up on a loaded CI
-          # runner; the 15s default times out. Give it room.
           MAESTRO_DRIVER_STARTUP_TIMEOUT: '120000'
         with:
-          api-level: 35
+          api-level: 34
           arch: x86_64
           profile: pixel_6
-          # Headless, software-GPU flags for CI stability.
-          emulator-options: -no-window -no-snapshot -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
+          ram-size: 6144M
+          cores: 4
+          emulator-boot-timeout: 900
+          emulator-options: -no-window -no-snapshot -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -memory 6144
           disable-animations: true
-          # The action already waits for the emulator to finish booting before it
-          # runs this. Keep the script a SINGLE command — the action word-splits
-          # complex inline lines (an inline `until … done` broke as `sh -c until`).
-          # All the install-retry + test logic lives in the committed script.
           script: bash .maestro/ci-install-and-test.sh
+      - name: Boot emulator + run smoke suite (attempt 2)
+        id: e2e2
+        if: steps.e2e1.outcome == 'failure'
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          MAESTRO_DRIVER_STARTUP_TIMEOUT: '120000'
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_6
+          ram-size: 6144M
+          cores: 4
+          emulator-boot-timeout: 900
+          emulator-options: -no-window -no-snapshot -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -memory 6144
+          disable-animations: true
+          script: bash .maestro/ci-install-and-test.sh
+      - name: Smoke suite result
+        # Fail the job only if BOTH attempts failed (so a single flaky emulator crash
+        # doesn't red the run, but a genuine flow failure across two fresh emulators does).
+        if: steps.e2e1.outcome == 'failure' && steps.e2e2.outcome == 'failure'
+        run: |
+          echo "Both maestro attempts failed."
+          exit 1
       - name: Upload native report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: maestro-report
           path: maestro-report.xml
+          if-no-files-found: warn
+      - name: Upload Maestro debug output (screenshots + hierarchy)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-debug
+          # Both the explicit --debug-output dir and Maestro's default location, so
+          # the failing step's screenshot + hierarchy is captured wherever it lands.
+          path: |
+            maestro-debug
+            /home/runner/.maestro/tests
           if-no-files-found: warn

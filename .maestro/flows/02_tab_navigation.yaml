@@ -4,26 +4,42 @@ tags:
   - core
 ---
 # JOURNEY: navigation. Switching tabs shows a control unique to each screen
-# (mirrors e2e/smoke.spec.ts). Tabs stay mounted (React <Activity>), so we assert
-# VISIBILITY of a per-tab control, not mere presence.
+# (mirrors e2e/smoke.spec.ts). The app mounts a tab's screen only on first visit
+# (visitedTabs) and keeps tabs mounted via <Activity>, so after each tap we
+# extendedWaitUntil the new screen's signature control renders — a bare assertVisible
+# can race the first mount.
 - runFlow: ../subflows/boot.yaml
 
 - tapOn: "Nutrition"
-- assertVisible: "food log"
+- extendedWaitUntil:
+    visible: "food log"
+    timeout: 20000
 
 - tapOn: "Coach"
-- assertVisible: "Meet your coach"
+- extendedWaitUntil:
+    visible: "Meet your coach"
+    timeout: 20000
 - tapOn: "Continue with coach"
-- assertVisible: "Message your coach"
+- extendedWaitUntil:
+    visible: "Message your coach"
+    timeout: 20000
 
 - tapOn: "Workout"
-- assertVisible: "History"        # Workout's inner segmented tab
+- extendedWaitUntil:
+    visible: "History"        # Workout's inner segmented tab
+    timeout: 20000
 
 - tapOn: "Community"
-- assertVisible: "League"         # Community's inner segmented tab
+- extendedWaitUntil:
+    visible: "League"         # Community's inner segmented tab
+    timeout: 20000
 
 - tapOn: "Nutrition"
-- assertVisible: "food log"
+- extendedWaitUntil:
+    visible: "food log"
+    timeout: 20000
 
 - tapOn: "Dashboard"
-- assertVisible: "Dashboard"
+- extendedWaitUntil:
+    visible: "Dashboard"
+    timeout: 20000

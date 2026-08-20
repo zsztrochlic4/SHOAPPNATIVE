@@ -26,7 +26,9 @@ if [ "$installed" != "1" ]; then
 fi
 
 echo "===== running Maestro smoke suite ====="
-"$HOME/.maestro/bin/maestro" test .maestro --include-tags smoke --format junit --output maestro-report.xml
+# --debug-output captures a per-step screenshot + view hierarchy (incl. the failing
+# step) into ./maestro-debug, which the workflow uploads as an artifact for diagnosis.
+"$HOME/.maestro/bin/maestro" test .maestro --include-tags smoke --debug-output maestro-debug --format junit --output maestro-report.xml
 rc=$?
 
 # On failure, dump app-relevant logcat so we can tell a boot-to-wrong-screen
