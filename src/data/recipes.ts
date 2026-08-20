@@ -26,7 +26,13 @@ import { BUDGET_MEALS_SEED } from './recipes.generated'
 const CACHE_KEY = 'sho.recipes.cloud.v1'
 const CATEGORIES = new Set<MealCategory>(['Breakfast', 'Lunch', 'Dinner', 'Snack', 'Sweet'])
 
-let current: BudgetMeal[] = BUDGET_MEALS_SEED
+// The recipes are already inexpensive by design, so "budget" is not the framing of this section —
+// these tags are dropped from what the user sees (the spreadsheet may still carry them). Applied to
+// both the bundled seed and any cloud recipe so it holds regardless of how the data was generated.
+const BUDGET_FRAMING_TAGS = new Set(['cheap', 'budget', 'budget-friendly', 'budget friendly', 'cheap eats', 'low-cost', 'low cost'])
+const cleanTags = (tags: string[]): string[] => tags.filter((t) => !BUDGET_FRAMING_TAGS.has(t.trim().toLowerCase()))
+
+let current: BudgetMeal[] = BUDGET_MEALS_SEED.map((m) => ({ ...m, tags: cleanTags(m.tags) }))
 const listeners = new Set<() => void>()
 const emit = () => listeners.forEach((l) => l())
 
@@ -69,7 +75,7 @@ function fromDoc(d: any): BudgetMeal | null {
     f: nz(d.f),
     ingredients: arr(d.ingredients),
     steps: arr(d.steps),
-    tags: arr(d.tags),
+    tags: cleanTags(arr(d.tags)),
   }
   if (typeof d.flavour === 'string' && d.flavour) meal.flavour = d.flavour
   if (typeof d.cookOnce === 'string' && d.cookOnce) meal.cookOnce = d.cookOnce
@@ -80,7 +86,7 @@ function fromDoc(d: any): BudgetMeal | null {
 
 /** Overlay cloud docs on the seed: edited/new win by id; `deprecated` removed. */
 function overlay(cloudDocs: any[]): BudgetMeal[] {
-  const map = new Map(BUDGET_MEALS_SEED.map((r) => [r.id, r]))
+  const map = new Map(BUDGET_MEALS_SEED.map((r) => [r.id, { ...r, tags: cleanTags(r.tags) }]))
   for (const raw of cloudDocs) {
     if (!raw || typeof raw.id !== 'string') continue
     if (raw.deprecated === true) {
