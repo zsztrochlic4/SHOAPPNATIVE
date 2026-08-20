@@ -382,7 +382,9 @@ function buildFlow(a: Answers): Step[] {
   push({ id: 'e3', type: 'single', section: 'training', key: 'alone', title: 'Do you usually train alone?', sub: 'This helps us decide your exercise selection and when someone may be able to help you.', options: ALONE_OPTIONS })
   push({ id: 'f1', type: 'single', section: 'training', key: 'environment', title: 'What equipment do you normally have access to?', options: ENVIRONMENT_OPTIONS, cards: true })
   if (a.environment === 'home' || a.environment === 'bodyweight') {
-    push({ id: 'f2', type: 'multi', section: 'training', key: 'equipment', title: 'Do you have any of these?', sub: 'Select everything you can regularly use.', options: a.environment === 'home' ? EQUIPMENT_HOME : EQUIPMENT_OPTIONS, optional: true })
+    // Required for Home Basics: skipping it left equipment_tags empty, so a self-described home-gym user
+    // silently got a bodyweight-only program. Bodyweight stays optional (little/no kit is a valid answer).
+    push({ id: 'f2', type: 'multi', section: 'training', key: 'equipment', title: 'Do you have any of these?', sub: a.environment === 'home' ? 'Select everything you can regularly use.' : 'Select any you can use (optional).', options: a.environment === 'home' ? EQUIPMENT_HOME : EQUIPMENT_OPTIONS, optional: a.environment !== 'home' })
   }
   push({ id: 'p_equip', type: 'interstitial', section: 'training', compute: equipmentMessage })
 

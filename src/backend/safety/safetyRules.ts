@@ -39,6 +39,9 @@ export interface UserSafetyContext {
   trains_alone: boolean
   /** Completed training weeks on the current program — drives P01 (< 4 weeks). */
   weeks_trained: number
+  /** Onboarding M1: has the user followed a structured program before? An explicit `false` extends the
+   *  conservative P01 first-weeks phase to an otherwise-experienced user. Optional (unknown ⇒ unchanged). */
+  followed_structured_program?: boolean
 }
 
 export interface Prescription {
@@ -77,8 +80,12 @@ export function isSkillBlocked(ex: ExerciseSafetyMeta, user: UserSafetyContext):
 
 /** P01: beginners (or young people) in the first 4 weeks get no Power/Advanced work. */
 export function isClassBlocked(ex: ExerciseSafetyMeta, user: UserSafetyContext): boolean {
+  // Also apply the conservative first-weeks phase to a more experienced user who has NEVER followed a
+  // structured program (onboarding M1) — the reason the flag is captured. Scoped to an EXPLICIT "no"
+  // (=== false) so unknown/true users are unchanged; this only ever tightens (adds caution).
   const beginnerPhase =
-    user.experience === 'Beginner' && user.weeks_trained < SAFETY_FLOORS.beginnerFirstWeeks
+    (user.experience === 'Beginner' || user.followed_structured_program === false) &&
+    user.weeks_trained < SAFETY_FLOORS.beginnerFirstWeeks
   if (beginnerPhase && ex.prescription_class === 'Power') return true
   return false
 }
@@ -138,9 +145,10 @@ export function clampPrescription(
     }
   }
 
-  // P01: beginner first 4 weeks → rir_min ≥ 2 (Power/Advanced already blocked upstream).
+  // P01: beginner (or a never-structured user, M1) first 4 weeks → rir_min ≥ 2. Explicit-"no" scoped.
   const beginnerPhase =
-    user.experience === 'Beginner' && user.weeks_trained < SAFETY_FLOORS.beginnerFirstWeeks
+    (user.experience === 'Beginner' || user.followed_structured_program === false) &&
+    user.weeks_trained < SAFETY_FLOORS.beginnerFirstWeeks
   if (beginnerPhase) raiseRir(SAFETY_FLOORS.beginnerRirMin, 'P01')
 
   // P02: minimum rest floor outside Fat Loss circuits / Interval work (a default).
