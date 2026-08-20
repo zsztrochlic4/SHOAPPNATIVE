@@ -931,11 +931,26 @@ export function ProfileSheet({ open, onClose }: Props) {
 /* ============================ Add Food ============================ */
 export function AddFoodSheet({ open, onClose, params }: Props) {
   const { state, dispatch } = useStore()
+  const { user } = useAuth()
+  const uid = user?.uid
   const toast = useToast()
   const [meal, setMeal] = useState<MealName>((params?.meal as MealName) || 'Snack')
   const [q, setQ] = useState('')
   const [budgetOnly, setBudgetOnly] = useState(state.profile.budgetMode)
   const [scanned, setScanned] = useState<string | null>(null)
+
+  // The budget-meals preference is a persisted setting, not a per-sheet whim: it seeds the food
+  // filter here AND is read by the coach (backendUser.tight_budget) so its meal suggestions stay
+  // budget-aware. Persist both the local flag and the backend mirror so the two never drift.
+  function toggleBudgetOnly() {
+    const next = !budgetOnly
+    setBudgetOnly(next)
+    const backendPatch = state.backendUser ? { tight_budget: next } : undefined
+    dispatch({ type: 'SET_PROFILE', patch: { budgetMode: next }, backendPatch })
+    if (uid && backendPatch && state.backendUser) {
+      void writeBackendUser(uid, { ...state.backendUser, ...backendPatch }).catch(() => { /* retried by CloudSync */ })
+    }
+  }
 
   const results = useMemo(() => {
     return FOODS.filter((f) => f.name.toLowerCase().includes(q.toLowerCase())).filter((f) => (budgetOnly ? f.budget : true))
@@ -995,7 +1010,7 @@ export function AddFoodSheet({ open, onClose, params }: Props) {
       </View>
 
       <View className="mb-3 flex-row">
-        <Pressable onPress={() => setBudgetOnly((b) => !b)} accessibilityRole="button" accessibilityLabel="Budget meals filter" accessibilityState={{ selected: budgetOnly }} className={`flex-row items-center gap-1.5 rounded-full px-3 py-1.5 active:opacity-90 ${budgetOnly ? 'bg-brand-400/20' : 'bg-ink-700'}`}>
+        <Pressable onPress={toggleBudgetOnly} accessibilityRole="button" accessibilityLabel="Budget meals filter" accessibilityState={{ selected: budgetOnly }} className={`flex-row items-center gap-1.5 rounded-full px-3 py-1.5 active:opacity-90 ${budgetOnly ? 'bg-brand-400/20' : 'bg-ink-700'}`}>
           <Wallet size={13} color={budgetOnly ? brand[400] : 'rgba(255,255,255,0.55)'} />
           <Text className={`text-xs font-semibold ${budgetOnly ? 'text-brand-400' : 'text-secondary'}`}>Budget meals {budgetOnly ? 'on' : 'off'}</Text>
         </Pressable>
