@@ -38,6 +38,11 @@ jobs:
       - run: npm ci
       - name: Build release APK (embedded JS bundle, no Metro needed)
         run: |
+          # Guarantee the EXPO_PUBLIC_* values are inlined into the release bundle:
+          # Expo's @expo/env loads .env.local deterministically at build time, which
+          # is more reliable than hoping the bundler subprocess inherits job env.
+          # Demo mode → seeded, onboarded, auto-entitled user lands on the Dashboard.
+          printf 'EXPO_PUBLIC_DEMO_MODE=1\nEXPO_PUBLIC_COACH_RELEASE_CHANNEL=internal\n' > .env.local
           npx expo prebuild --platform android --clean --non-interactive
           # Expo's default Gradle heap (~2g) OOMs the D8 dex merger on this app
           # (Task :app:mergeExtDexDebug -> java.lang.OutOfMemoryError). Raise it;

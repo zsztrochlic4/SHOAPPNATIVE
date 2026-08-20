@@ -25,4 +25,15 @@ if [ "$installed" != "1" ]; then
   exit 1
 fi
 
-exec "$HOME/.maestro/bin/maestro" test .maestro --include-tags smoke --format junit --output maestro-report.xml
+echo "===== running Maestro smoke suite ====="
+"$HOME/.maestro/bin/maestro" test .maestro --include-tags smoke --format junit --output maestro-report.xml
+rc=$?
+
+# On failure, dump app-relevant logcat so we can tell a boot-to-wrong-screen
+# (e.g. Onboarding because demo mode is off) from a release-build crash.
+if [ "$rc" != "0" ]; then
+  echo "===== logcat (RN / crashes / app) ====="
+  adb logcat -d -t 4000 2>/dev/null | grep -iE "ReactNativeJS|AndroidRuntime|FATAL|ExpoModules|zaggy887|strengthhub|Unable to load|bundle|Firebase" | tail -150 || true
+fi
+
+exit "$rc"
