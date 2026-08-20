@@ -7,6 +7,7 @@ import type {
   CoachWorkspaceSummary,
 } from './_shared/backend/coach/contracts'
 import type { CoachContextSnapshot } from './_shared/backend/coach/contextSelection'
+import type { GoalProgressInput } from './_shared/backend/coach/goalProgress'
 import type {
   CoachContext,
   SafetyDecision,
@@ -65,6 +66,11 @@ export interface CoachTurnData {
   /** Every exercise id in the workbook database — used to reject a model-emitted swap into an id that
    *  does not exist before the confirm card is ever shown (AD09). */
   validExerciseIds: ReadonlySet<string>
+  /** Structured body-weight-vs-goal signal for the deterministic goal-direction backstop. The model
+   *  reliably knows the goal and the weight but does NOT reliably read a trend against the goal's
+   *  intended direction (it praised a downward trend for a muscle-building goal). null when no body
+   *  weight is logged, in which case the model answers a progress question normally. */
+  goalProgress: GoalProgressInput | null
 }
 
 /** Frozen once: the set of every real exercise id, for the surfacing-time swap-id guard. */
@@ -494,6 +500,22 @@ export async function loadCoachTurnData(
       }
     }
   }
+  // Structured body-weight-vs-goal signal (deterministic goal-direction backstop). weights are newest
+  // first (recentDocs orderBy dateKey desc), so [0] is the current reading and the last is the oldest
+  // in the window. Null when nothing is logged, so the backstop stays out of the way.
+  const weightVals = (weights as Array<Record<string, unknown>>).map((d) => Number(d?.weightKg)).filter((n) => Number.isFinite(n))
+  const goalProgress: GoalProgressInput | null = weightVals.length
+    ? {
+        goal: String(backend.goal ?? profile.goal ?? ''),
+        name: profile.name ?? null,
+        currentKg: weightVals[0],
+        priorKg: weightVals.length > 1 ? weightVals[weightVals.length - 1] : null,
+        goalWeightKg: Number.isFinite(profile.goalWeightKg as number) ? (profile.goalWeightKg as number) : null,
+        recentPRs: recentPRsText(workoutSummaries) || null,
+        sessionsNote: sessions.length ? `you have completed ${completed.length} of your ${sessions.length} recent sessions` : null,
+      }
+    : null
+
   return {
     context,
     contextText: contextLines.join('\n'),
@@ -507,6 +529,7 @@ export async function loadCoachTurnData(
     programSchedule,
     todayWeekday: todayName,
     validExerciseIds: VALID_EXERCISE_IDS,
+    goalProgress,
   }
 }
 

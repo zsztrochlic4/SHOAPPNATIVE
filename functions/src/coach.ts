@@ -38,6 +38,7 @@ import {
 import { synthesizeBoundedActionProposal, synthesizeWellnessGoalProposal, synthesizeGoalWeightProposal, synthesizeSwapProposal, synthesizeDayMoveProposal, synthesizeScheduleGroundedReply, synthesizeMemoryFromMessage, synthesizeExerciseDetailNav, synthesizeTechniqueAnswer, synthesizeDepthFactAnswer, synthesizeMealPlanReview, proposalSurfacingIssue, proposalDestinationIssue, fabricatedExerciseIdInMessage, FABRICATED_EXERCISE_ID_LINE, isDayRescheduleIntent, dayRescheduleAsk } from './_shared/backend/coach/workoutActions'
 import { isOwnPlanReview, normalize as normalizeCoachText } from './_shared/backend/coach/safety/rules'
 import { synthesizeAppHelpAnswer, verifiedRouteAnswer, APP_ROUTE_MENU } from './_shared/backend/coach/appRoutes'
+import { synthesizeGoalProgressReply } from './_shared/backend/coach/goalProgress'
 import type {
   CoachActionProposal,
   CoachAnswerMode,
@@ -226,6 +227,7 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
         programSchedule: [],
         todayWeekday: '',
         validExerciseIds: new Set<string>(),
+        goalProgress: null,
       }
   const ctx = turnData.context
 
@@ -324,6 +326,20 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
     replyProposal = { kind: 'none' }
     suppressMemory = true
     scheduleReplyOwned = true
+  }
+  // GOAL-DIRECTION GROUNDING: the small model does not reliably read a body-weight trend against the
+  // goal's intended direction (it praised a downward trend for a muscle-building goal). On an explicit
+  // "am I on track / making progress" question with a real weight reading, answer deterministically from
+  // the data so the direction can never be inverted. Overrides the model text and owns the turn (so the
+  // app-route grounding below does not clobber it), exactly like the schedule-grounded reply.
+  if (!scheduleReplyOwned && turnData.goalProgress) {
+    const goalReply = synthesizeGoalProgressReply(turnData.goalProgress, message)
+    if (goalReply) {
+      replyMessage = goalReply
+      replyProposal = { kind: 'none' }
+      suppressMemory = true
+      scheduleReplyOwned = true
+    }
   }
   if (allowActions && !scheduleGrounded) {
     const emittedAction = replyProposal.kind === 'workout_action' ? String(replyProposal.payload?.action ?? '') : ''
