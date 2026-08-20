@@ -67,7 +67,6 @@ export interface BuildOptions {
   createdAt?: string
   /** infer_ok (M2): defaulted here, refined in-app later. */
   diet?: DietToken[]
-  tightBudget?: boolean
   /** M3: resolved Exercise Database ids for love/avoid (pending the resolver). */
   preferredExerciseIds?: string[]
   excludedExerciseIds?: string[]
@@ -335,7 +334,6 @@ export function buildUserDoc(input: OnboardingInput, opts: BuildOptions = {}): U
       waiver_accepted: input.terms === true,
     },
     diet: opts.diet ?? [],
-    tight_budget: opts.tightBudget ?? false,
     motivation: input.motivation.trim() || null,
     notes: input.moreInfo.trim() || null,
     planned_absences: [],

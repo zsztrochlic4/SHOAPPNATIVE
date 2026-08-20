@@ -58,7 +58,7 @@ function makeUser(goal: BackendGoal, experience: BackendExperience, days: number
     trains_alone: o.trains_alone ?? 'never', excluded_exercise_ids: [], preferred_exercise_ids: [],
     affected_regions: o.affected_regions ?? [], commitments: o.commitments ?? [],
     screening: { version: 'adult_v1', outcome: o.outcome ?? 'CLEAR', answers: {}, followups: {}, guardian_consent: false, clearance_confirmed: false, date: '', conditions: [], waiver_accepted: true },
-    diet: [], tight_budget: false, motivation: null, notes: null, planned_absences: [], created_at: '2026-07-16', schema_version: 1,
+    diet: [], motivation: null, notes: null, planned_absences: [], created_at: '2026-07-16', schema_version: 1,
   }
 }
 

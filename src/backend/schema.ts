@@ -154,7 +154,6 @@ export interface UserDoc {
   screening: ScreeningRecord
   /** Nutrition-only, infer_ok (M2): defaulted here, refined later in-app. */
   diet: DietToken[]
-  tight_budget: boolean
   motivation: string | null
   /** Free-text "anything else"; scanned for red-flags (CC06) before trust. */
   notes: string | null

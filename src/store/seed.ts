@@ -186,7 +186,6 @@ export function buildSeed(): AppState {
     sleepTargetH: 8,
     onboarded: true,
     examMode: false,
-    budgetMode: true,
     newToGym: false,
     premium: false,
     createdAtKey: dayKey(DAYS - 1),

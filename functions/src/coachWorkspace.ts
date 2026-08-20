@@ -435,7 +435,7 @@ export async function loadCoachTurnData(
       goalWeightKg: profile.goalWeightKg, startWeightKg: profile.startWeightKg, heightCm: profile.heightCm,
       daysPerWeek: profile.daysPerWeek, sessionMinutes: profile.sessionMinutes, equipment: profile.equipment,
       sleepGoalHours: profile.sleepTargetH, stepGoal: profile.stepTarget, waterGoalLitres: profile.waterTargetL,
-      dietaryPrefs: profile.dietaryPrefs, budgetMode: profile.budgetMode, motivation: profile.motivation,
+      dietaryPrefs: profile.dietaryPrefs, motivation: profile.motivation,
     }),
     canonicalProfile: compact({
       goal: backend.goal, experience: backend.experience,

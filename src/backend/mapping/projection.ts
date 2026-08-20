@@ -86,7 +86,6 @@ export function deriveLocalProfile(user: UserDoc): Partial<Profile> {
     goalWeightKg: user.goal_weight_kg,
     injuries: injuriesString(user),
     motivation: user.motivation ?? '',
-    budgetMode: user.tight_budget,
     dietaryPrefs: user.diet,
     createdAtKey: (user.created_at || '').slice(0, 10),
     ...nutritionTargets(goal),
