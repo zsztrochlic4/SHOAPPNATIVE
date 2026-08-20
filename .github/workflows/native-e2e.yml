@@ -89,30 +89,49 @@ jobs:
           name: app-release-apk
       - name: Install Maestro
         run: curl -Ls "https://get.maestro.mobile.dev" | bash
-      - name: Boot emulator + run native smoke suite
+      # The GitHub-hosted emulator dies INTERMITTENTLY mid-test ("device offline /
+      # emulator-5554 not found") — flow 01 passes cleanly when the emulator holds up
+      # and everything fails when it crashes. Since it's random, boot a FRESH emulator
+      # and retry: attempt 1 is non-fatal; attempt 2 only runs if attempt 1 failed.
+      - name: Boot emulator + run smoke suite (attempt 1)
+        id: e2e1
+        continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
         env:
-          # The Maestro instrumentation driver can be slow to come up on a loaded CI
-          # runner; the 15s default times out. Give it room.
           MAESTRO_DRIVER_STARTUP_TIMEOUT: '120000'
         with:
           api-level: 34
           arch: x86_64
           profile: pixel_6
-          # The intermittent "device offline / emulator not found" mid-test is memory
-          # pressure: give the AVD a large heap + cores (this job has the whole 16g
-          # runner — the build is a separate job). API 34 is more stable in CI than 35.
           ram-size: 6144M
           cores: 4
           emulator-boot-timeout: 900
-          # Headless, software-GPU flags for CI stability.
           emulator-options: -no-window -no-snapshot -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -memory 6144
           disable-animations: true
-          # The action already waits for the emulator to finish booting before it
-          # runs this. Keep the script a SINGLE command — the action word-splits
-          # complex inline lines (an inline `until … done` broke as `sh -c until`).
-          # All the install-retry + test logic lives in the committed script.
           script: bash .maestro/ci-install-and-test.sh
+      - name: Boot emulator + run smoke suite (attempt 2)
+        id: e2e2
+        if: steps.e2e1.outcome == 'failure'
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          MAESTRO_DRIVER_STARTUP_TIMEOUT: '120000'
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_6
+          ram-size: 6144M
+          cores: 4
+          emulator-boot-timeout: 900
+          emulator-options: -no-window -no-snapshot -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -memory 6144
+          disable-animations: true
+          script: bash .maestro/ci-install-and-test.sh
+      - name: Smoke suite result
+        # Fail the job only if BOTH attempts failed (so a single flaky emulator crash
+        # doesn't red the run, but a genuine flow failure across two fresh emulators does).
+        if: steps.e2e1.outcome == 'failure' && steps.e2e2.outcome == 'failure'
+        run: |
+          echo "Both maestro attempts failed."
+          exit 1
       - name: Upload native report
         if: always()
         uses: actions/upload-artifact@v4
