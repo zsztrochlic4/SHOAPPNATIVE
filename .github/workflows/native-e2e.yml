@@ -10,16 +10,21 @@ permissions:
   contents: read
 
 jobs:
-  maestro:
+  # Build the APK on its own runner with NO emulator running. The release build
+  # takes ~24 min; when it shared a job with a booted emulator, the emulator went
+  # offline mid-build (memory pressure) and the subsequent adb install failed
+  # (device offline / StorageManagerService.allocateBytes NPE). Splitting the build
+  # out keeps the emulator alive only for the short install+test window below.
+  build-apk:
     runs-on: ubuntu-latest
-    # Non-blocking until this build change is confirmed green in CI. The emulator/dex
-    # flakiness was fixed earlier; the remaining failure was that a DEBUG APK has no
-    # embedded JS bundle and CI runs no Metro server, so the app booted blank and every
-    # "Dashboard" assertion failed regardless of the PR. Now building a RELEASE APK
-    # (embedded bundle, no Metro) should fix that. Keep continue-on-error for a few runs
-    # to confirm the flows pass, then promote this back to a REQUIRED check.
     continue-on-error: true
-    timeout-minutes: 45
+    timeout-minutes: 40
+    env:
+      # EXPO_PUBLIC_* are inlined into the JS bundle AT BUILD TIME, so they must be
+      # set here (the bundle is what the app runs). Demo mode → seeded, onboarded,
+      # auto-entitled user lands straight on the Dashboard (mirrors the web e2e).
+      EXPO_PUBLIC_DEMO_MODE: '1'
+      EXPO_PUBLIC_COACH_RELEASE_CHANNEL: 'internal'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -31,50 +36,67 @@ jobs:
           distribution: temurin
           java-version: '21'
       - run: npm ci
+      - name: Build release APK (embedded JS bundle, no Metro needed)
+        run: |
+          npx expo prebuild --platform android --clean --non-interactive
+          # Expo's default Gradle heap (~2g) OOMs the D8 dex merger on this app
+          # (Task :app:mergeExtDexDebug -> java.lang.OutOfMemoryError). Raise it;
+          # the ubuntu-latest runner has 16g, so 6g is safe.
+          printf '\norg.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8\n' >> android/gradle.properties
+          # RELEASE, not debug: a debug APK loads its JS from a Metro dev server that
+          # CI never starts (app boots blank → every "Dashboard" assertion fails). The
+          # release build EMBEDS the Hermes bundle so the app runs standalone. Expo
+          # prebuild defaults the release buildType to the DEBUG signing config when no
+          # keystore is configured (this repo configures none) → self-signed, installable.
+          cd android && ./gradlew assembleRelease --no-daemon && cd ..
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+
+  maestro:
+    needs: build-apk
+    runs-on: ubuntu-latest
+    # Non-blocking until confirmed green in CI (emulator stability on the standard
+    # runner is the remaining risk). Promote back to a REQUIRED check once the flows
+    # pass reliably.
+    continue-on-error: true
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .maestro
+      - name: Download APK
+        uses: actions/download-artifact@v4
+        with:
+          name: app-release-apk
       - name: Install Maestro
         run: curl -Ls "https://get.maestro.mobile.dev" | bash
-      - name: Build and run native smoke suite
+      - name: Boot emulator + run native smoke suite
         uses: reactivecircus/android-emulator-runner@v2
         env:
-          EXPO_PUBLIC_DEMO_MODE: '1'
-          EXPO_PUBLIC_COACH_RELEASE_CHANNEL: 'internal'
-          # The Maestro instrumentation driver can be slow to come up on a loaded
-          # CI runner (emulator boot alone takes ~6 min here); the 15s default
-          # times out. Give it room.
+          # The Maestro instrumentation driver can be slow to come up on a loaded CI
+          # runner; the 15s default times out. Give it room.
           MAESTRO_DRIVER_STARTUP_TIMEOUT: '120000'
         with:
           api-level: 35
           arch: x86_64
           profile: pixel_6
-          # Headless, software-GPU emulator flags for CI stability (avoids the
-          # broken-pipe/driver-startup flakiness of the windowed default).
+          # Headless, software-GPU flags for CI stability.
           emulator-options: -no-window -no-snapshot -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           disable-animations: true
           script: |
-            npx expo prebuild --platform android --clean --non-interactive
-            # Expo's default Gradle heap (~2g) OOMs the D8 dex merger on this app
-            # (Task :app:mergeExtDexDebug -> java.lang.OutOfMemoryError). Raise it;
-            # the ubuntu-latest runner has 16g, so 6g is safe.
-            printf '\norg.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8\n' >> android/gradle.properties
-            # Build a RELEASE APK, not debug. A debug APK loads its JS from a Metro
-            # dev server, which CI never starts — so the app booted to a blank screen
-            # and every "Dashboard" assertion failed. The release build EMBEDS the JS
-            # bundle (Hermes) so the app runs standalone with no Metro. Expo's prebuild
-            # defaults the `release` buildType to the DEBUG signing config when no
-            # keystore is set (this repo configures none), so the APK is self-signed
-            # and installs on the emulator. The EXPO_PUBLIC_* env above is inlined into
-            # the bundle during this step, so the app boots demo-mode → seeded Dashboard.
-            cd android && ./gradlew assembleRelease --no-daemon && cd ..
-            # The emulator's package/storage services can still be initialising right
-            # after boot; installing then throws StorageManagerService.allocateBytes
-            # NPE (PackageManagerInternal not registered yet). Wait for boot + the
-            # package manager to be ready, let it settle, then retry to ride out the race.
+            # Emulator is freshly booted and the only heavy process now. Still wait for
+            # the package/storage services to be ready (they lag boot) and retry the
+            # install to ride out the StorageManagerService.allocateBytes race.
             adb wait-for-device
             until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; do sleep 3; done
             until adb shell pm path android >/dev/null 2>&1; do sleep 3; done
             sleep 15
             for n in 1 2 3 4 5; do
-              adb install -r android/app/build/outputs/apk/release/app-release.apk && break
+              adb install -r app-release.apk && break
               echo "install attempt $n failed; waiting for services…"; sleep 20
             done
             $HOME/.maestro/bin/maestro test .maestro --include-tags smoke --format junit --output maestro-report.xml
