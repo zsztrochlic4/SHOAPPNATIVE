@@ -193,6 +193,11 @@ export interface Settings {
   coachCheckinDismissedKey?: string
   /** True once the "Meet your coach" first-run welcome has been dismissed, so it shows only once. */
   coachWelcomeSeen?: boolean
+  /** True once the first-run Welcome tour (the four cards shown over the dashboard the very first
+   *  time a paid user lands in the app) has been completed or skipped, so it shows only once.
+   *  Versioned by name — bump the suffix (welcomeTourSeen → welcomeTourSeenV2) to re-show after a
+   *  redesign. Synced with the rest of settings, so a user sees the tour once per account. */
+  welcomeTourSeen?: boolean
   /** Connected third-party integrations, e.g. { strava: true }. */
   connections?: Record<string, boolean>
   /** Which metric the main Progress chart shows (default 'weight'). */

@@ -110,6 +110,15 @@ export function migrateAppState(value: unknown): MigrationResult {
     } as CommunityState
   }
 
+  // Grandfather established users past the first-run Welcome tour (added in v14). A save that
+  // predates the tour AND is already onboarded belongs to a veteran user, so mark it seen rather
+  // than greeting them with "you're all set!" after an update. Brand-new accounts start fresh at the
+  // current version with the flag unset, so they still see the tour exactly once. Keyed on the source
+  // version (not just "onboarded + unset") so a new user who reloads mid-tour still sees the rest.
+  if ((version as number) < 14 && next.profile.onboarded && typeof next.settings.welcomeTourSeen !== 'boolean') {
+    next.settings = { ...next.settings, welcomeTourSeen: true }
+  }
+
   return {
     ok: true,
     state: next,
