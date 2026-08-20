@@ -65,7 +65,7 @@ export type Action =
   | { type: 'MERGE_HISTORY'; history: WindowedHistory }
   | { type: 'BUILD_WORKOUT_SUMMARIES' }
   | { type: 'SET_SETTINGS'; patch: Partial<Settings> }
-  | { type: 'SET_PROFILE'; patch: Partial<Profile> }
+  | { type: 'SET_PROFILE'; patch: Partial<Profile>; backendPatch?: Partial<UserDoc> }
   | { type: 'SET_SUBSCRIPTION'; subscription: Subscription }
   | { type: 'COMPLETE_ONBOARDING'; profile: Partial<Profile>; backendUser?: UserDoc; generatedProgram?: StoredProgram | null; programStatus?: ProgramStatus | null; workoutInstances?: WorkoutInstanceDoc[]; programDoc?: ProgramDoc | null }
   | { type: 'APPLY_TRAINING_PROFILE'; profilePatch: Partial<Profile>; backendUser: UserDoc; generatedProgram?: StoredProgram | null; programStatus?: ProgramStatus | null; workoutInstances?: WorkoutInstanceDoc[]; programDoc?: ProgramDoc | null }
@@ -240,7 +240,16 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, settings: { ...state.settings, ...action.patch } }
 
     case 'SET_PROFILE':
-      return { ...state, profile: { ...state.profile, ...action.patch } }
+      // Local profile is the display source; backendPatch mirrors the fields the
+      // coach reads (goal_weight_kg / sex / height_cm) so an edit in Settings
+      // reaches the coach's context instead of drifting from the local copy.
+      return {
+        ...state,
+        profile: { ...state.profile, ...action.patch },
+        backendUser: (action.backendPatch && state.backendUser)
+          ? { ...state.backendUser, ...action.backendPatch }
+          : state.backendUser,
+      }
 
     case 'SET_SUBSCRIPTION':
       // Server-sourced (BillingSync ← entitlements/{uid}); local-only, never
