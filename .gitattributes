@@ -1,0 +1,5 @@
+# Shell scripts and CI workflows must use LF endings so they run correctly on
+# Linux CI runners regardless of the committer's OS (Windows autocrlf).
+*.sh text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf

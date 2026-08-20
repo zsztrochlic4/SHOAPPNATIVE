@@ -97,19 +97,11 @@ jobs:
           # Headless, software-GPU flags for CI stability.
           emulator-options: -no-window -no-snapshot -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           disable-animations: true
-          script: |
-            # Emulator is freshly booted and the only heavy process now. Still wait for
-            # the package/storage services to be ready (they lag boot) and retry the
-            # install to ride out the StorageManagerService.allocateBytes race.
-            adb wait-for-device
-            until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; do sleep 3; done
-            until adb shell pm path android >/dev/null 2>&1; do sleep 3; done
-            sleep 15
-            for n in 1 2 3 4 5; do
-              adb install -r app-release.apk && break
-              echo "install attempt $n failed; waiting for services…"; sleep 20
-            done
-            $HOME/.maestro/bin/maestro test .maestro --include-tags smoke --format junit --output maestro-report.xml
+          # The action already waits for the emulator to finish booting before it
+          # runs this. Keep the script a SINGLE command — the action word-splits
+          # complex inline lines (an inline `until … done` broke as `sh -c until`).
+          # All the install-retry + test logic lives in the committed script.
+          script: bash .maestro/ci-install-and-test.sh
       - name: Upload native report
         if: always()
         uses: actions/upload-artifact@v4
