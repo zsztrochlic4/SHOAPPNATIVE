@@ -65,7 +65,18 @@ jobs:
             # and installs on the emulator. The EXPO_PUBLIC_* env above is inlined into
             # the bundle during this step, so the app boots demo-mode → seeded Dashboard.
             cd android && ./gradlew assembleRelease --no-daemon && cd ..
-            adb install -r android/app/build/outputs/apk/release/app-release.apk
+            # The emulator's package/storage services can still be initialising right
+            # after boot; installing then throws StorageManagerService.allocateBytes
+            # NPE (PackageManagerInternal not registered yet). Wait for boot + the
+            # package manager to be ready, let it settle, then retry to ride out the race.
+            adb wait-for-device
+            until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; do sleep 3; done
+            until adb shell pm path android >/dev/null 2>&1; do sleep 3; done
+            sleep 15
+            for n in 1 2 3 4 5; do
+              adb install -r android/app/build/outputs/apk/release/app-release.apk && break
+              echo "install attempt $n failed; waiting for services…"; sleep 20
+            done
             $HOME/.maestro/bin/maestro test .maestro --include-tags smoke --format junit --output maestro-report.xml
       - name: Upload native report
         if: always()
