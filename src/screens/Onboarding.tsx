@@ -39,6 +39,7 @@ import {
   buildUserDoc, mapAffectedRegions, mapFollowups, mapScreeningAnswers,
   type OnboardingInput,
 } from '../backend/mapping/onboardingContract'
+import type { DietToken } from '../backend/schema'
 import { deriveLocalProfile } from '../backend/mapping/projection'
 import { evaluateScreening } from '../backend/safety/screening'
 import { hasRedFlag } from '../backend/safety/redFlagScan'
@@ -111,6 +112,7 @@ interface Answers {
   days: string[]; session: number; alone: string
   environment: EnvKey | ''
   equipment: string[]
+  diet: string[]
   trainAround: string[]; moreInfo: string
   activities: string[]; activityOther: string; activityDetail: Record<string, ActivityDetail>
   loveExercises: string[]; avoidExercises: string[]
@@ -128,7 +130,7 @@ const DEFAULT_ANSWERS: Answers = {
   height: 175, weight: 75, goalWeight: 78, noGoalWeight: false,
   goal: 'build', focus: [], experience: 'beginner', structured: '',
   days: ['Monday', 'Wednesday', 'Friday', 'Saturday'], session: 60, alone: '',
-  environment: 'gym', equipment: [], trainAround: [], moreInfo: '',
+  environment: 'gym', equipment: [], diet: [], trainAround: [], moreInfo: '',
   activities: [], activityOther: '', activityDetail: {}, loveExercises: [], avoidExercises: [],
   motivation: '', safety: {}, followup: {}, screeningRegions: [], movements: [], movementsOther: '', terms: false,
 }
@@ -174,6 +176,14 @@ const ENVIRONMENT_OPTIONS = [
 ]
 const EQUIPMENT_OPTIONS = ['Pull-up bar', 'Resistance bands', 'Bench or chair', 'Kettlebell']
 const EQUIPMENT_HOME = ['Squat rack', 'Barbell', 'Dumbbells', 'Bench or chair', 'Pull-up bar', 'Resistance bands', 'Kettlebell']
+// Values are canonical DietTokens so the coach can honour them directly (it never counts calories/macros).
+const DIET_OPTIONS = [
+  { value: 'vegetarian', label: 'Vegetarian' },
+  { value: 'vegan', label: 'Vegan' },
+  { value: 'halal', label: 'Halal' },
+  { value: 'dairy_free', label: 'Dairy-free' },
+  { value: 'gluten_free', label: 'Gluten-free' },
+]
 const TRAIN_AROUND_OPTIONS = ['Lower back', 'Knees', 'Shoulders', 'Wrists', 'Hips', 'Ankles']
 const ACTIVITY_OPTIONS = ['Basketball', 'Football', 'Running', 'Tennis', 'Climbing', 'Martial arts', 'Swimming', 'Cycling', 'Dance', 'Active job', 'Other']
 const INTENSITY_OPTIONS: { value: Intensity; label: string }[] = [
@@ -393,6 +403,9 @@ function buildFlow(a: Answers): Step[] {
   push({ id: 'h1', type: 'multi', section: 'lifestyle', key: 'activities', title: 'Are you active outside the gym?', sub: 'This helps us make sure your training works with the rest of your week.', options: ACTIVITY_OPTIONS, otherValue: 'Other', otherKey: 'activityOther', optional: true, skipLabel: 'No other activity' })
   if ((a.activities || []).filter((x) => x !== 'None').length > 0) {
     push({ id: 'h2', type: 'activitydetail', section: 'lifestyle', key: 'activityDetail', title: 'Tell us about your activities', sub: 'When you do each one, and how demanding it usually is.', optional: true, skipLabel: 'Skip, I’ll log these later' })
+  }
+  {
+    push({ id: 'n1', type: 'multi', section: 'lifestyle', key: 'diet', title: 'Any dietary needs we should respect?', sub: 'So the coach never suggests a food that does not fit. The app never sets calorie or macro targets.', options: DIET_OPTIONS, optional: true, skipLabel: 'No restrictions' })
     push({ id: 'p_activity', type: 'interstitial', section: 'lifestyle', compute: activityMessage })
   }
   push({ id: 'i1', type: 'search', section: 'lifestyle', key: 'loveExercises', title: 'Are there any exercises you love?', sub: 'We’ll prioritise them where they fit your plan.', optional: true, mode: 'love' })
@@ -948,6 +961,7 @@ export default function Onboarding() {
       redFlag: hasRedFlag(answers.moreInfo),
       preferredExerciseIds: resolveExerciseIdsByName(answers.loveExercises),
       excludedExerciseIds: resolveExerciseIdsByName(answers.avoidExercises),
+      diet: (answers.diet ?? []) as DietToken[],
     })
     const profile: Partial<Profile> = { ...deriveLocalProfile(userDoc), createdAtKey: todayKey }
     // Run the HARD generation gate + the deterministic generator. If the gate is closed

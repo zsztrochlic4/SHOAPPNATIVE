@@ -390,10 +390,32 @@ export async function loadCoachTurnData(
 
   const completed = sessions.filter((s) => s.completed === true)
   const coachingStyleText = String(workspaceSnap.get('coachingStyle') ?? 'balanced')
+  // Injury DETAIL beyond the region label — which movements aggravate, painful-now, under-treatment,
+  // active vs resolved — so the coach never endorses a movement that hits an actively painful pattern.
+  const fu = (screening.followups && typeof screening.followups === 'object') ? screening.followups : {}
+  const injuryDetail = [
+    Array.isArray(fu.aggravating_movements) && fu.aggravating_movements.length
+      ? `aggravated by ${fu.aggravating_movements.slice(0, 4).map((m: any) => ordinary(m, 30)).filter(Boolean).join(', ')}` : '',
+    fu.painful_now ? 'currently painful' : '',
+    fu.under_treatment ? 'under treatment' : '',
+    fu.exercise_restricted ? 'exercise restricted' : '',
+    fu.status === 'active' ? 'active' : (fu.status === 'resolved' ? 'resolved' : ''),
+  ].filter(Boolean).join(', ')
+  const freeInjury = ordinary(backend.notes, 120)
+  const trainsAlone = backend.trains_alone === 'always' || backend.trains_alone === 'usually'
+  // Declared time away / exam mode, so the coach respects a planned break rather than nagging.
+  const absences = Array.isArray(backend.planned_absences) ? backend.planned_absences : []
+  const declaredAway = absences
+    .map((a: any) => `${ordinary(a?.mode, 24)} ${ordinary(a?.startDate ?? a?.start, 12)} to ${ordinary(a?.endDate ?? a?.end, 12)}`.trim())
+    .filter((s: string) => s.length > 4).slice(0, 2).join('; ')
   const constraints = [
     affectedRegions.length ? `affected regions: ${affectedRegions.join(', ')}` : '',
+    injuryDetail ? `injury detail: ${injuryDetail}` : '',
+    freeInjury ? `injury note: ${freeInjury}` : '',
     excludedExerciseIds.length ? `excluded exercises: ${excludedExerciseIds.slice(0, 12).join(', ')}` : '',
     context.screeningOutcome ? `screening: ${context.screeningOutcome}` : '',
+    trainsAlone ? 'trains alone, so attach a safe-setup cue for any spotter lift (S09)' : '',
+    declaredAway ? `declared time away: ${declaredAway}; respect this planned break, do not read it as slacking` : '',
   ].filter(Boolean).join('; ')
 
   // Section-labelled snapshot for intent-aware selection (final plan Phase 2). The selector decides
