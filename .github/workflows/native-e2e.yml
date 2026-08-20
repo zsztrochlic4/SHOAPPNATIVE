@@ -10,14 +10,21 @@ permissions:
   contents: read
 
 jobs:
-  maestro:
+  # Build the APK on its own runner with NO emulator running. The release build
+  # takes ~24 min; when it shared a job with a booted emulator, the emulator went
+  # offline mid-build (memory pressure) and the subsequent adb install failed
+  # (device offline / StorageManagerService.allocateBytes NPE). Splitting the build
+  # out keeps the emulator alive only for the short install+test window below.
+  build-apk:
     runs-on: ubuntu-latest
-    # Non-blocking for now: the Android emulator/Maestro-driver setup is flaky on
-    # the standard GitHub runner (slow boots, driver-startup timeouts) and fails
-    # independently of the app code. Keep the job running for signal, but don't let
-    # it gate merges. Revert to a required check once it runs on a beefier runner.
     continue-on-error: true
-    timeout-minutes: 45
+    timeout-minutes: 40
+    env:
+      # EXPO_PUBLIC_* are inlined into the JS bundle AT BUILD TIME, so they must be
+      # set here (the bundle is what the app runs). Demo mode → seeded, onboarded,
+      # auto-entitled user lands straight on the Dashboard (mirrors the web e2e).
+      EXPO_PUBLIC_DEMO_MODE: '1'
+      EXPO_PUBLIC_COACH_RELEASE_CHANNEL: 'internal'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -29,34 +36,77 @@ jobs:
           distribution: temurin
           java-version: '21'
       - run: npm ci
+      - name: Build release APK (embedded JS bundle, no Metro needed)
+        run: |
+          # Guarantee the EXPO_PUBLIC_* values are inlined into the release bundle:
+          # Expo's @expo/env loads .env.local deterministically at build time, which
+          # is more reliable than hoping the bundler subprocess inherits job env.
+          # Demo mode → seeded, onboarded, auto-entitled user lands on the Dashboard.
+          printf 'EXPO_PUBLIC_DEMO_MODE=1\nEXPO_PUBLIC_COACH_RELEASE_CHANNEL=internal\n' > .env.local
+          npx expo prebuild --platform android --clean --non-interactive
+          # Expo's default Gradle heap (~2g) OOMs the D8 dex merger on this app
+          # (Task :app:mergeExtDexDebug -> java.lang.OutOfMemoryError). Raise it;
+          # the ubuntu-latest runner has 16g, so 6g is safe.
+          printf '\norg.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8\n' >> android/gradle.properties
+          # RELEASE, not debug: a debug APK loads its JS from a Metro dev server that
+          # CI never starts (app boots blank → every "Dashboard" assertion fails). The
+          # release build EMBEDS the Hermes bundle so the app runs standalone. Expo
+          # prebuild defaults the release buildType to the DEBUG signing config when no
+          # keystore is configured (this repo configures none) → self-signed, installable.
+          cd android && ./gradlew assembleRelease --no-daemon && cd ..
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+
+  maestro:
+    needs: build-apk
+    runs-on: ubuntu-latest
+    # Non-blocking until confirmed green in CI (emulator stability on the standard
+    # runner is the remaining risk). Promote back to a REQUIRED check once the flows
+    # pass reliably.
+    continue-on-error: true
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .maestro
+      - name: Enable KVM
+        # ubuntu-latest has KVM hardware, but the runner user lacks /dev/kvm
+        # permission by default — so the emulator fell back to `-accel off` (pure
+        # software emulation) and never reliably came online (adb stayed offline
+        # through the whole boot window). This udev rule grants access so the
+        # emulator boots hardware-accelerated. (Documented android-emulator-runner fix.)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Download APK
+        uses: actions/download-artifact@v4
+        with:
+          name: app-release-apk
       - name: Install Maestro
         run: curl -Ls "https://get.maestro.mobile.dev" | bash
-      - name: Build and run native smoke suite
+      - name: Boot emulator + run native smoke suite
         uses: reactivecircus/android-emulator-runner@v2
         env:
-          EXPO_PUBLIC_DEMO_MODE: '1'
-          EXPO_PUBLIC_COACH_RELEASE_CHANNEL: 'internal'
-          # The Maestro instrumentation driver can be slow to come up on a loaded
-          # CI runner (emulator boot alone takes ~6 min here); the 15s default
-          # times out. Give it room.
+          # The Maestro instrumentation driver can be slow to come up on a loaded CI
+          # runner; the 15s default times out. Give it room.
           MAESTRO_DRIVER_STARTUP_TIMEOUT: '120000'
         with:
           api-level: 35
           arch: x86_64
           profile: pixel_6
-          # Headless, software-GPU emulator flags for CI stability (avoids the
-          # broken-pipe/driver-startup flakiness of the windowed default).
+          # Headless, software-GPU flags for CI stability.
           emulator-options: -no-window -no-snapshot -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           disable-animations: true
-          script: |
-            npx expo prebuild --platform android --clean --non-interactive
-            # Expo's default Gradle heap (~2g) OOMs the D8 dex merger on this app
-            # (Task :app:mergeExtDexDebug -> java.lang.OutOfMemoryError). Raise it;
-            # the ubuntu-latest runner has 16g, so 6g is safe.
-            printf '\norg.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8\n' >> android/gradle.properties
-            cd android && ./gradlew assembleDebug --no-daemon && cd ..
-            adb install -r android/app/build/outputs/apk/debug/app-debug.apk
-            $HOME/.maestro/bin/maestro test .maestro --include-tags smoke --format junit --output maestro-report.xml
+          # The action already waits for the emulator to finish booting before it
+          # runs this. Keep the script a SINGLE command — the action word-splits
+          # complex inline lines (an inline `until … done` broke as `sh -c until`).
+          # All the install-retry + test logic lives in the committed script.
+          script: bash .maestro/ci-install-and-test.sh
       - name: Upload native report
         if: always()
         uses: actions/upload-artifact@v4

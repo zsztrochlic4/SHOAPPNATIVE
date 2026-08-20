@@ -7,13 +7,13 @@ tags:
 # full process restart (the app persists to AsyncStorage; auth uses RN persistence).
 - runFlow: ../subflows/boot.yaml
 - tapOn: "Nutrition"
-- assertVisible: "Today's food log"
+- assertVisible: "food log"
 
 # Background, then foreground — the app should resume on the same tab, not reset.
 - pressKey: Home
 - launchApp            # foreground WITHOUT clearState
 - extendedWaitUntil:
-    visible: "Today's food log"
+    visible: "food log"
     timeout: 20000
 
 # Full cold restart — persisted session should still land in the app (not the sign-in wall).

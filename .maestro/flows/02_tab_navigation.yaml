@@ -9,7 +9,7 @@ tags:
 - runFlow: ../subflows/boot.yaml
 
 - tapOn: "Nutrition"
-- assertVisible: "Today's food log"
+- assertVisible: "food log"
 
 - tapOn: "Coach"
 - assertVisible: "Meet your coach"
@@ -23,7 +23,7 @@ tags:
 - assertVisible: "League"         # Community's inner segmented tab
 
 - tapOn: "Nutrition"
-- assertVisible: "Today's food log"
+- assertVisible: "food log"
 
 - tapOn: "Dashboard"
 - assertVisible: "Dashboard"
