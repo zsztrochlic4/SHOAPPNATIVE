@@ -12,10 +12,12 @@ permissions:
 jobs:
   maestro:
     runs-on: ubuntu-latest
-    # Non-blocking for now: the Android emulator/Maestro-driver setup is flaky on
-    # the standard GitHub runner (slow boots, driver-startup timeouts) and fails
-    # independently of the app code. Keep the job running for signal, but don't let
-    # it gate merges. Revert to a required check once it runs on a beefier runner.
+    # Non-blocking until this build change is confirmed green in CI. The emulator/dex
+    # flakiness was fixed earlier; the remaining failure was that a DEBUG APK has no
+    # embedded JS bundle and CI runs no Metro server, so the app booted blank and every
+    # "Dashboard" assertion failed regardless of the PR. Now building a RELEASE APK
+    # (embedded bundle, no Metro) should fix that. Keep continue-on-error for a few runs
+    # to confirm the flows pass, then promote this back to a REQUIRED check.
     continue-on-error: true
     timeout-minutes: 45
     steps:
@@ -54,8 +56,16 @@ jobs:
             # (Task :app:mergeExtDexDebug -> java.lang.OutOfMemoryError). Raise it;
             # the ubuntu-latest runner has 16g, so 6g is safe.
             printf '\norg.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8\n' >> android/gradle.properties
-            cd android && ./gradlew assembleDebug --no-daemon && cd ..
-            adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+            # Build a RELEASE APK, not debug. A debug APK loads its JS from a Metro
+            # dev server, which CI never starts — so the app booted to a blank screen
+            # and every "Dashboard" assertion failed. The release build EMBEDS the JS
+            # bundle (Hermes) so the app runs standalone with no Metro. Expo's prebuild
+            # defaults the `release` buildType to the DEBUG signing config when no
+            # keystore is set (this repo configures none), so the APK is self-signed
+            # and installs on the emulator. The EXPO_PUBLIC_* env above is inlined into
+            # the bundle during this step, so the app boots demo-mode → seeded Dashboard.
+            cd android && ./gradlew assembleRelease --no-daemon && cd ..
+            adb install -r android/app/build/outputs/apk/release/app-release.apk
             $HOME/.maestro/bin/maestro test .maestro --include-tags smoke --format junit --output maestro-report.xml
       - name: Upload native report
         if: always()
