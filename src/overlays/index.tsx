@@ -3,7 +3,7 @@ import { View, Text, Pressable, TextInput, Image, ScrollView, Animated, Easing, 
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
 import {
-  Bell, Moon, Sun, GraduationCap, Wallet, RotateCcw, Trash2, Camera, Trophy,
+  Bell, Moon, Sun, GraduationCap, RotateCcw, Trash2, Camera, Trophy,
   Flame, Search, ScanLine, Plus, Check, Share2, ChevronRight, User, Sparkles, Dumbbell,
   Droplet, Footprints, BedDouble, Leaf, Play, Award, BellRing,
   HeartPulse, Activity, Zap, Minus, X, LogOut, Volume2, Download,
@@ -931,30 +931,14 @@ export function ProfileSheet({ open, onClose }: Props) {
 /* ============================ Add Food ============================ */
 export function AddFoodSheet({ open, onClose, params }: Props) {
   const { state, dispatch } = useStore()
-  const { user } = useAuth()
-  const uid = user?.uid
   const toast = useToast()
   const [meal, setMeal] = useState<MealName>((params?.meal as MealName) || 'Snack')
   const [q, setQ] = useState('')
-  const [budgetOnly, setBudgetOnly] = useState(state.profile.budgetMode)
   const [scanned, setScanned] = useState<string | null>(null)
 
-  // The budget-meals preference is a persisted setting, not a per-sheet whim: it seeds the food
-  // filter here AND is read by the coach (backendUser.tight_budget) so its meal suggestions stay
-  // budget-aware. Persist both the local flag and the backend mirror so the two never drift.
-  function toggleBudgetOnly() {
-    const next = !budgetOnly
-    setBudgetOnly(next)
-    const backendPatch = state.backendUser ? { tight_budget: next } : undefined
-    dispatch({ type: 'SET_PROFILE', patch: { budgetMode: next }, backendPatch })
-    if (uid && backendPatch && state.backendUser) {
-      void writeBackendUser(uid, { ...state.backendUser, ...backendPatch }).catch(() => { /* retried by CloudSync */ })
-    }
-  }
-
   const results = useMemo(() => {
-    return FOODS.filter((f) => f.name.toLowerCase().includes(q.toLowerCase())).filter((f) => (budgetOnly ? f.budget : true))
-  }, [q, budgetOnly])
+    return FOODS.filter((f) => f.name.toLowerCase().includes(q.toLowerCase()))
+  }, [q])
 
   // The user's own saved meals ("My meals"), searchable alongside the food catalog
   // so a saved meal can be logged straight into today's food log in one tap.
@@ -1006,13 +990,6 @@ export function AddFoodSheet({ open, onClose, params }: Props) {
         </View>
         <Pressable onPress={scan} accessibilityRole="button" accessibilityLabel="Scan a barcode" className="h-[46px] w-[46px] items-center justify-center rounded-xl bg-brand-400 active:opacity-90">
           <ScanLine size={20} color="#000" />
-        </Pressable>
-      </View>
-
-      <View className="mb-3 flex-row">
-        <Pressable onPress={toggleBudgetOnly} accessibilityRole="button" accessibilityLabel="Budget meals filter" accessibilityState={{ selected: budgetOnly }} className={`flex-row items-center gap-1.5 rounded-full px-3 py-1.5 active:opacity-90 ${budgetOnly ? 'bg-brand-400/20' : 'bg-ink-700'}`}>
-          <Wallet size={13} color={budgetOnly ? brand[400] : 'rgba(255,255,255,0.55)'} />
-          <Text className={`text-xs font-semibold ${budgetOnly ? 'text-brand-400' : 'text-secondary'}`}>Budget meals {budgetOnly ? 'on' : 'off'}</Text>
         </Pressable>
       </View>
 
@@ -1070,7 +1047,6 @@ function FoodRow({ id, onAdd }: { id: string; onAdd: (id: string) => void }) {
         <Text numberOfLines={1} className="font-bold leading-tight text-white">{f.name}</Text>
         <Text className="text-[12px] text-secondary">{f.serving} · {f.kcal} kcal · {f.p}P {f.c}C {f.f}F</Text>
       </View>
-      {f.budget && <Wallet size={14} color={brand[400]} />}
       <View className="h-7 w-7 items-center justify-center rounded-full bg-brand-400"><Plus size={16} strokeWidth={3} color="#000" /></View>
     </Pressable>
   )

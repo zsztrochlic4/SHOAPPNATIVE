@@ -73,7 +73,6 @@ function makeUser(overrides = {}) {
       waiver_accepted: true,
     },
     diet: [],
-    tight_budget: false,
     motivation: null,
     notes: null,
     planned_absences: [],

@@ -36,7 +36,7 @@ const userDoc = {
     heightCm: 175, startWeightKg: 75, goalWeightKg: 78,
     daysPerWeek: 4, sessionMinutes: 60, equipment: 'Full gym',
     sleepTargetH: 8, stepTarget: 9000, waterTargetL: 3,
-    dietaryPrefs: 'no restrictions', budgetMode: false, motivation: 'I want to feel fitter',
+    dietaryPrefs: 'no restrictions', motivation: 'I want to feel fitter',
   },
   // Canonical UserDoc shape (matches src/backend/mapping/onboardingContract.buildUserDoc), so the demo
   // exercises the SAME fields the coach reads for a real onboarded user — not a reader-shaped stand-in.

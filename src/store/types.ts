@@ -61,7 +61,6 @@ export interface Profile {
   examEndKey?: string
   /** The individual exam dates the user picked, sorted 'YYYY-MM-DD'. */
   examDates?: string[]
-  budgetMode: boolean
   /** opted into the New to the Gym first-90-days track */
   newToGym: boolean
   /** premium unlocks 1:1 video calls with the coach */
@@ -242,7 +241,6 @@ export interface FoodItem {
   c: number
   f: number
   barcode?: string
-  budget?: boolean
   /** rough cost per serving, in local currency units */
   cost?: number
 }

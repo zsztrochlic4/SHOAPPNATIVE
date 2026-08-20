@@ -65,7 +65,7 @@ function makeState(over: Partial<AppState> = {}): AppState {
       heightCm: 175, startWeightKg: 75, goalWeightKg: 72,
       calorieTarget: 0, proteinTarget: 0, carbTarget: 0, fatTarget: 0, // no calorie/nutrition goals (app-wide rule)
       waterTargetL: 3, stepTarget: 9000, sleepTargetH: 8,
-      onboarded: true, examMode: false, budgetMode: false, newToGym: false, premium: false,
+      onboarded: true, examMode: false, newToGym: false, premium: false,
       createdAtKey: todayKey,
     },
     settings: { units: 'metric', theme: 'dark', notificationsEnabled: false },
