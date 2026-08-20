@@ -68,6 +68,39 @@ record cannot be read as clearance:
 > no safety result is altered. If the owner later enables the coach on the strength of this waiver, that
 > enablement — and the matching `STATUS.md` update — must be recorded separately at that time.
 
+### Reviewer all-clear (2026-08-20) — recorded at the owner's direction
+
+The reviewer (**Jack Dov**) has given the **safety all-clear** for the coach, conditional only on the
+remaining NON-testing operational items below (App Check enforcement, deploy + named owners, live
+kill-switch drill, on-device fault capture, store/privacy alignment). This reflects that the
+critical-safety bar was met on every independent reviewer holdout (IRH-2026-08-18 A/B/C: **0 critical
+misses, 0 emergency under-routes**, stable ×3), with the residual benign false-positive rate accepted
+as low-severity **protective over-referral** (consistent with the reviewer's earlier R8 over-route
+ruling). **The safety-detection testing is therefore closed; it is no longer a launch blocker.** This
+entry records the owner's relay of that determination; the underlying reviewer artefacts remain the
+evidence. It does **not** enable the coach — `COACH_ENABLED` stays fail-closed until the sequence in
+`docs/COACH_ACTIVATION_CHECKLIST.md` is executed.
+
+### Operational owners — TEMPLATE to complete at activation (Jack's R8 activation condition 1)
+
+Before `COACH_ENABLED` is flipped, name the accountable human for each role (one person may hold
+several for a solo operation; list a backup where possible). Complete and sign this table, then it
+becomes the record of who owns the coach in production.
+
+| Role | Named owner | Contact | Backup | Notes |
+|---|---|---|---|---|
+| Safety monitoring (reviews flags / logs) | ______________________ | ______________________ | ____________ | daily during initial cohort |
+| Incident review (triage a reported bad response) | ______________________ | ______________________ | ____________ | |
+| Rollback authorization (decides to disable) | ______________________ | ______________________ | ____________ | |
+| Kill-switch operation (executes the disable) | ______________________ | ______________________ | ____________ | `config/coach.killSwitch = true` |
+| Reviewer of record (clinical/safety) | Jack Dov | ______________________ | ____________ | all-clear 2026-08-20 |
+
+| Field | Value |
+|---|---|
+| Completed by (owner) | ______________________ |
+| Date | ______________________ |
+| Signature | ____________________________ (owner to sign) |
+
 ### Enablement record (2026-08-03) — HISTORY, SUPERSEDED 2026-08-09
 
 Enabled by **owner decision** on the strength of a recorded passing run against the reviewer-owned

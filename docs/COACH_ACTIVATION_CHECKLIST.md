@@ -109,6 +109,53 @@ release-gate drill in `functions/test/coach-release-gate.test.mjs` (both pass). 
 - **Or:** set `config/coach.releaseEnabled = false` — closes the release gate (fail-closed) live.
 - **Full:** redeploy without `COACH_RELEASE_CHANNEL=internal` → `COACH_ENABLED=false` everywhere.
 
+## Store & privacy declaration flips — APPLY AT ACTIVATION (condition 5)
+
+**Do NOT apply these while the coach is off.** Store/privacy declarations must describe the *shipping*
+build; flipping them early recreates the 2026-08-09 "declarations contradict the build" audit finding.
+Apply them **in the same change that flips the coach on**, and have the privacy reviewer confirm the
+exact Apple App Privacy / Google Data Safety answers. These are the exact, pre-specified edits — the
+docs were written with the "when the Coach is enabled" branch already spelled out.
+
+**When the coach ships, the coach collects:** conversation messages + saved coach memories (per-user,
+with pause/delete/clear/delete-workspace controls), processed by **Google Gemini via Firebase AI
+Logic** to generate replies; coach text may contain **health free-text** (also covered by the Health
+declaration). Not used for third-party ads; not sold.
+
+### `docs/DATA_SAFETY.md`
+- **Banner (top):** change "**The AI Coach is currently gated OFF**" → "The AI Coach is **enabled** as
+  of `YYYY-MM-DD` (see `COACH_RELEASE_STATE.md`)"; update the "only once the Coach is enabled" aside.
+- **Data-type table — User Content → Other User Content:** change the condition cell from "**Only when
+  the AI Coach is enabled (currently OFF)** … Do **not** declare while `COACH_ENABLED = false`" →
+  "**Yes** — AI Coach messages & saved coach memories."
+- **Data-type table — Messages → Other in-app messages:** same flip, condition → "**Yes** — AI Coach
+  conversations & saved coach memories."
+- **Notes item 2 (AI Coach messages):** change "**currently DISABLED** … **no coach messages are
+  collected today** … Do **not** declare coach data while it is off" → the enabled wording it already
+  describes: coach conversations + memories stored per-user, declared as *User Content* (Apple) /
+  *Other in-app messages* (Google), health free-text covered by the Health declaration.
+- Confirm **Health & Fitness** already = Yes (unchanged); confirm **Photos = No** (meal scanner removed
+  — unchanged).
+
+### `docs/APP_STORE.md`
+- **Tech-stack line:** "**Google Gemini** for the AI Coach (currently disabled; …)" → "…(enabled `YYYY-MM-DD`)".
+- **"AI Coach is DISABLED" block:** replace with the enabled state — the coach UI is live (no "coming
+  soon"), user messages reach Gemini via Firebase AI Logic, and the store privacy answers now describe
+  the **enabled** coach. Reference `COACH_RELEASE_STATE.md` for the activation record + named owners.
+
+### `docs/PRIVACY.md`
+- Change "**The AI Coach is currently disabled and there is no other AI feature active.**" → a sentence
+  stating the AI Coach is active and uses Google's Gemini to generate replies, with the retention /
+  pause-delete controls and the "not an emergency or confidential clinical service" disclaimer (already
+  present at lines ~103–109) unchanged.
+- Verify the third-party-processor disclosure names **Google (Gemini via Firebase AI Logic)** as an AI
+  sub-processor for coach messages.
+- Bump the "last updated" date and re-publish the live Privacy Policy in step.
+
+> After applying, set `config/coach-release.json` → `production.privacyDeclarationApproved` and
+> `storeDeclarationApproved` to `true` (with the reviewer's name/date), so the machine-readable record
+> matches the published forms.
+
 ## What is NOT a blocker (so we stop citing it)
 
 - The safety **holdout / detection / false-positive testing** — done and cleared (see top).
