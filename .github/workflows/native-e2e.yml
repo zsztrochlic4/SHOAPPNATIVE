@@ -96,11 +96,17 @@ jobs:
           # runner; the 15s default times out. Give it room.
           MAESTRO_DRIVER_STARTUP_TIMEOUT: '120000'
         with:
-          api-level: 35
+          api-level: 34
           arch: x86_64
           profile: pixel_6
+          # The intermittent "device offline / emulator not found" mid-test is memory
+          # pressure: give the AVD a large heap + cores (this job has the whole 16g
+          # runner — the build is a separate job). API 34 is more stable in CI than 35.
+          ram-size: 6144M
+          cores: 4
+          emulator-boot-timeout: 900
           # Headless, software-GPU flags for CI stability.
-          emulator-options: -no-window -no-snapshot -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
+          emulator-options: -no-window -no-snapshot -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -memory 6144
           disable-animations: true
           # The action already waits for the emulator to finish booting before it
           # runs this. Keep the script a SINGLE command — the action word-splits
@@ -119,5 +125,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: maestro-debug
-          path: maestro-debug
+          # Both the explicit --debug-output dir and Maestro's default location, so
+          # the failing step's screenshot + hierarchy is captured wherever it lands.
+          path: |
+            maestro-debug
+            /home/runner/.maestro/tests
           if-no-files-found: warn
