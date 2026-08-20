@@ -63,11 +63,13 @@ export function contextForUser(user: UserDoc, weeksTrained = 0): BuildContext {
     equipmentTags: user.equipment_tags,
     experience: user.experience,
     excludedIds: new Set(user.excluded_exercise_ids),
+    preferredIds: new Set(user.preferred_exercise_ids ?? []),
     affectedRegions: user.affected_regions,
     safety: {
       experience: user.experience,
       trains_alone: user.trains_alone === 'always' || user.trains_alone === 'usually',
       weeks_trained: weeksTrained,
+      followed_structured_program: user.followed_structured_program ?? undefined,
     },
   }
 }

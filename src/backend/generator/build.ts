@@ -28,6 +28,7 @@ export interface BuildContext {
   equipmentTags: string[]
   experience: string
   excludedIds: Set<string>       // user dislikes + pain
+  preferredIds: Set<string>      // exercises the user said they love (onboarding "prioritise where they fit")
   affectedRegions: InjuryRegion[]
   safety: UserSafetyContext
 }
@@ -139,6 +140,10 @@ function score(ex: Exercise, p: ParsedSlot, ctx: BuildContext, injuryRegions: st
   // is served anyway — see prescribe()).
   if (ctx.safety.trains_alone && ex.spotterRecommended) s -= 10
   if (ex.primaryGoalFit === GOAL_NAME[ctx.goal]) s += 5
+  // Loved exercises: prioritise WHERE THEY FIT (the onboarding promise). A meaningful nudge that wins
+  // ties and ranks a preferred lift up, but stays below the injury penalty (-6) so it never overrides
+  // safety — it only prioritises among otherwise-eligible options.
+  if (ctx.preferredIds.has(ex.id)) s += 5
   if (p.preferType && ex.type === p.preferType) s += 4
   if (ctx.focalPoints.includes(ex.muscleGroup as FocalPoint)) s += 3
   s += Math.min(ex.substitutionCount, 10) * 0.1 // stable, well-covered lifts break ties

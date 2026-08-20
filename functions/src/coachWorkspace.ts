@@ -31,6 +31,18 @@ const CROSS_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000
 const ordinary = (value: unknown, max = 500): string =>
   typeof value === 'string' ? value.trim().slice(0, max) : ''
 
+/** Whole years from a YYYY-MM-DD date of birth, or undefined when absent/unparseable. Advisory only —
+ *  the deterministic 18+ eligibility gate lives upstream and is unaffected by this. */
+function ageFromDob(dob: unknown): number | undefined {
+  if (typeof dob !== 'string' || !dob) return undefined
+  const b = new Date(dob)
+  if (Number.isNaN(b.getTime())) return undefined
+  const n = new Date()
+  let a = n.getFullYear() - b.getFullYear()
+  if (n.getMonth() < b.getMonth() || (n.getMonth() === b.getMonth() && n.getDate() < b.getDate())) a--
+  return a >= 0 && a < 120 ? a : undefined
+}
+
 function iso(value: unknown): string | null {
   if (value instanceof Timestamp) return value.toDate().toISOString()
   if (value && typeof (value as { toDate?: () => Date }).toDate === 'function') {
@@ -241,10 +253,10 @@ function programTechniqueText(prog: unknown): string {
  *  beyond the days/length the user chose. */
 function programRationaleText(backend: Record<string, any>, profile: Record<string, any>, prog: any): string {
   const goal = ordinary(backend.goal || profile.goal, 40)
-  const exp = ordinary(backend.experience_level || profile.experience, 30)
-  const days = backend.days_per_week ?? profile.daysPerWeek
+  const exp = ordinary(backend.experience || profile.experience, 30)
+  const days = (Array.isArray(backend.days_available) ? backend.days_available.length : undefined) ?? profile.daysPerWeek
   const len = backend.session_length_min ?? profile.sessionMinutes
-  const equip = ordinary(backend.equipment || profile.equipment, 40)
+  const equip = ordinary(backend.equipment_tier || profile.equipment, 40)
   const alone = ordinary(backend.trains_alone, 20)
   const dayTypes = prog && Array.isArray(prog.days) ? prog.days.map((d: any) => ordinary(d?.dayType, 20)).filter(Boolean).join(', ') : ''
   const split = ordinary(prog?.name, 80) || (prog && Array.isArray(prog.days) ? `${prog.days.length} day split` : '')
@@ -378,10 +390,32 @@ export async function loadCoachTurnData(
 
   const completed = sessions.filter((s) => s.completed === true)
   const coachingStyleText = String(workspaceSnap.get('coachingStyle') ?? 'balanced')
+  // Injury DETAIL beyond the region label — which movements aggravate, painful-now, under-treatment,
+  // active vs resolved — so the coach never endorses a movement that hits an actively painful pattern.
+  const fu = (screening.followups && typeof screening.followups === 'object') ? screening.followups : {}
+  const injuryDetail = [
+    Array.isArray(fu.aggravating_movements) && fu.aggravating_movements.length
+      ? `aggravated by ${fu.aggravating_movements.slice(0, 4).map((m: any) => ordinary(m, 30)).filter(Boolean).join(', ')}` : '',
+    fu.painful_now ? 'currently painful' : '',
+    fu.under_treatment ? 'under treatment' : '',
+    fu.exercise_restricted ? 'exercise restricted' : '',
+    fu.status === 'active' ? 'active' : (fu.status === 'resolved' ? 'resolved' : ''),
+  ].filter(Boolean).join(', ')
+  const freeInjury = ordinary(backend.notes, 120)
+  const trainsAlone = backend.trains_alone === 'always' || backend.trains_alone === 'usually'
+  // Declared time away / exam mode, so the coach respects a planned break rather than nagging.
+  const absences = Array.isArray(backend.planned_absences) ? backend.planned_absences : []
+  const declaredAway = absences
+    .map((a: any) => `${ordinary(a?.mode, 24)} ${ordinary(a?.startDate ?? a?.start, 12)} to ${ordinary(a?.endDate ?? a?.end, 12)}`.trim())
+    .filter((s: string) => s.length > 4).slice(0, 2).join('; ')
   const constraints = [
     affectedRegions.length ? `affected regions: ${affectedRegions.join(', ')}` : '',
+    injuryDetail ? `injury detail: ${injuryDetail}` : '',
+    freeInjury ? `injury note: ${freeInjury}` : '',
     excludedExerciseIds.length ? `excluded exercises: ${excludedExerciseIds.slice(0, 12).join(', ')}` : '',
     context.screeningOutcome ? `screening: ${context.screeningOutcome}` : '',
+    trainsAlone ? 'trains alone, so attach a safe-setup cue for any spotter lift (S09)' : '',
+    declaredAway ? `declared time away: ${declaredAway}; respect this planned break, do not read it as slacking` : '',
   ].filter(Boolean).join('; ')
 
   // Section-labelled snapshot for intent-aware selection (final plan Phase 2). The selector decides
@@ -389,7 +423,7 @@ export async function loadCoachTurnData(
   const snapshot: CoachContextSnapshot = {
     coachingStyle: coachingStyleText,
     goal: ordinary(backend.goal || profile.goal, 60),
-    experience: ordinary(backend.experience_level || profile.experience, 40),
+    experience: ordinary(backend.experience || profile.experience, 40),
     units,
     constraints,
     // The user's full profile + goals/targets, so the coach can answer "what is my X" (sleep/step/
@@ -403,7 +437,19 @@ export async function loadCoachTurnData(
       sleepGoalHours: profile.sleepTargetH, stepGoal: profile.stepTarget, waterGoalLitres: profile.waterTargetL,
       dietaryPrefs: profile.dietaryPrefs, budgetMode: profile.budgetMode, motivation: profile.motivation,
     }),
-    canonicalProfile: compact({ goal: backend.goal, experience: backend.experience_level, daysPerWeek: backend.days_per_week, sessionLength: backend.session_length_min, equipment: backend.equipment, trainsAlone: backend.trains_alone }),
+    canonicalProfile: compact({
+      goal: backend.goal, experience: backend.experience,
+      daysPerWeek: Array.isArray(backend.days_available) ? backend.days_available.length : undefined,
+      sessionLength: backend.session_length_min,
+      equipmentTier: backend.equipment_tier,
+      // Granular equipment the user actually owns, so free-text advice never names gear they lack.
+      equipmentOwned: Array.isArray(backend.equipment_tags) && backend.equipment_tags.length ? backend.equipment_tags.join(', ') : undefined,
+      // Age, so conversational advice (caffeine, volume, recovery) can be age-appropriate. The 18+ gate
+      // is separate and upstream; this only informs tone/depth, never bypasses safety routing.
+      age: ageFromDob(backend.date_of_birth),
+      dietaryRestrictions: Array.isArray(backend.diet) && backend.diet.length ? backend.diet.join(', ') : undefined,
+      trainsAlone: backend.trains_alone,
+    }),
     program: compact(user.generatedProgram ?? user.program, 1800),
     recentTraining: `${completed.length}/${sessions.length} recent sessions completed. ${lastSessionText(sessions)} Latest ${compact(sessions.slice(0, 4), 1500)}`,
     trainingSummaries: compact(workoutSummaries.slice(0, 8), 1200),

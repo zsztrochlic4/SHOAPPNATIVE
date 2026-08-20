@@ -123,7 +123,8 @@ export function GoalsSettings() {
   const [steps, setSteps] = useState(() => String(p.stepTarget))
   const [sleep, setSleep] = useState(() => String(p.sleepTargetH))
   const [water, setWater] = useState(() => waterDisplay(p.waterTargetL))
-  const [days, setDays] = useState(() => String(p.daysPerWeek))
+  const [sex, setSex] = useState<'male' | 'female' | 'other'>(p.sex)
+  const [heightCm, setHeightCm] = useState(() => String(p.heightCm || ''))
 
   // The units toggle sits directly above this, so re-read unit-bearing values
   // whenever it (or the saved goal) changes — otherwise the fields would keep
@@ -142,7 +143,8 @@ export function GoalsSettings() {
         stepTarget: Math.max(0, Math.round(Number(steps) || 0)),
         sleepTargetH: Math.max(0, Math.min(14, Number(sleep) || 0)),
         waterTargetL: Math.max(0, units === 'imperial' ? (Number(water) || 0) / L_TO_OZ : Number(water) || 0),
-        daysPerWeek: Math.max(1, Math.min(7, Math.round(Number(days) || 1))),
+        sex,
+        heightCm: Math.max(0, Math.min(260, Math.round(Number(heightCm) || 0))),
       },
     })
     toast('Goals updated')
@@ -163,9 +165,19 @@ export function GoalsSettings() {
       <GoalRow label="Water" unit={units === 'imperial' ? 'fl oz' : 'litres'}>
         <TextInput value={water} onChangeText={(v) => setWater(v.replace(/[^\d.]/g, ''))} keyboardType="decimal-pad" placeholderTextColor="rgba(148,148,148,0.6)" className={inputCls} />
       </GoalRow>
-      <GoalRow label="Workouts / week" unit="days">
-        <TextInput value={days} onChangeText={(v) => setDays(v.replace(/\D/g, '').slice(0, 1))} keyboardType="number-pad" placeholderTextColor="rgba(148,148,148,0.6)" className={inputCls} />
+      <GoalRow label="Height" unit="cm">
+        <TextInput value={heightCm} onChangeText={(v) => setHeightCm(v.replace(/\D/g, '').slice(0, 3))} keyboardType="number-pad" placeholderTextColor="rgba(148,148,148,0.6)" className={inputCls} />
       </GoalRow>
+      <View className="flex-row items-center justify-between py-1">
+        <Text className="text-[15px] text-white">Sex</Text>
+        <View className="flex-row gap-1.5">
+          {(['male', 'female', 'other'] as const).map((s) => (
+            <Pressable key={s} onPress={() => setSex(s)} accessibilityRole="radio" accessibilityLabel={s} accessibilityState={{ selected: sex === s, checked: sex === s }} className={`rounded-lg border px-3 py-1.5 ${sex === s ? 'border-brand-400 bg-brand-400/10' : 'border-white/8 bg-ink-900'}`}>
+              <Text className={`text-[12.5px] font-bold ${sex === s ? 'text-brand-400' : 'text-secondary'}`}>{s[0].toUpperCase() + s.slice(1)}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
       <Pressable onPress={saveGoals} className="btn-primary mt-1 w-full py-2.5 active:opacity-90">
         <Text className="text-sm font-semibold text-black">Save goals</Text>
       </Pressable>

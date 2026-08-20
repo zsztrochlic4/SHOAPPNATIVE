@@ -38,10 +38,14 @@ const userDoc = {
     sleepTargetH: 8, stepTarget: 9000, waterTargetL: 3,
     dietaryPrefs: 'no restrictions', budgetMode: false, motivation: 'I want to feel fitter',
   },
+  // Canonical UserDoc shape (matches src/backend/mapping/onboardingContract.buildUserDoc), so the demo
+  // exercises the SAME fields the coach reads for a real onboarded user — not a reader-shaped stand-in.
   backendUser: {
-    goal: 'hypertrophy', experience_level: 'beginner', days_per_week: 4, session_length_min: 60,
+    goal: 'Hypertrophy', experience: 'Beginner', session_length_min: 60,
     days_available: ['Monday', 'Wednesday', 'Friday', 'Sunday'],
-    equipment: 'full_gym', trains_alone: 'usually', date_of_birth: '2006-01-01',
+    equipment_tier: 'Full Gym',
+    equipment_tags: ['barbell', 'plates', 'ez_bar', 'trap_bar', 'dumbbell', 'bench', 'rack', 'cable', 'machine', 'pull_up_bar', 'kettlebell', 'band'],
+    goal_weight_kg: 78, diet: [], trains_alone: 'usually', date_of_birth: '2006-01-01',
     affected_regions: [], excluded_exercise_ids: [],
   },
   settings: { units: 'metric', timezone: 'Australia/Sydney' },

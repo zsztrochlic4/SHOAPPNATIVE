@@ -513,10 +513,26 @@ export function isOwnPlanReview(n: Norm): boolean {
   return mealReviewIntent(n) && !mealCreateIntent(n) && !mealPlanMacros(n)
 }
 
+// Asking ABOUT the no-calorie-targets policy, or to do something WITHOUT calorie/macro targets, is NOT
+// a request for one — this app is deliberately calorie-free, so a mention of "calorie/macro target" in
+// that frame is an app/nutrition question, not a meal_plan block ("update a goal WITHOUT calorie
+// targets", "why does the app AVOID prescribing a calorie target"). Scoped to the calorie/macro frame,
+// so it never lets an actual "make me a meal plan" creation through (that blocks on mealPlanPhrase).
+function caloriePolicyOrAvoid(n: Norm): boolean {
+  return has(n,
+    'without calorie', 'without a calorie', 'without creating calorie', 'without setting calorie',
+    'without giving me calorie', 'without exact calorie', 'without macro', 'without a macro',
+    'without calorie or macro', 'avoid calorie', 'avoid prescribing', 'avoid a calorie',
+    'avoid setting calorie', 'no calorie target', 'not a calorie target', 'not calorie target',
+    'instead of calorie', 'rather than calorie', 'why does the app avoid', 'why no calorie',
+    'why not calorie', 'why is the app', 'why are calorie', 'qualitative rather than', 'qualitative instead')
+}
+
 function detectMealPlan(n: Norm): DetectorHit[] {
-  // Only a review of an EXISTING plan (review intent AND no creation verb) is allowed; macros and
-  // from-scratch creation always block.
-  const block = mealPlanMacros(n) || (mealPlanPhrase(n) && (mealCreateIntent(n) || !mealReviewIntent(n)))
+  // Only a review of an EXISTING plan (review intent AND no creation verb) is allowed; from-scratch
+  // creation always blocks. A numeric-target mention blocks UNLESS the user is asking about / to avoid
+  // the calorie policy (the app has none), which is an ordinary app question.
+  const block = (mealPlanMacros(n) && !caloriePolicyOrAvoid(n)) || (mealPlanPhrase(n) && (mealCreateIntent(n) || !mealReviewIntent(n)))
   if (block) return [hit('meal_plan', 'meal_plan_request')]
   return []
 }
@@ -603,8 +619,8 @@ function detectUnder18(n: Norm): DetectorHit[] {
 
 function detectUnsafeTraining(n: Norm): DetectorHit[] {
   const out: DetectorHit[] = []
-  if (has(n, 'twice a day every day', 'no rest days', 'no rest day', 'without rest', 'no days off',
-    'every single day no rest', 'train every day no rest', 'skip rest days'))
+  if (has(n, 'twice a day every day', 'no rest days', 'no rest day', 'without a rest day', 'without rest days',
+    'without any rest', 'with no rest', 'no days off', 'every single day no rest', 'train every day no rest', 'skip rest days'))
     out.push(hit('unsafe_training', 'overtraining_request'))
   if (has(n, 'heavier than recommended', 'more than the app says', 'bypass the limit', 'ignore the limit',
     'override the safety', 'lift more than you said'))
@@ -1241,6 +1257,50 @@ const APP_HELP_TERMS = [
   'weights in pounds', 'pinging me', 'stop pinging', 'buzzing when', 'mute the app', 'mute the sounds',
   'garmin', 'fitbit', 'apple health', 'google fit', 'unlock trophies', 'my achievements', 'ranking system',
   'charging my card', 'stop being charged', 'be more blunt', 'keep notes on me', 'notes on me',
+  // Additional app vocabulary surfaced by the 2000-prompt wide test (all suppress ONLY the off_topic
+  // tier, never a safety category). Curated to app-specific phrasings to avoid over-matching.
+  // units
+  'to pounds', 'to kilograms', 'to kg', 'to lb', 'to lbs', 'kilograms to', 'pounds instead',
+  'everything in pounds', 'display in pounds', 'switch to pounds', 'switch to metric', 'switch to imperial',
+  'change the units', 'change units', 'every display',
+  // coaching style
+  'direct style', 'supportive style', 'balanced style', 'be firm', 'firm without', 'be blunt',
+  'blunt with me', 'change styles', 'switch styles', 'choosing a style', 'coach to be', 'coaching to be',
+  // coach memory
+  'what the coach remembers', 'coach remembers', 'currently remembers', 'what you know about me',
+  'what have you saved', 'what you have saved', 'clear the coach', 'clear what',
+  // community scopes / ranking
+  'campus', 'dorm', 'society', 'scope', 'scopes', 'the feed', 'my rank', 'league rank', 'my league',
+  'ranking work', 'how leagues', 'how do leagues', 'how streaks', 'how does the streak',
+  // subscription / billing / paywall
+  'subscription', 'my subscription', 'cancel my subscription', 'manage subscription', 'billing',
+  'free trial', 'the trial', 'trial period', 'trial end', 'paywall', 'upgrade', 'refund', 'restore purchase',
+  'renew', 'payment', 'cancel my plan',
+  // confirmation / action outcomes
+  'the confirm', 'confirm button', 'tap confirm', 'confirmation', 'action failed', 'action did not',
+  'the proposal', 'proposed a change', 'did the change', 'did it save', 'apply the change',
+  // Second calibration pass — long-tail app phrasings from the 2000-prompt re-run (off_topic tier only).
+  // exercise-library search
+  'search for an exercise', 'search for an exersise', 'search returns', 'no result for', 'search using',
+  'common nickname', 'nickname', 'the exercise library', 'find an exercise',
+  // quick workouts
+  'quick circuit', 'easiest quick', 'the quick workout', 'quick workout is', 'shortest workout',
+  // barcode / scanning
+  'scanning a', 'scanning an', 'scan a barcode', 'barcode scan', 'camera permission', 'imported product',
+  'sticker over', 'scanning will not', 'scan will not', 'scanner',
+  // coach memory
+  'long-term memory', 'long term memory', 'turn memory off', 'not saved as', 'saved as a long',
+  'keeping consent', 'keeping other', 'memory off while',
+  // coach action / outcome
+  'do not apply', 'apply it yet', 'action switch', 'action card', 'i tapped confirm', 'actually saved',
+  'retry once', 'says failed', 'card says failed', 'action outcome', 'goal change but do not',
+  // plan around your life
+  'busy period', 'end an active', 'the period early', 'end the period', 'travel dates', 'active busy',
+  // settings
+  'reduced motion', 'battery saver', 'reduce animations', 'reduced-motion',
+  // paywall / billing
+  'restore an existing', 'existing purchase', 'restore my purchase', 'restore purchases',
+  'never subscribed', 'restore a purchase', 'previous purchase',
 ]
 
 /**
