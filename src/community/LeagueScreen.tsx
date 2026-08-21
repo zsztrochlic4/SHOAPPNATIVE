@@ -100,7 +100,9 @@ function useLeagueData(me: ReturnType<typeof myLeaderStats>, sync: SyncPayload, 
 
 export function LeagueScreen({ onClaimUsername }: { onClaimUsername: () => void }) {
   const { state, dispatch } = useStore()
-  const me = useMemo(() => myLeaderStats(state), [state])
+  // myLeaderStats reads only these slices; narrowing the deps is intentional (avoids recomputing on every unrelated dispatch).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const me = useMemo(() => myLeaderStats(state), [state.habits, state.sessions, state.activities, state.community, state.profile])
   const [view, setView] = useState<'league' | 'global'>('league')
   const [howOpen, setHowOpen] = useState(false)
   const [appealOpen, setAppealOpen] = useState(false)
@@ -410,7 +412,9 @@ function LeagueHero({ tier, rank, points, cohort, zone, onHow }: {
 function StreakCard() {
   const { state, dispatch } = useStore()
   const toast = useToast()
-  const me = useMemo(() => myLeaderStats(state), [state])
+  // myLeaderStats reads only these slices; narrowing the deps is intentional (avoids recomputing on every unrelated dispatch).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const me = useMemo(() => myLeaderStats(state), [state.habits, state.sessions, state.activities, state.community, state.profile])
   const tokens = state.community.freezeTokens ?? 0
   const restingToday = (state.community.restDays ?? []).includes(todayKey)
 

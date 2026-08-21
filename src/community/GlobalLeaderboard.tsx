@@ -22,7 +22,9 @@ type Status = 'loading' | 'ready' | 'error'
 
 export function GlobalLeaderboard({ onClaimUsername }: { onClaimUsername: () => void }) {
   const { state } = useStore()
-  const me = useMemo(() => myLeaderStats(state), [state])
+  // myLeaderStats reads only these slices; narrowing the deps is intentional (avoids recomputing on every unrelated dispatch).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const me = useMemo(() => myLeaderStats(state), [state.habits, state.sessions, state.activities, state.community, state.profile])
   const colors = useColors()
 
   const [status, setStatus] = useState<Status>('loading')

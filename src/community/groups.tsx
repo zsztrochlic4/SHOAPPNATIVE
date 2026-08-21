@@ -153,7 +153,9 @@ type ActiveSheet =
 
 export function GroupsTab({ onClaimUsername }: { onClaimUsername: () => void }) {
   const { state, dispatch } = useStore()
-  const me = useMemo(() => myLeaderStats(state), [state])
+  // myLeaderStats reads only these slices; narrowing the deps is intentional (avoids recomputing on every unrelated dispatch).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const me = useMemo(() => myLeaderStats(state), [state.habits, state.sessions, state.activities, state.community, state.profile])
   const groups = state.community.groups
   const [sheet, setSheet] = useState<ActiveSheet>(null)
 
@@ -266,7 +268,9 @@ function CreateGroupSheet({ open, onClose, onCreated }: { open: boolean; onClose
   const { state, dispatch } = useStore()
   const toast = useToast()
   const colors = useColors()
-  const me = useMemo(() => myLeaderStats(state), [state])
+  // myLeaderStats reads only these slices; narrowing the deps is intentional (avoids recomputing on every unrelated dispatch).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const me = useMemo(() => myLeaderStats(state), [state.habits, state.sessions, state.activities, state.community, state.profile])
   const [name, setName] = useState('')
   const [pick, setPick] = useState(0)
   const [visibility, setVisibility] = useState<'private' | 'public'>('private')
@@ -401,7 +405,9 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
   const { state, dispatch } = useStore()
   const toast = useToast()
   const colors = useColors()
-  const me = useMemo(() => myLeaderStats(state), [state])
+  // myLeaderStats reads only these slices; narrowing the deps is intentional (avoids recomputing on every unrelated dispatch).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const me = useMemo(() => myLeaderStats(state), [state.habits, state.sessions, state.activities, state.community, state.profile])
   const joinedIds = state.community.groups.map((g) => g.id)
 
   const [query, setQuery] = useState('')
@@ -660,7 +666,9 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
   const { state, dispatch } = useStore()
   const toast = useToast()
   const colors = useColors()
-  const me = useMemo(() => myLeaderStats(state), [state])
+  // myLeaderStats reads only these slices; narrowing the deps is intentional (avoids recomputing on every unrelated dispatch).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const me = useMemo(() => myLeaderStats(state), [state.habits, state.sessions, state.activities, state.community, state.profile])
   const group = state.community.groups.find((g) => g.id === groupId) ?? null
   // Preview: no claimed identity — hide owner/leave controls, offer to join.
   const preview = !me.username

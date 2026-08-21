@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { View, Text, Pressable, Image, Animated, Easing, Platform, ScrollView, StyleSheet, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Circle, G, Defs, RadialGradient, Stop, Rect } from 'react-native-svg'
@@ -97,8 +97,12 @@ export default function Dashboard() {
   const session = todaySession(state)
   const t = dailyTargets(state)
   const exam = examState(state)
-  const streak = streakStats(state)
-  const idx = weeklyIndex(state)
+  // These two scan the whole habit/session/activity history; memoise them on the slices they
+  // read so a trivial dispatch (e.g. nudging water) doesn't re-scan everything on every render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const streak = useMemo(() => streakStats(state), [state.habits, state.community, state.profile])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const idx = useMemo(() => weeklyIndex(state), [state.habits, state.sessions, state.activities, state.profile])
   const weightLoggedToday = state.weights.some((x) => x.dateKey === todayKey)
   // The streak is "at risk" until the user logs something today — the nudge that
   // drives the daily loop (Duolingo's whole retention engine).
