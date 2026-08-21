@@ -26,6 +26,29 @@ export const WEEKDAY_KEYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as
  */
 export type AccentKey = 'brand' | 'blue' | 'purple' | 'orange' | 'yellow' | 'fg'
 
+/**
+ * Semantic per-section colour coding — the single source of truth for the small
+ * visual cues that tell a user which part of the app a stat, log tile or coach
+ * message belongs to. Lives here (not in theme.tsx) so the React-free modules
+ * (lib/metrics, the coach layer) can share it; theme.tsx re-exports it and adds
+ * `sectionColor()` to resolve a key against a live palette.
+ *
+ *   Training / Workouts / Strength → green (brand)
+ *   Nutrition / Eating             → yellow
+ *   Hydration / Water              → blue
+ *   Sleep / Recovery               → purple
+ *   Movement / Steps / Cardio      → orange
+ */
+export type Section = 'training' | 'nutrition' | 'hydration' | 'sleep' | 'movement'
+
+export const SECTION_ACCENT: Record<Section, AccentKey> = {
+  training: 'brand',
+  nutrition: 'yellow',
+  hydration: 'blue',
+  sleep: 'purple',
+  movement: 'orange',
+}
+
 export interface PeriodModeMeta {
   id: PeriodMode
   title: string

@@ -30,7 +30,7 @@ import { todaySession, leaderboardSorted, youRank } from '../store/selectors'
 import { relativeLabel, todayKey, deviceTimezone } from '../lib/date'
 import { CHART_METRICS, DASHBOARD_FEATURED, MAX_DASHBOARD_STATS, PROGRESS_LIFT_PERIODS, STAT_METRICS, STAT_TIMEFRAMES, dashboardFeaturedId, dashboardLiftPeriod, dashboardStatIds, dashboardTimeframe, dashboardTrackedIds, progressMetricId } from '../lib/metrics'
 import type { ProgressLiftPeriod } from '../store/types'
-import { brand, useColors, accentFor, type AccentKey } from '../theme'
+import { brand, useColors, accentFor, SECTION_ACCENT, type AccentKey } from '../theme'
 import { AppModal, IS_WEB, WEB_SCREEN } from '../components/WebFrame'
 import { CoachScreen } from '../coach/CoachScreen'
 import type { ReactNode } from 'react'
@@ -466,8 +466,8 @@ function StatSwitch({ on, colors, big = false }: { on: boolean; colors: ReturnTy
 /** The Progress tab's "Top stat" presets — one drives the featured chart. */
 const TOP_STATS: { id: string; label: string; icon: string; accent: AccentKey }[] = [
   { id: 'weight', label: 'Body weight', icon: 'scale', accent: 'blue' },
-  { id: 'nutrition', label: 'Eating quality', icon: 'leaf', accent: 'orange' },
-  { id: 'water', label: 'Water', icon: 'droplet', accent: 'blue' },
+  { id: 'nutrition', label: 'Eating quality', icon: 'leaf', accent: SECTION_ACCENT.nutrition },
+  { id: 'water', label: 'Water', icon: 'droplet', accent: SECTION_ACCENT.hydration },
 ]
 
 /**

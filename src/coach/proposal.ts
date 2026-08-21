@@ -6,27 +6,49 @@
 import type { AppState } from '../store/types'
 import type { CoachActionProposal } from '../backend/coach/contracts'
 import type { Palette } from '../theme'
+import { sectionColor } from '../theme'
 import { exerciseView } from '../store/programSession'
 import { resolveExerciseRef } from '../backend/data'
 import { fmtWeight } from '../lib/format'
 
-/** The four coach action categories, keyed to their accent colour (per CLAUDE.md). */
-export type CoachCategory = 'training' | 'recovery' | 'progress' | 'nutrition'
+/**
+ * Coach action categories, aligned to the app-wide semantic section colours so a
+ * coach message's coloured dot matches the section it refers to (see SECTION_ACCENT
+ * in store/periods.ts). The five section categories map 1:1 onto sections; 'progress'
+ * (weight trend / PRs) is a coach-specific concept the sections don't cover and keeps
+ * the app's body-weight blue.
+ *
+ *   training → green · nutrition → yellow · hydration → blue · sleep/recovery → purple ·
+ *   movement → orange · progress → blue
+ */
+export type CoachCategory = 'training' | 'nutrition' | 'hydration' | 'sleep' | 'movement' | 'progress'
 
 const CATEGORY_LABEL: Record<CoachCategory, string> = {
   training: 'Training',
-  recovery: 'Recovery',
-  progress: 'Progress',
   nutrition: 'Nutrition',
+  hydration: 'Hydration',
+  sleep: 'Recovery',
+  movement: 'Movement',
+  progress: 'Progress',
 }
 
-/** Category → accent colour: Training = brand green, Recovery = orange, Progress = blue, Nutrition = purple. */
+/** Category → accent colour, resolved through the shared section-colour map (progress = body-weight blue). */
 export function categoryColor(cat: CoachCategory, c: Palette): string {
-  return cat === 'training' ? c.brand400 : cat === 'recovery' ? c.accentOrange : cat === 'progress' ? c.accentBlue : c.accentPurple
+  if (cat === 'progress') return c.accentBlue
+  return sectionColor(cat, c)
 }
 
 export function categoryLabel(cat: CoachCategory): string {
   return CATEGORY_LABEL[cat]
+}
+
+/** Route a wellness metric (water/sleep/steps/nutrition/weight) to its section category. */
+function metricCategory(metric: string): CoachCategory {
+  if (metric === 'water') return 'hydration'
+  if (metric === 'sleep') return 'sleep'
+  if (metric === 'steps') return 'movement'
+  if (metric === 'weight') return 'progress'
+  return 'nutrition'
 }
 
 /** Map a proposal to its category, so every proposed change carries the right coloured dot + label. */
@@ -34,22 +56,25 @@ export function proposalCategory(p: CoachActionProposal): CoachCategory {
   if (p.kind === 'navigation') {
     const overlay = String(p.payload?.overlay ?? '')
     if (overlay === 'progress' || overlay === 'logWeight') return 'progress'
-    if (overlay === 'nutrition' || overlay === 'logProgress') return 'nutrition'
+    if (overlay === 'nutrition') return 'nutrition'
+    if (overlay === 'logProgress') return 'training'
     return 'training'
   }
   if (p.kind === 'workout_action') {
-    switch (String(p.payload?.action ?? '')) {
+    const action = String(p.payload?.action ?? '')
+    switch (action) {
       case 'planned_absence':
       case 'exam_mode':
       case 'catch_up':
       case 'deload':
-        return 'recovery'
+        // Load-management / recovery actions share the Sleep/Recovery purple.
+        return 'sleep'
       case 'set_goal_weight':
       case 'share_pr':
         return 'progress'
       case 'set_wellness_goal':
       case 'nudge_log':
-        return 'nutrition'
+        return metricCategory(String(p.payload?.metric ?? ''))
       default:
         return 'training'
     }

@@ -1,6 +1,6 @@
 import type { AppState, Units, HabitDay, StatTimeframe, WeightEntry, ProgressLiftPeriod } from '../store/types'
 import { weightStats, streakStats, regularWorkoutsInRange, oneRMSeries } from '../store/selectors'
-import type { AccentKey } from '../store/periods'
+import { SECTION_ACCENT, type AccentKey } from '../store/periods'
 import { fluidUnit, fmtFluid, fmtWeight, fmtWeightNum, weightUnit, weightVal } from './format'
 import { dayKey, shortDate } from './date'
 import { exById } from '../data/catalog'
@@ -106,7 +106,7 @@ const round1 = (v: number) => Math.round(v * 10) / 10
 
 export const STAT_METRICS: StatMetric[] = [
   {
-    id: 'workouts', label: 'Workouts', icon: 'dumbbell', accent: 'brand',
+    id: 'workouts', label: 'Workouts', icon: 'dumbbell', accent: SECTION_ACCENT.training,
     compute: (s, _u, tf) => {
       const d = TIMEFRAME_DAYS[tf]
       const now = regularWorkoutsInRange(s, d - 1, 0)
@@ -116,7 +116,7 @@ export const STAT_METRICS: StatMetric[] = [
     },
   },
   {
-    id: 'strength', label: 'Strength', icon: 'trending', accent: 'brand',
+    id: 'strength', label: 'Strength', icon: 'trending', accent: SECTION_ACCENT.training,
     compute: (s, _u, tf) => {
       const d = TIMEFRAME_DAYS[tf]
       const now = strengthGainPct(s, d - 1, 0)
@@ -148,7 +148,7 @@ export const STAT_METRICS: StatMetric[] = [
     },
   },
   {
-    id: 'water', label: 'Water', icon: 'droplet', accent: 'blue',
+    id: 'water', label: 'Water', icon: 'droplet', accent: SECTION_ACCENT.hydration,
     compute: (s, units, tf) => {
       const d = TIMEFRAME_DAYS[tf]
       const now = habitAvg(s, (h) => h.waterL, d - 1, 0)
@@ -163,7 +163,7 @@ export const STAT_METRICS: StatMetric[] = [
     },
   },
   {
-    id: 'steps', label: 'Daily steps', icon: 'footprints', accent: 'orange',
+    id: 'steps', label: 'Daily steps', icon: 'footprints', accent: SECTION_ACCENT.movement,
     compute: (s, _u, tf) => {
       const d = TIMEFRAME_DAYS[tf]
       const now = habitAvg(s, (h) => h.steps, d - 1, 0)
@@ -187,7 +187,7 @@ export const STAT_METRICS: StatMetric[] = [
     },
   },
   {
-    id: 'sleep', label: 'Sleep', icon: 'bed', accent: 'yellow',
+    id: 'sleep', label: 'Sleep', icon: 'bed', accent: SECTION_ACCENT.sleep,
     compute: (s, _u, tf) => {
       const d = TIMEFRAME_DAYS[tf]
       const now = habitAvg(s, (h) => h.sleepH, d - 1, 0)
@@ -224,11 +224,11 @@ export function dashboardStatIds(s: AppState): string[] {
 /** The stats that can be featured in the dashboard composition card (the big card
  *  under "Progress overview"). Selectable from the dashboard Customise sheet. */
 export const DASHBOARD_FEATURED: { id: string; label: string; icon: string; accent: AccentKey }[] = [
-  { id: 'nutrition', label: 'Eating quality', icon: 'leaf', accent: 'brand' },
+  { id: 'nutrition', label: 'Eating quality', icon: 'leaf', accent: SECTION_ACCENT.nutrition },
   { id: 'weight', label: 'Body weight', icon: 'scale', accent: 'blue' },
-  { id: 'water', label: 'Water', icon: 'droplet', accent: 'blue' },
-  { id: 'steps', label: 'Daily steps', icon: 'footprints', accent: 'orange' },
-  { id: 'sleep', label: 'Sleep', icon: 'bed', accent: 'yellow' },
+  { id: 'water', label: 'Water', icon: 'droplet', accent: SECTION_ACCENT.hydration },
+  { id: 'steps', label: 'Daily steps', icon: 'footprints', accent: SECTION_ACCENT.movement },
+  { id: 'sleep', label: 'Sleep', icon: 'bed', accent: SECTION_ACCENT.sleep },
 ]
 
 /** Which metric the dashboard featured card shows (default 'nutrition'). The
