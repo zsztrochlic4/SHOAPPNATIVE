@@ -8,7 +8,7 @@ import { cssVars, useThemeName } from '../theme'
 import { tick, thud } from '../lib/haptics'
 import { startCheckout, openBillingPortal } from '../lib/billing'
 import { iapActive, purchasePlan, restorePurchases } from '../lib/iap'
-import { DEFAULT_PLAN, type PlanId } from '../lib/plans'
+import { DEFAULT_PLAN, BILLING_OFFER, type PlanId } from '../lib/plans'
 import { LegalDocModal } from '../components/LegalDocModal'
 import { type LegalDocKey } from '../content/legal'
 import { useReducedMotion } from '../lib/a11y'
@@ -223,7 +223,7 @@ function PlanTab({
 
 /* ─────────────────────────────── screen ─────────────────────────────────── */
 
-export function Paywall({ email, onBack }: { email?: string; onBack?: () => void }) {
+export function Paywall({ email, onBack, onSignOut }: { email?: string; onBack?: () => void; onSignOut?: () => void }) {
   const tok = useTok()
   const insets = useSafeAreaInsets()
   const reduced = useReducedMotion()
@@ -317,8 +317,8 @@ export function Paywall({ email, onBack }: { email?: string; onBack?: () => void
 
   const openDoc = (key: LegalDocKey) => { tick(); setLegalDoc(key) }
 
-  const ctaLabel = isAnnual ? 'Get 12 months for $90' : 'Start my 4-week free trial'
-  const footerLine1 = isAnnual ? '$90 today, 52 weeks of access' : `$0 today, then $2/week from ${billDate}`
+  const ctaLabel = isAnnual ? `Get 12 months for ${BILLING_OFFER.annual.totalLabel}` : `Start my ${BILLING_OFFER.weekly.trialWeeks}-week free trial`
+  const footerLine1 = isAnnual ? `${BILLING_OFFER.annual.totalLabel} today, ${BILLING_OFFER.annual.weeks} weeks of access` : `$0 today, then ${BILLING_OFFER.weekly.perWeekLabel} from ${billDate}`
   const footerLine2 = isAnnual ? 'Just $1.73/week, billed yearly. Renews at $90.' : `Cancel before ${billDate} and pay nothing.`
 
   return (
@@ -328,15 +328,20 @@ export function Paywall({ email, onBack }: { email?: string; onBack?: () => void
         contentContainerStyle={{ paddingHorizontal: 22, paddingTop: insets.top + 14, paddingBottom: 24 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* eyebrow + optional back */}
+        {/* eyebrow + optional back + escape hatch (sign out) so a non-paying user is never trapped */}
         <Rise delay={0}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 36, marginLeft: onBack ? -8 : 0 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 36, marginLeft: onBack ? -8 : 0 }}>
             {onBack ? (
               <Pressable onPress={() => { tick(); onBack() }} hitSlop={8} accessibilityRole="button" accessibilityLabel="Go back" style={{ width: 40, height: 40, borderRadius: 999, alignItems: 'center', justifyContent: 'center' }}>
                 <ChevronLeft color={tok.rgb('--fg', 0.7)} />
               </Pressable>
             ) : null}
             <Text style={{ fontSize: 12.5, fontWeight: '800', letterSpacing: 1.6, textTransform: 'uppercase', color: tok.rgb('--brand-400') }}>Almost there</Text>
+            {onSignOut ? (
+              <Pressable onPress={() => { tick(); onSignOut() }} hitSlop={8} accessibilityRole="button" accessibilityLabel="Sign out" style={{ marginLeft: 'auto', paddingHorizontal: 8, paddingVertical: 6 }}>
+                <Text style={{ fontSize: 13.5, fontWeight: '700', color: tok.rgb('--fg', 0.5) }}>Sign out</Text>
+              </Pressable>
+            ) : null}
           </View>
         </Rise>
 
@@ -351,7 +356,7 @@ export function Paywall({ email, onBack }: { email?: string; onBack?: () => void
           <View style={{ borderRadius: 24, backgroundColor: tok.rgb('--ink-800'), borderWidth: 1, borderColor: tok.rgb('--fg', 0.06), overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 24, shadowOffset: { width: 0, height: 8 }, elevation: 6 }}>
             {/* plan selector */}
             <View style={{ flexDirection: 'row', gap: 8, padding: 14, backgroundColor: tok.rgb('--ink-900', 0.4), borderBottomWidth: 1, borderBottomColor: tok.rgb('--fg', 0.07) }}>
-              <PlanTab tok={tok} selected={!isAnnual} onPress={() => selectPlan('weekly')} line1="Free trial" line2="Then $2/week" />
+              <PlanTab tok={tok} selected={!isAnnual} onPress={() => selectPlan('weekly')} line1="Free trial" line2={`Then ${BILLING_OFFER.weekly.perWeekLabel}`} />
               <PlanTab tok={tok} selected={isAnnual} onPress={() => selectPlan('annual')} line1="52 weeks" line2="$90 upfront" ribbon="SAVE 13%" />
             </View>
 

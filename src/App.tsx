@@ -394,7 +394,7 @@ function ProgramDayMaterialiser(): null {
 }
 
 function AuthGate() {
-  const { enabled, loading, user } = useAuth()
+  const { enabled, loading, user, signOut } = useAuth()
   const { state, hydrated } = useStore()
   const insets = useSafeAreaInsets()
 
@@ -455,7 +455,10 @@ function AuthGate() {
     return (
       <>
         {services}
-        <Paywall />
+        {/* Give a non-paying (or returning-unentitled) user an escape hatch: sign out to switch
+            accounts or leave, instead of being trapped at the paywall until they reinstall.
+            Only when Firebase auth is actually enabled and a user is signed in. */}
+        <Paywall onSignOut={enabled && user ? () => { void signOut() } : undefined} />
       </>
     )
   }
