@@ -180,6 +180,12 @@ export interface ProgramDoc {
   active: boolean
   superseded_by: string | null
   generation_audit: { step: number; rule_ids_applied: string[]; choices: string[] }[]
+  /**
+   * GC07 easy transition week. Present only right after a goal change: the active program is the
+   * eased (rir_min + 1) version, and it settles to full target intensity on/after `settlesOnKey`.
+   * Cleared once settled. Absent/null on every ordinary program.
+   */
+  transition?: { settlesOnKey: string } | null
 }
 
 /* ------------------------------------------------------------------ */

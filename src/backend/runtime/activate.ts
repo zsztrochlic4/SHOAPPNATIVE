@@ -16,9 +16,10 @@
  * clamps every prescription through the Safety Rules.
  */
 
-import type { UserDoc, ProgramDoc, WorkoutInstanceDoc, PrescribedExercise, Weekday, DayType } from '../schema'
+import type { UserDoc, ProgramDoc, WorkoutInstanceDoc, PrescribedExercise, Weekday, DayType, BackendGoal } from '../schema'
 import { canGenerate } from '../mapping/onboardingContract'
 import { generateProgram, type GeneratedProgram } from '../generator/generate'
+import { changeGoal } from '../generator/goalChange'
 import type { BuiltExercise, PrescribedFields } from '../generator/build'
 import { EXERCISE_BY_ID } from '../data/index'
 
@@ -146,7 +147,7 @@ function toStoredProgram(programId: string, createdAt: string, g: GeneratedProgr
   }
 }
 
-function toProgramDoc(programId: string, createdAt: string, uid: string, g: GeneratedProgram, version = 1): ProgramDoc {
+function toProgramDoc(programId: string, createdAt: string, uid: string, g: GeneratedProgram, version = 1, transition: { settlesOnKey: string } | null = null): ProgramDoc {
   const schedule: Partial<Record<Weekday, DayType>> = {}
   for (const p of g.placements) schedule[p.weekday as Weekday] = p.dayType
   return {
@@ -161,6 +162,7 @@ function toProgramDoc(programId: string, createdAt: string, uid: string, g: Gene
     active: true,
     superseded_by: null,
     generation_audit: [{ step: 14, rule_ids_applied: [], choices: g.audit }],
+    transition,
   }
 }
 
@@ -193,15 +195,17 @@ const blocked = (reason: string | null): ActivationResult => ({
  * so both produce identical projections. The program is already safety-clamped by the
  * generator; this only reshapes it.
  */
-export function projectProgram(uid: string, createdAt: string, g: GeneratedProgram, version = 1): {
+export function projectProgram(uid: string, createdAt: string, g: GeneratedProgram, version = 1, transition: { settlesOnKey: string } | null = null): {
   program: StoredProgram
   programDoc: ProgramDoc
   instances: WorkoutInstanceDoc[]
 } {
-  const programId = `${uid}_v1`
+  // GC09: each program version has its own id so history is addressable (the old bug pinned
+  // every version to `${uid}_v1` even when a later version was requested).
+  const programId = `${uid}_v${version}`
   return {
     program: toStoredProgram(programId, createdAt, g),
-    programDoc: toProgramDoc(programId, createdAt, uid, g, version),
+    programDoc: toProgramDoc(programId, createdAt, uid, g, version, transition),
     instances: toInstances(programId, uid, g),
   }
 }
@@ -218,5 +222,63 @@ export function activateProgram(user: UserDoc, createdAt: string = new Date().to
   if (!gen.ok) return blocked(`generation_failed:${gen.reason}`)
 
   const projected = projectProgram(user.uid, createdAt, gen.program)
+  return { status: { ok: true, reason: null }, ...projected }
+}
+
+/** Add `days` calendar days to a YYYY-MM-DD key (pure, UTC — no clock read). */
+function addDaysToKey(key: string, days: number): string {
+  const [y, m, d] = key.split('-').map(Number)
+  const dt = new Date(Date.UTC(y, m - 1, d))
+  dt.setUTCDate(dt.getUTCDate() + days)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${dt.getUTCFullYear()}-${p(dt.getUTCMonth() + 1)}-${p(dt.getUTCDate())}`
+}
+
+/**
+ * Apply a goal change end-to-end (GC01–GC09). Runs the gate for the NEW goal, re-runs the goal
+ * engine (re-select split / re-budget / re-prescribe, loads preserved), version-bumps, and projects
+ * the eased GC07 transition week as the ACTIVE program with a settle date one week out. This is the
+ * single shared entry point for BOTH the coach `change_goal` action and the Settings training-profile
+ * edit, so the two paths can never diverge (previously Settings skipped versioning and the transition
+ * week entirely, and the coach applied the full-intensity program instead of the eased one).
+ * `user` must already carry the NEW goal.
+ */
+export function changeGoalActivation(
+  user: UserDoc,
+  newGoal: BackendGoal,
+  prevVersion: number,
+  todayKey: string,
+  createdAt: string = new Date().toISOString(),
+): ActivationResult {
+  const gate = canGenerate({ ...user, goal: newGoal })
+  if (!gate.ok) return blocked(gate.reason)
+  // `user` carries the OLD goal here; changeGoal re-generates for `newGoal` internally.
+  const result = changeGoal(user, newGoal, prevVersion)
+  if (!('ok' in result) || result.ok !== true) return blocked(`goal_change_failed:${(result as { reason: string }).reason}`)
+  const settlesOnKey = addDaysToKey(todayKey, 7)
+  // GC07: the ACTIVE program is the eased transition week; it settles automatically on settlesOnKey.
+  const projected = projectProgram(user.uid, createdAt, result.transitionProgram, result.version, { settlesOnKey })
+  return { status: { ok: true, reason: null }, ...projected }
+}
+
+/**
+ * GC07 settle. If the active program's transition week is due (today ≥ settlesOnKey), regenerate the
+ * program at full target intensity from the (already goal-updated) user and clear the marker; the
+ * version is unchanged (this is the same program settling, not a new one). Returns null when nothing
+ * is due, so callers can cheaply no-op on every app open. Deterministic given its inputs.
+ */
+export function settleTransitionIfDue(
+  user: UserDoc,
+  programDoc: ProgramDoc | null | undefined,
+  todayKey: string,
+  createdAt: string = new Date().toISOString(),
+): ActivationResult | null {
+  const t = programDoc?.transition
+  if (!t || todayKey < t.settlesOnKey) return null
+  const gate = canGenerate(user)
+  if (!gate.ok) return null
+  const gen = generateProgram(user)
+  if (!gen.ok) return null
+  const projected = projectProgram(user.uid, createdAt, gen.program, programDoc!.version, null)
   return { status: { ok: true, reason: null }, ...projected }
 }

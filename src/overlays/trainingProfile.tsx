@@ -5,7 +5,8 @@ import { Sheet } from '../components/Sheet'
 import { useStore } from '../store/store'
 import { useToast } from '../components/Toast'
 import { useAuth } from '../auth/AuthProvider'
-import { activateProgram } from '../backend/runtime/activate'
+import { activateProgram, changeGoalActivation } from '../backend/runtime/activate'
+import { todayKey } from '../lib/date'
 import { writeBackendUser } from '../backend/repo/userRepo'
 import { writeActiveProgram } from '../backend/repo/programRepo'
 import { thud, tick } from '../lib/haptics'
@@ -151,8 +152,18 @@ export function TrainingProfileSheet({ open, onClose }: Props) {
       return
     }
     // The SAME deterministic gate + generator as onboarding — no safety rule
-    // is relaxed for edits, and nothing is committed by a preview.
-    setPreview(activateProgram(nextUser()))
+    // is relaxed for edits, and nothing is committed by a preview. When the GOAL changed we
+    // route through the shared changeGoalActivation (the SAME entry point the coach uses), so a
+    // Settings goal change also version-bumps (GC09) and applies the eased GC07 transition week —
+    // previously this path silently reset to version 1 and skipped the transition entirely.
+    const nu = nextUser()
+    if (backendUser && goal !== backendUser.goal) {
+      // Keep every other edited field, but hand changeGoal the pre-change goal so it computes the
+      // transition/version correctly.
+      setPreview(changeGoalActivation({ ...nu, goal: backendUser.goal }, goal, state.programDoc?.version ?? 1, todayKey))
+    } else {
+      setPreview(activateProgram(nu))
+    }
     tick()
   }
 
