@@ -70,6 +70,10 @@ export function IntegrationsSection() {
         const st = integ[p.id]
         const on = !!st?.connected
         const sync = lastSyncLabel(st)
+        // Whether this provider can actually be connected right now. Until the native builds ship
+        // this is false everywhere, so instead of a live-looking "Connect" button that only toasts a
+        // refusal, we show a muted, non-interactive "Soon" chip that sets the right expectation.
+        const canConnect = on || providerAvailable(p).ok
         return (
           <View key={p.id} className="flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-4">
             <View className="h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/5">{ICONS[p.id]}</View>
@@ -77,12 +81,20 @@ export function IntegrationsSection() {
               <Text className="font-bold leading-tight text-white">{p.name}</Text>
               <Text className="text-[12px] text-secondary">{on && sync ? sync : p.sub}</Text>
             </View>
-            <Pressable
-              onPress={() => onPress(p)}
-              className={`rounded-full px-3.5 py-1.5 active:opacity-90 ${on ? 'bg-ink-700' : 'bg-brand-400'}`}
-            >
-              <Text className={`text-sm font-bold ${on ? 'text-brand-400' : 'text-black'}`}>{on ? 'Connected' : 'Connect'}</Text>
-            </Pressable>
+            {canConnect ? (
+              <Pressable
+                onPress={() => onPress(p)}
+                accessibilityRole="button"
+                accessibilityLabel={on ? `Disconnect ${p.name}` : `Connect ${p.name}`}
+                className={`rounded-full px-3.5 py-1.5 active:opacity-90 ${on ? 'bg-ink-700' : 'bg-brand-400'}`}
+              >
+                <Text className={`text-sm font-bold ${on ? 'text-brand-400' : 'text-black'}`}>{on ? 'Connected' : 'Connect'}</Text>
+              </Pressable>
+            ) : (
+              <View accessibilityLabel={`${p.name} coming with the app`} className="rounded-full border border-white/10 px-3.5 py-1.5">
+                <Text className="text-sm font-bold text-tertiary">Soon</Text>
+              </View>
+            )}
           </View>
         )
       })}

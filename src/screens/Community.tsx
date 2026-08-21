@@ -8,6 +8,7 @@ import type { AppState } from '../store/types'
 import { LeagueScreen } from '../community/LeagueScreen'
 import { GroupsTab } from '../community/groups'
 import { UsernameSheet, CommunitySetupGate, CommunityWelcomeModal } from '../community/UsernameSetup'
+import { COMMUNITY_BACKEND } from '../community/backendConfig'
 
 const TABS = ['League', 'Groups']
 
@@ -69,6 +70,12 @@ export default function Community() {
       ) : (
         <>
           <SegmentedTabs tabs={TABS} active={tab} onChange={setTab} />
+          {!COMMUNITY_BACKEND && (
+            <View className="mt-4 rounded-xl border border-amber-400/25 bg-amber-400/10 px-3 py-2">
+              <Text className="text-[12px] font-semibold text-amber-300">Preview</Text>
+              <Text className="text-[11.5px] leading-snug text-secondary">Leaderboards show sample players while Community is in preview — real rankings arrive when it goes live.</Text>
+            </View>
+          )}
           <View className="mt-5">
             {tab === 'League' && <LeagueScreen onClaimUsername={() => setUsernameOpen(true)} />}
             {tab === 'Groups' && <GroupsTab onClaimUsername={() => setUsernameOpen(true)} />}

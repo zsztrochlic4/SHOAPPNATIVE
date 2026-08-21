@@ -3,8 +3,8 @@ import { View, Text, Pressable, TextInput, Image, ScrollView, Animated, Easing, 
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
 import {
-  Bell, Moon, Sun, GraduationCap, RotateCcw, Trash2, Camera, Trophy,
-  Flame, Search, ScanLine, Plus, Check, Share2, ChevronRight, User, Sparkles, Dumbbell,
+  Bell, Moon, Sun, GraduationCap, RotateCcw, Trash2, Trophy,
+  Flame, Search, Plus, Check, Share2, ChevronRight, User, Sparkles, Dumbbell,
   Droplet, Footprints, BedDouble, Leaf, Play, Award, BellRing,
   HeartPulse, Activity, Zap, Minus, X, LogOut, Volume2, Download,
 } from 'lucide-react-native'
@@ -30,7 +30,6 @@ import { writeBackendUser } from '../backend/repo/userRepo'
 import { canOfferDemoReset } from '../store/resetGuards'
 import { serializeUserExport, splitLocalState, buildExportFilename } from '../lib/dataExport'
 import { deliverExport } from '../lib/exportDeliver'
-import { pick, makeRng } from '../lib/rng'
 import { requestPushPermission, resolveNotifPrefs } from '../lib/notifications'
 import { openBillingPortal } from '../lib/billing'
 import { subscribeSyncStatus, type SyncStatus } from '../store/syncStatus'
@@ -934,7 +933,6 @@ export function AddFoodSheet({ open, onClose, params }: Props) {
   const toast = useToast()
   const [meal, setMeal] = useState<MealName>((params?.meal as MealName) || 'Snack')
   const [q, setQ] = useState('')
-  const [scanned, setScanned] = useState<string | null>(null)
 
   const results = useMemo(() => {
     return FOODS.filter((f) => f.name.toLowerCase().includes(q.toLowerCase()))
@@ -960,13 +958,6 @@ export function AddFoodSheet({ open, onClose, params }: Props) {
     onClose()
   }
 
-  function scan() {
-    // simulate a barcode scan resolving to a product
-    const f = pick(makeRng(Date.now() % 100000), FOODS.filter((x) => x.barcode))
-    setScanned(f.id)
-    setQ('')
-  }
-
   return (
     <Sheet open={open} onClose={onClose} title="Add food">
       <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-1 mb-3" contentContainerStyle={{ gap: 8, paddingHorizontal: 4 }}>
@@ -977,28 +968,18 @@ export function AddFoodSheet({ open, onClose, params }: Props) {
         ))}
       </ScrollView>
 
-      <View className="mb-3 flex-row gap-2">
+      <View className="mb-3">
         <View className="flex-1 flex-row items-center gap-2 rounded-xl border border-white/8 bg-ink-800 px-3">
           <Search size={18} color="rgba(255,255,255,0.4)" />
           <TextInput
             value={q}
-            onChangeText={(v) => { setQ(v); setScanned(null) }}
+            onChangeText={setQ}
             placeholder="Search foods…"
             placeholderTextColor="rgba(148,148,148,0.6)"
             className="flex-1 bg-transparent py-3 text-sm text-white"
           />
         </View>
-        <Pressable onPress={scan} accessibilityRole="button" accessibilityLabel="Scan a barcode" className="h-[46px] w-[46px] items-center justify-center rounded-xl bg-brand-400 active:opacity-90">
-          <ScanLine size={20} color="#000" />
-        </Pressable>
       </View>
-
-      {scanned && (
-        <View className="mb-3 rounded-2xl border border-brand-400/30 bg-brand-400/10 p-3">
-          <Text className="mb-1 text-[12px] font-semibold text-brand-400">✓ Barcode matched</Text>
-          <FoodRow id={scanned} onAdd={add} />
-        </View>
-      )}
 
       {myResults.length > 0 && (
         <View className="mb-4">

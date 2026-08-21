@@ -364,7 +364,10 @@ export function useCoachChat({ active }: { active: boolean }) {
         else toast("I couldn't find that exercise to open — try naming the lift as it appears in your program.")
         return
       }
-      if (overlay === 'workout' || overlay === 'nutrition' || overlay === 'progress') nav.goTab(overlay)
+      // The standalone Progress tab is intentionally blank; its progress cards live on the
+      // Dashboard, so a coach "show me my progress" navigation goes there instead of a blank screen.
+      if (overlay === 'progress') nav.goTab('dashboard')
+      else if (overlay === 'workout' || overlay === 'nutrition') nav.goTab(overlay)
       else nav.open(overlay as 'activeWorkout' | 'logProgress' | 'logWeight' | 'logActivity' | 'beginner')
       return
     }

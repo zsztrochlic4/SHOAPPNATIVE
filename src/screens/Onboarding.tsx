@@ -1890,12 +1890,6 @@ function AccountCreate({ name, onComplete, onBack, onLogin }: { name: string; on
     }
   }
 
-  const apple = () => {
-    tick()
-    if (!enabled) { onComplete(); return }
-    setError('Apple sign-in is coming soon — use email or Google for now.')
-  }
-
   return (
     <View style={{ flex: 1 }}>
       <TopBack onBack={onBack} label="Almost there" />
@@ -1919,20 +1913,23 @@ function AccountCreate({ name, onComplete, onBack, onLogin }: { name: string; on
             {busy ? <ActivityIndicator color="#08140a" /> : <Text style={{ fontSize: 16, fontWeight: '700', color: '#08140a' }}>Create Account</Text>}
           </Pressable>
         </Reveal>
-        <Reveal delay={380}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 18 }}>
-            <View style={{ flex: 1, height: 1, backgroundColor: tok.rgb('--fg', 0.08) }} /><Text style={{ fontSize: 12.5, color: tok.rgb('--fg', 0.4) }}>or</Text><View style={{ flex: 1, height: 1, backgroundColor: tok.rgb('--fg', 0.08) }} />
-          </View>
-          <View style={{ gap: 10 }}>
-            <Pressable onPress={google} disabled={busy} style={{ height: 52, borderRadius: 999, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#fff', opacity: busy ? 0.7 : 1 }}>
-              <View style={{ width: 20, height: 20, borderRadius: 5, backgroundColor: 'rgba(0,0,0,0.08)', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 12, fontWeight: '900', color: '#111' }}>G</Text></View>
-              <Text style={{ fontSize: 15.5, fontWeight: '700', color: '#111' }}>Continue with Google</Text>
-            </Pressable>
-            <Pressable onPress={apple} style={{ height: 52, borderRadius: 999, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: tok.rgb('--ink-700') }}>
-              <Text style={{ fontSize: 15.5, fontWeight: '700', color: tok.rgb('--fg') }}>Continue with Apple</Text>
-            </Pressable>
-          </View>
-        </Reveal>
+        {/* Social sign-in is only shown where it actually works. Google is wired for web only
+            (native needs expo-auth-session, not built yet); Apple sign-in is not implemented, so it
+            is hidden rather than shown as a button that only errors. On native this whole block is
+            omitted so users aren't offered dead controls at the highest-intent moment. */}
+        {enabled && !NATIVE && (
+          <Reveal delay={380}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 18 }}>
+              <View style={{ flex: 1, height: 1, backgroundColor: tok.rgb('--fg', 0.08) }} /><Text style={{ fontSize: 12.5, color: tok.rgb('--fg', 0.4) }}>or</Text><View style={{ flex: 1, height: 1, backgroundColor: tok.rgb('--fg', 0.08) }} />
+            </View>
+            <View style={{ gap: 10 }}>
+              <Pressable onPress={google} disabled={busy} style={{ height: 52, borderRadius: 999, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#fff', opacity: busy ? 0.7 : 1 }}>
+                <View style={{ width: 20, height: 20, borderRadius: 5, backgroundColor: 'rgba(0,0,0,0.08)', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 12, fontWeight: '900', color: '#111' }}>G</Text></View>
+                <Text style={{ fontSize: 15.5, fontWeight: '700', color: '#111' }}>Continue with Google</Text>
+              </Pressable>
+            </View>
+          </Reveal>
+        )}
       </ScrollView>
       <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 26 }}>
         <Text style={{ fontSize: 14.5, color: tok.rgb('--fg', 0.5) }}>Already have an account? </Text>
@@ -2339,17 +2336,23 @@ function Login({ onBack }: { onBack: () => void }) {
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 10 }} keyboardShouldPersistTaps="handled">
         <Reveal delay={60}><Text style={{ fontSize: 28, fontWeight: '800', letterSpacing: -0.5, color: tok.rgb('--fg') }}>Welcome back</Text></Reveal>
         <Reveal delay={120}><Text style={{ marginTop: 8, marginBottom: 22, fontSize: 15, color: tok.rgb('--fg', 0.55) }}>Log in to pick up where you left off.</Text></Reveal>
-        <Reveal delay={160}>
-          <Pressable onPress={google} disabled={busy} style={{ height: 52, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 11, backgroundColor: '#fff', opacity: busy ? 0.7 : 1 }}>
-            <View style={{ width: 20, height: 20, borderRadius: 5, backgroundColor: 'rgba(0,0,0,0.08)', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 12, fontWeight: '900', color: '#111' }}>G</Text></View>
-            <Text style={{ fontSize: 15.5, fontWeight: '600', color: '#1f1f1f' }}>Continue with Google</Text>
-          </Pressable>
-        </Reveal>
-        <Reveal delay={210}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 20 }}>
-            <View style={{ flex: 1, height: 1, backgroundColor: tok.rgb('--fg', 0.1) }} /><Text style={{ fontSize: 12.5, fontWeight: '600', color: tok.rgb('--fg', 0.4) }}>or</Text><View style={{ flex: 1, height: 1, backgroundColor: tok.rgb('--fg', 0.1) }} />
-          </View>
-        </Reveal>
+        {/* Google sign-in is wired for web only; hidden on native (expo-auth-session not built yet)
+            so we never show a button that just errors. */}
+        {!NATIVE && (
+          <>
+            <Reveal delay={160}>
+              <Pressable onPress={google} disabled={busy} style={{ height: 52, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 11, backgroundColor: '#fff', opacity: busy ? 0.7 : 1 }}>
+                <View style={{ width: 20, height: 20, borderRadius: 5, backgroundColor: 'rgba(0,0,0,0.08)', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 12, fontWeight: '900', color: '#111' }}>G</Text></View>
+                <Text style={{ fontSize: 15.5, fontWeight: '600', color: '#1f1f1f' }}>Continue with Google</Text>
+              </Pressable>
+            </Reveal>
+            <Reveal delay={210}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 20 }}>
+                <View style={{ flex: 1, height: 1, backgroundColor: tok.rgb('--fg', 0.1) }} /><Text style={{ fontSize: 12.5, fontWeight: '600', color: tok.rgb('--fg', 0.4) }}>or</Text><View style={{ flex: 1, height: 1, backgroundColor: tok.rgb('--fg', 0.1) }} />
+              </View>
+            </Reveal>
+          </>
+        )}
         <View ref={formRef}>
           <Reveal delay={260}>
             <Text style={{ fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', color: tok.rgb('--fg', 0.4), marginBottom: 8 }}>Email</Text>

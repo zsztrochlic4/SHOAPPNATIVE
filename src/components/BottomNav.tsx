@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { TabKey } from '../App'
 import { useColors } from '../theme'
 import { withAlpha } from '../lib/color'
+import { coachAvailable } from '../backend/coach/coachGate'
 
 /** The items-row height (above the home-indicator region + safe-area inset). Exported so the Coach
  *  tab can reserve the right amount of space for its composer to sit directly above the nav. */
@@ -69,14 +70,17 @@ function NavIcon({ name, size, color }: { name: IconKey; size: number; color: st
 
 type Item = { key: TabKey; label: string; center?: boolean }
 
-// Design "B": five tabs, Coach the raised centre control.
-const items: Item[] = [
+// Design "B": five tabs, Coach the raised centre control. The Coach tab is only shown while the
+// coach is actually available; when it is gated off we drop the tab entirely (rather than leaving a
+// prominent centre button that dead-ends on a "coming soon" screen).
+const allItems: Item[] = [
   { key: 'dashboard', label: 'Dashboard' },
   { key: 'workout', label: 'Workout' },
   { key: 'coach', label: 'Coach', center: true },
   { key: 'nutrition', label: 'Nutrition' },
   { key: 'community', label: 'Community' },
 ]
+const items: Item[] = coachAvailable() ? allItems : allItems.filter((i) => i.key !== 'coach')
 
 export function BottomNav({
   active,
