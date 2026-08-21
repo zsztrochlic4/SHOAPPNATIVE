@@ -14,6 +14,7 @@ import { IndexGauge } from '../components/IndexGauge'
 import { FeaturedStatCard } from '../components/FeaturedStatCard'
 import { TrainingProgressCard } from '../components/TrainingProgressCard'
 import { useStore } from '../store/store'
+import { useT } from '../lib/useT'
 import { useNav } from '../nav'
 import { currentWeekKeys, todayKey, longDate, shortDate, fromKey, currentHour } from '../lib/date'
 import { fmtFluid, fmtWeightNum, weightUnit, fmtVolume } from '../lib/format'
@@ -43,9 +44,9 @@ const GOAL_LABEL: Record<string, string> = {
 }
 
 function greetingFor(hour: number): string {
-  if (hour < 12) return 'Good morning'
-  if (hour < 18) return 'Good afternoon'
-  return 'Good evening'
+  if (hour < 12) return 'dashboard.morning'
+  if (hour < 18) return 'dashboard.afternoon'
+  return 'dashboard.evening'
 }
 
 // Tone → real colour (RN can't use the web's inline CSS variables).
@@ -90,6 +91,7 @@ function goalSheetValue(g: Goal): string {
 
 export default function Dashboard() {
   const { state, dispatch } = useStore()
+  const tr = useT()
   const nav = useNav()
   const colors = useColors()
   const units = state.settings.units
@@ -128,7 +130,7 @@ export default function Dashboard() {
   const openCheckin = (cta?: CoachMessage['cta']) =>
     cta?.overlay ? nav.open(cta.overlay as Parameters<typeof nav.open>[0]) : nav.goTab('coach')
 
-  const greeting = greetingFor(currentHour())
+  const greeting = tr(greetingFor(currentHour()))
   const weekKeys = currentWeekKeys()
 
   // Tap the readiness gauge to reveal what's driving the number (Whoop/Oura's
@@ -146,7 +148,7 @@ export default function Dashboard() {
   const selActivities = activitiesForDay(state, selDate)
   const selTags = nutritionTagsForDay(state, selDate)
   const selWeekday = FULL_WD[fromKey(selDate).getDay()]
-  const selTitle = isToday ? "Today's progress" : `${selWeekday}'s progress`
+  const selTitle = isToday ? tr('dashboard.todaysProgress') : tr('dashboard.dayProgress', { day: selWeekday })
 
   // The five rings and the old "To-do today" list were two views of the same day,
   // stacked. They're now one checklist, built for whichever day the week strip has
@@ -166,9 +168,9 @@ export default function Dashboard() {
   // CTA for the muscle-map plan card, driven by today's tick progress (mirrors the Workout tab).
   const selProg = selSession ? sessionProgress(selSession) : null
   const todayPlanCta =
-    selProg && selProg.total > 0 && selProg.done === selProg.total ? 'Completed'
-    : selProg && selProg.done > 0 ? 'Continue Workout'
-    : 'Start Workout'
+    selProg && selProg.total > 0 && selProg.done === selProg.total ? tr('dashboard.completed')
+    : selProg && selProg.done > 0 ? tr('dashboard.continueWorkout')
+    : tr('dashboard.startWorkout')
 
   // Fixed order, matching the design — done rows stay in place, struck through.
   const goals: Goal[] = [
@@ -271,7 +273,7 @@ export default function Dashboard() {
       {/* Expanded explainer — how the score is built, per habit. */}
       {showWhy && (
         <Card className="mt-3 p-4">
-          <Text className="text-[13px] font-bold text-white">How your readiness works</Text>
+          <Text className="text-[13px] font-bold text-white">{tr('dashboard.howReadinessWorks')}</Text>
           <Text className="mt-1 text-[12px] leading-snug text-secondary">
             It blends your last 14 days across five habits versus your targets. <Text className="font-semibold text-white/75">50 means on track</Text>. Higher means you're beating your goals. Hit your targets and each bar fills toward 100%.
           </Text>
@@ -329,7 +331,7 @@ export default function Dashboard() {
       </View>
 
       {/* Plan / workout: follows the selected day */}
-      <Section title={isToday ? "Today's plan" : `${selWeekday}'s workout`} />
+      <Section title={isToday ? tr('dashboard.todaysPlan') : tr('dashboard.dayWorkout', { day: selWeekday })} />
       {selSession && !restByPeriodMode ? (
         isToday ? (
           <MuscleMapCard
@@ -365,13 +367,13 @@ export default function Dashboard() {
           <LinearGradient colors={[colors.ink800, `${colors.ink800}99`, `${colors.ink800}00`]} locations={[0.25, 0.47, 0.74]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} pointerEvents="none" />
           <View className="p-5">
             <View className="flex-row items-center gap-2">
-              <Text className="text-sm font-semibold text-brand-400">{isToday ? "Today's plan" : 'Rest day'}</Text>
-              {exam.active && isToday && <View className="rounded-full bg-accent-purple/20 px-2 py-0.5"><Text className="text-[10px] font-bold text-accent-purple">Exam mode</Text></View>}
+              <Text className="text-sm font-semibold text-brand-400">{isToday ? tr('dashboard.todaysPlan') : tr('dashboard.restDay')}</Text>
+              {exam.active && isToday && <View className="rounded-full bg-accent-purple/20 px-2 py-0.5"><Text className="text-[10px] font-bold text-accent-purple">{tr('dashboard.examMode')}</Text></View>}
             </View>
-            <Text className="mt-1 text-2xl font-extrabold tracking-tight text-white">Rest day</Text>
+            <Text className="mt-1 text-2xl font-extrabold tracking-tight text-white">{tr('dashboard.restDay')}</Text>
             <View className="mt-2 flex-row items-center gap-1.5">
               <Clock size={15} color="rgba(255,255,255,0.6)" />
-              <Text className="text-sm text-secondary">Recovery and mobility</Text>
+              <Text className="text-sm text-secondary">{tr('dashboard.recoveryMobility')}</Text>
             </View>
           </View>
         </View>
@@ -422,7 +424,7 @@ export default function Dashboard() {
       {/* Progress — the merged checklist for today (opens the update sheet), or an
        *  editable "catch-up" log for a past day so nothing gets missed. */}
       <Section title={selTitle} tight />
-      {isToday && t.adjusted && <Text className="-mt-1 mb-3 text-[12px] text-accent-purple">Targets eased for exam season</Text>}
+      {isToday && t.adjusted && <Text className="-mt-1 mb-3 text-[12px] text-accent-purple">{tr('dashboard.targetsEased')}</Text>}
       <DayProgressCard
         goals={goals}
         doneCount={goalsDone}
@@ -437,10 +439,10 @@ export default function Dashboard() {
        *  live behind "Customise". */}
       <View className="mt-7 flex-row items-end justify-between" style={{ marginBottom: 12 }}>
         <View className="min-w-0 flex-1">
-          <Text className="text-[19px] font-extrabold text-white" style={{ letterSpacing: -0.19 }}>Progress overview</Text>
+          <Text className="text-[19px] font-extrabold text-white" style={{ letterSpacing: -0.19 }}>{tr('dashboard.progressOverview')}</Text>
           {!!GOAL_LABEL[state.profile.goal] && (
             <Text numberOfLines={1} className="mt-[3px] text-[12px] font-semibold text-secondary">
-              Goal: {GOAL_LABEL[state.profile.goal]}
+              {tr('dashboard.goalPrefix', { goal: tr('goal.' + state.profile.goal) })}
             </Text>
           )}
         </View>
@@ -480,18 +482,18 @@ export default function Dashboard() {
       <TrainingProgressCard />
 
       {/* When is your busy period? — exams, travel, moving house. */}
-      <Text className="text-[19px] font-extrabold text-white" style={{ marginTop: 26, marginBottom: 17 }}>When is your busy period?</Text>
+      <Text className="text-[19px] font-extrabold text-white" style={{ marginTop: 26, marginBottom: 17 }}>{tr('dashboard.busyPeriodQ')}</Text>
       <BusyPeriodCard colors={colors} onPress={() => nav.open('examMode')} />
 
       {/* More tools */}
       {state.profile.newToGym && (
         <>
-          <Section title="More" tight />
+          <Section title={tr('dashboard.more')} tight />
           <Pressable onPress={() => nav.open('beginner')} className="flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-3.5 active:opacity-90">
             <View className="h-10 w-10 items-center justify-center rounded-xl bg-brand-400/15"><Leaf size={20} color={brand[400]} /></View>
             <View className="flex-1">
-              <Text className="font-bold text-white">New to the gym</Text>
-              <Text className="text-[12px] text-secondary">Your first 90 days, step by step</Text>
+              <Text className="font-bold text-white">{tr('dashboard.newToGym')}</Text>
+              <Text className="text-[12px] text-secondary">{tr('dashboard.first90Days')}</Text>
             </View>
             <ChevronRight size={18} color={chevron} />
           </Pressable>
@@ -1294,6 +1296,7 @@ function OverviewCard({ accent, result, colors, centered = false }: { accent: st
  */
 function BusyPeriodCard({ colors, onPress }: { colors: ThemeColors; onPress: () => void }) {
   const { state } = useStore()
+  const tr = useT()
   const active = activePeriod(state)
   const upcoming = upcomingPeriods(state)
 
@@ -1301,15 +1304,15 @@ function BusyPeriodCard({ colors, onPress }: { colors: ThemeColors; onPress: () 
   let chipAccent: AccentKey
   let subtitle: string
   if (active) {
-    chipLabel = 'Active now'
+    chipLabel = tr('dashboard.planActiveNow')
     chipAccent = 'brand'
-    subtitle = `Active now · returns ${fmtPeriodDate(nextDayKey(active.end))}`
+    subtitle = tr('dashboard.planReturns', { date: fmtPeriodDate(nextDayKey(active.end)) })
   } else if (upcoming.length === 0) {
-    chipLabel = 'Set up'
+    chipLabel = tr('dashboard.setUp')
     chipAccent = 'fg'
-    subtitle = "Add exams, travel or other busy dates and we'll adapt your training."
+    subtitle = tr('dashboard.addExamsTravel')
   } else {
-    chipLabel = 'Scheduled'
+    chipLabel = tr('dashboard.scheduled')
     chipAccent = 'purple'
     const next = Math.min(...upcoming.map((p) => daysUntil(p.start)))
     subtitle = `${upcoming.length} period${upcoming.length > 1 ? 's' : ''} set · next ${daysLabel(next)}`
@@ -1353,7 +1356,7 @@ function BusyPeriodCard({ colors, onPress }: { colors: ThemeColors; onPress: () 
             </View>
             <View className="min-w-0 flex-1">
               <View className="flex-row items-start" style={{ gap: 8 }}>
-                <Text className="text-[16px] font-bold text-white">Plan Around Your Life</Text>
+                <Text className="text-[16px] font-bold text-white">{tr('dashboard.planAroundLife')}</Text>
                 <View style={{ borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3, backgroundColor: `${chipCol}${neutralChip ? '1a' : '26'}` }}>
                   <Text style={{ fontSize: 12, fontWeight: '700', color: neutralChip ? `${colors.fg}b3` : chipCol }}>{chipLabel}</Text>
                 </View>

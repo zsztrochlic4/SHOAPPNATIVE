@@ -35,6 +35,40 @@ export function coachOutputLanguage(lang: Language): Language {
 type Dict = Record<string, string>
 
 const en: Dict = {
+  // dashboard
+  "dashboard.first90Days": "Your first 90 days, step by step",
+  "dashboard.planActiveNow": "Active now",
+  "dashboard.planReturns": "Active now · returns {date}",
+  "dashboard.morning": "Good morning",
+  "dashboard.afternoon": "Good afternoon",
+  "dashboard.evening": "Good evening",
+  "dashboard.goalPrefix": "Goal: {goal}",
+  "goal.build-muscle": "Build muscle",
+  "goal.lose-fat": "Lose fat",
+  "goal.gain-strength": "Gain strength",
+  "goal.stay-healthy": "Stay healthy",
+  "dashboard.todaysProgress": "Today's progress",
+  "dashboard.dayProgress": "{day}'s progress",
+  "dashboard.todaysPlan": "Today's plan",
+  "dashboard.dayWorkout": "{day}'s workout",
+  "dashboard.startWorkout": "Start Workout",
+  "dashboard.continueWorkout": "Continue Workout",
+  "dashboard.completed": "Completed",
+  "dashboard.restDay": "Rest day",
+  "dashboard.recoveryMobility": "Recovery and mobility",
+  "dashboard.examMode": "Exam mode",
+  "dashboard.targetsEased": "Targets eased for exam season",
+  "dashboard.progressOverview": "Progress overview",
+  "dashboard.more": "More",
+  "dashboard.newToGym": "New to the gym",
+  "dashboard.howReadinessWorks": "How your readiness works",
+  "dashboard.planAroundLife": "Plan Around Your Life",
+  "dashboard.busyPeriodQ": "When is your busy period?",
+  "dashboard.addExamsTravel": "Add exams, travel or other busy dates and we'll adapt your training.",
+  "dashboard.activeNow": "Active now",
+  "dashboard.setUp": "Set up",
+  "dashboard.scheduled": "Scheduled",
+
   // onboarding (Welcome)
   'onboarding.tagline': 'Training built around you.',
   'onboarding.getStarted': 'Get Started',
@@ -91,6 +125,40 @@ const en: Dict = {
 }
 
 const zh: Dict = {
+  // dashboard
+  "dashboard.first90Days": "循序渐进的头 90 天",
+  "dashboard.planActiveNow": "进行中",
+  "dashboard.planReturns": "进行中 · {date} 恢复",
+  "dashboard.morning": "早上好",
+  "dashboard.afternoon": "下午好",
+  "dashboard.evening": "晚上好",
+  "dashboard.goalPrefix": "目标：{goal}",
+  "goal.build-muscle": "增肌",
+  "goal.lose-fat": "减脂",
+  "goal.gain-strength": "增强力量",
+  "goal.stay-healthy": "保持健康",
+  "dashboard.todaysProgress": "今日进度",
+  "dashboard.dayProgress": "{day} 的进度",
+  "dashboard.todaysPlan": "今日计划",
+  "dashboard.dayWorkout": "{day} 的训练",
+  "dashboard.startWorkout": "开始训练",
+  "dashboard.continueWorkout": "继续训练",
+  "dashboard.completed": "已完成",
+  "dashboard.restDay": "休息日",
+  "dashboard.recoveryMobility": "恢复与灵活性",
+  "dashboard.examMode": "考试模式",
+  "dashboard.targetsEased": "考试季目标已放宽",
+  "dashboard.progressOverview": "进度概览",
+  "dashboard.more": "更多",
+  "dashboard.newToGym": "健身新手",
+  "dashboard.howReadinessWorks": "你的状态如何计算",
+  "dashboard.planAroundLife": "围绕你的生活安排",
+  "dashboard.busyPeriodQ": "你的忙碌期是什么时候？",
+  "dashboard.addExamsTravel": "添加考试、旅行或其他忙碌日期，我们会相应调整你的训练。",
+  "dashboard.activeNow": "进行中",
+  "dashboard.setUp": "设置",
+  "dashboard.scheduled": "已安排",
+
   // onboarding (Welcome)
   'onboarding.tagline': '为你打造的训练。',
   'onboarding.getStarted': '开始',
@@ -144,6 +212,40 @@ const zh: Dict = {
 }
 
 const hi: Dict = {
+  // dashboard
+  "dashboard.first90Days": "आपके पहले 90 दिन, कदम दर कदम",
+  "dashboard.planActiveNow": "अभी सक्रिय",
+  "dashboard.planReturns": "अभी सक्रिय · {date} को वापसी",
+  "dashboard.morning": "सुप्रभात",
+  "dashboard.afternoon": "शुभ दोपहर",
+  "dashboard.evening": "शुभ संध्या",
+  "dashboard.goalPrefix": "लक्ष्य: {goal}",
+  "goal.build-muscle": "मांसपेशियां बनाएं",
+  "goal.lose-fat": "चर्बी घटाएं",
+  "goal.gain-strength": "ताकत बढ़ाएं",
+  "goal.stay-healthy": "स्वस्थ रहें",
+  "dashboard.todaysProgress": "आज की प्रगति",
+  "dashboard.dayProgress": "{day} की प्रगति",
+  "dashboard.todaysPlan": "आज की योजना",
+  "dashboard.dayWorkout": "{day} का वर्कआउट",
+  "dashboard.startWorkout": "वर्कआउट शुरू करें",
+  "dashboard.continueWorkout": "वर्कआउट जारी रखें",
+  "dashboard.completed": "पूरा हुआ",
+  "dashboard.restDay": "आराम का दिन",
+  "dashboard.recoveryMobility": "रिकवरी और गतिशीलता",
+  "dashboard.examMode": "परीक्षा मोड",
+  "dashboard.targetsEased": "परीक्षा सीज़न के लिए लक्ष्य आसान किए",
+  "dashboard.progressOverview": "प्रगति अवलोकन",
+  "dashboard.more": "अधिक",
+  "dashboard.newToGym": "जिम में नए",
+  "dashboard.howReadinessWorks": "आपकी तैयारी कैसे काम करती है",
+  "dashboard.planAroundLife": "अपनी ज़िंदगी के मुताबिक योजना",
+  "dashboard.busyPeriodQ": "आपका व्यस्त समय कब है?",
+  "dashboard.addExamsTravel": "परीक्षा, यात्रा या अन्य व्यस्त तिथियां जोड़ें, हम आपकी ट्रेनिंग ढाल देंगे।",
+  "dashboard.activeNow": "अभी सक्रिय",
+  "dashboard.setUp": "सेट अप करें",
+  "dashboard.scheduled": "निर्धारित",
+
   // onboarding (Welcome)
   'onboarding.tagline': 'आपके लिए बनाया गया प्रशिक्षण।',
   'onboarding.getStarted': 'शुरू करें',
@@ -197,6 +299,40 @@ const hi: Dict = {
 }
 
 const ar: Dict = {
+  // dashboard
+  "dashboard.first90Days": "أوّل 90 يومًا لك، خطوة بخطوة",
+  "dashboard.planActiveNow": "نشط الآن",
+  "dashboard.planReturns": "نشط الآن · العودة {date}",
+  "dashboard.morning": "صباح الخير",
+  "dashboard.afternoon": "طاب مساؤك",
+  "dashboard.evening": "مساء الخير",
+  "dashboard.goalPrefix": "الهدف: {goal}",
+  "goal.build-muscle": "بناء العضلات",
+  "goal.lose-fat": "خسارة الدهون",
+  "goal.gain-strength": "زيادة القوة",
+  "goal.stay-healthy": "الحفاظ على الصحة",
+  "dashboard.todaysProgress": "تقدّم اليوم",
+  "dashboard.dayProgress": "تقدّم {day}",
+  "dashboard.todaysPlan": "خطة اليوم",
+  "dashboard.dayWorkout": "تمرين {day}",
+  "dashboard.startWorkout": "ابدأ التمرين",
+  "dashboard.continueWorkout": "متابعة التمرين",
+  "dashboard.completed": "مكتمل",
+  "dashboard.restDay": "يوم راحة",
+  "dashboard.recoveryMobility": "التعافي والمرونة",
+  "dashboard.examMode": "وضع الامتحانات",
+  "dashboard.targetsEased": "أهداف مُخفّفة لموسم الامتحانات",
+  "dashboard.progressOverview": "نظرة عامة على التقدّم",
+  "dashboard.more": "المزيد",
+  "dashboard.newToGym": "جديد في الصالة الرياضية",
+  "dashboard.howReadinessWorks": "كيف تعمل جاهزيتك",
+  "dashboard.planAroundLife": "خطّط حول حياتك",
+  "dashboard.busyPeriodQ": "متى فترة انشغالك؟",
+  "dashboard.addExamsTravel": "أضف الامتحانات أو السفر أو أيّام الانشغال وسنكيّف تدريبك.",
+  "dashboard.activeNow": "نشط الآن",
+  "dashboard.setUp": "إعداد",
+  "dashboard.scheduled": "مجدوَل",
+
   // onboarding (Welcome)
   'onboarding.tagline': 'تدريب مُصمّم من أجلك.',
   'onboarding.getStarted': 'ابدأ',
@@ -250,6 +386,40 @@ const ar: Dict = {
 }
 
 const vi: Dict = {
+  // dashboard
+  "dashboard.first90Days": "90 ngày đầu, từng bước một",
+  "dashboard.planActiveNow": "Đang hoạt động",
+  "dashboard.planReturns": "Đang hoạt động · trở lại {date}",
+  "dashboard.morning": "Chào buổi sáng",
+  "dashboard.afternoon": "Chào buổi chiều",
+  "dashboard.evening": "Chào buổi tối",
+  "dashboard.goalPrefix": "Mục tiêu: {goal}",
+  "goal.build-muscle": "Tăng cơ",
+  "goal.lose-fat": "Giảm mỡ",
+  "goal.gain-strength": "Tăng sức mạnh",
+  "goal.stay-healthy": "Giữ sức khỏe",
+  "dashboard.todaysProgress": "Tiến độ hôm nay",
+  "dashboard.dayProgress": "Tiến độ {day}",
+  "dashboard.todaysPlan": "Kế hoạch hôm nay",
+  "dashboard.dayWorkout": "Buổi tập {day}",
+  "dashboard.startWorkout": "Bắt đầu tập",
+  "dashboard.continueWorkout": "Tiếp tục tập",
+  "dashboard.completed": "Hoàn thành",
+  "dashboard.restDay": "Ngày nghỉ",
+  "dashboard.recoveryMobility": "Phục hồi và vận động",
+  "dashboard.examMode": "Chế độ thi cử",
+  "dashboard.targetsEased": "Đã giảm mục tiêu cho mùa thi",
+  "dashboard.progressOverview": "Tổng quan tiến độ",
+  "dashboard.more": "Thêm",
+  "dashboard.newToGym": "Mới tập gym",
+  "dashboard.howReadinessWorks": "Cách tính mức sẵn sàng",
+  "dashboard.planAroundLife": "Lên kế hoạch quanh cuộc sống",
+  "dashboard.busyPeriodQ": "Giai đoạn bận rộn của bạn là khi nào?",
+  "dashboard.addExamsTravel": "Thêm lịch thi, du lịch hoặc ngày bận khác và chúng tôi sẽ điều chỉnh bài tập.",
+  "dashboard.activeNow": "Đang hoạt động",
+  "dashboard.setUp": "Thiết lập",
+  "dashboard.scheduled": "Đã lên lịch",
+
   // onboarding (Welcome)
   'onboarding.tagline': 'Chương trình tập luyện dành cho bạn.',
   'onboarding.getStarted': 'Bắt đầu',
@@ -307,7 +477,20 @@ const DICTS: Record<Language, Dict> = { en, zh, hi, ar, vi }
 /** Exposed for the i18n coverage test (missing-key / orphan-key guard). Not for app use. */
 export const __DICTS_FOR_TEST: Record<Language, Dict> = DICTS
 
-/** Returns a translate function for the given language, falling back to English. */
+/** Values a `{placeholder}` in a string can be filled with. */
+export type TParams = Record<string, string | number>
+
+/**
+ * Returns a translate function for the given language, falling back to English then the raw key.
+ * Supports `{name}`-style interpolation for dynamic strings, e.g.
+ *   t('dashboard.dayProgress', { day: 'Monday' })  //  "Monday's progress"
+ */
 export function translator(lang: Language) {
-  return (key: string): string => DICTS[lang]?.[key] ?? en[key] ?? key
+  return (key: string, params?: TParams): string => {
+    let s = DICTS[lang]?.[key] ?? en[key] ?? key
+    if (params) {
+      for (const p of Object.keys(params)) s = s.split(`{${p}}`).join(String(params[p]))
+    }
+    return s
+  }
 }
