@@ -34,6 +34,7 @@ import { cssVars, useThemeName } from '../theme'
 import { tick, thud } from '../lib/haptics'
 import { todayKey } from '../lib/date'
 import { LANGUAGES, type Language } from '../lib/i18n'
+import { useT } from '../lib/useT'
 import type { Equipment, Experience, Goal, Profile } from '../store/types'
 import {
   buildUserDoc, mapAffectedRegions, mapFollowups, mapScreeningAnswers,
@@ -2222,6 +2223,7 @@ function LanguageSelect() {
 
 function Welcome({ onStart, onLogin }: { onStart: () => void; onLogin: () => void }) {
   const tok = useTok()
+  const t = useT()
   const themeName = useThemeName()
   const { height: winH } = useWindowDimensions()
   const insets = useSafeAreaInsets()
@@ -2254,15 +2256,15 @@ function Welcome({ onStart, onLogin }: { onStart: () => void; onLogin: () => voi
       </View>
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 16, paddingBottom: 16 }}>
         <AppShowcase scale={scale} />
-        <Reveal delay={360}><Text style={{ marginTop: 30 * scale, fontSize: 33, lineHeight: 36, fontWeight: '800', letterSpacing: -1, color: tok.rgb('--fg'), textAlign: 'center' }}>Training built{'\n'}around you.</Text></Reveal>
+        <Reveal delay={360}><Text style={{ marginTop: 30 * scale, fontSize: 33, lineHeight: 36, fontWeight: '800', letterSpacing: -1, color: tok.rgb('--fg'), textAlign: 'center' }}>{t('onboarding.tagline')}</Text></Reveal>
       </View>
       <View style={{ paddingHorizontal: 8, paddingBottom: 32 }}>
         <Reveal delay={920}>
-          <Pressable onPress={() => { thud(); onStart() }} style={{ height: 56, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: tok.rgb('--brand-400') }}><Text style={{ fontSize: 16.5, fontWeight: '700', color: '#08140a' }}>Get Started</Text></Pressable>
+          <Pressable onPress={() => { thud(); onStart() }} style={{ height: 56, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: tok.rgb('--brand-400') }}><Text style={{ fontSize: 16.5, fontWeight: '700', color: '#08140a' }}>{t('onboarding.getStarted')}</Text></Pressable>
         </Reveal>
         <Reveal delay={1080}>
           <Pressable onPress={() => { tick(); onLogin() }} style={{ height: 50, marginTop: 18, alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ fontSize: 15.5, fontWeight: '600', color: tok.rgb('--fg', 0.6) }}>Already have an account? <Text style={{ color: tok.rgb('--brand-300') }}>Log In</Text></Text>
+            <Text style={{ fontSize: 15.5, fontWeight: '600', color: tok.rgb('--fg', 0.6) }}>{t('onboarding.haveAccount')} <Text style={{ color: tok.rgb('--brand-300') }}>{t('onboarding.logIn')}</Text></Text>
           </Pressable>
         </Reveal>
       </View>

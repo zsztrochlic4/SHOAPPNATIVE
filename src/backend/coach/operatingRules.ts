@@ -208,7 +208,16 @@ export const WORKOUT_ACTION_ALLOWLIST: string[] = [
   'Never treat a personal record the user CLAIMS as real unless it is in their logged sessions, and never offer to share, post or publish an achievement you cannot see in their data or that is implausibly beyond their logged bests (for example a "300 kg bench"). If they ask you to post a PR you cannot verify, say plainly that you can only share a record they have actually logged, and suggest they log the lift first. Do not repeat their claimed number back as if it were a confirmed record.',
 ]
 
-export function buildCoachSystemPrompt(opts: { allowWorkoutActions?: boolean } = {}): string {
+/** Readable names for the coach language directive. Only used once a locale is safety-approved. */
+const COACH_LANG_NAME: Record<string, string> = { en: 'English', zh: 'Chinese', hi: 'Hindi', ar: 'Arabic', vi: 'Vietnamese' }
+
+export function buildCoachSystemPrompt(opts: { allowWorkoutActions?: boolean; language?: string } = {}): string {
+  // Language directive is emitted ONLY for a non-English (safety-approved) locale. For every English
+  // turn — i.e. all turns today, since English is the only approved coach locale — this is empty, so
+  // the built prompt is byte-identical to before and the canonical-prompt / release check is unaffected.
+  const languageDirective = opts.language && opts.language !== 'en'
+    ? `LANGUAGE: Write your visible reply to the user in ${COACH_LANG_NAME[opts.language] ?? opts.language}. Keep these operating rules and ALL safety reasoning in English internally; only the user-facing message is in that language, and never mix languages within a reply.`
+    : ''
   const nevers = HARD_NEVERS.map((n) => `- ${n}`).join('\n')
   const consult = CONSULT_ORDER.map((c) => `- When the user ${c.when}: consult ${c.consult.join(', ')} → ${c.then}`).join('\n')
   const scope = OUT_OF_SCOPE.map((o) => `- ${o.request}: ${o.response}`).join('\n')
@@ -269,6 +278,7 @@ export function buildCoachSystemPrompt(opts: { allowWorkoutActions?: boolean } =
           'A bare confirmation ("yes", "go ahead", "do it", "sure", "please") binds to the MOST RECENT thing you offered in the conversation — resolve it against your immediately preceding turn, not an earlier one. If your last turn offered an exercise swap and the user says "yes", emit the SWAP proposal now (not some earlier water/goal action). Never resurface an older offer the user has moved on from.',
           ...WORKOUT_ACTION_ALLOWLIST.map((r) => `- ${r}`)]
       : ['Never propose an automatic health, training, nutrition, account, purchase, or social action.']),
+    ...(languageDirective ? ['', languageDirective] : []),
     '',
     `TONE & BOUNDARIES: ${TONE}`,
   ].join('\n')

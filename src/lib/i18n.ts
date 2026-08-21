@@ -16,9 +16,31 @@ export const LANGUAGES: { code: Language; native: string; english: string; rtl?:
 
 export const isRTL = (lang: Language) => lang === 'ar'
 
+/**
+ * Coach output languages that have passed their per-locale SAFETY review (native-speaker + clinical
+ * sign-off, crisis + indirect-distress holdouts, localised crisis resources). The coach must never
+ * emit a non-English locale until it is on this list — switching only the output language while the
+ * crisis-detection logic stays English can reduce crisis recall. Extend ONLY after that sign-off.
+ */
+export const COACH_APPROVED_LOCALES: Language[] = ['en']
+
+/**
+ * The language the coach is allowed to answer in for a user's selected language: the selection when
+ * it is safety-approved, else English (an explicit, defined fallback — never silent mixed-language).
+ */
+export function coachOutputLanguage(lang: Language): Language {
+  return COACH_APPROVED_LOCALES.includes(lang) ? lang : 'en'
+}
+
 type Dict = Record<string, string>
 
 const en: Dict = {
+  // onboarding (Welcome)
+  'onboarding.tagline': 'Training built around you.',
+  'onboarding.getStarted': 'Get Started',
+  'onboarding.haveAccount': 'Already have an account?',
+  'onboarding.logIn': 'Log In',
+
   'settings.title': 'Settings',
   'settings.language': 'Language',
   'settings.units': 'Units',
@@ -69,6 +91,12 @@ const en: Dict = {
 }
 
 const zh: Dict = {
+  // onboarding (Welcome)
+  'onboarding.tagline': '为你打造的训练。',
+  'onboarding.getStarted': '开始',
+  'onboarding.haveAccount': '已有账户？',
+  'onboarding.logIn': '登录',
+
   'settings.title': '设置',
   'settings.language': '语言',
   'settings.units': '单位',
@@ -116,6 +144,12 @@ const zh: Dict = {
 }
 
 const hi: Dict = {
+  // onboarding (Welcome)
+  'onboarding.tagline': 'आपके लिए बनाया गया प्रशिक्षण।',
+  'onboarding.getStarted': 'शुरू करें',
+  'onboarding.haveAccount': 'पहले से खाता है?',
+  'onboarding.logIn': 'लॉग इन करें',
+
   'settings.title': 'सेटिंग्स',
   'settings.language': 'भाषा',
   'settings.units': 'इकाइयाँ',
@@ -163,6 +197,12 @@ const hi: Dict = {
 }
 
 const ar: Dict = {
+  // onboarding (Welcome)
+  'onboarding.tagline': 'تدريب مُصمّم من أجلك.',
+  'onboarding.getStarted': 'ابدأ',
+  'onboarding.haveAccount': 'لديك حساب بالفعل؟',
+  'onboarding.logIn': 'تسجيل الدخول',
+
   'settings.title': 'الإعدادات',
   'settings.language': 'اللغة',
   'settings.units': 'الوحدات',
@@ -210,6 +250,12 @@ const ar: Dict = {
 }
 
 const vi: Dict = {
+  // onboarding (Welcome)
+  'onboarding.tagline': 'Chương trình tập luyện dành cho bạn.',
+  'onboarding.getStarted': 'Bắt đầu',
+  'onboarding.haveAccount': 'Đã có tài khoản?',
+  'onboarding.logIn': 'Đăng nhập',
+
   'settings.title': 'Cài đặt',
   'settings.language': 'Ngôn ngữ',
   'settings.units': 'Đơn vị',
@@ -257,6 +303,9 @@ const vi: Dict = {
 }
 
 const DICTS: Record<Language, Dict> = { en, zh, hi, ar, vi }
+
+/** Exposed for the i18n coverage test (missing-key / orphan-key guard). Not for app use. */
+export const __DICTS_FOR_TEST: Record<Language, Dict> = DICTS
 
 /** Returns a translate function for the given language, falling back to English. */
 export function translator(lang: Language) {

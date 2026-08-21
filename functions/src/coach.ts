@@ -105,6 +105,12 @@ export interface CoachMessageInput {
    * lands) so the coach's very first reply after a change still names the correct local day.
    */
   timezone?: string
+  /**
+   * The language the coach should reply in — the client has already gated it to a safety-approved
+   * locale (coachOutputLanguage), so it is 'en' until a locale passes its per-locale safety review.
+   * A non-'en' value adds a language directive to the system prompt; 'en'/absent leaves it unchanged.
+   */
+  language?: string
 }
 
 export interface CoachTurnResult {
@@ -276,7 +282,7 @@ export async function coachTurnCore(uid: string, input: CoachMessageInput, deps:
     : (deps.actionsDisabled?.() ?? false)
   const allowActions = input.allowActions === true && !actionsOff
   const systemPrompt = [
-    buildCoachSystemPrompt({ allowWorkoutActions: allowActions }),
+    buildCoachSystemPrompt({ allowWorkoutActions: allowActions, language: input.language }),
     '',
     selectedContext,
     // App-help turns get the verified app-navigation map so the model gives correct paths instead of

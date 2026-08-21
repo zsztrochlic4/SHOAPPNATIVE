@@ -16,6 +16,7 @@ import { IS_WEB } from '../components/WebFrame'
 import { coachDisplayName, recentPR } from '../store/coach'
 import { coachReply } from '../lib/coachChat'
 import { askCoachServer } from '../lib/coachServer'
+import { coachOutputLanguage } from '../lib/i18n'
 import { newCoachRequestKey } from '../lib/coachRequestKey'
 import {
   fetchCoachWorkspace,
@@ -181,7 +182,7 @@ export function useCoachChat({ active }: { active: boolean }) {
     const requestKey = opts?.resend && requestKeyRef.current ? requestKeyRef.current : newCoachRequestKey()
     requestKeyRef.current = requestKey
     try {
-      const res = await askCoachServer({ message: msg, requestKey, allowActions: COACH_ACTIONING, timezone: deviceTimezone() ?? undefined })
+      const res = await askCoachServer({ message: msg, requestKey, allowActions: COACH_ACTIONING, timezone: deviceTimezone() ?? undefined, language: coachOutputLanguage(state.settings.language ?? 'en') })
       if (seq !== sendSeqRef.current) return
       dispatch({
         type: 'PUSH_CHAT', role: 'coach', text: res.text,
