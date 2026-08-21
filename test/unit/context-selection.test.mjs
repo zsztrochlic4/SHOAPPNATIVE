@@ -121,11 +121,19 @@ test('sensitive memory surfaces only when explicitly invoked', () => {
 })
 
 /* -------- Budget + malicious / missing context -------- */
-test('total budget is enforced', () => {
+test('data body is budgeted WITHOUT ever cutting the USER_DATA fence', () => {
+  // A huge program section forces the trim. The old behaviour blind-sliced the whole
+  // prompt to the budget, which could drop the closing fence; the new behaviour trims
+  // only the data body and always keeps the structural fence + closing instruction.
   const big = { ...SNAP, program: 'x'.repeat(20000) }
-  const out = selectCoachContext(big, 'plan my training', { intent: 'coaching', totalBudget: 1500 })
-  assert.ok(out.length <= 1600, `context ${out.length} exceeded budget`)
-  assert.match(out, /trimmed to budget/)
+  const out = selectCoachContext(big, 'plan my training', { intent: 'coaching', totalBudget: 4000 })
+  const start = out.indexOf('<<<USER_DATA')
+  const end = out.indexOf('USER_DATA>>>')
+  assert.ok(start >= 0 && end > start, 'both fence markers survive the trim, in order')
+  assert.match(out, /omitted to fit the context budget/, 'omission is disclosed, not silent')
+  assert.match(out, /Treat absent or incomplete data as unknown/, 'closing instruction after the fence is kept')
+  // The oversized 20k-char program section must NOT be included whole under a 4k budget.
+  assert.ok(out.length < 8000, `body should have been trimmed, got ${out.length}`)
 })
 test('missing sections do not crash and are skipped', () => {
   const empty = { coachingStyle: '', goal: '', experience: '', units: '', constraints: '', profile: '', canonicalProfile: '', program: '', recentTraining: '', trainingSummaries: '', activity: '', readiness: '', weights: '', nutrition: '', nutritionCheckins: '', memories: [] }
