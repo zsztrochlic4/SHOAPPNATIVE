@@ -24,6 +24,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["expo", "start", "--web", "--port", "8135"],
       "port": 8135
+    },
+    {
+      "name": "menu-preview",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["expo", "start", "--web", "--port", "8137"],
+      "port": 8137
     }
   ]
 }

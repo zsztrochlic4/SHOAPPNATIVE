@@ -497,6 +497,20 @@ function DevPaywallPreviewGate(): React.ReactElement | null {
   return <PaywallPreviewScreen />
 }
 
+/**
+ * DEV-ONLY live preview of the side Menu (the full-screen `MenuDrawer`). Guarded
+ * the same two ways as the paywall preview so it can NEVER ship:
+ *   1. `__DEV__` — constant-folded away in release builds, dropping the require.
+ *   2. `EXPO_PUBLIC_MENU_PREVIEW === '1'` — off unless explicitly set.
+ * It mounts the real menu drawer, forced open, in its own provider stack; it
+ * does not change the entitlement gate or any real navigation.
+ */
+function DevMenuPreviewGate(): React.ReactElement | null {
+  if (!__DEV__ || process.env.EXPO_PUBLIC_MENU_PREVIEW !== '1') return null
+  const { MenuPreviewScreen } = require('./dev/MenuPreviewScreen')
+  return <MenuPreviewScreen />
+}
+
 // Catch uncaught JS errors + unhandled rejections app-wide (audit F-034) —
 // they flow through the reportError seam into the redacted local diagnostics
 // buffer (and any crash service registered later via setErrorReporter).
@@ -512,6 +526,9 @@ export default function App() {
 
   const paywallPreview = DevPaywallPreviewGate()
   if (paywallPreview) return paywallPreview
+
+  const menuPreview = DevMenuPreviewGate()
+  if (menuPreview) return menuPreview
 
   return (
     // GestureHandlerRootView must wrap the whole app for react-native-gesture-handler.
