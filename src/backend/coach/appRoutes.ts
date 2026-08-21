@@ -119,9 +119,23 @@ const NAV_QUESTION =
  * ~22% accuracy). Self-gating: safe to call on any turn — a training/nutrition/advice turn either has no
  * navigation phrasing or no route match, and returns null.
  */
-/** The verified answer text for a route — a real path, phrased once, so the source is a single place. */
+/**
+ * The verified answer text for a route — a real path, phrased WARMLY, so the source is a single place.
+ * A handful of friendly frames chosen deterministically by route id: a given destination always reads
+ * the same, but app-help answers no longer all sound like the same robotic sentence. Every frame keeps
+ * the useful signal (the user makes the change there themselves; the coach doesn't touch app settings)
+ * without the stiff "nothing changes until you make the change there yourself" tail. Dash-free
+ * (punctuation rule). */
+const ROUTE_FRAMES: ((r: string) => string)[] = [
+  (r) => `Sure thing. You'll find that in ${r}, pop in and set it however suits you.`,
+  (r) => `Easy one. That lives in ${r}, head over whenever you like and it saves the moment you change it.`,
+  (r) => `You can sort that in ${r}. Tap in, adjust it to what you want, and you're set.`,
+  (r) => `No worries. It's under ${r}, make the change there and you're good to go.`,
+]
 function routeAnswerText(route: AppRoute): string {
-  return `In StrengthHub you'll find that under ${route.route}. If you don't see it straight away, it's on that screen; nothing changes until you make the change there yourself.`
+  let h = 0
+  for (let i = 0; i < route.id.length; i++) h = (h + route.id.charCodeAt(i)) % ROUTE_FRAMES.length
+  return ROUTE_FRAMES[h](route.route)
 }
 
 export function synthesizeAppHelpAnswer(message: string): string | null {
