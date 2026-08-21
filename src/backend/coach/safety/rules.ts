@@ -1221,11 +1221,21 @@ function matchesFitnessIntentPattern(n: Norm): boolean {
  * lunch more balanced"). Narrow: needs a MEAL noun AND an improve-the-quality phrase; restriction/loss
  * framing never reaches here (already handled upstream).
  */
-function isNutritionQualityQuestion(n: Norm): boolean {
-  const mealNoun = hasRe(n, /\b(meal|meals|lunch|dinner|breakfast|brekkie|snack|snacks|food|plate|sandwich|sandwiches|wrap|wraps|bowl|dish)\b/)
-  const improveQuality = has(n, 'more balanced', 'balanced', 'healthier', 'more nutritious', 'nutritious',
-    'well rounded', 'well-rounded', 'more filling', 'more veg', 'more vegetables', 'more wholesome', 'wholesome')
-  return mealNoun && improveQuality
+function isNutritionQuestion(n: Norm): boolean {
+  const foodNoun = hasRe(n, /\b(meal|meals|lunch|lunches|dinner|dinners|breakfast|brekkie|snack|snacks|food|foods|plate|sandwich|sandwiches|wrap|wraps|bowl|dish|produce|fruit|fruits|vegetable|vegetables|veg|veggies|protein|carb|carbs|dairy|yoghurt|yogurt|oats|rice|eggs|chicken|tuna|beans|lentils|grocery|groceries|snacking|eating)\b/)
+  // Qualitative nutrition opinion / comparison / choice — in scope (spec §5). Only calorie/macro TARGETS
+  // and full meal PLANS are out, and those trip detectMealPlan / the DE detectors UPSTREAM of this, so
+  // this can only ever rescue an off_topic bounce of an ordinary "is this food any good" question.
+  const opinionFrame = has(n, 'more balanced', 'balanced', 'healthier', 'healthy', 'more nutritious',
+    'nutritious', 'well rounded', 'well-rounded', 'more filling', 'filling', 'more veg', 'more vegetables',
+    'wholesome', 'more wholesome', 'good for me', 'good for you', 'better for me', 'as good as', 'as useful',
+    'as healthy', 'worth eating', 'worth buying', 'should i eat', 'what should i eat', 'what can i eat',
+    'okay to eat', 'ok to eat', 'fine to eat', 'good choice', 'good option', 'good idea', 'better than',
+    'instead of', 'high in protein', 'enough protein', 'a good source')
+  // Budget-food framing ("thirty dollars for lunches", "cheap high-protein meals", "on a student budget").
+  const budgetFood = hasRe(n, /\b(cheap|budget|afford|affordable|\$\s?\d|\d+\s?dollars?|dollars|bucks|on a budget|tight budget|student budget|to spend|to cover)\b/) &&
+    hasRe(n, /\b(meal|meals|lunch|lunches|dinner|food|eat|eating|snack|snacks|grocery|groceries|protein|produce)\b/)
+  return budgetFood || (foodNoun && opinionFrame)
 }
 
 /**
@@ -1259,7 +1269,12 @@ export function isOnTopicFitness(text: string): boolean {
   const n = normalize(text)
   if (has(n, ...FITNESS_TERMS)) return true
   if (matchesFitnessIntentPattern(n)) return true
-  if (isNutritionQualityQuestion(n)) return true
+  if (isNutritionQuestion(n)) return true
+  // Training-format nouns that are unambiguously fitness but were missing from the term list (a "circuit
+  // still feels too difficult" is a training question). Kept out of FITNESS_TERMS deliberately (that list
+  // also feeds the crisis benign-life-event guard); this is on-topic recognition only.
+  if (has(n, 'circuit', 'circuits', 'superset', 'supersets', 'super set', 'dropset', 'drop set', 'amrap',
+    'emom', 'giant set', 'tempo work', 'the 12-minute', '12-minute circuit', '12 minute circuit')) return true
   if (isScheduleEditIntent(text)) return true
   const words = n.p.trim().split(/\s+/).filter(Boolean)
   // Word-boundaried so a continuity token can't match INSIDE another word ("ok" in "joke").
@@ -1371,6 +1386,19 @@ const APP_HELP_TERMS = [
   // paywall / billing
   'restore an existing', 'existing purchase', 'restore my purchase', 'restore purchases',
   'never subscribed', 'restore a purchase', 'previous purchase',
+  // Third calibration pass — long-tail app phrasings from the fresh SPEC-500 + MIX-2000 suites.
+  // the reply-label meta question (general / personalised / app-help)
+  'general, personalised', 'personalised or app-help', 'app-help label', 'app help label', 'answer show a',
+  'answer is labelled', 'reply labelled', 'why is this labelled', 'the label on', 'general or personalised',
+  // goal selection
+  'which goal', 'which goal option', 'goal option', 'goal best fits', 'best goal for me', 'pick a goal',
+  'choose a goal', 'goal to pick',
+  // workout template / custom session management
+  'workout template', 'delete a template', 'delete the template', 'rename a workout', 'rename a template',
+  'rename the workout', 'delete or rename', 'my templates', 'custom session', 'saved workout',
+  // history duplicates / corrections
+  'appears twice', 'shows twice', 'twice in history', 'twice in my history', 'duplicate workout',
+  'duplicated in history', 'logged twice', 'two entries',
 ]
 
 /**
