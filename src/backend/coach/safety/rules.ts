@@ -258,6 +258,51 @@ function hasFirstPersonDistress(n: Norm): boolean {
 }
 
 /**
+ * A benign TRAINING / academic-stress / quit-training question that the LLM classifier intermittently
+ * over-flags as `crisis_concern` ("high exam stress and several poor nights of sleep, should I still
+ * train hard?"; "I want to give up on training, no progress in weeks"). These are training-adjustment
+ * questions, not self-harm. Owner-approved 2026-08-21 (post Jack clearance) to stop the over-escalation.
+ *
+ * SAFETY BOUNDING — this only ever lets `scopeClassifierHits` drop a CLASSIFIER `crisis_concern` hit,
+ * and only when EVERY deterministic self-harm detector is clear: `hasFirstPersonDistress` (CRISIS_IDEATION
+ * ∪ explicit self-harm ∪ OTHER_HARM ∪ selfHarmIntent ∪ concealedIntent) AND the `_LIFE_DIRECTED` crisis
+ * lexicon ("dont want to be here", "cant go on", "hopeless"…) must both be absent. So any genuine signal
+ * keeps the crisis route, the rules-floor/state crisis (added separately in the router) is never touched,
+ * and 000-tier (immediate_danger / medical_emergency / overdose) is never touched. Requires a positive
+ * training/stress FRAME, so a bare, context-free "I want to quit" still escalates (conservative).
+ */
+// Raw crisis-euphemism / finality / goodbye / isolation / cease-to-exist / self-reveal markers, checked
+// WITHOUT the fitness exemption that `selfHarmIntent` applies via benignLifeEvent — so a genuine euphemism
+// that co-occurs with a training word ("i train hard but tonight is the night and im alone") is STILL
+// recognised as crisis and never de-escalated. Mirrors the phrase lists inside selfHarmIntent.
+const _CRISIS_EUPHEMISM = /\b(this is it|tonight is it|today is it|this is the night|tonight is the night|today is the day|this is the end|the end for me|my time is up|gone for good|be gone for good|checking out for good|check out for good|cash it in for good|slip away for good|wont be around|will not be around|wont be here|not be here anymore|wont be here anymore|not be around anymore|wont see tomorrow|not see tomorrow|wont make it to tomorrow|dont want to wake up|do not want to wake up|never want to wake up|never wake up|not going to wake up|i mean me|i mean myself|its about me|it s about me|this is about me|talking about myself|im alone|i m alone|im all alone|all alone|by myself|no one will|nobody will|goodbye|saying goodbye|this is goodbye|end it|ending it|end things|ending things|go through with it|going through with it|the pills|took the pills|taken the pills|swallowed them all|step off|off the bridge)\b/
+
+export function isBenignTrainingStress(n: Norm): boolean {
+  // "quit / give up / take a break from" an explicit TRAINING object — the benign case the classifier
+  // over-flags. The training object is what makes "give up" here a break-from-the-gym, not from life.
+  const quitTraining = hasRe(n, /\b(quit|quitting|give up|giving up|gave up|stop|stopping|pack (it |this )?in|take a break from|taking a break from|thinking of quitting)\b[a-z0-9 ]{0,20}\b(training|my training|the gym|this gym|working out|work out|workouts|lifting|exercise|exercising|cardio|my workouts|my routine|my program|the program|my split|my plan|this app)\b/)
+  const trainingFrame =
+    quitTraining ||
+    has(n, 'train', 'training', 'trained', 'workout', 'workouts', 'work out', 'working out', 'gym',
+      'session', 'sessions', 'lift', 'lifting', 'lifts', 'exercise', 'exercising', 'program', 'programme',
+      'routine', 'split', 'reps', 'sets', 'deload', 'plateau', 'progress', 'progressing', 'my plan') ||
+    (hasRe(n, /\b(exam|exams|study|studying|studies|deadline|deadlines|assignment|thesis|semester|placement)\b/) &&
+      hasRe(n, /\b(stress|stressed|sleep|slept|tired|exhausted|drained|run down|wrecked|busy|train|training|workout|gym|motivation)\b/))
+  if (!trainingFrame) return false
+  // HARD crisis guards — any one keeps the crisis route (never de-escalated):
+  if (hasFirstPersonDistress(n)) return false               // explicit self-harm / ideation / OTHER_HARM / wantsToDie
+  if (_CRISIS_EUPHEMISM.test(n.p)) return false             // finality / goodbye / isolation / cease-to-exist / reveal (raw)
+  const lifeDirected = _LIFE_DIRECTED.test(n.p)             // "cant go on", "hopeless", "dont want to be here", bare "give up"…
+  if (lifeDirected && !quitTraining) return false
+  if (lifeDirected && quitTraining) {
+    // a give-up-training match is fine, but a SECOND life-directed phrase beyond it is not
+    const stripped = n.p.replace(/\b(give up|giving up|gave up)\b/g, ' ')
+    if (_LIFE_DIRECTED.test(stripped)) return false
+  }
+  return true
+}
+
+/**
  * A crisis/self-harm word appearing as the OBJECT OF STUDY/RESEARCH/WRITING, a topic label, or a
  * named exercise drill — not a personal disclosure. Requires tight ADJACENCY between an academic
  * verb/noun and the crisis term (or a topic-label suffix), so a genuine disclosure that merely
@@ -973,6 +1018,14 @@ export function scopeClassifierHits(text: string, hits: DetectorHit[], ctx?: Coa
   if (isAppHelp(text) && scoped.hits.some((h) => h.category === 'off_topic')) {
     scoped.hits = scoped.hits.filter((h) => h.category !== 'off_topic')
     scoped.suppressions.push({ category: 'off_topic', rule: 'app_help' })
+  }
+  // Benign training-stress override: drop ONLY a classifier `crisis_concern` false-positive on an
+  // ordinary training / academic-stress / quit-training question (see isBenignTrainingStress for the
+  // hard bounding). Never touches 000-tier categories, and never touches a rules-floor/state crisis
+  // (those are combined separately in the router), so genuine crisis routing is unaffected.
+  if (isBenignTrainingStress(n) && scoped.hits.some((h) => h.category === 'crisis_concern')) {
+    scoped.hits = scoped.hits.filter((h) => h.category !== 'crisis_concern')
+    scoped.suppressions.push({ category: 'crisis_concern', rule: 'benign_training_stress' })
   }
   return scoped
 }
