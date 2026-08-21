@@ -1160,6 +1160,22 @@ function matchesFitnessIntentPattern(n: Norm): boolean {
 }
 
 /**
+ * A benign nutrition-QUALITY question: "how can I make this lunch more balanced / healthier / more
+ * nutritious?". Qualitative nutrition is in scope (spec §5) — only calorie/macro TARGETS and full meal
+ * PLANS are out, and those are caught by the meal_plan + disordered-eating detectors that run UPSTREAM
+ * of isOnTopicFitness. So this only rescues an otherwise off_topic bounce of an ordinary "make my meal
+ * healthier" question (the 2000-wide eval over-refused "small student budget, make my convenience-store
+ * lunch more balanced"). Narrow: needs a MEAL noun AND an improve-the-quality phrase; restriction/loss
+ * framing never reaches here (already handled upstream).
+ */
+function isNutritionQualityQuestion(n: Norm): boolean {
+  const mealNoun = hasRe(n, /\b(meal|meals|lunch|dinner|breakfast|brekkie|snack|snacks|food|plate|sandwich|sandwiches|wrap|wraps|bowl|dish)\b/)
+  const improveQuality = has(n, 'more balanced', 'balanced', 'healthier', 'more nutritious', 'nutritious',
+    'well rounded', 'well-rounded', 'more filling', 'more veg', 'more vegetables', 'more wholesome', 'wholesome')
+  return mealNoun && improveQuality
+}
+
+/**
  * Option B "refer by default": the coach only free-coaches a message that is affirmatively an on-topic
  * training/nutrition request (or a short in-flow affirmation). Everything else — off-topic, ambiguous,
  * or a distress disclosure that slipped every safety detector — is NOT coached; the router routes it to
@@ -1190,6 +1206,7 @@ export function isOnTopicFitness(text: string): boolean {
   const n = normalize(text)
   if (has(n, ...FITNESS_TERMS)) return true
   if (matchesFitnessIntentPattern(n)) return true
+  if (isNutritionQualityQuestion(n)) return true
   if (isScheduleEditIntent(text)) return true
   const words = n.p.trim().split(/\s+/).filter(Boolean)
   // Word-boundaried so a continuity token can't match INSIDE another word ("ok" in "joke").
