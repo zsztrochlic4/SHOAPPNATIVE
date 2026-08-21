@@ -223,12 +223,9 @@ export function PlanAroundLifeSheet({ open, onClose }: { open: boolean; onClose:
   return (
     <Sheet open={open} onClose={onClose} bare>
       <View style={{ flex: 1, paddingTop: insets.top }}>
-        <ScrollView
-          ref={scroller}
-          contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 6, paddingBottom: 132 + insets.bottom }}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
+        {/* Pinned dismiss/back control — kept ABOVE the ScrollView so it never scrolls away
+            (Back within the flow, Close on the hub). */}
+        <View style={{ paddingHorizontal: 24, paddingTop: 6, paddingBottom: 2 }}>
           <Pressable
             onPress={back}
             hitSlop={8}
@@ -237,7 +234,13 @@ export function PlanAroundLifeSheet({ open, onClose }: { open: boolean; onClose:
           >
             <ChevronLeft size={22} color={`${colors.fg}cc`} />
           </Pressable>
-
+        </View>
+        <ScrollView
+          ref={scroller}
+          contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 6, paddingBottom: 132 + insets.bottom }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
           {screen !== 'hub' && (
             <View style={{ marginTop: 16 }}>
               <ProgressBar value={Math.round((stepNum / stepTotal) * 100)} color={colors.brand400} height={4} />

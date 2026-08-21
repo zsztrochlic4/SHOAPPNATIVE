@@ -632,11 +632,12 @@ function ListScreen(props: any) {
     <ScreenIn>
       {/* Persistent progress header */}
       <View style={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: dim(0.06) }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+        {/* Close control sits top-RIGHT to match the app-wide dismiss pattern (X-right, pinned). */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
+          <Text style={{ fontSize: 12, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase', color: dim(0.4) }}>Active Workout</Text>
           <PressableScale onPress={onClose} scaleTo={0.9} accessibilityLabel="Close workout" className="items-center justify-center rounded-full" style={{ width: 34, height: 34, backgroundColor: dim(0.08) }}>
             <X size={17} strokeWidth={2.4} color={dim(0.8)} />
           </PressableScale>
-          <Text style={{ fontSize: 12, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase', color: dim(0.4) }}>Active Workout</Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
           <View style={{ flex: 1 }}>
