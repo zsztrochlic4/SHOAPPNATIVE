@@ -223,10 +223,17 @@ export interface RecomputeInput {
  */
 export function computeCompetitionMetrics({ records, targets, ctx }: RecomputeInput): CompetitionMetrics {
   // Odometer: habit entries in the last ODOMETER_WINDOW_DAYS (14) calendar days,
-  // with workouts over the same window and the workout target scaled to it.
+  // with workouts over the SAME window. Both halves are counted over the identical
+  // 14-key set (offsetKey(0..13)); we deliberately do NOT use sumInWindow here,
+  // because its `>= offsetKey(14)` cutoff is inclusive and would span 15 calendar
+  // dates for the workout half while the habit half spans 14 — the two halves of
+  // the same gauge must measure the exact same days.
   const windowKeys = new Set(Array.from({ length: ODOMETER_WINDOW_DAYS }, (_, d) => ctx.offsetKey(d)))
   const habitDays: HabitLike[] = records.filter((r) => r.hasHabit && windowKeys.has(r.dayKey))
-  const workoutsWindow = sumInWindow(records, ctx, ODOMETER_WINDOW_DAYS, (r) => r.sessions + r.activities)
+  const workoutsWindow = records.reduce(
+    (a, r) => (windowKeys.has(r.dayKey) ? a + r.sessions + r.activities : a),
+    0,
+  )
   const { score } = weeklyIndexCore(habitDays, workoutsWindow, targets, ODOMETER_WINDOW_DAYS)
 
   // Sessions THIS WEEK (7-day) — the unit the shared weekly team goal counts; kept

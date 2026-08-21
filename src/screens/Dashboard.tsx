@@ -19,7 +19,7 @@ import { currentWeekKeys, todayKey, longDate, shortDate, fromKey, currentHour } 
 import { fmtFluid, fmtWeightNum, weightUnit, fmtVolume } from '../lib/format'
 import { prefersReducedMotion } from '../lib/a11y'
 import {
-  todayHabit, habitForDay, todaySession, sessionForDay, activitiesForDay,
+  todayHabit, habitForDay, todaySession, sessionForDay, sessionsForDay, activitiesForDay,
   streakStats, foodReviewForDay, weeklyIndex, nutritionTagsForDay,
   workoutStartedForDay, sessionProgress,
 } from '../store/selectors'
@@ -136,6 +136,9 @@ export default function Dashboard() {
   const isToday = selDate === todayKey
   const selHabit = habitForDay(state, selDate)
   const selSession = sessionForDay(state, selDate)
+  // A program day can also carry a custom or 12-minute quick session; the card above
+  // shows the first, so surface how many more were logged that day (rather than hiding them).
+  const extraSessions = Math.max(0, sessionsForDay(state, selDate).length - 1)
   const selActivities = activitiesForDay(state, selDate)
   const selTags = nutritionTagsForDay(state, selDate)
   const selWeekday = FULL_WD[fromKey(selDate).getDay()]
@@ -368,6 +371,12 @@ export default function Dashboard() {
             </View>
           </View>
         </View>
+      )}
+
+      {extraSessions > 0 && (
+        <Text className="mt-2 px-1 text-[12px] text-tertiary">
+          +{extraSessions} more {extraSessions === 1 ? 'session' : 'sessions'} logged this day · see Workout history
+        </Text>
       )}
 
       {/* Past day: read-only list of what was done */}

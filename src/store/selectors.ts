@@ -136,6 +136,13 @@ export function todaySession(s: AppState): WorkoutSession | undefined {
   return sessionForDay(s, todayKey)
 }
 
+/** ALL workout sessions logged on a day (a program day can also carry a custom or
+ *  12-minute quick session). `sessionForDay` returns only the first for the day card;
+ *  use this where every session should be visible/counted (history, coach summaries). */
+export function sessionsForDay(s: AppState, key: string = todayKey): WorkoutSession[] {
+  return s.sessions.filter((x) => x.dateKey === key)
+}
+
 export function sessionForDay(s: AppState, key: string = todayKey): WorkoutSession | undefined {
   return s.sessions.find((x) => x.dateKey === key)
 }
@@ -254,14 +261,18 @@ export function regularWorkoutsInWeek(s: AppState, offset = 0) {
   return sessions + weeklyActivitiesInWeek(s, offset).length
 }
 
-/** Prescribed sessions + weekly activities in a rolling window of days,
- *  e.g. (6, 0) = the last 7 days, (13, 7) = the 7 days before that. */
+/** Completed workouts in a rolling window of days, e.g. (6, 0) = the last 7 days,
+ *  (13, 7) = the 7 days before that. A "workout" is a completed prescribed/custom/quick
+ *  session OR a logged sport activity — every logged workout counts, matching the odometer.
+ *  (The `weekly` flag now means only "auto-repeat this activity on the plan"; it no longer
+ *  gates whether an activity is counted, so the Dashboard "Workouts" tile and the odometer
+ *  can never disagree about the same football match.) */
 export function regularWorkoutsInRange(s: AppState, fromDays: number, toDays = 0) {
   const lo = dayKey(fromDays)
   const hi = dayKey(toDays)
   const inWin = (k: string) => k >= lo && k <= hi
   const sessions = completedSessions(s).filter((x) => inWin(x.dateKey)).length
-  const acts = (s.activities ?? []).filter((a) => a.weekly && inWin(a.dateKey)).length
+  const acts = (s.activities ?? []).filter((a) => inWin(a.dateKey)).length
   return sessions + acts
 }
 
@@ -358,9 +369,15 @@ export type WeeklyIndex = {
 export function weeklyIndex(s: AppState): WeeklyIndex {
   const byKey = new Map(s.habits.map((h) => [h.dateKey, h]))
   const win = Array.from({ length: ODOMETER_WINDOW_DAYS }, (_, d) => dayKey(d))
+  const winSet = new Set(win)
   const days = win.map((k) => byKey.get(k)).filter(Boolean) as HabitDay[]
-  // Count prescribed sessions and self-logged activities over the same window. All fitness counts.
-  const workouts = workoutsInRange(s, ODOMETER_WINDOW_DAYS) + activitiesInRange(s, ODOMETER_WINDOW_DAYS).length
+  // Count prescribed sessions and self-logged activities over the EXACT same 14-key
+  // window as the habit half above. (Not workoutsInRange/activitiesInRange, whose
+  // `>= dayKey(14)` cutoff is inclusive and would span 15 dates — so the workout and
+  // habit halves of the odometer would silently measure different spans.) All fitness counts.
+  const sessionsInWin = completedSessions(s).filter((x) => winSet.has(x.dateKey)).length
+  const activitiesInWin = (s.activities ?? []).filter((a) => winSet.has(a.dateKey)).length
+  const workouts = sessionsInWin + activitiesInWin
 
   // Score + per-dimension ratios come from the shared scoring core so the dashboard
   // odometer and the server-recomputed league points can never drift (window included).
