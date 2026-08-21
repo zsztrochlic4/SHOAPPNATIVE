@@ -35,6 +35,7 @@ import { tick, thud } from '../lib/haptics'
 import { todayKey } from '../lib/date'
 import { LANGUAGES, type Language } from '../lib/i18n'
 import { useT } from '../lib/useT'
+import { syncLayoutDirection } from '../lib/rtl'
 import type { Equipment, Experience, Goal, Profile } from '../store/types'
 import {
   buildUserDoc, mapAffectedRegions, mapFollowups, mapScreeningAnswers,
@@ -2209,7 +2210,7 @@ function LanguageSelect() {
       {open ? (
         <View style={{ position: 'absolute', top: 40, right: 0, minWidth: 158, padding: 6, borderRadius: 14, backgroundColor: tok.rgb('--ink-700'), borderWidth: 1, borderColor: tok.rgb('--fg', 0.1) }}>
           {LANGUAGES.map((l) => (
-            <Pressable key={l.code} onPress={() => { tick(); setOpen(false); dispatch({ type: 'SET_SETTINGS', patch: { language: l.code } }) }} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 9, backgroundColor: l.code === code ? tok.rgb('--brand-400', 0.14) : 'transparent' }}>
+            <Pressable key={l.code} onPress={() => { tick(); setOpen(false); dispatch({ type: 'SET_SETTINGS', patch: { language: l.code } }); syncLayoutDirection(l.code) }} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 9, backgroundColor: l.code === code ? tok.rgb('--brand-400', 0.14) : 'transparent' }}>
               <Flag code={LANG_CODE[l.code]} w={24} />
               <Text style={{ flex: 1, fontSize: 14.5, fontWeight: '600', color: l.code === code ? tok.rgb('--brand-300') : tok.rgb('--fg', 0.85) }}>{l.native}</Text>
               {l.code === code ? <Icon name="check" size={15} stroke={3} color={tok.rgb('--brand-300')} /> : null}

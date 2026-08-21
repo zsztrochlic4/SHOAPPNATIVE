@@ -50,6 +50,7 @@ import {
 import { ActivityIcon } from '../components/ActivityIcon'
 import { activePeriod, upcomingPeriods } from '../store/periods'
 import { translator, LANGUAGES, type Language } from '../lib/i18n'
+import { syncLayoutDirection } from '../lib/rtl'
 import { shareText } from '../lib/share'
 import type { MealName, Units, Theme, NotificationPrefs } from '../store/types'
 import { brand, accent } from '../theme'
@@ -370,7 +371,10 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
 
   function setLang(code: Language) {
     dispatch({ type: 'SET_SETTINGS', patch: { language: code } })
-    toast(translator(code)('toast.langSet'))
+    // Align RTL layout (gated; see lib/rtl). If the direction flips, RN only applies it on the next
+    // launch, so ask the user to restart. When RTL layout is gated off this is a no-op.
+    const { changed } = syncLayoutDirection(code)
+    toast(changed ? 'Restart the app to apply right-to-left layout' : translator(code)('toast.langSet'))
   }
 
   return (
