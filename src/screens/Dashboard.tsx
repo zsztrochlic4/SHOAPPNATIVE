@@ -174,11 +174,11 @@ export default function Dashboard() {
 
   // Fixed order, matching the design — done rows stay in place, struck through.
   const goals: Goal[] = [
-    { id: 'steps', kind: 'measure', icon: 'footprints', tile: colors.brand400, label: 'Steps', done: selHabit.steps >= t.steps, value: selHabit.steps, target: t.steps, step: 500, fmt: (v) => Math.round(v).toLocaleString(), patch: (v) => dispatch({ type: 'PATCH_HABIT', dateKey: selDate, patch: { steps: v } }) },
-    { id: 'sleep', kind: 'measure', icon: 'moon', tile: colors.accentPurple, label: 'Sleep', done: selHabit.sleepH >= t.sleepH, value: selHabit.sleepH, target: t.sleepH, step: 0.5, fmt: (v) => `${Math.round(v * 10) / 10} hrs`, patch: (v) => dispatch({ type: 'PATCH_HABIT', dateKey: selDate, patch: { sleepH: v } }) },
-    { id: 'water', kind: 'measure', icon: 'droplet', tile: colors.accentBlue, label: 'Water', done: selHabit.waterL >= t.waterL, value: selHabit.waterL, target: t.waterL, step: 0.2, fmt: (v) => fmtFluid(v, units), patch: (v) => dispatch({ type: 'PATCH_HABIT', dateKey: selDate, patch: { waterL: v } }) },
-    { id: 'nutrition', kind: 'auto', icon: 'leaf', tile: colors.accentOrange, label: isToday ? "Today's nutrition choices" : 'Nutrition choices', done: selCheckedIn, sub: selCheckedIn ? 'Checked in · auto' : isToday ? 'Not checked in yet' : 'No check-in', sheetValue: selCheckedIn ? 'Checked in' : 'Not checked in yet', cta: 'Log', onOpen: () => nav.goTab('nutrition') },
-    { id: 'workout', kind: 'auto', icon: 'dumbbell', tile: colors.brand400, label: 'Workout', done: selWorkoutDone, sub: isRestDay ? 'Rest day · auto' : `${selSession.name} · ${selWorkoutDone ? 'auto' : 'not started'}`, sheetValue: isRestDay ? 'Rest day' : selWorkoutDone ? 'Completed' : 'Not yet', cta: 'Start', onOpen: () => (selSession ? nav.open('activeWorkout') : nav.goTab('workout')) },
+    { id: 'steps', kind: 'measure', icon: 'footprints', tile: colors.brand400, label: tr('Steps'), done: selHabit.steps >= t.steps, value: selHabit.steps, target: t.steps, step: 500, fmt: (v) => Math.round(v).toLocaleString(), patch: (v) => dispatch({ type: 'PATCH_HABIT', dateKey: selDate, patch: { steps: v } }) },
+    { id: 'sleep', kind: 'measure', icon: 'moon', tile: colors.accentPurple, label: tr('Sleep'), done: selHabit.sleepH >= t.sleepH, value: selHabit.sleepH, target: t.sleepH, step: 0.5, fmt: (v) => `${Math.round(v * 10) / 10} hrs`, patch: (v) => dispatch({ type: 'PATCH_HABIT', dateKey: selDate, patch: { sleepH: v } }) },
+    { id: 'water', kind: 'measure', icon: 'droplet', tile: colors.accentBlue, label: tr('Water'), done: selHabit.waterL >= t.waterL, value: selHabit.waterL, target: t.waterL, step: 0.2, fmt: (v) => fmtFluid(v, units), patch: (v) => dispatch({ type: 'PATCH_HABIT', dateKey: selDate, patch: { waterL: v } }) },
+    { id: 'nutrition', kind: 'auto', icon: 'leaf', tile: colors.accentOrange, label: isToday ? tr("Today's nutrition choices") : tr('Nutrition choices'), done: selCheckedIn, sub: selCheckedIn ? tr('Checked in · auto') : isToday ? tr('Not checked in yet') : tr('No check-in'), sheetValue: selCheckedIn ? tr('Checked in') : tr('Not checked in yet'), cta: tr('Log'), onOpen: () => nav.goTab('nutrition') },
+    { id: 'workout', kind: 'auto', icon: 'dumbbell', tile: colors.brand400, label: tr('Workout'), done: selWorkoutDone, sub: isRestDay ? tr('Rest day · auto') : `${selSession.name} · ${selWorkoutDone ? tr('auto') : tr('not started')}`, sheetValue: isRestDay ? tr('Rest day') : selWorkoutDone ? tr('Completed') : tr('Not yet'), cta: tr('Start'), onOpen: () => (selSession ? nav.open('activeWorkout') : nav.goTab('workout')) },
   ]
   const goalsDone = goals.filter((g) => g.done).length
 
@@ -226,7 +226,7 @@ export default function Dashboard() {
       {streakAtRisk && (
         <Pressable onPress={openTodayProgress} className="mt-3 flex-row items-center gap-2 rounded-2xl border border-accent-orange/25 bg-accent-orange/10 px-3.5 py-2.5 active:opacity-80">
           <Flame size={16} color={accent.orange} />
-          <Text className="flex-1 text-[13px] font-semibold text-white/80">Log anything today to keep your {streak.current}-day streak alive.</Text>
+          <Text className="flex-1 text-[13px] font-semibold text-white/80">{tr('Log anything today to keep your {days}-day streak alive.', { days: streak.current })}</Text>
           <ChevronRight size={16} color={accent.orange} />
         </Pressable>
       )}
@@ -247,7 +247,7 @@ export default function Dashboard() {
         <Text className="mt-2 text-center text-[13px] leading-snug text-secondary">{idx.blurb}</Text>
         <View className="mt-1.5 flex-row items-center justify-center gap-1">
           <Info size={12} color="rgba(148,148,148,0.7)" />
-          <Text className="text-[12px] font-semibold text-secondary">{showWhy ? 'Hide the breakdown' : 'What moves this score?'}</Text>
+          <Text className="text-[12px] font-semibold text-secondary">{showWhy ? tr('Hide the breakdown') : tr('What moves this score?')}</Text>
           <ChevronDown size={13} color="rgba(148,148,148,0.7)" style={{ transform: [{ rotate: showWhy ? '180deg' : '0deg' }] }} />
         </View>
       </Pressable>
@@ -275,13 +275,13 @@ export default function Dashboard() {
         <Card className="mt-3 p-4">
           <Text className="text-[13px] font-bold text-white">{tr('dashboard.howReadinessWorks')}</Text>
           <Text className="mt-1 text-[12px] leading-snug text-secondary">
-            It blends your last 14 days across five habits versus your targets. <Text className="font-semibold text-white/75">50 means on track</Text>. Higher means you're beating your goals. Hit your targets and each bar fills toward 100%.
+            {tr('It blends your last 14 days across five habits versus your targets.')} <Text className="font-semibold text-white/75">{tr('50 means on track')}</Text>. {tr("Higher means you're beating your goals. Hit your targets and each bar fills toward 100%.")}
           </Text>
           <View className="mt-3 gap-2.5">
             {idx.parts.map((p) => {
               const good = p.pct >= 85, mid = p.pct >= 55
               const bar = good ? colors.brand400 : mid ? colors.accentOrange : colors.danger
-              const note = good ? 'On target' : mid ? 'A little under' : 'Needs attention'
+              const note = good ? tr('On target') : mid ? tr('A little under') : tr('Needs attention')
               return (
                 <View key={p.label} className="flex-row items-center gap-3">
                   <Text className="w-20 text-[12px] font-semibold text-white/70">{p.label}</Text>
@@ -349,7 +349,7 @@ export default function Dashboard() {
             </View>
             <LinearGradient colors={[colors.ink800, `${colors.ink800}99`, `${colors.ink800}00`]} locations={[0.25, 0.47, 0.74]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} pointerEvents="none" />
             <View className="p-5">
-              <Text className="text-sm font-semibold text-brand-400">{selSession.completed ? 'Completed' : 'Logged'}</Text>
+              <Text className="text-sm font-semibold text-brand-400">{selSession.completed ? tr('Completed') : tr('Logged')}</Text>
               <Text className="mt-1 text-2xl font-extrabold tracking-tight text-white">{selSession.name}</Text>
               <View className="mt-2 flex-row items-center gap-1.5">
                 <Clock size={15} color="rgba(255,255,255,0.6)" />
@@ -418,7 +418,7 @@ export default function Dashboard() {
       )}
 
       {!isToday && !selSession && selActivities.length === 0 && (
-        <Text className="mt-3 rounded-2xl border border-dashed border-white/15 py-4 text-center text-[13px] text-tertiary">No workout or activity logged on {shortDate(selDate)}.</Text>
+        <Text className="mt-3 rounded-2xl border border-dashed border-white/15 py-4 text-center text-[13px] text-tertiary">{tr('No workout or activity logged on {date}.', { date: shortDate(selDate) })}</Text>
       )}
 
       {/* Progress — the merged checklist for today (opens the update sheet), or an
@@ -678,6 +678,7 @@ function GoalRow({ goal, index, onPress, colors }: { goal: Goal; index: number; 
  * instead for a past day, which renders the same rows as a read-only record.
  */
 function DayProgressCard({ goals, doneCount, total, onUpdate, stamp, tags, onTag, colors }: { goals: Goal[]; doneCount: number; total: number; onUpdate?: () => void; stamp?: string; tags: string[]; onTag?: () => void; colors: ThemeColors }) {
+  const tr = useT()
   const target = total ? (doneCount / total) * 100 : 0
   // Bar eases to the new fraction whenever a goal flips done — a small reward.
   const w = useRef(new Animated.Value(0)).current
@@ -703,10 +704,10 @@ function DayProgressCard({ goals, doneCount, total, onUpdate, stamp, tags, onTag
         <Animated.View style={{ transform: [{ scale: bump }] }}>
           <Text className="text-[16px] font-extrabold" style={{ color: colors.brand400 }}>{doneCount}</Text>
         </Animated.View>
-        <Text className="text-[13px] font-semibold text-secondary">of {total} done</Text>
+        <Text className="text-[13px] font-semibold text-secondary">{tr('of {total} done', { total })}</Text>
         {onUpdate ? (
           <Pressable onPress={onUpdate} hitSlop={8} className="ml-auto active:opacity-60">
-            <Text className="text-[12.5px] font-bold" style={{ color: colors.brand400 }}>Update →</Text>
+            <Text className="text-[12.5px] font-bold" style={{ color: colors.brand400 }}>{tr('Update')} →</Text>
           </Pressable>
         ) : (
           <Text className="ml-auto text-[12.5px] text-tertiary">{stamp}</Text>
@@ -727,12 +728,13 @@ function DayProgressCard({ goals, doneCount, total, onUpdate, stamp, tags, onTag
 }
 
 function FoodCheckIn({ tags, colors, onTag }: { tags: string[]; colors: ThemeColors; onTag?: () => void }) {
+  const tr = useT()
   return (
     <View>
       <View className="mb-3 flex-row items-center gap-2">
         <Leaf size={14} color={colors.brand400} />
-        <Text className="text-[12px] font-bold uppercase tracking-wide text-tertiary">Food check-in</Text>
-        <Text className="ml-auto text-[11px] text-tertiary">from your nutrition log</Text>
+        <Text className="text-[12px] font-bold uppercase tracking-wide text-tertiary">{tr('Food check-in')}</Text>
+        <Text className="ml-auto text-[11px] text-tertiary">{tr('from your nutrition log')}</Text>
       </View>
       {tags.length > 0 ? (
         <View className="flex-row flex-wrap gap-2">
@@ -750,10 +752,10 @@ function FoodCheckIn({ tags, colors, onTag }: { tags: string[]; colors: ThemeCol
         </View>
       ) : onTag ? (
         <Pressable onPress={onTag} className="active:opacity-70">
-          <Text className="text-[13px] font-semibold" style={{ color: colors.brand400 }}>Tag how your eating went →</Text>
+          <Text className="text-[13px] font-semibold" style={{ color: colors.brand400 }}>{tr('Tag how your eating went')} →</Text>
         </Pressable>
       ) : (
-        <Text className="text-[13px] text-tertiary">No food tags for this day</Text>
+        <Text className="text-[13px] text-tertiary">{tr('No food tags for this day')}</Text>
       )}
     </View>
   )
@@ -794,6 +796,7 @@ function DayEditorSheet({ open, onClose, dateKey, dayLabel, goals, tags, workout
   colors: ThemeColors
   dispatch: (action: any) => void
 }) {
+  const tr = useT()
   const win = useWindowDimensions()
   const screenH = IS_WEB ? WEB_SCREEN.height : win.height
   const insets = useSafeAreaInsets()
@@ -833,8 +836,8 @@ function DayEditorSheet({ open, onClose, dateKey, dayLabel, goals, tags, workout
             <View style={{ width: 38, height: 4, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'center', marginBottom: 12 }} />
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
               <View>
-                <Text style={{ fontSize: 18, fontWeight: '800', color: '#fff' }}>Update {dayLabel}</Text>
-                <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>Fill in what you did. It still counts.</Text>
+                <Text style={{ fontSize: 18, fontWeight: '800', color: '#fff' }}>{tr('Update')} {dayLabel}</Text>
+                <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>{tr('Fill in what you did. It still counts.')}</Text>
               </View>
               <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Close" style={{ width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.06)' }}>
                 <X size={14} color="rgba(255,255,255,0.5)" strokeWidth={2.5} />
@@ -860,14 +863,14 @@ function DayEditorSheet({ open, onClose, dateKey, dayLabel, goals, tags, workout
                 <Icon name="dumbbell" size={18} color={colors.brand400} />
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>Workout</Text>
-                <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 1 }}>{isRestDay ? 'Rest day' : workoutDone ? 'Marked complete' : 'Not completed'}</Text>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>{tr('Workout')}</Text>
+                <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 1 }}>{isRestDay ? tr('Rest day') : workoutDone ? tr('Marked complete') : tr('Not completed')}</Text>
               </View>
               {!isRestDay && (
                 <PressableScale onPress={() => dispatch({ type: 'SET_WORKOUT_DONE', dateKey, done: !workoutDone })} scaleTo={0.96}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: workoutDone ? colors.brand400 : 'rgba(255,255,255,0.08)' }}>
                     {workoutDone && <Check size={14} strokeWidth={3} color="#000" />}
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: workoutDone ? '#000' : 'rgba(255,255,255,0.7)' }}>{workoutDone ? 'Completed' : 'Mark done'}</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: workoutDone ? '#000' : 'rgba(255,255,255,0.7)' }}>{workoutDone ? tr('Completed') : tr('Mark done')}</Text>
                   </View>
                 </PressableScale>
               )}
@@ -875,8 +878,8 @@ function DayEditorSheet({ open, onClose, dateKey, dayLabel, goals, tags, workout
 
             {/* How did your eating go? — the 16 tags, toggled for this day */}
             <View style={{ marginTop: 6, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)', paddingTop: 16 }}>
-              <Text style={{ fontSize: 15, fontWeight: '800', color: '#fff' }}>How did your eating go?</Text>
-              <Text style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.45)', marginTop: 2, marginBottom: 12 }}>Tap any that fit. These show on your dashboard.</Text>
+              <Text style={{ fontSize: 15, fontWeight: '800', color: '#fff' }}>{tr('How did your eating go?')}</Text>
+              <Text style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.45)', marginTop: 2, marginBottom: 12 }}>{tr('Tap any that fit. These show on your dashboard.')}</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                 {NUTRITION_TAGS.map((tg) => {
                   const on = tags.includes(tg.id)
@@ -901,7 +904,7 @@ function DayEditorSheet({ open, onClose, dateKey, dayLabel, goals, tags, workout
           <View style={{ borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.07)', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 22 + insets.bottom }}>
             <PressableScale onPress={onClose} scaleTo={0.98}>
               <View style={{ alignItems: 'center', borderRadius: 999, paddingVertical: 14, backgroundColor: colors.brand400 }}>
-                <Text style={{ fontSize: 15, fontWeight: '800', color: '#000' }}>Done</Text>
+                <Text style={{ fontSize: 15, fontWeight: '800', color: '#000' }}>{tr('Done')}</Text>
               </View>
             </PressableScale>
           </View>
@@ -1053,6 +1056,7 @@ function SheetGoalRow({ goal, colors, expanded, onExpand, onMarkDone, onUndo, on
   onUndo: () => void
   onClose: () => void
 }) {
+  const tr = useT()
   // The ring keeps the goal's own icon rather than swapping to a tick, so a row
   // stays recognisable at a glance once it's complete.
   const ringPct = goal.kind === 'measure' ? goalPct(goal) : goal.done ? 100 : 0
@@ -1101,7 +1105,7 @@ function SheetGoalRow({ goal, colors, expanded, onExpand, onMarkDone, onUndo, on
               </PressableScale>
               <PressableScale onPress={onMarkDone} scaleTo={0.96}>
                 <View style={[S.markDone, { backgroundColor: colors.brand400 }]}>
-                  <Text style={S.markDoneText}>Mark done</Text>
+                  <Text style={S.markDoneText}>{tr('Mark done')}</Text>
                 </View>
               </PressableScale>
             </View>
@@ -1124,10 +1128,11 @@ function SheetGoalRow({ goal, colors, expanded, onExpand, onMarkDone, onUndo, on
 }
 
 function DonePill({ colors, onPress }: { colors: ThemeColors; onPress?: () => void }) {
+  const tr = useT()
   const body = (
     <View style={[S.pill, { backgroundColor: `${colors.brand400}26` }]}>
       <Check size={14} strokeWidth={3} color={colors.brand400} />
-      <Text style={[S.pillText, { color: colors.brand400 }]}>Done</Text>
+      <Text style={[S.pillText, { color: colors.brand400 }]}>{tr('Done')}</Text>
     </View>
   )
   if (!onPress) return body
@@ -1135,6 +1140,7 @@ function DonePill({ colors, onPress }: { colors: ThemeColors; onPress?: () => vo
 }
 
 export function UpdateTodaySheet({ open, onClose, goals, doneCount, total, colors }: { open: boolean; onClose: () => void; goals: Goal[]; doneCount: number; total: number; colors: ThemeColors }) {
+  const tr = useT()
   const win = useWindowDimensions()
   const screenH = IS_WEB ? WEB_SCREEN.height : win.height
   const insets = useSafeAreaInsets()
@@ -1197,8 +1203,8 @@ export function UpdateTodaySheet({ open, onClose, goals, doneCount, total, color
             <View style={{ width: 38, height: 4, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'center', marginBottom: 12 }} />
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
               <View>
-                <Text style={{ fontSize: 18, fontWeight: '800', color: '#fff' }}>Update today</Text>
-                <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>{doneCount} of {total} on track</Text>
+                <Text style={{ fontSize: 18, fontWeight: '800', color: '#fff' }}>{tr('Update today')}</Text>
+                <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>{tr('{doneCount} of {total} on track', { doneCount, total })}</Text>
               </View>
               <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Close" style={{ width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.06)' }}>
                 <X size={14} color="rgba(255,255,255,0.5)" strokeWidth={2.5} />
@@ -1224,7 +1230,7 @@ export function UpdateTodaySheet({ open, onClose, goals, doneCount, total, color
           <View style={{ borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.07)', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 22 + insets.bottom }}>
             <PressableScale onPress={onClose} scaleTo={0.98}>
               <View style={{ alignItems: 'center', borderRadius: 999, paddingVertical: 14, backgroundColor: colors.brand400 }}>
-                <Text style={{ fontSize: 15, fontWeight: '800', color: '#000' }}>Done</Text>
+                <Text style={{ fontSize: 15, fontWeight: '800', color: '#000' }}>{tr('Done')}</Text>
               </View>
             </PressableScale>
           </View>

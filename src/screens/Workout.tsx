@@ -30,13 +30,14 @@ import { ProgramHolding, GeneratedProgramView } from './GeneratedProgramView'
 const TABS = ['Today', 'Program', 'Exercises', 'History']
 
 export default function Workout() {
+  const tr = useT()
   const [tab, setTab] = useState('Today')
   const insets = useSafeAreaInsets()
   const contentStyle = useMemo(() => ({ paddingBottom: insets.bottom + 112 }), [insets.bottom])
   return (
     <View className="flex-1 pt-2">
       <View className="px-5">
-        <ScreenHeader title="Workout" />
+        <ScreenHeader title={tr('Workout')} />
         <SegmentedTabs tabs={TABS} active={tab} onChange={setTab} />
       </View>
       {tab === 'Exercises' ? (
@@ -82,6 +83,7 @@ function RowThumb({ uri }: { uri: string }) {
  * a one-tap retry. Hidden when everything is synced.
  */
 function PendingSyncChip() {
+  const tr = useT()
   const { user } = useAuth()
   const [pending, setPending] = useState(0)
   const [retrying, setRetrying] = useState(false)
@@ -99,9 +101,9 @@ function PendingSyncChip() {
       className="mb-4 flex-row items-center justify-between rounded-[16px] border border-amber-400/25 bg-amber-400/10 px-4 py-3 active:opacity-80"
     >
       <Text className="text-[12.5px] font-semibold text-amber-200">
-        {pending} {pending === 1 ? 'workout' : 'workouts'} waiting to sync — progress is safe on this device
+        {pending} {pending === 1 ? tr('workout') : tr('workouts')} {tr('waiting to sync — progress is safe on this device')}
       </Text>
-      <Text className="text-[12.5px] font-extrabold text-amber-300">{retrying ? 'Retrying…' : 'Retry'}</Text>
+      <Text className="text-[12.5px] font-extrabold text-amber-300">{retrying ? tr('Retrying…') : tr('Retry')}</Text>
     </Pressable>
   )
 }
@@ -136,7 +138,7 @@ function TodayTab() {
   }
 
   // Driven by the visible tick progress: none ticked → Start, some → Continue, all → Completed.
-  const ctaLabel = prog.total > 0 && prog.done === prog.total ? 'Completed' : prog.done > 0 ? 'Continue Workout' : 'Start Workout'
+  const ctaLabel = prog.total > 0 && prog.done === prog.total ? tr('Completed') : prog.done > 0 ? tr('Continue Workout') : tr('Start Workout')
 
   return (
     <>
@@ -150,7 +152,7 @@ function TodayTab() {
           <View className="mt-6">
             <Text className="section-title mb-2">{tr('wk.todaysProgress')}</Text>
             <View className="mb-[7px] flex-row items-center justify-between">
-              <Text className="text-[12.5px] text-secondary">{prog.done}/{prog.total} exercises completed</Text>
+              <Text className="text-[12.5px] text-secondary">{prog.done}/{prog.total} {tr('exercises completed')}</Text>
               <Text className="text-[12.5px] font-semibold text-white">{prog.pct}%</Text>
             </View>
             <ProgressBar value={prog.pct} />
@@ -203,7 +205,7 @@ function TodayTab() {
       <Pressable onPress={() => nav.open('quick')} className="mt-7 w-full flex-row items-center gap-3 rounded-[20px] border border-accent-blue/30 bg-accent-blue/[0.09] p-3.5 active:opacity-90">
         <View className="h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-accent-blue/[0.18]"><Clock size={20} color="#3B82F6" /></View>
         <View className="min-w-0 flex-1">
-          <Text className="text-[14.5px] font-bold leading-tight text-white">12-Minute Bodyweight Exercises</Text>
+          <Text className="text-[14.5px] font-bold leading-tight text-white">{tr('12-Minute Bodyweight Exercises')}</Text>
           <Text className="mt-0.5 text-[12px] text-secondary">{tr('wk.quickDesc')}</Text>
         </View>
         <ChevronRight size={17} color="rgba(59,130,246,0.55)" />
@@ -264,7 +266,7 @@ function OtherActivities() {
             </View>
           ))}
           <Pressable onPress={() => nav.open('logActivity')} className="w-full items-center rounded-[20px] border border-dashed border-white/15 py-3 active:opacity-80">
-            <Text className="text-[13.5px] font-semibold text-secondary">+ Log another activity</Text>
+            <Text className="text-[13.5px] font-semibold text-secondary">+ {tr('Log another activity')}</Text>
           </Pressable>
         </View>
       )}
@@ -324,7 +326,7 @@ function MyWorkouts() {
                   <Play size={12} color="#000" fill="#000" />
                   <Text className="text-[13px] font-bold text-black">{tr('wk.start')}</Text>
                 </Pressable>
-                <Pressable onPress={() => { dispatch({ type: 'REMOVE_TEMPLATE', id: t.id }); toast('Workout removed') }} hitSlop={6} className="h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/5 active:opacity-80">
+                <Pressable onPress={() => { dispatch({ type: 'REMOVE_TEMPLATE', id: t.id }); toast(tr('Workout removed')) }} hitSlop={6} className="h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/5 active:opacity-80">
                   <Trash2 size={15} color="rgba(255,255,255,0.45)" />
                 </Pressable>
               </View>
@@ -357,7 +359,7 @@ function LegacyProgram() {
   return (
     <View className="gap-2.5">
       <View className="rounded-[20px] border border-brand-400/20 bg-brand-400/[0.06] p-4">
-        <Text className="text-[14px] font-bold text-white">Your weekly split · {state.profile.daysPerWeek}-day program</Text>
+        <Text className="text-[14px] font-bold text-white">{tr('Your weekly split · {days}-day program', { days: state.profile.daysPerWeek })}</Text>
         <Text className="mt-1.5 text-[12.5px] leading-5 text-secondary">{tr('wk.builtAroundWeek')}</Text>
       </View>
       {state.program.map((d) => {
@@ -485,7 +487,7 @@ function ExercisesTab({ bottomInset }: { bottomInset: number }) {
         <TextInput
           value={q}
           onChangeText={setQ}
-          placeholder="Search exercises or muscle…"
+          placeholder={tr('Search exercises or muscle…')}
           placeholderTextColor="rgba(255,255,255,0.35)"
           className="w-full rounded-2xl border border-white/10 bg-ink-800 py-3 pl-10 pr-10 text-[13.5px] text-white"
         />
@@ -515,7 +517,7 @@ function ExercisesTab({ bottomInset }: { bottomInset: number }) {
 
       {/* Filter title + result count */}
       <View className="mb-3 flex-row items-center justify-between px-0.5">
-        <Text className="text-[12px] font-bold uppercase tracking-wider text-tertiary">{muscle ?? 'All exercises'}</Text>
+        <Text className="text-[12px] font-bold uppercase tracking-wider text-tertiary">{muscle ?? tr('All exercises')}</Text>
         <Text className="text-[12px] text-tertiary">{filtered.length} of {all.length}</Text>
       </View>
 
@@ -688,7 +690,7 @@ function HistoryTab({ bottomInset }: { bottomInset: number }) {
           className={`flex-row items-center justify-center gap-2 rounded-[20px] border border-brand-400/20 bg-brand-400/5 py-2.5 active:opacity-80 ${syncing ? 'opacity-60' : ''}`}
         >
           <RefreshCw size={14} color={brand[400]} />
-          <Text className="text-[13px] font-semibold text-brand-400">{syncing ? 'Syncing…' : 'Sync connected apps'}</Text>
+          <Text className="text-[13px] font-semibold text-brand-400">{syncing ? tr('Syncing…') : tr('Sync connected apps')}</Text>
         </Pressable>
       ) : null}
       ListEmptyComponent={(
@@ -718,7 +720,7 @@ function HistoryTab({ bottomInset }: { bottomInset: number }) {
                     </View>
                   )}
                 </View>
-                <Text className="mt-0.5 text-[12px] text-secondary">{relativeLabel(h.dateKey)}{h.kind === 'activity' ? ' · activity' : ''}</Text>
+                <Text className="mt-0.5 text-[12px] text-secondary">{relativeLabel(h.dateKey)}{h.kind === 'activity' ? ` · ${tr('activity')}` : ''}</Text>
               </View>
               {h.kind === 'session' && volSeries.length >= 2 && (
                 <View className="mr-1 shrink-0"><Sparkline values={volSeries} activeIndex={volIndex.get(h.id) ?? -1} color={brand[400]} /></View>
@@ -732,7 +734,7 @@ function HistoryTab({ bottomInset }: { bottomInset: number }) {
                 ) : (
                   <>
                     <Text className="text-[13.5px] font-bold text-white">{h.minutes} min</Text>
-                    <Text className="mt-px text-[12px] capitalize text-secondary">activity</Text>
+                    <Text className="mt-px text-[12px] capitalize text-secondary">{tr('activity')}</Text>
                   </>
                 )}
               </View>
@@ -743,7 +745,7 @@ function HistoryTab({ bottomInset }: { bottomInset: number }) {
               <View className="px-3.5 pb-3.5">
                 <View className="mb-3 h-px bg-white/5" />
                 <View className="mb-2 flex-row items-center justify-between">
-                  <Text className="text-[10.5px] font-bold uppercase tracking-wider text-tertiary">{h.kind === 'session' ? 'What you lifted' : 'Effort'}</Text>
+                  <Text className="text-[10.5px] font-bold uppercase tracking-wider text-tertiary">{h.kind === 'session' ? tr('What you lifted') : tr('Effort')}</Text>
                   <Text className="text-[11.5px] text-tertiary">
                     {h.kind === 'session' ? `${h.exercises.length} exercises · ${h.durationMin} min` : `${h.intensity} · ${h.minutes} min`}
                   </Text>
@@ -771,7 +773,7 @@ function HistoryTab({ bottomInset }: { bottomInset: number }) {
                     <View className="flex-row items-center justify-between gap-3">
                       <View className="min-w-0 flex-1">
                         <Text className="text-[13px] font-semibold text-white">{tr('wk.estimatedBurn')}</Text>
-                        <Text className="mt-px text-[11.5px] capitalize text-secondary">{h.minutes} min at {h.intensity} effort</Text>
+                        <Text className="mt-px text-[11.5px] capitalize text-secondary">{tr('{minutes} min at {intensity} effort', { minutes: h.minutes, intensity: h.intensity })}</Text>
                       </View>
                       <Text className="text-[13px] font-bold text-brand-300">{h.calories} kcal</Text>
                     </View>
@@ -800,7 +802,7 @@ function HistoryTab({ bottomInset }: { bottomInset: number }) {
                       setOpenId(null)
                       if (h.kind === 'session') dispatch({ type: 'REMOVE_SESSION', id: h.id })
                       else dispatch({ type: 'REMOVE_ACTIVITY', id: h.id })
-                      toast(h.kind === 'session' ? 'Workout deleted — charts and streaks updated' : 'Activity deleted')
+                      toast(h.kind === 'session' ? tr('Workout deleted — charts and streaks updated') : tr('Activity deleted'))
                     }}
                     accessibilityRole="button"
                     accessibilityLabel={confirmDeleteId === h.id ? `Confirm delete ${h.name}` : `Delete ${h.name}`}
@@ -808,7 +810,7 @@ function HistoryTab({ bottomInset }: { bottomInset: number }) {
                   >
                     <Trash2 size={13} color={confirmDeleteId === h.id ? '#f87171' : 'rgba(255,255,255,0.7)'} />
                     <Text className={`text-[12.5px] font-bold ${confirmDeleteId === h.id ? 'text-red-400' : 'text-white/80'}`}>
-                      {confirmDeleteId === h.id ? 'Tap again to delete' : 'Delete'}
+                      {confirmDeleteId === h.id ? tr('Tap again to delete') : tr('Delete')}
                     </Text>
                   </Pressable>
                 </View>

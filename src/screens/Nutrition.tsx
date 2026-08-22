@@ -247,7 +247,7 @@ function OverviewTab() {
   const selected = nutritionTagsForDay(state)
 
   const tagCount = selected.length
-  const tagCountLabel = tagCount === 0 ? 'Tap any that fit your day' : `${tagCount} logged today`
+  const tagCountLabel = tagCount === 0 ? tr('Tap any that fit your day') : tr('{count} logged today', { count: tagCount })
 
   return (
     <ScrollView className="flex-1" contentContainerStyle={scrollPad} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets>
@@ -310,7 +310,7 @@ function TodayLogCard({ onAddFood }: { onAddFood: () => void }) {
           <Text className="text-[18px] font-extrabold tracking-tight text-white">{tr('nt.todaysFoodLog')}</Text>
           {/* Descriptive only — we don't set a calorie goal to hit (app-wide rule). */}
           <Text className="mt-0.5 text-[12px] text-secondary">
-            {`${Math.round(day.kcal)} kcal logged`}
+            {`${Math.round(day.kcal)} kcal ${tr('logged')}`}
           </Text>
         </View>
         <Pressable
@@ -325,9 +325,9 @@ function TodayLogCard({ onAddFood }: { onAddFood: () => void }) {
       </View>
       <View className="mt-3 flex-row gap-4">
         {[
-          { label: 'Protein', v: Math.round(day.p), color: c.accentBlue },
-          { label: 'Carbs', v: Math.round(day.c), color: c.accentOrange },
-          { label: 'Fat', v: Math.round(day.f), color: c.accentPurple },
+          { label: tr('Protein'), v: Math.round(day.p), color: c.accentBlue },
+          { label: tr('Carbs'), v: Math.round(day.c), color: c.accentOrange },
+          { label: tr('Fat'), v: Math.round(day.f), color: c.accentPurple },
         ].map((m) => (
           <View key={m.label} className="flex-row items-center gap-1.5">
             <View className="h-2 w-2 rounded-full" style={{ backgroundColor: m.color }} />
@@ -337,7 +337,7 @@ function TodayLogCard({ onAddFood }: { onAddFood: () => void }) {
       </View>
       {day.meals.length === 0 ? (
         <Text className="mt-3.5 text-[12.5px] leading-5 text-tertiary">
-          Nothing logged yet today. Add food to build today’s log — totals update instantly.
+          {tr('Nothing logged yet today. Add food to build today’s log — totals update instantly.')}
         </Text>
       ) : (
         <View className="mt-3.5 gap-2">
@@ -350,7 +350,7 @@ function TodayLogCard({ onAddFood }: { onAddFood: () => void }) {
                 </Text>
               </View>
               <Pressable
-                onPress={() => { dispatch({ type: 'REMOVE_MEAL', id: m.id }); toast('Removed from today’s log') }}
+                onPress={() => { dispatch({ type: 'REMOVE_MEAL', id: m.id }); toast(tr('Removed from today’s log')) }}
                 accessibilityRole="button"
                 accessibilityLabel={`Remove ${m.name} from today's log`}
                 hitSlop={8}
@@ -363,7 +363,7 @@ function TodayLogCard({ onAddFood }: { onAddFood: () => void }) {
         </View>
       )}
       <Text className="mt-3 text-[10.5px] leading-4 text-tertiary">
-        Targets are general guidance, not medical advice.
+        {tr('Targets are general guidance, not medical advice.')}
       </Text>
     </View>
   )
@@ -413,7 +413,7 @@ function RecipesTab({ onOpenRecipe, onAddMeal }: { onOpenRecipe: (m: BudgetMeal 
             <Pressable key={m.id} onPress={() => onOpenRecipe(m)} className="flex-row items-center gap-3 rounded-2xl border border-white/[0.06] bg-ink-800 px-3.5 py-3 active:opacity-80">
               <View className="min-w-0 flex-1">
                 <Text numberOfLines={1} className="text-[14px] font-bold text-white">{m.name}</Text>
-                <Text numberOfLines={1} className="mt-0.5 text-[11.5px] text-secondary">{m.ingredients.slice(0, 4).join(', ') || m.notes || 'My recipe'}</Text>
+                <Text numberOfLines={1} className="mt-0.5 text-[11.5px] text-secondary">{m.ingredients.slice(0, 4).join(', ') || m.notes || tr('My recipe')}</Text>
               </View>
               <Text className="text-[11px] font-bold text-brand-400">{m.kcal} kcal · {m.p}g protein</Text>
             </Pressable>
@@ -442,7 +442,7 @@ function RecipesTab({ onOpenRecipe, onAddMeal }: { onOpenRecipe: (m: BudgetMeal 
       {/* Search */}
       <View className="mt-3 flex-row items-center gap-2.5 rounded-[14px] border border-white/[0.08] bg-ink-800 px-3.5">
         <Search size={16} color={alpha(c.fg, 0.35)} />
-        <TextInput value={query} onChangeText={setQuery} placeholder="Search recipes…" placeholderTextColor={alpha(c.fg, 0.3)} className="flex-1 py-2.5 text-[14px] text-white" />
+        <TextInput value={query} onChangeText={setQuery} placeholder={tr('Search recipes…')} placeholderTextColor={alpha(c.fg, 0.3)} className="flex-1 py-2.5 text-[14px] text-white" />
       </View>
 
       <Text className="mb-2.5 mt-4 text-[12px] font-extrabold uppercase tracking-[1.6px] text-tertiary">{countLabel}</Text>
@@ -548,21 +548,21 @@ function MealPlanTab() {
   const sameSet = (a: string[], b: string[]) => a.length === b.length && b.every((x) => a.includes(x))
   const scopeLabel =
     chosen.length === 0 ? '' :
-    chosen.length === 7 ? 'every day' :
-    sameSet(chosen, PLAN_DAYS.slice(0, 5)) ? 'Mon to Fri' :
-    sameSet(chosen, PLAN_DAYS.slice(5)) ? 'the weekend' :
+    chosen.length === 7 ? tr('every day') :
+    sameSet(chosen, PLAN_DAYS.slice(0, 5)) ? tr('Mon to Fri') :
+    sameSet(chosen, PLAN_DAYS.slice(5)) ? tr('the weekend') :
     chosen.length === 1 ? chosen[0] :
     `${chosen.slice(0, -1).join(', ')} & ${chosen[chosen.length - 1]}`
   const whenHint =
-    !meal ? 'Pick a meal, then choose the days to repeat it on.' :
-    chosen.length === 0 ? 'Pick at least one day to repeat on.' :
-    `Adds ${meal} at ${slot.toLowerCase()} to ${scopeLabel}.`
+    !meal ? tr('Pick a meal, then choose the days to repeat it on.') :
+    chosen.length === 0 ? tr('Pick at least one day to repeat on.') :
+    tr('Adds {meal} at {slot} to {scope}.', { meal, slot: slot.toLowerCase(), scope: scopeLabel })
 
   const toggleDay = (d: string) => setDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]))
 
   function addToPlan() {
-    if (!meal) { toast('Pick a meal first'); return }
-    if (chosen.length === 0) { toast('Pick at least one day'); return }
+    if (!meal) { toast(tr('Pick a meal first')); return }
+    if (chosen.length === 0) { toast(tr('Pick at least one day')); return }
     let added = 0
     chosen.forEach((d) => {
       if (!wItems.some((p) => p.day === d && p.slot === slot && p.name === meal)) {
@@ -571,23 +571,23 @@ function MealPlanTab() {
       }
     })
     setPlanSearch('')
-    toast(added ? `Added to ${scopeLabel}` : 'Already planned')
+    toast(added ? tr('Added to {scope}', { scope: scopeLabel }) : tr('Already planned'))
   }
   function clearWeek() {
     wItems.forEach((p) => dispatch({ type: 'REMOVE_PLANNED_MEAL', id: p.id }))
-    toast('Week cleared')
+    toast(tr('Week cleared'))
   }
 
   const now = new Date()
   const mon = new Date(now); mon.setDate(now.getDate() - ((now.getDay() + 6) % 7) + weekOffset * 7)
   const sun = new Date(mon); sun.setDate(mon.getDate() + 6)
   const fmt = (d: Date) => `${d.getDate()} ${MONTHS[d.getMonth()]}`
-  const weekLabel = weekOffset === 0 ? 'This week' : weekOffset === -1 ? 'Last week' : weekOffset === 1 ? 'Next week' : weekOffset < 0 ? `${-weekOffset} weeks ago` : `In ${weekOffset} weeks`
+  const weekLabel = weekOffset === 0 ? tr('This week') : weekOffset === -1 ? tr('Last week') : weekOffset === 1 ? tr('Next week') : weekOffset < 0 ? tr('{n} weeks ago', { n: -weekOffset }) : tr('In {n} weeks', { n: weekOffset })
 
   const QUICK: { label: string; set: string[] }[] = [
-    { label: 'Every day', set: PLAN_DAYS.slice() },
-    { label: 'Weekdays', set: PLAN_DAYS.slice(0, 5) },
-    { label: 'Weekends', set: PLAN_DAYS.slice(5) },
+    { label: tr('Every day'), set: PLAN_DAYS.slice() },
+    { label: tr('Weekdays'), set: PLAN_DAYS.slice(0, 5) },
+    { label: tr('Weekends'), set: PLAN_DAYS.slice(5) },
   ]
 
   return (
@@ -598,7 +598,7 @@ function MealPlanTab() {
         <View className="flex-row items-center justify-between gap-2.5">
           <Text className="text-[18px] font-extrabold tracking-tight text-white">{tr('nt.planWeek')}</Text>
           <View className="flex-row items-center gap-2.5">
-            <Text className="text-[11px] font-bold text-brand-400">{plannedCount} planned</Text>
+            <Text className="text-[11px] font-bold text-brand-400">{tr('{count} planned', { count: plannedCount })}</Text>
             {plannedCount > 0 && <Pressable onPress={clearWeek} className="active:opacity-70"><Text className="text-[11px] font-bold text-secondary">{tr('nt.clear')}</Text></Pressable>}
           </View>
         </View>
@@ -607,7 +607,7 @@ function MealPlanTab() {
         <PlanLabel>{tr('nt.myMeals')}</PlanLabel>
         <Dropdown
           value={myMealNames.includes(meal) ? meal : ''}
-          placeholder="Choose a saved meal…"
+          placeholder={tr('Choose a saved meal…')}
           options={myMeals.map((m) => ({ value: m.name, label: m.name }))}
           onSelect={setMeal}
         />
@@ -615,7 +615,7 @@ function MealPlanTab() {
         <PlanLabel>{tr('nt.suggestedMeals')}</PlanLabel>
         <View className="flex-row items-center gap-2.5 rounded-[13px] bg-ink-700 px-3.5">
           <Search size={16} color={alpha(c.fg, 0.35)} />
-          <TextInput value={planSearch} onChangeText={setPlanSearch} placeholder="Search easy recipes worth cooking…" placeholderTextColor={alpha(c.fg, 0.3)} className="flex-1 py-2.5 text-[14px] text-white" />
+          <TextInput value={planSearch} onChangeText={setPlanSearch} placeholder={tr('Search easy recipes worth cooking…')} placeholderTextColor={alpha(c.fg, 0.3)} className="flex-1 py-2.5 text-[14px] text-white" />
         </View>
         {suggested.length > 0 && (
           <View className="mt-2 gap-1.5">
@@ -675,7 +675,7 @@ function MealPlanTab() {
         <Pressable onPress={() => setWeekOffset((w) => Math.max(-12, w - 1))} className="h-[42px] w-[42px] items-center justify-center rounded-full border border-white/[0.08] bg-ink-800 active:opacity-70" style={{ opacity: weekOffset <= -12 ? 0.3 : 1 }}><ChevronLeft size={20} color={c.brand400} strokeWidth={2.6} /></Pressable>
         <View className="min-w-0 flex-1 items-center">
           <Text className="text-[16px] font-extrabold tracking-tight text-white">{weekLabel}</Text>
-          <Text className="mt-px text-[11.5px] font-semibold text-secondary">{fmt(mon)} to {fmt(sun)} · {plannedCount} planned</Text>
+          <Text className="mt-px text-[11.5px] font-semibold text-secondary">{tr('{start} to {end} · {count} planned', { start: fmt(mon), end: fmt(sun), count: plannedCount })}</Text>
         </View>
         <Pressable onPress={() => setWeekOffset((w) => Math.min(6, w + 1))} className="h-[42px] w-[42px] items-center justify-center rounded-full border border-white/[0.08] bg-ink-800 active:opacity-70" style={{ opacity: weekOffset >= 6 ? 0.3 : 1 }}><ChevronRight size={20} color={c.brand400} strokeWidth={2.6} /></Pressable>
       </View>
@@ -694,7 +694,7 @@ function MealPlanTab() {
                   <Text className="text-[15px] font-extrabold text-white">{d}</Text>
                   {isToday && <Text className="text-[10px] font-extrabold uppercase tracking-wide text-brand-400">{tr('nt.today')}</Text>}
                 </View>
-                <Text className="text-[11px] font-semibold text-tertiary">{items.length ? `${items.length} planned` : logged.length ? '' : 'None'}</Text>
+                <Text className="text-[11px] font-semibold text-tertiary">{items.length ? tr('{count} planned', { count: items.length }) : logged.length ? '' : tr('None')}</Text>
               </View>
               {empty ? (
                 <Text className="text-[12.5px] text-tertiary">{tr('nt.nothingPlanned')}</Text>
@@ -808,7 +808,7 @@ function GuideTab() {
 
       <View className="mt-3.5 flex-row items-center justify-center gap-2.5">
         <Text className="text-[20px]">🥑</Text>
-        <Text className="text-[13px] font-semibold text-secondary">Add a small amount of <Text onPress={() => { setPlate(3); setPlateEx(false) }} className="font-bold" style={{ color: c.accentPurple }}>healthy fat</Text> on the side</Text>
+        <Text className="text-[13px] font-semibold text-secondary">{tr('Add a small amount of')} <Text onPress={() => { setPlate(3); setPlateEx(false) }} className="font-bold" style={{ color: c.accentPurple }}>{tr('healthy fat')}</Text> {tr('on the side')}</Text>
       </View>
 
       <View className="mt-6 flex-row flex-wrap" style={{ gap: 9 }}>
@@ -961,7 +961,7 @@ function RecipeModal({ meal, onClose, onEdit }: { meal: BudgetMeal | UserMeal | 
     if (budget?.steps.length) { lines.push('METHOD', ...budget.steps.map((s, i) => `${i + 1}. ${s}`), '') }
     if (um?.notes) { lines.push('NOTES', um.notes, '') }
     lines.push('— via StrengthHub')
-    try { await Clipboard.setStringAsync(lines.join('\n')); toast('Recipe copied to clipboard') } catch { toast("Couldn't copy") }
+    try { await Clipboard.setStringAsync(lines.join('\n')); toast(tr('Recipe copied to clipboard')) } catch { toast(tr("Couldn't copy")) }
   }
 
   return (
@@ -1016,7 +1016,7 @@ function RecipeModal({ meal, onClose, onEdit }: { meal: BudgetMeal | UserMeal | 
           <View className="flex-row gap-2.5 border-t border-white/[0.06] p-3">
             {um && (
               <>
-                <Pressable onPress={() => { dispatch({ type: 'REMOVE_MY_MEAL', id: um.id }); onClose(); toast('Meal deleted') }} className="items-center justify-center rounded-[13px] px-4 py-3 active:opacity-80" style={{ backgroundColor: alpha(c.danger, 0.12), borderWidth: 1, borderColor: alpha(c.danger, 0.3) }}><Trash2 size={15} color={c.danger} /></Pressable>
+                <Pressable onPress={() => { dispatch({ type: 'REMOVE_MY_MEAL', id: um.id }); onClose(); toast(tr('Meal deleted')) }} className="items-center justify-center rounded-[13px] px-4 py-3 active:opacity-80" style={{ backgroundColor: alpha(c.danger, 0.12), borderWidth: 1, borderColor: alpha(c.danger, 0.3) }}><Trash2 size={15} color={c.danger} /></Pressable>
                 <Pressable onPress={() => onEdit(um)} className="flex-1 flex-row items-center justify-center gap-1.5 rounded-[13px] bg-white/[0.06] py-3 active:opacity-80"><Pencil size={15} color={c.fg} /><Text className="text-[14px] font-bold text-white">{tr('nt.edit')}</Text></Pressable>
               </>
             )}
@@ -1068,10 +1068,10 @@ function AddMealSheet({ open, editing, onClose }: { open: boolean; editing: User
     if (editing) {
       dispatch({ type: 'REMOVE_MY_MEAL', id: editing.id })
       dispatch({ type: 'ADD_MY_MEAL', meal: fields })
-      toast('Meal updated')
+      toast(tr('Meal updated'))
     } else {
       dispatch({ type: 'ADD_MY_MEAL', meal: fields })
-      toast('Meal saved')
+      toast(tr('Meal saved'))
     }
     onClose()
   }
@@ -1084,29 +1084,29 @@ function AddMealSheet({ open, editing, onClose }: { open: boolean; editing: User
         <View className="rounded-t-[26px] border-t border-white/10 bg-ink-800" style={{ maxHeight: '94%' }}>
           <View className="flex-row items-center justify-between px-[18px] pb-2 pt-[18px]">
             <View>
-              <Text className="text-[18px] font-extrabold text-white">{editing ? 'Edit your meal' : 'Add your meal'}</Text>
-              <Text className="mt-px text-[12px] text-secondary">{editing ? 'Update the details below.' : 'Save a recipe you cook often.'}</Text>
+              <Text className="text-[18px] font-extrabold text-white">{editing ? tr('Edit your meal') : tr('Add your meal')}</Text>
+              <Text className="mt-px text-[12px] text-secondary">{editing ? tr('Update the details below.') : tr('Save a recipe you cook often.')}</Text>
             </View>
             <Pressable onPress={onClose} className="h-8 w-8 items-center justify-center rounded-full bg-white/[0.06] active:opacity-80"><X size={16} color={c.fg} /></Pressable>
           </View>
           <ScrollView className="px-[18px]" contentContainerStyle={{ paddingBottom: 40, paddingTop: 12, gap: 14 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
-            <Field label="Meal name">
-              <TextInput value={name} onChangeText={setName} placeholder="e.g. My chicken rice bowl" placeholderTextColor={alpha(c.fg, 0.3)} className="rounded-[12px] bg-ink-700 px-[13px] py-3 text-[14px] text-white" />
+            <Field label={tr('Meal name')}>
+              <TextInput value={name} onChangeText={setName} placeholder={tr('e.g. My chicken rice bowl')} placeholderTextColor={alpha(c.fg, 0.3)} className="rounded-[12px] bg-ink-700 px-[13px] py-3 text-[14px] text-white" />
             </Field>
-            <Field label="Ingredients" optional>
-              <TextInput value={ing} onChangeText={setIng} multiline placeholder={'2 chicken breasts\n1 cup rice\nHandful of veg'} placeholderTextColor={alpha(c.fg, 0.3)} style={{ minHeight: 84, textAlignVertical: 'top' }} className="rounded-[12px] bg-ink-700 px-[13px] py-3 text-[14px] leading-[1.5] text-white" />
+            <Field label={tr('Ingredients')} optional>
+              <TextInput value={ing} onChangeText={setIng} multiline placeholder={tr('2 chicken breasts\n1 cup rice\nHandful of veg')} placeholderTextColor={alpha(c.fg, 0.3)} style={{ minHeight: 84, textAlignVertical: 'top' }} className="rounded-[12px] bg-ink-700 px-[13px] py-3 text-[14px] leading-[1.5] text-white" />
             </Field>
-            <Field label="Notes" optional>
-              <TextInput value={notes} onChangeText={setNotes} multiline placeholder="Anything worth remembering about this meal" placeholderTextColor={alpha(c.fg, 0.3)} style={{ minHeight: 64, textAlignVertical: 'top' }} className="rounded-[12px] bg-ink-700 px-[13px] py-3 text-[14px] leading-[1.5] text-white" />
+            <Field label={tr('Notes')} optional>
+              <TextInput value={notes} onChangeText={setNotes} multiline placeholder={tr('Anything worth remembering about this meal')} placeholderTextColor={alpha(c.fg, 0.3)} style={{ minHeight: 64, textAlignVertical: 'top' }} className="rounded-[12px] bg-ink-700 px-[13px] py-3 text-[14px] leading-[1.5] text-white" />
             </Field>
             <View className="flex-row gap-2.5">
-              <View className="flex-1"><Field label="Calories" optional><TextInput value={kcal} onChangeText={setKcal} keyboardType="numeric" placeholder="645" placeholderTextColor={alpha(c.fg, 0.3)} className="rounded-[12px] bg-ink-700 px-[13px] py-3 text-[14px] text-white" /></Field></View>
-              <View className="flex-1"><Field label="Protein g" optional><TextInput value={pro} onChangeText={setPro} keyboardType="numeric" placeholder="48" placeholderTextColor={alpha(c.fg, 0.3)} className="rounded-[12px] bg-ink-700 px-[13px] py-3 text-[14px] text-white" /></Field></View>
+              <View className="flex-1"><Field label={tr('Calories')} optional><TextInput value={kcal} onChangeText={setKcal} keyboardType="numeric" placeholder="645" placeholderTextColor={alpha(c.fg, 0.3)} className="rounded-[12px] bg-ink-700 px-[13px] py-3 text-[14px] text-white" /></Field></View>
+              <View className="flex-1"><Field label={tr('Protein g')} optional><TextInput value={pro} onChangeText={setPro} keyboardType="numeric" placeholder="48" placeholderTextColor={alpha(c.fg, 0.3)} className="rounded-[12px] bg-ink-700 px-[13px] py-3 text-[14px] text-white" /></Field></View>
             </View>
           </ScrollView>
           <View className="flex-row gap-2.5 border-t border-white/[0.06] px-[18px] pb-5 pt-3">
             <Pressable onPress={onClose} className="flex-1 items-center rounded-[13px] bg-white/[0.06] py-3.5 active:opacity-80"><Text className="text-[14px] font-bold text-white">{tr('nt.cancel')}</Text></Pressable>
-            <Pressable onPress={save} disabled={!canSave} className="flex-[2] items-center rounded-[13px] py-3.5 active:opacity-90" style={{ backgroundColor: canSave ? c.brand400 : alpha(c.brand400, 0.35) }}><Text className="text-[14px] font-extrabold text-black">{editing ? 'Save changes' : 'Save meal'}</Text></Pressable>
+            <Pressable onPress={save} disabled={!canSave} className="flex-[2] items-center rounded-[13px] py-3.5 active:opacity-90" style={{ backgroundColor: canSave ? c.brand400 : alpha(c.brand400, 0.35) }}><Text className="text-[14px] font-extrabold text-black">{editing ? tr('Save changes') : tr('Save meal')}</Text></Pressable>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -1115,9 +1115,10 @@ function AddMealSheet({ open, editing, onClose }: { open: boolean; editing: User
 }
 
 function Field({ label, optional, children }: { label: string; optional?: boolean; children: ReactNode }) {
+  const tr = useT()
   return (
     <View>
-      <Text className="mb-1.5 text-[11px] font-extrabold uppercase tracking-wide text-tertiary">{label}{optional && <Text className="font-semibold normal-case tracking-normal text-tertiary"> · optional</Text>}</Text>
+      <Text className="mb-1.5 text-[11px] font-extrabold uppercase tracking-wide text-tertiary">{label}{optional && <Text className="font-semibold normal-case tracking-normal text-tertiary"> · {tr('optional')}</Text>}</Text>
       {children}
     </View>
   )
