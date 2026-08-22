@@ -1,0 +1,71 @@
+appId: com.zaggy887.strengthhub
+tags:
+  # Kept OUT of the `smoke` CI gate until validated on a real device (the swipe
+  # segment needs on-device tuning). Promote to `smoke` after the first green run.
+  - onboarding
+---
+# JOURNEY: first-run Welcome tour (screens/WelcomeTour). On a clean-state DEMO launch the
+# four-card tour floats over the dashboard, personalised from the seeded user (name "Alex",
+# goal build-muscle, 5 days a week). This asserts it: appears on first run, personalises the
+# Welcome + Train cards, advances by BOTH tap and swipe, swaps the final CTA, dismisses to
+# reveal the dashboard, and does NOT reappear on the next launch (persisted "seen once").
+#
+# Launches directly (NOT via subflows/boot.yaml) because boot dismisses the tour; this flow
+# needs it up. What Maestro CANNOT prove is on the manual on-device checklist in the README:
+# the haptic tick/thud, the SVG radial overlay, and the light-theme scrim.
+
+# --- Step 1: Welcome, personalised from the profile ---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Skip tour"
+    timeout: 120000
+# TODO (on device): a build with no first name shows the fallback "You're all set!".
+- assertVisible: "Alex, you're all set!"
+- assertVisible: "Next"
+
+# --- Advance by TAP through all four steps, asserting each card's copy ---
+- tapOn: "Next"
+# Train card: goal phrase + day count both pulled from the profile.
+- assertVisible: "Built for building muscle, 5 days a week"
+- tapOn: "Next"
+- assertVisible: "Eat well without tracking your meals"
+- tapOn: "Next"
+- assertVisible: "Train with friends"
+# Last step swaps the primary button from "Next" to the finish CTA.
+- assertVisible: "Let's get started"
+
+# --- Finishing reveals the dashboard ---
+- tapOn: "Let's get started"
+- extendedWaitUntil:
+    notVisible: "Skip tour"
+    timeout: 10000
+- assertVisible: "Dashboard"
+
+# --- Shows once: relaunch WITHOUT clearing state; the tour must not return ---
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible: "Dashboard"
+    timeout: 120000
+- assertNotVisible: "Skip tour"
+
+# --- Swipe navigation on a fresh tour (left = next). Gesture start is anchored on the card
+#     via `from` so the pan lands on the card, not the surrounding scrim. TODO (on device):
+#     swipe distance/velocity may need tuning for react-native-gesture-handler on the emulator. ---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Skip tour"
+    timeout: 120000
+- swipe:
+    direction: LEFT
+    from:
+      text: "Next"
+- assertVisible: "Built for building muscle, 5 days a week"
+# Swipe back (right = previous) returns to the Welcome card.
+- swipe:
+    direction: RIGHT
+    from:
+      text: "Next"
+- assertVisible: "Alex, you're all set!"

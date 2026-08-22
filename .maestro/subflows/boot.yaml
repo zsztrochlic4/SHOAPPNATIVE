@@ -12,3 +12,16 @@ appId: com.zaggy887.strengthhub
     # paint (JS bundle init + demo seed). It only waits as long as needed, so a fast
     # local run is unaffected; the large ceiling just absorbs CI variance.
     timeout: 120000
+# The first-run Welcome tour (screens/WelcomeTour) floats over the dashboard on a
+# clean-state launch. Dismiss it here so every downstream flow lands on an interactive
+# dashboard instead of tapping the tour's scrim. No-op once it has been dismissed, so
+# this stays correct whether or not the tour is showing. The tour itself is exercised
+# directly by flows/08_welcome_tour.yaml.
+- runFlow:
+    when:
+      visible: "Skip tour"
+    commands:
+      - tapOn: "Skip tour"
+      - extendedWaitUntil:
+          notVisible: "Skip tour"
+          timeout: 10000
