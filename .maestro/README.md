@@ -47,12 +47,31 @@ maestro test .maestro -e APP_ID=com.zaggy887.strengthhub   # (then use ${APP_ID}
 | Community | `05_community_groups` | inner segments + settings |
 | Background / restart | `06_background_restart` | resume + cold restart persistence |
 | Accessibility labels | `07_accessibility_labels` | controls reachable by accessibilityLabel |
+| First-run Welcome tour | `08_welcome_tour` | four cards, name/goal personalisation, tap + swipe nav, dismissal + shows-once persistence |
+
+> **Note:** the first-run Welcome tour (`screens/WelcomeTour`) now floats over the dashboard on a
+> clean-state launch, so `subflows/boot.yaml` dismisses it (taps **Skip tour** when present) before
+> handing control to a flow. `08_welcome_tour` launches directly instead, so it can drive the tour.
 
 **Still TODO to complete the 18-journey matrix** (need a device + fixtures): empty / loading / error
 / offline (airplane-mode toggle) / large-dataset / write-conflict states, plus the full a11y passes
 Maestro can't do directly — **VoiceOver/TalkBack** swipe order, **200% dynamic type**, **contrast**,
 and **reduced-motion** (use Xcode Accessibility Inspector / Android Accessibility Scanner + an
 XCUITest/Espresso audit for those).
+
+### Welcome tour — manual on-device checklist
+
+`08_welcome_tour` proves the structure (appears, personalises, tap + swipe navigation, dismissal,
+shows-once). Maestro **cannot** verify these — check them by hand on a device once:
+
+- **Haptics** — a light `tick` on Next/swipe-commit and a firmer `thud` on finish/skip.
+- **Radial overlay** — each card's SVG dark radial overlay renders (text stays legible toward the
+  bottom-right) and the per-step base colour cross-fades on step change.
+- **Scrim** — the dashboard is dimmed behind the card in **both** the dark and the light theme.
+- **Reduced motion** — with the OS "Reduce Motion" on, the entrance/step/dot animations collapse to
+  their final state instantly (no card rise, no cross-fade), and navigation still works.
+- **Entrance from checkout** — after a real Stripe checkout the card rises over an already-painted
+  dashboard (no flash, no extra screen).
 
 ## Auth (non-demo builds)
 
