@@ -5,6 +5,7 @@ import Svg, { Path, Rect, Line, Circle } from 'react-native-svg'
 import { LinearGradient } from 'expo-linear-gradient'
 import { PressableScale } from '../components/PressableScale'
 import { cssVars, useThemeName } from '../theme'
+import { useT } from '../lib/useT'
 import { tick, thud } from '../lib/haptics'
 import { startCheckout, openBillingPortal } from '../lib/billing'
 import { iapActive, purchasePlan, restorePurchases } from '../lib/iap'
@@ -170,14 +171,15 @@ const MORE_BENEFITS: Benefit[] = [
 ]
 
 function BenefitRow({ tok, benefit, first }: { tok: Tok; benefit: Benefit; first?: boolean }) {
+  const tr = useT()
   return (
     <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center', paddingVertical: 17, borderTopWidth: first ? 0 : 1, borderTopColor: tok.rgb('--fg', 0.06) }}>
       <View style={{ width: 42, height: 42, borderRadius: 999, flexShrink: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: tok.rgb(benefit.token, 0.16) }}>
         <BenefitIcon kind={benefit.kind} color={tok.rgb(benefit.token)} />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={{ fontSize: 15.5, fontWeight: '700', color: tok.rgb('--fg') }}>{benefit.title}</Text>
-        <Text style={{ marginTop: 3, fontSize: 13.5, lineHeight: 19, color: tok.rgb('--fg', 0.52) }}>{benefit.desc}</Text>
+        <Text style={{ fontSize: 15.5, fontWeight: '700', color: tok.rgb('--fg') }}>{tr(`pw.benefit.${benefit.kind}.title`)}</Text>
+        <Text style={{ marginTop: 3, fontSize: 13.5, lineHeight: 19, color: tok.rgb('--fg', 0.52) }}>{tr(`pw.benefit.${benefit.kind}.desc`)}</Text>
       </View>
     </View>
   )
@@ -225,6 +227,7 @@ function PlanTab({
 
 export function Paywall({ email, onBack, onSignOut }: { email?: string; onBack?: () => void; onSignOut?: () => void }) {
   const tok = useTok()
+  const tr = useT()
   const insets = useSafeAreaInsets()
   const reduced = useReducedMotion()
   const [plan, setPlan] = useState<PlanId>(DEFAULT_PLAN)
@@ -294,7 +297,7 @@ export function Paywall({ email, onBack, onSignOut }: { email?: string; onBack?:
         else if (outcome === 'cancel' || outcome === 'dismiss') setBusy(false)
       }
     } catch (e) {
-      setError((e as Error)?.message ?? 'Could not start checkout. Please try again.')
+      setError((e as Error)?.message ?? tr('pw.errCheckout'))
       setBusy(false)
     }
   }
@@ -306,20 +309,20 @@ export function Paywall({ email, onBack, onSignOut }: { email?: string; onBack?:
       if (iapActive()) {
         const { entitled } = await restorePurchases()
         if (entitled) setConfirming(true)
-        else setError('No existing subscription found to restore.')
+        else setError(tr('pw.errNoSub'))
       } else {
         await openBillingPortal()
       }
     } catch (e) {
-      setError('No existing subscription found to restore.')
+      setError(tr('pw.errNoSub'))
     }
   }
 
   const openDoc = (key: LegalDocKey) => { tick(); setLegalDoc(key) }
 
-  const ctaLabel = isAnnual ? `Get 12 months for ${BILLING_OFFER.annual.totalLabel}` : `Start my ${BILLING_OFFER.weekly.trialWeeks}-week free trial`
-  const footerLine1 = isAnnual ? `${BILLING_OFFER.annual.totalLabel} today, ${BILLING_OFFER.annual.weeks} weeks of access` : `$0 today, then ${BILLING_OFFER.weekly.perWeekLabel} from ${billDate}`
-  const footerLine2 = isAnnual ? 'Just $1.73/week, billed yearly. Renews at $90.' : `Cancel before ${billDate} and pay nothing.`
+  const ctaLabel = isAnnual ? tr('pw.ctaAnnual', { price: BILLING_OFFER.annual.totalLabel }) : tr('pw.ctaTrial', { weeks: BILLING_OFFER.weekly.trialWeeks })
+  const footerLine1 = isAnnual ? tr('pw.footerAnnual1', { price: BILLING_OFFER.annual.totalLabel, weeks: BILLING_OFFER.annual.weeks }) : tr('pw.footerTrial1', { price: BILLING_OFFER.weekly.perWeekLabel, date: billDate })
+  const footerLine2 = isAnnual ? tr('pw.footerAnnual2', { price: BILLING_OFFER.annual.totalLabel }) : tr('pw.footerTrial2', { date: billDate })
 
   return (
     <View style={{ flex: 1, backgroundColor: tok.rgb('--ink-900') }}>
@@ -336,10 +339,10 @@ export function Paywall({ email, onBack, onSignOut }: { email?: string; onBack?:
                 <ChevronLeft color={tok.rgb('--fg', 0.7)} />
               </Pressable>
             ) : null}
-            <Text style={{ fontSize: 12.5, fontWeight: '800', letterSpacing: 1.6, textTransform: 'uppercase', color: tok.rgb('--brand-400') }}>Almost there</Text>
+            <Text style={{ fontSize: 12.5, fontWeight: '800', letterSpacing: 1.6, textTransform: 'uppercase', color: tok.rgb('--brand-400') }}>{tr('pw.almostThere')}</Text>
             {onSignOut ? (
               <Pressable onPress={() => { tick(); onSignOut() }} hitSlop={8} accessibilityRole="button" accessibilityLabel="Sign out" style={{ marginLeft: 'auto', paddingHorizontal: 8, paddingVertical: 6 }}>
-                <Text style={{ fontSize: 13.5, fontWeight: '700', color: tok.rgb('--fg', 0.5) }}>Sign out</Text>
+                <Text style={{ fontSize: 13.5, fontWeight: '700', color: tok.rgb('--fg', 0.5) }}>{tr('pw.signOut')}</Text>
               </Pressable>
             ) : null}
           </View>
@@ -347,8 +350,8 @@ export function Paywall({ email, onBack, onSignOut }: { email?: string; onBack?:
 
         {/* title */}
         <Rise delay={60} style={{ marginTop: 12 }}>
-          <Text style={{ fontSize: 32, lineHeight: 35, fontWeight: '800', letterSpacing: -0.6, color: tok.rgb('--fg') }}>Your first 4 weeks are on us</Text>
-          <Text style={{ marginTop: 11, fontSize: 15.5, lineHeight: 22, color: tok.rgb('--fg', 0.55) }}>Prove it to yourself before you pay a thing.</Text>
+          <Text style={{ fontSize: 32, lineHeight: 35, fontWeight: '800', letterSpacing: -0.6, color: tok.rgb('--fg') }}>{tr('pw.title')}</Text>
+          <Text style={{ marginTop: 11, fontSize: 15.5, lineHeight: 22, color: tok.rgb('--fg', 0.55) }}>{tr('pw.subtitle')}</Text>
         </Rise>
 
         {/* pricing card */}
@@ -356,8 +359,8 @@ export function Paywall({ email, onBack, onSignOut }: { email?: string; onBack?:
           <View style={{ borderRadius: 24, backgroundColor: tok.rgb('--ink-800'), borderWidth: 1, borderColor: tok.rgb('--fg', 0.06), overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 24, shadowOffset: { width: 0, height: 8 }, elevation: 6 }}>
             {/* plan selector */}
             <View style={{ flexDirection: 'row', gap: 8, padding: 14, backgroundColor: tok.rgb('--ink-900', 0.4), borderBottomWidth: 1, borderBottomColor: tok.rgb('--fg', 0.07) }}>
-              <PlanTab tok={tok} selected={!isAnnual} onPress={() => selectPlan('weekly')} line1="Free trial" line2={`Then ${BILLING_OFFER.weekly.perWeekLabel}`} />
-              <PlanTab tok={tok} selected={isAnnual} onPress={() => selectPlan('annual')} line1="52 weeks" line2="$90 upfront" ribbon="SAVE 13%" />
+              <PlanTab tok={tok} selected={!isAnnual} onPress={() => selectPlan('weekly')} line1={tr('pw.freeTrial')} line2={tr('pw.thenPrice', { price: BILLING_OFFER.weekly.perWeekLabel })} />
+              <PlanTab tok={tok} selected={isAnnual} onPress={() => selectPlan('annual')} line1={tr('pw.weeks52')} line2={tr('pw.upfront90')} ribbon={tr('pw.save13')} />
             </View>
 
             {/* price band */}
@@ -368,7 +371,7 @@ export function Paywall({ email, onBack, onSignOut }: { email?: string; onBack?:
                 end={{ x: 1, y: 1 }}
                 style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}
               />
-              <Text style={{ fontSize: 11.5, fontWeight: '800', letterSpacing: 1.3, textTransform: 'uppercase', color: tok.rgb('--fg', 0.5) }}>Due today</Text>
+              <Text style={{ fontSize: 11.5, fontWeight: '800', letterSpacing: 1.3, textTransform: 'uppercase', color: tok.rgb('--fg', 0.5) }}>{tr('pw.dueToday')}</Text>
 
               {isAnnual ? (
                 <>
@@ -376,18 +379,18 @@ export function Paywall({ email, onBack, onSignOut }: { email?: string; onBack?:
                     <Text style={{ fontSize: 44, fontWeight: '800', letterSpacing: -1, lineHeight: 46, color: tok.rgb('--brand-400') }}>$90</Text>
                     <Text style={{ fontSize: 15, fontWeight: '700', color: tok.rgb('--fg', 0.45), textDecorationLine: 'line-through', marginBottom: 6 }}>$104</Text>
                   </View>
-                  <Text style={{ marginTop: 8, fontSize: 13.5, color: tok.rgb('--fg', 0.55) }}>One payment for 52 weeks, just $1.73/week.</Text>
+                  <Text style={{ marginTop: 8, fontSize: 13.5, color: tok.rgb('--fg', 0.55) }}>{tr('pw.onePayment')}</Text>
                 </>
               ) : (
                 <>
                   <Text style={{ marginTop: 8, fontSize: 44, fontWeight: '800', letterSpacing: -1, lineHeight: 46, color: tok.rgb('--brand-400') }}>$0.00</Text>
-                  <Text style={{ marginTop: 8, fontSize: 13.5, color: tok.rgb('--fg', 0.55) }}>Then $2/week starting {billDate}.</Text>
+                  <Text style={{ marginTop: 8, fontSize: 13.5, color: tok.rgb('--fg', 0.55) }}>{tr('pw.thenStarting', { price: BILLING_OFFER.weekly.perWeekLabel, date: billDate })}</Text>
 
                   {/* trial timeline */}
                   <View style={{ marginTop: 20, flexDirection: 'row' }}>
                     <View style={{ position: 'absolute', left: '16%', right: '16%', top: 5, height: 2, backgroundColor: tok.rgb('--fg', 0.14) }} />
-                    <TimelineNode tok={tok} label="Today" value="$0" valueColor={tok.rgb('--fg')} dot={<View style={{ width: 12, height: 12, borderRadius: 999, backgroundColor: tok.rgb('--brand-400') }} />} />
-                    <TimelineNode tok={tok} label="Weeks 1-4" value="Free" valueColor={tok.rgb('--brand-400')} dot={<View style={{ width: 12, height: 12, borderRadius: 999, backgroundColor: tok.rgb('--ink-800'), borderWidth: 2, borderColor: tok.rgb('--brand-400') }} />} />
+                    <TimelineNode tok={tok} label={tr('pw.today')} value="$0" valueColor={tok.rgb('--fg')} dot={<View style={{ width: 12, height: 12, borderRadius: 999, backgroundColor: tok.rgb('--brand-400') }} />} />
+                    <TimelineNode tok={tok} label={tr('pw.weeks1to4')} value={tr('pw.free')} valueColor={tok.rgb('--brand-400')} dot={<View style={{ width: 12, height: 12, borderRadius: 999, backgroundColor: tok.rgb('--ink-800'), borderWidth: 2, borderColor: tok.rgb('--brand-400') }} />} />
                     <TimelineNode tok={tok} label={billDate} value="$2/wk" valueColor={tok.rgb('--fg')} dot={<View style={{ width: 12, height: 12, borderRadius: 999, backgroundColor: tok.rgb('--ink-600'), borderWidth: 2, borderColor: tok.rgb('--fg', 0.2) }} />} />
                   </View>
                 </>
@@ -409,7 +412,7 @@ export function Paywall({ email, onBack, onSignOut }: { email?: string; onBack?:
                 accessibilityRole="button"
                 style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 15, borderTopWidth: 1, borderTopColor: tok.rgb('--fg', 0.06) }}
               >
-                <Text style={{ fontSize: 13.5, fontWeight: '700', color: tok.rgb('--brand-400') }}>{showMore ? 'Show less' : 'See everything you unlock (3 more)'}</Text>
+                <Text style={{ fontSize: 13.5, fontWeight: '700', color: tok.rgb('--brand-400') }}>{showMore ? tr('pw.showLess') : tr('pw.seeEverything')}</Text>
                 <Animated.View style={{ transform: [{ rotate: chevron.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] }) }] }}>
                   <ChevronDown color={tok.rgb('--brand-400')} />
                 </Animated.View>
@@ -422,20 +425,20 @@ export function Paywall({ email, onBack, onSignOut }: { email?: string; onBack?:
         <Rise delay={200} style={{ marginTop: 16 }}>
           <View style={{ padding: 22, borderRadius: 20, backgroundColor: tok.rgb('--ink-800'), borderWidth: 1, borderColor: tok.rgb('--fg', 0.06), overflow: 'hidden' }}>
             <Text style={{ position: 'absolute', top: -14, right: 16, fontSize: 90, fontWeight: '800', color: tok.rgb('--fg', 0.06) }}>{'”'}</Text>
-            <Text style={{ fontSize: 11.5, fontWeight: '800', letterSpacing: 1.3, textTransform: 'uppercase', color: tok.rgb('--fg', 0.4) }}>What members say</Text>
+            <Text style={{ fontSize: 11.5, fontWeight: '800', letterSpacing: 1.3, textTransform: 'uppercase', color: tok.rgb('--fg', 0.4) }}>{tr('pw.membersSay')}</Text>
 
             <Text style={{ marginTop: 14, fontSize: 16, lineHeight: 24, color: tok.rgb('--fg', 0.92) }}>
-              {'“'}I used to bookmark workouts from Instagram Reels that I always lost. Now I open StrengthHub and it <Text style={{ fontWeight: '600', color: tok.rgb('--fg') }}>simply tells me what to do</Text>.{'”'}
+              {'“'}{tr('pw.t1')}{'”'}
             </Text>
             <Text style={{ marginTop: 14, fontSize: 14, fontWeight: '600', color: tok.rgb('--fg') }}>Jedidiah O.</Text>
-            <Text style={{ marginTop: 2, fontSize: 13, color: tok.rgb('--fg', 0.5) }}>StrengthHub member</Text>
+            <Text style={{ marginTop: 2, fontSize: 13, color: tok.rgb('--fg', 0.5) }}>{tr('pw.member')}</Text>
 
             <View style={{ marginTop: 20, paddingTop: 20, borderTopWidth: 1, borderTopColor: tok.rgb('--fg', 0.08) }}>
               <Text style={{ fontSize: 16, lineHeight: 24, color: tok.rgb('--fg', 0.92) }}>
-                {'“'}After six years with an in-person trainer I was skeptical about switching, but the AI coach <Text style={{ fontWeight: '600', color: tok.rgb('--fg') }}>helps me hit my goals at a fraction of the cost</Text>.{'”'}
+                {'“'}{tr('pw.t2')}{'”'}
               </Text>
               <Text style={{ marginTop: 14, fontSize: 14, fontWeight: '600', color: tok.rgb('--fg') }}>Jason A.</Text>
-              <Text style={{ marginTop: 2, fontSize: 13, color: tok.rgb('--fg', 0.5) }}>StrengthHub member</Text>
+              <Text style={{ marginTop: 2, fontSize: 13, color: tok.rgb('--fg', 0.5) }}>{tr('pw.member')}</Text>
             </View>
           </View>
         </Rise>
@@ -471,7 +474,7 @@ export function Paywall({ email, onBack, onSignOut }: { email?: string; onBack?:
           {busy || confirming ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <ActivityIndicator color={tok.rgb('--ink-900')} />
-              <Text style={{ fontSize: 17, fontWeight: '800', color: tok.rgb('--ink-900') }}>{confirming ? (isAnnual ? 'Confirming your plan…' : 'Confirming your trial…') : 'Opening secure checkout…'}</Text>
+              <Text style={{ fontSize: 17, fontWeight: '800', color: tok.rgb('--ink-900') }}>{confirming ? (isAnnual ? tr('pw.confirmingPlan') : tr('pw.confirmingTrial')) : tr('pw.openingCheckout')}</Text>
             </View>
           ) : (
             <Text style={{ fontSize: 17, fontWeight: '800', letterSpacing: -0.2, color: tok.rgb('--ink-900') }}>{ctaLabel}</Text>
@@ -482,18 +485,18 @@ export function Paywall({ email, onBack, onSignOut }: { email?: string; onBack?:
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 12 }}>
           <PayChip tok={tok}><AppleGlyph color={tok.rgb('--fg', 0.8)} /><Text style={{ fontSize: 13, fontWeight: '600', color: tok.rgb('--fg', 0.8) }}>Pay</Text></PayChip>
           <PayChip tok={tok}><Text style={{ fontSize: 13, fontWeight: '700', color: tok.rgb('--fg', 0.8) }}>G Pay</Text></PayChip>
-          <PayChip tok={tok}><CardIcon color={tok.rgb('--fg', 0.8)} /><Text style={{ fontSize: 13, fontWeight: '600', color: tok.rgb('--fg', 0.8) }}>Card</Text></PayChip>
+          <PayChip tok={tok}><CardIcon color={tok.rgb('--fg', 0.8)} /><Text style={{ fontSize: 13, fontWeight: '600', color: tok.rgb('--fg', 0.8) }}>{tr('pw.payCard')}</Text></PayChip>
         </View>
 
         {/* legal + restore */}
         <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 12 }}>
-          <Pressable onPress={() => openDoc('terms')} hitSlop={10} accessibilityRole="link" accessibilityLabel="Terms of Service"><Text style={{ fontSize: 12, color: tok.rgb('--fg', 0.4) }}>Terms</Text></Pressable>
+          <Pressable onPress={() => openDoc('terms')} hitSlop={10} accessibilityRole="link" accessibilityLabel="Terms of Service"><Text style={{ fontSize: 12, color: tok.rgb('--fg', 0.4) }}>{tr('pw.terms')}</Text></Pressable>
           <Text style={{ fontSize: 12, color: tok.rgb('--fg', 0.28) }}>{'   ·   '}</Text>
-          <Pressable onPress={() => openDoc('privacy')} hitSlop={10} accessibilityRole="link" accessibilityLabel="Privacy Policy"><Text style={{ fontSize: 12, color: tok.rgb('--fg', 0.4) }}>Privacy</Text></Pressable>
+          <Pressable onPress={() => openDoc('privacy')} hitSlop={10} accessibilityRole="link" accessibilityLabel="Privacy Policy"><Text style={{ fontSize: 12, color: tok.rgb('--fg', 0.4) }}>{tr('pw.privacy')}</Text></Pressable>
           <Text style={{ fontSize: 12, color: tok.rgb('--fg', 0.28) }}>{'   ·   '}</Text>
-          <Pressable onPress={restore} hitSlop={10} accessibilityRole="button" accessibilityLabel="Restore an existing subscription"><Text style={{ fontSize: 12, color: tok.rgb('--fg', 0.4) }}>Restore</Text></Pressable>
+          <Pressable onPress={restore} hitSlop={10} accessibilityRole="button" accessibilityLabel="Restore an existing subscription"><Text style={{ fontSize: 12, color: tok.rgb('--fg', 0.4) }}>{tr('pw.restore')}</Text></Pressable>
           <Text style={{ fontSize: 12, color: tok.rgb('--fg', 0.28) }}>{'   ·   '}</Text>
-          <Text style={{ fontSize: 12, color: tok.rgb('--fg', 0.4) }}>Secured by Stripe</Text>
+          <Text style={{ fontSize: 12, color: tok.rgb('--fg', 0.4) }}>{tr('pw.securedStripe')}</Text>
         </View>
       </View>
 
