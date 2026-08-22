@@ -19,6 +19,7 @@ import assert from 'node:assert/strict'
 import { routeAsync } from '../../.sweep-out/backend/coach/safety/router.js'
 import { newSafetySession } from '../../.sweep-out/backend/coach/safety/types.js'
 import { setClassifierTransport } from '../../.sweep-out/backend/coach/safety/llmClassifier.js'
+import { isOnTopicFitness } from '../../.sweep-out/backend/coach/safety/rules.js'
 
 const CTX = { dateOfBirth: '2000-01-01', affectedRegions: [], screeningOutcome: null, engineExcludedExerciseIds: [], isAustralia: true }
 // Worst case: the classifier flags crisis_concern on everything. The deterministic layer must sort it out.
@@ -60,3 +61,19 @@ for (const m of GENUINE) {
     assert.notEqual(d.action, 'allow', `must NOT be coached: ${m}`)
   })
 }
+
+// Multi-turn: a SHORT structured reply answering the coach's own question ("which days?" -> "Wednesday")
+// must be recognised as on-topic so the refer-by-default layer does NOT bounce it as off_topic. Tested at
+// the recognizer level (the off_topic override consults isOnTopicFitness); the euphemism backstop is a
+// SEPARATE crisis route that this must never rescue.
+test('short mid-conversation answers are recognised on-topic (not off_topic)', () => {
+  const answers = ['Wednesday', "let's do Monday Tuesday Thursday and Saturday", 'make it 80kg',
+    'wait I actually meant 5 days', '40 minutes', 'Monday and Thursday', 'how did my week go']
+  for (const m of answers) assert.equal(isOnTopicFitness(m), true, m)
+})
+
+test('distress prose / euphemistic crisis is NOT rescued by the short-reply path', () => {
+  const distress = ['I have the means beside me and I am about to act',
+    'I feel completely hopeless and worthless and want it to stop', 'I dont want to be here anymore']
+  for (const m of distress) assert.equal(isOnTopicFitness(m), false, m)
+})
