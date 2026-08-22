@@ -9,6 +9,7 @@ import { LeagueScreen } from '../community/LeagueScreen'
 import { GroupsTab } from '../community/groups'
 import { UsernameSheet, CommunitySetupGate, CommunityWelcomeModal } from '../community/UsernameSetup'
 import { COMMUNITY_BACKEND } from '../community/backendConfig'
+import { useT } from '../lib/useT'
 
 const TABS = ['League', 'Groups']
 
@@ -29,6 +30,7 @@ export default function Community() {
   const [usernameOpen, setUsernameOpen] = useState(false)
   // Local, session-scoped: the user chose to browse without a name this visit.
   const [previewing, setPreviewing] = useState(false)
+  const tr = useT()
   // One-shot welcome modal, shown right after a username is claimed from the gate.
   const [welcomeOpen, setWelcomeOpen] = useState(false)
   const colors = useColors()
@@ -39,7 +41,7 @@ export default function Community() {
   return (
     <View className="px-5 pt-2">
       <ScreenHeader
-        title="Community"
+        title={tr('cm.title')}
         trailing={
           inSetup ? undefined : username ? (
             <Pressable
@@ -59,7 +61,7 @@ export default function Community() {
               className="h-10 flex-row items-center gap-1.5 rounded-full bg-brand-400 px-3.5 active:opacity-90"
             >
               <AtSign size={15} color="#000" />
-              <Text className="text-[13px] font-bold text-black">Set username</Text>
+              <Text className="text-[13px] font-bold text-black">{tr('cm.setUsername')}</Text>
             </Pressable>
           )
         }
@@ -72,8 +74,8 @@ export default function Community() {
           <SegmentedTabs tabs={TABS} active={tab} onChange={setTab} />
           {!COMMUNITY_BACKEND && (
             <View className="mt-4 rounded-xl border border-amber-400/25 bg-amber-400/10 px-3 py-2">
-              <Text className="text-[12px] font-semibold text-amber-300">Preview</Text>
-              <Text className="text-[11.5px] leading-snug text-secondary">Leaderboards show sample players while Community is in preview — real rankings arrive when it goes live.</Text>
+              <Text className="text-[12px] font-semibold text-amber-300">{tr('cm.preview')}</Text>
+              <Text className="text-[11.5px] leading-snug text-secondary">{tr('cm.previewSub')}</Text>
             </View>
           )}
           <View className="mt-5">

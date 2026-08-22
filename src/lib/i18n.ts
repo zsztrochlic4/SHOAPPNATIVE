@@ -37,6 +37,11 @@ type Dict = Record<string, string>
 const en: Dict = {
   // dashboard
   // paywall
+  // community
+  "cm.title": "Community",
+  "cm.setUsername": "Set username",
+  "cm.preview": "Preview",
+  "cm.previewSub": "Leaderboards show sample players while Community is in preview — real rankings arrive when it goes live.",
   // nutrition
   "nt.nothingChoose": "Nothing to choose from yet.",
   "nt.nutrition": "Nutrition",
@@ -248,6 +253,11 @@ const en: Dict = {
 const zh: Dict = {
   // dashboard
   // paywall
+  // community
+  "cm.title": "社区",
+  "cm.setUsername": "设置用户名",
+  "cm.preview": "预览",
+  "cm.previewSub": "社区处于预览阶段，排行榜显示的是示例玩家——正式上线后将显示真实排名。",
   // nutrition
   "nt.nothingChoose": "暂无可选项。",
   "nt.nutrition": "营养",
@@ -456,6 +466,11 @@ const zh: Dict = {
 const hi: Dict = {
   // dashboard
   // paywall
+  // community
+  "cm.title": "कम्युनिटी",
+  "cm.setUsername": "यूज़रनेम सेट करें",
+  "cm.preview": "प्रीव्यू",
+  "cm.previewSub": "कम्युनिटी प्रीव्यू में है इसलिए लीडरबोर्ड नमूना खिलाड़ी दिखाते हैं — लाइव होने पर असली रैंकिंग आएगी।",
   // nutrition
   "nt.nothingChoose": "अभी चुनने के लिए कुछ नहीं।",
   "nt.nutrition": "पोषण",
@@ -664,6 +679,11 @@ const hi: Dict = {
 const ar: Dict = {
   // dashboard
   // paywall
+  // community
+  "cm.title": "المجتمع",
+  "cm.setUsername": "تعيين اسم المستخدم",
+  "cm.preview": "معاينة",
+  "cm.previewSub": "لوحات الصدارة تعرض لاعبين تجريبيين أثناء المعاينة — تصل الترتيبات الحقيقية عند الإطلاق.",
   // nutrition
   "nt.nothingChoose": "لا شيء للاختيار بعد.",
   "nt.nutrition": "التغذية",
@@ -872,6 +892,11 @@ const ar: Dict = {
 const vi: Dict = {
   // dashboard
   // paywall
+  // community
+  "cm.title": "Cộng đồng",
+  "cm.setUsername": "Đặt tên người dùng",
+  "cm.preview": "Xem trước",
+  "cm.previewSub": "Bảng xếp hạng hiển thị người chơi mẫu khi Cộng đồng đang xem trước — xếp hạng thật sẽ có khi ra mắt.",
   // nutrition
   "nt.nothingChoose": "Chưa có gì để chọn.",
   "nt.nutrition": "Dinh dưỡng",
