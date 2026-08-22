@@ -572,6 +572,7 @@ function Spinner({ size = 60, thickness = 4 }: { size?: number; thickness?: numb
 /** Premium segmented progress + section label (ProgressHeader). */
 function ProgressHeader({ sectionIdx, sectionProgress, onBack, showBack = true }: { sectionIdx: number; sectionProgress: number; onBack: () => void; showBack?: boolean }) {
   const tok = useTok()
+  const t = useT()
   // The header remounts with each step (Stage keys the whole screen), so start
   // each bar AT its current fill — mirroring CSS, which only transitions
   // changes after mount — and animate only subsequent in-place updates.
@@ -599,7 +600,7 @@ function ProgressHeader({ sectionIdx, sectionProgress, onBack, showBack = true }
         </View>
         <View style={{ width: 32 }} />
       </View>
-      <Text style={{ marginTop: 8, marginLeft: 34, fontSize: 12.5, fontWeight: '600', letterSpacing: 0.7, textTransform: 'uppercase', color: tok.rgb('--brand-300') }}>{SECTIONS[sectionIdx]?.label}</Text>
+      <Text style={{ marginTop: 8, marginLeft: 34, fontSize: 12.5, fontWeight: '600', letterSpacing: 0.7, textTransform: 'uppercase', color: tok.rgb('--brand-300') }}>{t(SECTIONS[sectionIdx]?.label ?? '')}</Text>
     </View>
   )
 }
@@ -607,11 +608,15 @@ function ProgressHeader({ sectionIdx, sectionProgress, onBack, showBack = true }
 /** Question heading block (QHeader) with optional chip. */
 function QHeader({ title, sub, chip }: { title: string; sub?: string; chip?: ReactNode }) {
   const tok = useTok()
+  // Translate by the English string itself as the key: a translated locale supplies the value,
+  // and anything without a translation (incl. the safety-screening questions, deliberately left
+  // English until native/clinical review) falls back to the English key unchanged.
+  const t = useT()
   return (
     <View style={{ marginBottom: 22 }}>
       {chip ? <Reveal delay={40} style={{ marginBottom: 12, alignSelf: 'flex-start' }}>{chip}</Reveal> : null}
-      <Reveal delay={60}><Text style={{ fontSize: 27, lineHeight: 32, fontWeight: '800', letterSpacing: -0.5, color: tok.rgb('--fg') }}>{title}</Text></Reveal>
-      {sub ? <Reveal delay={130}><Text style={{ marginTop: 10, fontSize: 15, lineHeight: 22, color: tok.rgb('--fg', 0.55) }}>{sub}</Text></Reveal> : null}
+      <Reveal delay={60}><Text style={{ fontSize: 27, lineHeight: 32, fontWeight: '800', letterSpacing: -0.5, color: tok.rgb('--fg') }}>{t(title)}</Text></Reveal>
+      {sub ? <Reveal delay={130}><Text style={{ marginTop: 10, fontSize: 15, lineHeight: 22, color: tok.rgb('--fg', 0.55) }}>{t(sub)}</Text></Reveal> : null}
     </View>
   )
 }
@@ -619,12 +624,13 @@ function QHeader({ title, sub, chip }: { title: string; sub?: string; chip?: Rea
 /** Bottom action bar with a gradient scrim, optional hint + skip link. */
 function ActionBar({ onPress, disabled, label = 'Continue', onSkip, skipLabel = 'Skip', hint }: { onPress: () => void; disabled?: boolean; label?: string; onSkip?: () => void; skipLabel?: string; hint?: string }) {
   const tok = useTok()
+  const t = useT()
   const scale = useRef(new Animated.Value(1)).current
   return (
     <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 26 }}>
       {/* prototype scrim: linear-gradient(to top, ink-900 62%, transparent) */}
       <LinearGradient pointerEvents="none" colors={[tok.rgb('--ink-900', 0), tok.rgb('--ink-900'), tok.rgb('--ink-900')]} locations={[0, 0.38, 1]} style={{ position: 'absolute', top: -26, left: 0, right: 0, bottom: 0 }} />
-      {hint ? <Text style={{ textAlign: 'center', fontSize: 13, color: tok.rgb('--fg', 0.5), marginBottom: 10 }}>{hint}</Text> : null}
+      {hint ? <Text style={{ textAlign: 'center', fontSize: 13, color: tok.rgb('--fg', 0.5), marginBottom: 10 }}>{t(hint)}</Text> : null}
       <Animated.View style={{ transform: [{ scale }] }}>
         <Pressable
           disabled={disabled}
@@ -636,12 +642,12 @@ function ActionBar({ onPress, disabled, label = 'Continue', onSkip, skipLabel = 
           onPress={() => { if (!disabled) { thud(); onPress() } }}
           style={{ height: 54, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: disabled ? tok.rgb('--fg', 0.09) : tok.rgb('--brand-400') }}
         >
-          <Text style={{ fontSize: 16, fontWeight: '700', color: disabled ? tok.rgb('--fg', 0.35) : '#08140a' }}>{label}</Text>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: disabled ? tok.rgb('--fg', 0.35) : '#08140a' }}>{t(label)}</Text>
         </Pressable>
       </Animated.View>
       {onSkip ? (
         <Pressable onPress={() => { tick(); onSkip() }} accessibilityRole="button" accessibilityLabel={skipLabel} style={{ height: 44, marginTop: 6, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ fontSize: 15, fontWeight: '600', color: tok.rgb('--fg', 0.5) }}>{skipLabel}</Text>
+          <Text style={{ fontSize: 15, fontWeight: '600', color: tok.rgb('--fg', 0.5) }}>{t(skipLabel)}</Text>
         </Pressable>
       ) : null}
     </View>
@@ -660,12 +666,13 @@ function Radio({ selected }: { selected: boolean }) {
 /** Simple single-select row (glyph + label + optional flag + radio). */
 function OptionRow({ label, glyph, flag, selected, onPress }: { label: string; glyph?: string; flag?: string; selected: boolean; onPress: () => void }) {
   const tok = useTok()
+  const t = useT()
   return (
-    <Pressable onPress={onPress} accessibilityRole="radio" accessibilityLabel={label} accessibilityState={{ selected, checked: selected }} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 17, paddingHorizontal: 18, borderRadius: 18, backgroundColor: selected ? tok.rgb('--brand-400', 0.12) : tok.rgb('--ink-800'), borderWidth: 1.5, borderColor: selected ? tok.rgb('--brand-400', 0.9) : tok.rgb('--fg', 0.06), transform: [{ scale: selected ? 1.005 : 1 }] }}>
+    <Pressable onPress={onPress} accessibilityRole="radio" accessibilityLabel={t(label)} accessibilityState={{ selected, checked: selected }} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 17, paddingHorizontal: 18, borderRadius: 18, backgroundColor: selected ? tok.rgb('--brand-400', 0.12) : tok.rgb('--ink-800'), borderWidth: 1.5, borderColor: selected ? tok.rgb('--brand-400', 0.9) : tok.rgb('--fg', 0.06), transform: [{ scale: selected ? 1.005 : 1 }] }}>
       {glyph ? <View style={{ width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: selected ? tok.rgb('--brand-400', 0.18) : tok.rgb('--fg', 0.06) }}><Text style={{ fontSize: 22, color: selected ? tok.rgb('--brand-300') : tok.rgb('--fg', 0.6) }}>{glyph}</Text></View> : null}
       <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 9 }}>
-        <Text style={{ fontSize: 16.5, fontWeight: '700', color: tok.rgb('--fg') }}>{label}</Text>
-        {flag ? <View style={{ paddingVertical: 3, paddingHorizontal: 8, borderRadius: 999, backgroundColor: tok.rgb('--brand-400', 0.16) }}><Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase', color: tok.rgb('--brand-300') }}>{flag}</Text></View> : null}
+        <Text style={{ fontSize: 16.5, fontWeight: '700', color: tok.rgb('--fg') }}>{t(label)}</Text>
+        {flag ? <View style={{ paddingVertical: 3, paddingHorizontal: 8, borderRadius: 999, backgroundColor: tok.rgb('--brand-400', 0.16) }}><Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase', color: tok.rgb('--brand-300') }}>{t(flag)}</Text></View> : null}
       </View>
       <Radio selected={selected} />
     </Pressable>
@@ -675,12 +682,13 @@ function OptionRow({ label, glyph, flag, selected, onPress }: { label: string; g
 /** Rich selection card (icon + title + description + radio). */
 function OptionCard({ icon, label, desc, selected, onPress }: { icon?: string; label: string; desc?: string; selected: boolean; onPress: () => void }) {
   const tok = useTok()
+  const t = useT()
   return (
     <Pressable onPress={onPress} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 15, paddingVertical: 17, paddingHorizontal: 17, borderRadius: 20, backgroundColor: selected ? tok.rgb('--brand-400', 0.12) : tok.rgb('--ink-800'), borderWidth: 1.5, borderColor: selected ? tok.rgb('--brand-400', 0.9) : tok.rgb('--fg', 0.06), transform: [{ scale: selected ? 1.005 : 1 }] }}>
       {icon ? <View style={{ width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: selected ? tok.rgb('--brand-400', 0.18) : tok.rgb('--fg', 0.06) }}><Icon name={icon} size={24} color={selected ? tok.rgb('--brand-300') : tok.rgb('--fg', 0.6)} /></View> : null}
       <View style={{ flex: 1, paddingTop: 1 }}>
-        <Text style={{ fontSize: 16.5, fontWeight: '700', color: tok.rgb('--fg') }}>{label}</Text>
-        {desc ? <Text style={{ fontSize: 13.5, lineHeight: 19.5, color: tok.rgb('--fg', 0.5), marginTop: 4 }}>{desc}</Text> : null}
+        <Text style={{ fontSize: 16.5, fontWeight: '700', color: tok.rgb('--fg') }}>{t(label)}</Text>
+        {desc ? <Text style={{ fontSize: 13.5, lineHeight: 19.5, color: tok.rgb('--fg', 0.5), marginTop: 4 }}>{t(desc)}</Text> : null}
       </View>
       <View style={{ paddingTop: 11 }}><Radio selected={selected} /></View>
     </Pressable>
@@ -690,10 +698,11 @@ function OptionCard({ icon, label, desc, selected, onPress }: { icon?: string; l
 /** Multi-select pill chip. */
 function SelectChip({ label, selected, disabled, onPress }: { label: string; selected: boolean; disabled?: boolean; onPress: () => void }) {
   const tok = useTok()
+  const t = useT()
   return (
     <Pressable disabled={disabled && !selected} onPress={onPress} style={{ flexDirection: 'row', alignItems: 'center', gap: 7, paddingVertical: 12, paddingHorizontal: 18, borderRadius: 999, backgroundColor: selected ? tok.rgb('--brand-400', 0.16) : tok.rgb('--ink-800'), borderWidth: 1.5, borderColor: selected ? tok.rgb('--brand-400', 0.85) : tok.rgb('--fg', 0.07), transform: [{ scale: selected ? 1.03 : 1 }] }}>
       {selected ? <Icon name="check" size={14} color={tok.rgb('--brand-300')} stroke={3} /> : null}
-      <Text style={{ fontSize: 15, fontWeight: '600', color: selected ? tok.rgb('--brand-300') : disabled ? tok.rgb('--fg', 0.28) : tok.rgb('--fg', 0.82) }}>{label}</Text>
+      <Text style={{ fontSize: 15, fontWeight: '600', color: selected ? tok.rgb('--brand-300') : disabled ? tok.rgb('--fg', 0.28) : tok.rgb('--fg', 0.82) }}>{t(label)}</Text>
     </Pressable>
   )
 }
@@ -1028,6 +1037,7 @@ function StepView({ step, answers, set, header, onContinue, onAdvance, onRestart
   step: Step; answers: Answers; set: SetFn; header: ReactNode; onContinue: () => void; onAdvance: () => void; onRestart: () => void
 }) {
   const tok = useTok()
+  const t = useT()
   if (!step) return null
 
   switch (step.type) {
@@ -1082,7 +1092,7 @@ function StepView({ step, answers, set, header, onContinue, onAdvance, onRestart
           <QHeader title={step.title} sub={step.sub}
             chip={step.max ? (
               <View style={{ paddingVertical: 5, paddingHorizontal: 12, borderRadius: 999, backgroundColor: atMax ? tok.rgb('--brand-400', 0.16) : tok.rgb('--fg', 0.08) }}>
-                <Text style={{ fontSize: 12.5, fontWeight: '700', color: atMax ? tok.rgb('--brand-300') : tok.rgb('--fg', 0.6) }}>{count}/{step.max} selected{atMax ? ' · limit reached' : ''}</Text>
+                <Text style={{ fontSize: 12.5, fontWeight: '700', color: atMax ? tok.rgb('--brand-300') : tok.rgb('--fg', 0.6) }}>{t('{count}/{max} selected', { count, max: step.max })}{atMax ? t(' · limit reached') : ''}</Text>
               </View>
             ) : undefined} />
           {step.weekday ? (
@@ -1100,16 +1110,16 @@ function StepView({ step, answers, set, header, onContinue, onAdvance, onRestart
               <Text style={{ fontSize: 14, fontWeight: '600', color: tok.rgb('--brand-300') }}>{daysMessage(answers)}</Text>
             </View>
           ) : null}
-          {step.weekday && step.note ? <Text style={{ marginTop: 12, fontSize: 13, lineHeight: 19.5, color: tok.rgb('--fg', 0.4) }}>{step.note}</Text> : null}
+          {step.weekday && step.note ? <Text style={{ marginTop: 12, fontSize: 13, lineHeight: 19.5, color: tok.rgb('--fg', 0.4) }}>{t(step.note)}</Text> : null}
           {step.selectNote && count > 0 ? (
             <View style={{ marginTop: 18, flexDirection: 'row', gap: 10, alignItems: 'flex-start', paddingVertical: 13, paddingHorizontal: 15, borderRadius: 14, backgroundColor: tok.rgb('--brand-400', 0.08), borderWidth: 1, borderColor: tok.rgb('--brand-400', 0.18) }}>
               <View style={{ marginTop: 1 }}><Icon name="shield" size={17} color={tok.rgb('--brand-300')} /></View>
-              <Text style={{ flex: 1, fontSize: 13.5, lineHeight: 19.6, fontWeight: '500', color: tok.rgb('--brand-300') }}>{step.selectNote}</Text>
+              <Text style={{ flex: 1, fontSize: 13.5, lineHeight: 19.6, fontWeight: '500', color: tok.rgb('--brand-300') }}>{t(step.selectNote)}</Text>
             </View>
           ) : null}
           {showOther ? (
             <View style={{ marginTop: 16 }}>
-              <FocusInput value={answers.activityOther} onChangeText={(t) => set('activityOther', t)} placeholder="What activity is it?" />
+              <FocusInput value={answers.activityOther} onChangeText={(v) => set('activityOther', v)} placeholder="What activity is it?" />
             </View>
           ) : null}
         </Shell>
@@ -1127,9 +1137,9 @@ function StepView({ step, answers, set, header, onContinue, onAdvance, onRestart
         <View style={{ flex: 1 }}>
           {header}
           <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 26 }}>
-            <Reveal delay={60}><Text style={{ fontSize: 12.5, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', color: tok.rgb('--brand-300'), marginBottom: 14 }}>Extra care</Text></Reveal>
-            <Reveal delay={120}><Text style={{ fontSize: 26, fontWeight: '800', letterSpacing: -0.5, color: tok.rgb('--fg'), lineHeight: 31 }}>About your {areas || 'flagged area'}</Text></Reveal>
-            <Reveal delay={200}><Text style={{ marginTop: 14, fontSize: 15.5, lineHeight: 24, color: tok.rgb('--fg', 0.6) }}>You mentioned this may need extra care. Just a few quick questions so we can work around it and see how we can help.</Text></Reveal>
+            <Reveal delay={60}><Text style={{ fontSize: 12.5, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', color: tok.rgb('--brand-300'), marginBottom: 14 }}>{t('Extra care')}</Text></Reveal>
+            <Reveal delay={120}><Text style={{ fontSize: 26, fontWeight: '800', letterSpacing: -0.5, color: tok.rgb('--fg'), lineHeight: 31 }}>{t('About your {area}', { area: areas || t('flagged area') })}</Text></Reveal>
+            <Reveal delay={200}><Text style={{ marginTop: 14, fontSize: 15.5, lineHeight: 24, color: tok.rgb('--fg', 0.6) }}>{t('You mentioned this may need extra care. Just a few quick questions so we can work around it and see how we can help.')}</Text></Reveal>
           </View>
           <ActionBar label="Continue" onPress={onAdvance} />
         </View>
@@ -1170,7 +1180,7 @@ function StepView({ step, answers, set, header, onContinue, onAdvance, onRestart
             </Stagger>
           </View>
           <View style={{ marginTop: 18 }}>
-            <FocusInput value={answers.movementsOther} onChangeText={(t) => set('movementsOther', t)} placeholder="Anything else you'd like to describe (optional)" multiline />
+            <FocusInput value={answers.movementsOther} onChangeText={(v) => set('movementsOther', v)} placeholder={t("Anything else you'd like to describe (optional)")} multiline />
           </View>
         </Shell>
       )
@@ -1181,7 +1191,7 @@ function StepView({ step, answers, set, header, onContinue, onAdvance, onRestart
       const total = SAFETY_QUESTIONS.length
       const setV = (id: string, v: 'yes' | 'no') => { tick(); set('safety', { ...answers.safety, [id]: v }) }
       return (
-        <Shell header={header} footer={<ActionBar disabled={answered < total} onPress={onContinue} hint={answered < total ? `${answered} of ${total} answered` : undefined} />}>
+        <Shell header={header} footer={<ActionBar disabled={answered < total} onPress={onContinue} hint={answered < total ? t('{answered} of {total} answered', { answered, total }) : undefined} />}>
           <QHeader title="Our final 7 second safety check" sub="Tap Yes or No for each." />
           <View style={{ gap: 10 }}>
             {SAFETY_QUESTIONS.map((q, i) => (
@@ -1220,22 +1230,24 @@ function FocusInput({ value, onChangeText, placeholder, multiline, autoFocus, ke
   value: string; onChangeText: (t: string) => void; placeholder?: string; multiline?: boolean; autoFocus?: boolean; keyboardType?: 'default' | 'email-address'; autoCapitalize?: 'none' | 'words' | 'sentences'; big?: boolean; label?: string
 }) {
   const tok = useTok()
+  const t = useT()
   const [focused, setFocused] = useState(false)
   const ref = useRef<TextInput>(null)
   // The prototype focuses 360ms after mount so the screen slide settles first —
   // focusing immediately yanks the view mid-transition.
   useEffect(() => {
     if (!autoFocus) return
-    const t = setTimeout(() => ref.current?.focus(), 360)
-    return () => clearTimeout(t)
+    const timer = setTimeout(() => ref.current?.focus(), 360)
+    return () => clearTimeout(timer)
   }, [autoFocus])
+  const ph = placeholder ? t(placeholder) : placeholder
   return (
     <TextInput
       ref={ref}
       // Screen readers need a programmatic name, not just the placeholder
       // (audit F-016 — the name field exposed no label at runtime).
-      accessibilityLabel={label ?? placeholder}
-      value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={tok.rgb('--fg', 0.32)}
+      accessibilityLabel={label ? t(label) : ph}
+      value={value} onChangeText={onChangeText} placeholder={ph} placeholderTextColor={tok.rgb('--fg', 0.32)}
       multiline={multiline} keyboardType={keyboardType} autoCapitalize={autoCapitalize}
       onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} selectionColor={tok.rgb('--brand-400')}
       style={{
@@ -1256,6 +1268,7 @@ function FocusInput({ value, onChangeText, placeholder, multiline, autoFocus, ke
 
 function TextStep({ step, answers, set, header, onContinue, onSkip }: { step: Step; answers: Answers; set: SetFn; header: ReactNode; onContinue: () => void; onSkip: () => void }) {
   const tok = useTok()
+  const t = useT()
   const key = step.key as keyof Answers
   const val = (answers[key] as string) || ''
   const valid = step.optional ? true : val.trim().length > 0
@@ -1264,12 +1277,12 @@ function TextStep({ step, answers, set, header, onContinue, onSkip }: { step: St
     <Shell header={header} footer={<ActionBar disabled={!valid} onPress={onContinue} onSkip={step.optional ? onSkip : undefined} skipLabel="Skip" />}>
       <QHeader title={step.title} sub={step.sub} />
       <Reveal delay={180}>
-        <FocusInput value={val} onChangeText={(t) => set(key, t as any)} placeholder={step.placeholder} multiline={!!step.multiline} autoFocus big label={step.title} />
+        <FocusInput value={val} onChangeText={(v) => set(key, v as any)} placeholder={step.placeholder} multiline={!!step.multiline} autoFocus big label={step.title} />
       </Reveal>
-      {showName ? <Reveal delay={40} style={{ marginTop: 16 }}><Text style={{ fontSize: 15, fontWeight: '600', color: tok.rgb('--brand-300') }}>Great to meet you, {normalizeName(val).split(' ')[0]}.</Text></Reveal> : null}
+      {showName ? <Reveal delay={40} style={{ marginTop: 16 }}><Text style={{ fontSize: 15, fontWeight: '600', color: tok.rgb('--brand-300') }}>{t('Great to meet you, {name}.', { name: normalizeName(val).split(' ')[0] })}</Text></Reveal> : null}
       {step.prompts ? (
         <View style={{ marginTop: 18 }}>
-          <Text style={{ fontSize: 12.5, fontWeight: '600', letterSpacing: 0.6, textTransform: 'uppercase', color: tok.rgb('--fg', 0.4), marginBottom: 10 }}>Need a nudge?</Text>
+          <Text style={{ fontSize: 12.5, fontWeight: '600', letterSpacing: 0.6, textTransform: 'uppercase', color: tok.rgb('--fg', 0.4), marginBottom: 10 }}>{t('Need a nudge?')}</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             {(step.prompts as string[]).map((p, i) => {
               const on = val.toLowerCase().includes(p.toLowerCase())
@@ -1451,6 +1464,7 @@ function SkipText({ children }: { children: ReactNode }) {
 
 function SearchStep({ step, answers, set, header, onContinue, onSkip }: { step: Step; answers: Answers; set: SetFn; header: ReactNode; onContinue: () => void; onSkip: () => void }) {
   const tok = useTok()
+  const t = useT()
   const key = step.key as 'loveExercises' | 'avoidExercises'
   const sel = answers[key]
   const avoid = step.mode === 'avoid'
@@ -1468,8 +1482,8 @@ function SearchStep({ step, answers, set, header, onContinue, onSkip }: { step: 
       <Reveal delay={160}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: tok.rgb('--ink-800'), borderRadius: 14, paddingVertical: 13, paddingHorizontal: 15, borderWidth: 1.5, borderColor: focus ? (avoid ? tok.rgb('--danger', 0.7) : tok.rgb('--brand-400', 0.7)) : tok.rgb('--fg', 0.08) }}>
           <Icon name="search" size={19} color={tok.rgb('--fg', 0.4)} />
-          <TextInput value={q} onChangeText={setQ} onSubmitEditing={addCustom} onFocus={() => setFocus(true)} onBlur={() => setFocus(false)} placeholder="Search or type an exercise" placeholderTextColor={tok.rgb('--fg', 0.35)} selectionColor={accent} style={{ flex: 1, fontSize: 16, color: tok.rgb('--fg') }} />
-          {q.trim() ? <Pressable onPress={addCustom} style={{ backgroundColor: accentBg, borderRadius: 999, paddingVertical: 5, paddingHorizontal: 11 }}><Text style={{ fontSize: 13, fontWeight: '700', color: accent }}>Add</Text></Pressable> : null}
+          <TextInput value={q} onChangeText={setQ} onSubmitEditing={addCustom} onFocus={() => setFocus(true)} onBlur={() => setFocus(false)} placeholder={t('Search or type an exercise')} placeholderTextColor={tok.rgb('--fg', 0.35)} selectionColor={accent} style={{ flex: 1, fontSize: 16, color: tok.rgb('--fg') }} />
+          {q.trim() ? <Pressable onPress={addCustom} style={{ backgroundColor: accentBg, borderRadius: 999, paddingVertical: 5, paddingHorizontal: 11 }}><Text style={{ fontSize: 13, fontWeight: '700', color: accent }}>{t('Add')}</Text></Pressable> : null}
         </View>
       </Reveal>
       {results.length > 0 ? (
@@ -1503,6 +1517,7 @@ function SearchStep({ step, answers, set, header, onContinue, onSkip }: { step: 
 
 function ActivityDetailStep({ step, answers, set, header, onContinue, onSkip }: { step: Step; answers: Answers; set: SetFn; header: ReactNode; onContinue: () => void; onSkip: () => void }) {
   const tok = useTok()
+  const t = useT()
   const acts = (answers.activities || []).filter((x) => x !== 'None' && x !== 'Other')
   const detail = answers.activityDetail
   const [open, setOpen] = useState<string | null>(acts[0] || null)
@@ -1529,14 +1544,14 @@ function ActivityDetailStep({ step, answers, set, header, onContinue, onSkip }: 
                 </Pressable>
                 {isOpen ? (
                   <View style={{ paddingHorizontal: 17, paddingBottom: 18 }}>
-                    <Text style={{ fontSize: 13, color: tok.rgb('--fg', 0.5), marginTop: 4, marginBottom: 10 }}>When do you usually do this?</Text>
+                    <Text style={{ fontSize: 13, color: tok.rgb('--fg', 0.5), marginTop: 4, marginBottom: 10 }}>{t('When do you usually do this?')}</Text>
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                       {DAYS.map((day) => {
                         const on = (d.days || []).includes(day)
                         return <Pressable key={day} onPress={() => toggleDay(act, day)} style={{ paddingVertical: 9, paddingHorizontal: 12, borderRadius: 999, backgroundColor: on ? tok.rgb('--brand-400', 0.16) : tok.rgb('--ink-700'), borderWidth: 1.5, borderColor: on ? tok.rgb('--brand-400', 0.8) : tok.rgb('--fg', 0.06) }}><Text style={{ fontSize: 13, fontWeight: '700', color: on ? tok.rgb('--brand-300') : tok.rgb('--fg', 0.55) }}>{DAYS_SHORT[day]}</Text></Pressable>
                       })}
                     </View>
-                    <Text style={{ fontSize: 13, color: tok.rgb('--fg', 0.5), marginTop: 16, marginBottom: 10 }}>How demanding is it usually?</Text>
+                    <Text style={{ fontSize: 13, color: tok.rgb('--fg', 0.5), marginTop: 16, marginBottom: 10 }}>{t('How demanding is it usually?')}</Text>
                     <View style={{ flexDirection: 'row', gap: 8 }}>
                       {INTENSITY_OPTIONS.map((o) => {
                         const on = d.intensity === o.value
@@ -1558,22 +1573,24 @@ function ActivityDetailStep({ step, answers, set, header, onContinue, onSkip }: 
 
 function Interstitial({ message, header, onContinue }: { message: { title: string; sub?: string }; header: ReactNode; onContinue: () => void }) {
   const tok = useTok()
-  useEffect(() => { const t = setTimeout(onContinue, 1700); return () => clearTimeout(t) }, [onContinue])
+  const t = useT()
+  useEffect(() => { const timer = setTimeout(onContinue, 1700); return () => clearTimeout(timer) }, [onContinue])
   return (
     <View style={{ flex: 1 }}>
       {header}
       <Pressable onPress={onContinue} style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 34 }}>
         <Reveal delay={80}><Checkmark size={74} /></Reveal>
-        <Reveal delay={320}><Text style={{ marginTop: 24, fontSize: 29, fontWeight: '800', letterSpacing: -0.6, color: tok.rgb('--fg'), lineHeight: 33, textAlign: 'center' }}>{message.title}</Text></Reveal>
-        {message.sub ? <Reveal delay={440}><Text style={{ marginTop: 14, fontSize: 15.5, lineHeight: 23, color: tok.rgb('--fg', 0.55), textAlign: 'center', maxWidth: 300 }}>{message.sub}</Text></Reveal> : null}
+        <Reveal delay={320}><Text style={{ marginTop: 24, fontSize: 29, fontWeight: '800', letterSpacing: -0.6, color: tok.rgb('--fg'), lineHeight: 33, textAlign: 'center' }}>{t(message.title)}</Text></Reveal>
+        {message.sub ? <Reveal delay={440}><Text style={{ marginTop: 14, fontSize: 15.5, lineHeight: 23, color: tok.rgb('--fg', 0.55), textAlign: 'center', maxWidth: 300 }}>{t(message.sub)}</Text></Reveal> : null}
       </Pressable>
-      <Text style={{ textAlign: 'center', paddingBottom: 24, fontSize: 13.5, color: tok.rgb('--fg', 0.4) }}>Tap to continue</Text>
+      <Text style={{ textAlign: 'center', paddingBottom: 24, fontSize: 13.5, color: tok.rgb('--fg', 0.4) }}>{t('Tap to continue')}</Text>
     </View>
   )
 }
 
 function MidTransition({ header, onContinue }: { header: ReactNode; onContinue: () => void }) {
   const tok = useTok()
+  const t = useT()
   const [phase, setPhase] = useState(0)
   useEffect(() => {
     const t1 = setTimeout(() => setPhase(1), 2100)
@@ -1587,13 +1604,13 @@ function MidTransition({ header, onContinue }: { header: ReactNode; onContinue: 
         {phase === 0 ? (
           <>
             <Spinner />
-            <Reveal><Text style={{ marginTop: 26, fontSize: 24, fontWeight: '800', color: tok.rgb('--fg'), letterSpacing: -0.3, textAlign: 'center' }}>Understanding your training needs…</Text></Reveal>
+            <Reveal><Text style={{ marginTop: 26, fontSize: 24, fontWeight: '800', color: tok.rgb('--fg'), letterSpacing: -0.3, textAlign: 'center' }}>{t('Understanding your training needs…')}</Text></Reveal>
             <Reveal delay={100}><Text style={{ marginTop: 10, fontSize: 15, color: tok.rgb('--fg', 0.5), textAlign: 'center' }}>Reading your goals and experience.</Text></Reveal>
           </>
         ) : (
           <>
             <Checkmark size={76} />
-            <Reveal><Text style={{ marginTop: 22, fontSize: 25, fontWeight: '800', color: tok.rgb('--fg'), letterSpacing: -0.3, lineHeight: 30, textAlign: 'center' }}>We have a clearer picture of what will work for you.</Text></Reveal>
+            <Reveal><Text style={{ marginTop: 22, fontSize: 25, fontWeight: '800', color: tok.rgb('--fg'), letterSpacing: -0.3, lineHeight: 30, textAlign: 'center' }}>{t('We have a clearer picture of what will work for you.')}</Text></Reveal>
           </>
         )}
       </View>
@@ -1603,6 +1620,7 @@ function MidTransition({ header, onContinue }: { header: ReactNode; onContinue: 
 
 function SafetyOutcome({ answers, header, onSaveExit }: { answers: Answers; header: ReactNode; onSaveExit: () => void }) {
   const tok = useTok()
+  const t = useT()
   const verdict = evaluateSafety(answers)
   const cfg: Record<string, { icon: string; title: string; body: string; tone: 'warn' | 'danger' }> = {
     block: { icon: 'shield', tone: 'warn', title: 'Please speak with a qualified health professional before continuing', body: 'Based on your answers, we can’t safely generate a training program for you yet. Please speak with a GP, physiotherapist or another appropriately qualified health professional.\n\nOnce you’ve been cleared to exercise, you can return and continue setting up your StrengthHub experience.' },
@@ -1617,11 +1635,11 @@ function SafetyOutcome({ answers, header, onSaveExit }: { answers: Answers; head
         <Reveal delay={80}><View style={{ width: 70, height: 70, borderRadius: 22, backgroundColor: c.tone === 'danger' ? tok.rgb('--danger', 0.14) : tok.rgb('--accent-orange', 0.14), alignItems: 'center', justifyContent: 'center' }}><Icon name={c.icon} size={34} color={accent} /></View></Reveal>
         <Reveal delay={260}><Text style={{ marginTop: 24, fontSize: 24, fontWeight: '800', letterSpacing: -0.5, color: tok.rgb('--fg'), lineHeight: 29 }}>{c.title}</Text></Reveal>
         <Reveal delay={360}><Text style={{ marginTop: 14, fontSize: 15, lineHeight: 24, color: tok.rgb('--fg', 0.6) }}>{c.body}</Text></Reveal>
-        <Reveal delay={440}><View style={{ marginTop: 18, paddingVertical: 13, paddingHorizontal: 15, borderRadius: 14, backgroundColor: tok.rgb('--fg', 0.05) }}><Text style={{ fontSize: 13, lineHeight: 19.5, color: tok.rgb('--fg', 0.5) }}>StrengthHub provides general fitness information, not a medical assessment. This isn’t a diagnosis.</Text></View></Reveal>
+        <Reveal delay={440}><View style={{ marginTop: 18, paddingVertical: 13, paddingHorizontal: 15, borderRadius: 14, backgroundColor: tok.rgb('--fg', 0.05) }}><Text style={{ fontSize: 13, lineHeight: 19.5, color: tok.rgb('--fg', 0.5) }}>{t('StrengthHub provides general fitness information, not a medical assessment. This isn’t a diagnosis.')}</Text></View></Reveal>
       </View>
       <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 26 }}>
         <Pressable onPress={() => { thud(); onSaveExit() }} style={{ height: 54, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: tok.rgb('--fg', 0.1) }}>
-          <Text style={{ fontSize: 16, fontWeight: '700', color: tok.rgb('--fg') }}>I’ll come back later</Text>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: tok.rgb('--fg') }}>{t('I’ll come back later')}</Text>
         </Pressable>
       </View>
     </View>
@@ -1642,6 +1660,7 @@ function CheckboxCard({ checked, onToggle, children }: { checked: boolean; onTog
 
 function Under18({ onBack }: { onBack: () => void }) {
   const tok = useTok()
+  const t = useT()
   return (
     <View style={{ flex: 1 }}>
       <View style={{ paddingTop: 10, paddingHorizontal: 20 }}>
@@ -1649,12 +1668,12 @@ function Under18({ onBack }: { onBack: () => void }) {
       </View>
       <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 26 }}>
         <Reveal delay={80}><View style={{ width: 66, height: 66, borderRadius: 20, backgroundColor: tok.rgb('--fg', 0.06), alignItems: 'center', justifyContent: 'center' }}><Icon name="heart" size={32} color={tok.rgb('--fg', 0.8)} /></View></Reveal>
-        <Reveal delay={180}><Text style={{ marginTop: 24, fontSize: 26, fontWeight: '800', letterSpacing: -0.5, color: tok.rgb('--fg'), lineHeight: 31 }}>Thanks for your interest in StrengthHub</Text></Reveal>
-        <Reveal delay={260}><Text style={{ marginTop: 14, fontSize: 15.5, lineHeight: 25, color: tok.rgb('--fg', 0.6) }}>StrengthHub creates personalised training programs for people aged 18 and over. We can’t generate a program for you yet — but we’d love to have you when the time is right.</Text></Reveal>
-        <Reveal delay={340}><Text style={{ marginTop: 12, fontSize: 14, lineHeight: 21.7, color: tok.rgb('--fg', 0.45) }}>In the meantime, staying active with sport and everyday movement is a great foundation.</Text></Reveal>
+        <Reveal delay={180}><Text style={{ marginTop: 24, fontSize: 26, fontWeight: '800', letterSpacing: -0.5, color: tok.rgb('--fg'), lineHeight: 31 }}>{t('Thanks for your interest in StrengthHub')}</Text></Reveal>
+        <Reveal delay={260}><Text style={{ marginTop: 14, fontSize: 15.5, lineHeight: 25, color: tok.rgb('--fg', 0.6) }}>{t('StrengthHub creates personalised training programs for people aged 18 and over. We can’t generate a program for you yet — but we’d love to have you when the time is right.')}</Text></Reveal>
+        <Reveal delay={340}><Text style={{ marginTop: 12, fontSize: 14, lineHeight: 21.7, color: tok.rgb('--fg', 0.45) }}>{t('In the meantime, staying active with sport and everyday movement is a great foundation.')}</Text></Reveal>
       </View>
       <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 26 }}>
-        <Pressable onPress={onBack} style={{ height: 54, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: tok.rgb('--fg', 0.1) }}><Text style={{ fontSize: 16, fontWeight: '700', color: tok.rgb('--fg') }}>Back</Text></Pressable>
+        <Pressable onPress={onBack} style={{ height: 54, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: tok.rgb('--fg', 0.1) }}><Text style={{ fontSize: 16, fontWeight: '700', color: tok.rgb('--fg') }}>{t('Back')}</Text></Pressable>
       </View>
     </View>
   )
@@ -1662,6 +1681,7 @@ function Under18({ onBack }: { onBack: () => void }) {
 
 function Terms({ answers, set, onContinue, onBack }: { answers: Answers; set: SetFn; onContinue: () => void; onBack: () => void }) {
   const tok = useTok()
+  const t = useT()
   const checked = answers.terms
   const [legalDoc, setLegalDoc] = useState<LegalDocKey | null>(null)
   return (
@@ -1693,11 +1713,12 @@ function Terms({ answers, set, onContinue, onBack }: { answers: Answers; set: Se
 
 function Processing({ onDone }: { onDone: () => void }) {
   const tok = useTok()
+  const t = useT()
   const [idx, setIdx] = useState(0)
   useEffect(() => {
-    if (idx >= PROCESSING_STAGES.length) { const t = setTimeout(onDone, 700); return () => clearTimeout(t) }
-    const t = setTimeout(() => setIdx((i) => i + 1), idx === 0 ? 500 : 640)
-    return () => clearTimeout(t)
+    if (idx >= PROCESSING_STAGES.length) { const timer = setTimeout(onDone, 700); return () => clearTimeout(timer) }
+    const timer = setTimeout(() => setIdx((i) => i + 1), idx === 0 ? 500 : 640)
+    return () => clearTimeout(timer)
   }, [idx, onDone])
   const pct = Math.round((Math.min(idx, PROCESSING_STAGES.length) / PROCESSING_STAGES.length) * 100)
   const bar = useRef(new Animated.Value(0)).current
@@ -1706,7 +1727,7 @@ function Processing({ onDone }: { onDone: () => void }) {
     <View style={{ flex: 1, paddingHorizontal: 26 }}>
       <View style={{ paddingTop: 30, alignItems: 'center' }}>
         <Wordmark size={18} />
-        <Text style={{ marginTop: 22, fontSize: 24, fontWeight: '800', letterSpacing: -0.5, color: tok.rgb('--fg') }}>Building your experience</Text>
+        <Text style={{ marginTop: 22, fontSize: 24, fontWeight: '800', letterSpacing: -0.5, color: tok.rgb('--fg') }}>{t('Building your experience')}</Text>
         <View style={{ marginTop: 18, width: 220, height: 6, borderRadius: 999, backgroundColor: tok.rgb('--fg', 0.1), overflow: 'hidden' }}>
           <Animated.View style={{ height: '100%', borderRadius: 999, backgroundColor: tok.rgb('--brand-400'), width: bar.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] }) }} />
         </View>
@@ -1721,7 +1742,7 @@ function Processing({ onDone }: { onDone: () => void }) {
                 <View style={{ width: 26, height: 26, alignItems: 'center', justifyContent: 'center' }}>
                   {done ? <Icon name="check" size={22} stroke={3} color={tok.rgb('--brand-400')} /> : <Spinner size={20} thickness={3} />}
                 </View>
-                <Text style={{ fontSize: 15.5, fontWeight: '600', color: done ? tok.rgb('--fg', 0.85) : tok.rgb('--fg', 0.6) }}>{s}</Text>
+                <Text style={{ fontSize: 15.5, fontWeight: '600', color: done ? tok.rgb('--fg', 0.85) : tok.rgb('--fg', 0.6) }}>{t(s)}</Text>
               </View>
             </Reveal>
           )
@@ -1749,6 +1770,7 @@ function Wordmark({ size = 26 }: { size?: number }) {
 
 function Summary({ answers, onEdit, onContinue, onBack }: { answers: Answers; onEdit: (id: string) => void; onContinue: () => void; onBack: () => void }) {
   const tok = useTok()
+  const t = useT()
   const g = GOAL_OPTIONS.find((o) => o.value === answers.goal)?.label || 'Not set'
   const exp = EXPERIENCE_OPTIONS.find((o) => o.value === answers.experience)?.label || 'Not set'
   const env = ENVIRONMENT_OPTIONS.find((o) => o.value === answers.environment)?.label || 'Not set'
@@ -1762,27 +1784,27 @@ function Summary({ answers, onEdit, onContinue, onBack }: { answers: Answers; on
   const Stat = ({ label, value, edit }: { label: string; value: string; edit?: string }) => (
     <View style={{ flex: 1, backgroundColor: tok.rgb('--ink-800'), borderRadius: 16, paddingVertical: 14, paddingHorizontal: 15, borderWidth: 1, borderColor: tok.rgb('--fg', 0.05) }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text style={{ fontSize: 11.5, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase', color: tok.rgb('--fg', 0.4) }}>{label}</Text>
-        {edit ? <Pressable onPress={() => { tick(); onEdit(edit) }} hitSlop={8}><Text style={{ fontSize: 12.5, fontWeight: '700', color: tok.rgb('--brand-300') }}>Edit</Text></Pressable> : null}
+        <Text style={{ fontSize: 11.5, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase', color: tok.rgb('--fg', 0.4) }}>{t(label)}</Text>
+        {edit ? <Pressable onPress={() => { tick(); onEdit(edit) }} hitSlop={8}><Text style={{ fontSize: 12.5, fontWeight: '700', color: tok.rgb('--brand-300') }}>{t('Edit')}</Text></Pressable> : null}
       </View>
-      <Text style={{ marginTop: 6, fontSize: 15.5, fontWeight: '700', color: tok.rgb('--fg'), lineHeight: 20 }}>{value}</Text>
+      <Text style={{ marginTop: 6, fontSize: 15.5, fontWeight: '700', color: tok.rgb('--fg'), lineHeight: 20 }}>{t(value)}</Text>
     </View>
   )
 
   return (
     <View style={{ flex: 1 }}>
-      <TopBack onBack={onBack} label="Your setup" />
+      <TopBack onBack={onBack} label={t('Your setup')} />
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 8 }} showsVerticalScrollIndicator={false}>
         <Reveal delay={60} style={{ alignItems: 'center', marginBottom: 6 }}><Checkmark size={64} /></Reveal>
-        <Reveal delay={240}><Text style={{ marginTop: 6, fontSize: 26, fontWeight: '800', letterSpacing: -0.5, color: tok.rgb('--fg'), textAlign: 'center', lineHeight: 31 }}>Your StrengthHub experience is ready</Text></Reveal>
-        <Reveal delay={340}><Text style={{ marginTop: 10, marginBottom: 20, fontSize: 14.5, color: tok.rgb('--fg', 0.55), textAlign: 'center', lineHeight: 21.7 }}>Shaped around your goals, schedule and preferences, {firstName(answers)}.</Text></Reveal>
+        <Reveal delay={240}><Text style={{ marginTop: 6, fontSize: 26, fontWeight: '800', letterSpacing: -0.5, color: tok.rgb('--fg'), textAlign: 'center', lineHeight: 31 }}>{t('Your StrengthHub experience is ready')}</Text></Reveal>
+        <Reveal delay={340}><Text style={{ marginTop: 10, marginBottom: 20, fontSize: 14.5, color: tok.rgb('--fg', 0.55), textAlign: 'center', lineHeight: 21.7 }}>{t('Shaped around your goals, schedule and preferences, {name}.', { name: firstName(answers) })}</Text></Reveal>
 
         <Reveal delay={420}>
           <LinearGradient colors={[tok.rgb('--brand-900', 0.5), tok.rgb('--ink-800')]} start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }} style={{ borderRadius: 20, padding: 18, borderWidth: 1, borderColor: tok.rgb('--brand-400', 0.2), marginBottom: 12 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: tok.rgb('--brand-400', 0.18), alignItems: 'center', justifyContent: 'center' }}><Icon name="muscle" size={22} color={tok.rgb('--brand-300')} /></View>
               <View>
-                <Text style={{ fontSize: 12, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase', color: tok.rgb('--brand-300') }}>Your plan</Text>
+                <Text style={{ fontSize: 12, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase', color: tok.rgb('--brand-300') }}>{t('Your plan')}</Text>
                 <Text style={{ fontSize: 18, fontWeight: '800', color: tok.rgb('--fg') }}>{g} · {days.length || 4} day{(days.length || 4) === 1 ? '' : 's'} / week</Text>
               </View>
             </View>
@@ -1791,7 +1813,7 @@ function Summary({ answers, onEdit, onContinue, onBack }: { answers: Answers; on
                 <View key={d} style={{ paddingVertical: 6, paddingHorizontal: 11, borderRadius: 999, backgroundColor: tok.rgb('--brand-400', 0.14) }}><Text style={{ fontSize: 12.5, fontWeight: '700', color: tok.rgb('--brand-300') }}>{DAYS_SHORT[d]}</Text></View>
               ))}
             </View>
-            <Text style={{ marginTop: 12, fontSize: 13, color: tok.rgb('--fg', 0.5) }}>A full week-by-week program unlocks once you save your experience.</Text>
+            <Text style={{ marginTop: 12, fontSize: 13, color: tok.rgb('--fg', 0.5) }}>{t('A full week-by-week program unlocks once you save your experience.')}</Text>
           </LinearGradient>
         </Reveal>
 
@@ -1811,7 +1833,7 @@ function Summary({ answers, onEdit, onContinue, onBack }: { answers: Answers; on
           </View>
         </Reveal>
       </ScrollView>
-      <ActionBar label="Save my experience" onPress={onContinue} />
+      <ActionBar label="Save my experience" onPress={onContinue} />{/* label translated inside ActionBar */}
     </View>
   )
 }
@@ -1830,6 +1852,7 @@ function Summary({ answers, onEdit, onContinue, onBack }: { answers: Answers; on
  */
 function AccountCreate({ name, onComplete, onBack, onLogin }: { name: string; onComplete: () => void; onBack: () => void; onLogin: () => void }) {
   const tok = useTok()
+  const t = useT()
   const { enabled, user, signUp, signInWithGoogle } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -1894,25 +1917,25 @@ function AccountCreate({ name, onComplete, onBack, onLogin }: { name: string; on
 
   return (
     <View style={{ flex: 1 }}>
-      <TopBack onBack={onBack} label="Almost there" />
+      <TopBack onBack={onBack} label={t('Almost there')} />
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 18 }} keyboardShouldPersistTaps="handled">
         <Reveal delay={60}><View style={{ width: 60, height: 60, borderRadius: 18, backgroundColor: tok.rgb('--brand-400', 0.14), alignItems: 'center', justifyContent: 'center' }}><Icon name="lock" size={28} color={tok.rgb('--brand-300')} /></View></Reveal>
-        <Reveal delay={140}><Text style={{ marginTop: 20, fontSize: 27, fontWeight: '800', letterSpacing: -0.5, color: tok.rgb('--fg'), lineHeight: 32 }}>Save your personalised experience</Text></Reveal>
-        <Reveal delay={220}><Text style={{ marginTop: 12, marginBottom: 22, fontSize: 15, lineHeight: 22.5, color: tok.rgb('--fg', 0.55) }}>Create your account to save your answers, access your personalised training and track your progress.</Text></Reveal>
+        <Reveal delay={140}><Text style={{ marginTop: 20, fontSize: 27, fontWeight: '800', letterSpacing: -0.5, color: tok.rgb('--fg'), lineHeight: 32 }}>{t('Save your personalised experience')}</Text></Reveal>
+        <Reveal delay={220}><Text style={{ marginTop: 12, marginBottom: 22, fontSize: 15, lineHeight: 22.5, color: tok.rgb('--fg', 0.55) }}>{t('Create your account to save your answers, access your personalised training and track your progress.')}</Text></Reveal>
         <Reveal delay={300}>
-          <Text style={{ fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', color: tok.rgb('--fg', 0.4), marginBottom: 8 }}>Email</Text>
+          <Text style={{ fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', color: tok.rgb('--fg', 0.4), marginBottom: 8 }}>{t('Email')}</Text>
           <View ref={formRef}>
             <View style={{ marginBottom: 12 }}><FocusInput value={email} onChangeText={setEmail} placeholder="you@university.ac.uk" keyboardType="email-address" autoCapitalize="none" label="Email address" /></View>
             {enabled ? (
               <>
-                <Text style={{ fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', color: tok.rgb('--fg', 0.4), marginBottom: 8 }}>Password</Text>
+                <Text style={{ fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', color: tok.rgb('--fg', 0.4), marginBottom: 8 }}>{t('Password')}</Text>
                 <View style={{ marginBottom: 12 }}><PasswordInput value={password} onChangeText={setPassword} /></View>
               </>
             ) : null}
           </View>
           {error ? <Text style={{ marginBottom: 12, fontSize: 13, lineHeight: 18, color: 'rgb(252,165,165)' }}>{error}</Text> : null}
           <Pressable onPress={createAccount} disabled={busy} style={{ height: 54, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: tok.rgb('--brand-400'), opacity: busy ? 0.7 : 1 }}>
-            {busy ? <ActivityIndicator color="#08140a" /> : <Text style={{ fontSize: 16, fontWeight: '700', color: '#08140a' }}>Create Account</Text>}
+            {busy ? <ActivityIndicator color="#08140a" /> : <Text style={{ fontSize: 16, fontWeight: '700', color: '#08140a' }}>{t('Create Account')}</Text>}
           </Pressable>
         </Reveal>
         {/* Social sign-in is only shown where it actually works. Google is wired for web only
@@ -1922,20 +1945,20 @@ function AccountCreate({ name, onComplete, onBack, onLogin }: { name: string; on
         {enabled && !NATIVE && (
           <Reveal delay={380}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 18 }}>
-              <View style={{ flex: 1, height: 1, backgroundColor: tok.rgb('--fg', 0.08) }} /><Text style={{ fontSize: 12.5, color: tok.rgb('--fg', 0.4) }}>or</Text><View style={{ flex: 1, height: 1, backgroundColor: tok.rgb('--fg', 0.08) }} />
+              <View style={{ flex: 1, height: 1, backgroundColor: tok.rgb('--fg', 0.08) }} /><Text style={{ fontSize: 12.5, color: tok.rgb('--fg', 0.4) }}>{t('or')}</Text><View style={{ flex: 1, height: 1, backgroundColor: tok.rgb('--fg', 0.08) }} />
             </View>
             <View style={{ gap: 10 }}>
               <Pressable onPress={google} disabled={busy} style={{ height: 52, borderRadius: 999, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#fff', opacity: busy ? 0.7 : 1 }}>
                 <View style={{ width: 20, height: 20, borderRadius: 5, backgroundColor: 'rgba(0,0,0,0.08)', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 12, fontWeight: '900', color: '#111' }}>G</Text></View>
-                <Text style={{ fontSize: 15.5, fontWeight: '700', color: '#111' }}>Continue with Google</Text>
+                <Text style={{ fontSize: 15.5, fontWeight: '700', color: '#111' }}>{t('Continue with Google')}</Text>
               </Pressable>
             </View>
           </Reveal>
         )}
       </ScrollView>
       <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 26 }}>
-        <Text style={{ fontSize: 14.5, color: tok.rgb('--fg', 0.5) }}>Already have an account? </Text>
-        <Pressable onPress={() => { tick(); onLogin() }} hitSlop={8}><Text style={{ fontSize: 14.5, fontWeight: '700', color: tok.rgb('--brand-300') }}>Log In</Text></Pressable>
+        <Text style={{ fontSize: 14.5, color: tok.rgb('--fg', 0.5) }}>{t('Already have an account? ')}</Text>
+        <Pressable onPress={() => { tick(); onLogin() }} hitSlop={8}><Text style={{ fontSize: 14.5, fontWeight: '700', color: tok.rgb('--brand-300') }}>{t('Log In')}</Text></Pressable>
       </View>
     </View>
   )
@@ -2275,6 +2298,7 @@ function Welcome({ onStart, onLogin }: { onStart: () => void; onLogin: () => voi
 
 function Login({ onBack }: { onBack: () => void }) {
   const tok = useTok()
+  const t = useT()
   const { enabled, signIn, signInWithGoogle, resetPassword } = useAuth()
   const [email, setEmail] = useState('')
   const [pw, setPw] = useState('')
@@ -2337,8 +2361,8 @@ function Login({ onBack }: { onBack: () => void }) {
         <Pressable onPress={onBack} hitSlop={8} style={{ width: 40, height: 40, marginLeft: -8, borderRadius: 999, alignItems: 'center', justifyContent: 'center' }}><Icon name="back" size={22} color={tok.rgb('--fg', 0.7)} /></Pressable>
       </View>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 10 }} keyboardShouldPersistTaps="handled">
-        <Reveal delay={60}><Text style={{ fontSize: 28, fontWeight: '800', letterSpacing: -0.5, color: tok.rgb('--fg') }}>Welcome back</Text></Reveal>
-        <Reveal delay={120}><Text style={{ marginTop: 8, marginBottom: 22, fontSize: 15, color: tok.rgb('--fg', 0.55) }}>Log in to pick up where you left off.</Text></Reveal>
+        <Reveal delay={60}><Text style={{ fontSize: 28, fontWeight: '800', letterSpacing: -0.5, color: tok.rgb('--fg') }}>{t('Welcome back')}</Text></Reveal>
+        <Reveal delay={120}><Text style={{ marginTop: 8, marginBottom: 22, fontSize: 15, color: tok.rgb('--fg', 0.55) }}>{t('Log in to pick up where you left off.')}</Text></Reveal>
         {/* Google sign-in is wired for web only; hidden on native (expo-auth-session not built yet)
             so we never show a button that just errors. */}
         {!NATIVE && (
@@ -2346,27 +2370,27 @@ function Login({ onBack }: { onBack: () => void }) {
             <Reveal delay={160}>
               <Pressable onPress={google} disabled={busy} style={{ height: 52, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 11, backgroundColor: '#fff', opacity: busy ? 0.7 : 1 }}>
                 <View style={{ width: 20, height: 20, borderRadius: 5, backgroundColor: 'rgba(0,0,0,0.08)', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 12, fontWeight: '900', color: '#111' }}>G</Text></View>
-                <Text style={{ fontSize: 15.5, fontWeight: '600', color: '#1f1f1f' }}>Continue with Google</Text>
+                <Text style={{ fontSize: 15.5, fontWeight: '600', color: '#1f1f1f' }}>{t('Continue with Google')}</Text>
               </Pressable>
             </Reveal>
             <Reveal delay={210}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 20 }}>
-                <View style={{ flex: 1, height: 1, backgroundColor: tok.rgb('--fg', 0.1) }} /><Text style={{ fontSize: 12.5, fontWeight: '600', color: tok.rgb('--fg', 0.4) }}>or</Text><View style={{ flex: 1, height: 1, backgroundColor: tok.rgb('--fg', 0.1) }} />
+                <View style={{ flex: 1, height: 1, backgroundColor: tok.rgb('--fg', 0.1) }} /><Text style={{ fontSize: 12.5, fontWeight: '600', color: tok.rgb('--fg', 0.4) }}>{t('or')}</Text><View style={{ flex: 1, height: 1, backgroundColor: tok.rgb('--fg', 0.1) }} />
               </View>
             </Reveal>
           </>
         )}
         <View ref={formRef}>
           <Reveal delay={260}>
-            <Text style={{ fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', color: tok.rgb('--fg', 0.4), marginBottom: 8 }}>Email</Text>
+            <Text style={{ fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', color: tok.rgb('--fg', 0.4), marginBottom: 8 }}>{t('Email')}</Text>
             <View style={{ marginBottom: 14 }}><FocusInput value={email} onChangeText={setEmail} placeholder="you@university.ac.uk" keyboardType="email-address" autoCapitalize="none" label="Email address" /></View>
           </Reveal>
           <Reveal delay={300}>
-            <Text style={{ fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', color: tok.rgb('--fg', 0.4), marginBottom: 8 }}>Password</Text>
+            <Text style={{ fontSize: 12.5, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', color: tok.rgb('--fg', 0.4), marginBottom: 8 }}>{t('Password')}</Text>
             <PasswordInput value={pw} onChangeText={setPw} />
           </Reveal>
         </View>
-        <Reveal delay={340}><Pressable style={{ marginTop: 12 }} onPress={forgot} hitSlop={6}><Text style={{ color: tok.rgb('--brand-300'), fontSize: 14, fontWeight: '600' }}>Forgot password?</Text></Pressable></Reveal>
+        <Reveal delay={340}><Pressable style={{ marginTop: 12 }} onPress={forgot} hitSlop={6}><Text style={{ color: tok.rgb('--brand-300'), fontSize: 14, fontWeight: '600' }}>{t('Forgot password?')}</Text></Pressable></Reveal>
         {error && <Text style={{ marginTop: 10, fontSize: 13, lineHeight: 18, color: 'rgb(252,165,165)' }}>{error}</Text>}
         {notice && <Text style={{ marginTop: 10, fontSize: 13, lineHeight: 18, color: tok.rgb('--fg', 0.6) }}>{notice}</Text>}
       </ScrollView>
