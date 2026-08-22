@@ -4,6 +4,7 @@ import Svg, { Path, Ellipse, Rect, Line, G, Defs, RadialGradient, Stop, Circle }
 import { LinearGradient } from 'expo-linear-gradient'
 import { Play, Clock } from 'lucide-react-native'
 import { useColors, brand, type Palette } from '../theme'
+import { useT } from '../lib/useT'
 import { exerciseView } from '../store/programSession'
 import { fromKey, todayKey } from '../lib/date'
 import type { WorkoutSession } from '../store/types'
@@ -319,6 +320,7 @@ export function MuscleFigures({ session, sex, c }: { session?: WorkoutSession; s
  */
 export function RestDayCard({ sex }: { sex: 'male' | 'female' | 'other' }) {
   const c = useColors()
+  const t = useT()
   return (
     <View style={{ position: 'relative', overflow: 'hidden', borderRadius: 16, borderWidth: 1, borderColor: withA(c.fg, 0.05), backgroundColor: c.ink800 }}>
       <View style={{ position: 'absolute', top: 6, bottom: 6, right: 4, width: 150 }} pointerEvents="none">
@@ -333,11 +335,11 @@ export function RestDayCard({ sex }: { sex: 'male' | 'female' | 'other' }) {
         pointerEvents="none"
       />
       <View style={{ padding: 20 }}>
-        <Text style={{ fontSize: 14, fontWeight: '600', color: brand[400] }}>Today's plan</Text>
-        <Text style={{ marginTop: 4, fontSize: 24, fontWeight: '800', letterSpacing: -0.5, color: c.fg }}>Rest day</Text>
+        <Text style={{ fontSize: 14, fontWeight: '600', color: brand[400] }}>{t("Today's plan")}</Text>
+        <Text style={{ marginTop: 4, fontSize: 24, fontWeight: '800', letterSpacing: -0.5, color: c.fg }}>{t('Rest day')}</Text>
         <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Clock size={15} color={withA(c.fg, 0.6)} />
-          <Text style={{ fontSize: 14, color: withA(c.fg, 0.6) }}>Recovery and mobility</Text>
+          <Text style={{ fontSize: 14, color: withA(c.fg, 0.6) }}>{t('Recovery and mobility')}</Text>
         </View>
       </View>
     </View>
@@ -360,6 +362,7 @@ export function MuscleMapCard({
   onPress: () => void
 }) {
   const c = useColors()
+  const t = useT()
   const { active, secondary } = useMemo(() => deriveGroups(session), [session])
   const female = sex !== 'male'
   const Front = female ? FrontFemale : FrontMale
@@ -414,12 +417,12 @@ export function MuscleMapCard({
       {/* 4 · content */}
       <View style={{ position: 'relative', flex: 1, paddingVertical: 15, paddingHorizontal: 20, justifyContent: 'space-between' }}>
         <View style={{ gap: 8 }}>
-          <Text style={{ fontSize: 11, letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: '700', color: withA(c.fg, 0.42) }}>Today · {weekday}</Text>
+          <Text style={{ fontSize: 11, letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: '700', color: withA(c.fg, 0.42) }}>{t('Today · {day}', { day: t(weekday) })}</Text>
           <Text numberOfLines={1} style={{ fontSize: 27, fontWeight: '800', letterSpacing: -0.5, lineHeight: 36, paddingBottom: 2, color: c.fg }}>{session.name}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
-            <Text style={{ fontSize: 14, fontWeight: '600', color: withA(c.fg, 0.75) }}>{session.exercises.length} exercises</Text>
+            <Text style={{ fontSize: 14, fontWeight: '600', color: withA(c.fg, 0.75) }}>{t('{n} exercises', { n: session.exercises.length })}</Text>
             <View style={{ width: 3, height: 3, borderRadius: 1.5, backgroundColor: withA(c.fg, 0.3) }} />
-            <Text style={{ fontSize: 15, fontWeight: '800', color: c.fg }}>{session.durationMin} min</Text>
+            <Text style={{ fontSize: 15, fontWeight: '800', color: c.fg }}>{t('{n} min', { n: session.durationMin })}</Text>
           </View>
           {chips.length > 0 && (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 1 }}>

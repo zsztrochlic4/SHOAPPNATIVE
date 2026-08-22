@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { WifiOff, Wifi } from 'lucide-react-native'
 import { useConnectivity } from '../lib/useConnectivity'
 import { useColors } from '../theme'
+import { useT } from '../lib/useT'
 
 /**
  * A calm, persistent offline indicator (premium-feel §5 "ugly states" / offline).
@@ -25,6 +26,7 @@ export function OfflineBanner() {
   const online = useConnectivity()
   const insets = useSafeAreaInsets()
   const c = useColors()
+  const t = useT()
 
   // After a real drop, show a short "Back online" confirmation, then hide.
   const wasOffline = useRef(false)
@@ -55,8 +57,8 @@ export function OfflineBanner() {
   const style = useAnimatedStyle(() => ({ transform: [{ translateY: ty.value }] }))
 
   const label = online
-    ? 'Back online'
-    : "You're offline — changes are saved on this device and sync when you reconnect."
+    ? t('Back online')
+    : t("You're offline — changes are saved on this device and sync when you reconnect.")
 
   return (
     <Animated.View

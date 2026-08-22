@@ -7,6 +7,7 @@ import { SectionHeader } from './ui'
 import { useStore } from '../store/store'
 import { bmiInfo, type ProgressColor } from '../lib/metrics'
 import { useColors, type Palette } from '../theme'
+import { useT } from '../lib/useT'
 
 function progColor(c: ProgressColor, colors: Palette): string {
   switch (c) {
@@ -47,6 +48,7 @@ function needleBandPct(bmi: number): number {
 export function BodyCompositionCard() {
   const { state } = useStore()
   const colors = useColors()
+  const t = useT()
   const bmi = bmiInfo(state)
   const [infoOpen, setInfoOpen] = useState(false)
 
@@ -58,11 +60,11 @@ export function BodyCompositionCard() {
 
   return (
     <>
-      <SectionHeader title="Body composition" />
+      <SectionHeader title={t('Body composition')} />
       <View className="border border-white/5 bg-ink-800" style={{ borderRadius: 20, padding: 18 }}>
         {/* header */}
         <View className="flex-row items-center justify-between">
-          <Text style={{ fontSize: 14, fontWeight: '600', color: `${colors.fg}b3` }}>Your BMI</Text>
+          <Text style={{ fontSize: 14, fontWeight: '600', color: `${colors.fg}b3` }}>{t('Your BMI')}</Text>
           <Pressable
             onPress={() => setInfoOpen(true)}
             accessibilityRole="button"
@@ -78,7 +80,7 @@ export function BodyCompositionCard() {
         {/* value · caption · category chip, all on one baseline */}
         <View className="mt-1.5 flex-row flex-wrap items-baseline" style={{ gap: 12 }}>
           <Text className="text-white" style={{ fontSize: 40, fontWeight: '800', letterSpacing: -1.2, lineHeight: 40 }}>{bmi.bmi.toFixed(1)}</Text>
-          <Text style={{ fontSize: 14, color: `${colors.fg}80` }}>Your weight is</Text>
+          <Text style={{ fontSize: 14, color: `${colors.fg}80` }}>{t('Your weight is')}</Text>
           <View style={{ paddingHorizontal: 11, paddingVertical: 4, borderRadius: 999, backgroundColor: `${accent}2e` }}>
             <Text style={{ fontSize: 13, fontWeight: '700', color: accent }}>{bmi.label}</Text>
           </View>
@@ -101,7 +103,7 @@ export function BodyCompositionCard() {
         {/* labels — the active band is highlighted in its category colour */}
         <View className="flex-row justify-between" style={{ marginTop: 12 }}>
           {BMI_BANDS.map((label, i) => (
-            <Text key={label} style={{ fontSize: 12, fontWeight: i === band ? '600' : '400', color: i === band ? accent : `${colors.fg}66` }}>{label}</Text>
+            <Text key={label} style={{ fontSize: 12, fontWeight: i === band ? '600' : '400', color: i === band ? accent : `${colors.fg}66` }}>{t(label)}</Text>
           ))}
         </View>
       </View>
@@ -115,6 +117,7 @@ export function BodyCompositionCard() {
 /*  BmiInfoSheet — the "What is BMI?" explainer (self-contained sheet)  */
 /* ================================================================== */
 function BmiInfoSheet({ open, onClose, colors }: { open: boolean; onClose: () => void; colors: Palette }) {
+  const t = useT()
   const win = useWindowDimensions()
   const screenH = IS_WEB ? WEB_SCREEN.height : win.height
   const insets = useSafeAreaInsets()
@@ -158,7 +161,7 @@ function BmiInfoSheet({ open, onClose, colors }: { open: boolean; onClose: () =>
           <View style={{ paddingHorizontal: 22, paddingTop: 12, paddingBottom: 8 }}>
             <View style={{ width: 40, height: 4, borderRadius: 999, backgroundColor: `${colors.fg}33`, alignSelf: 'center', marginBottom: 16 }} />
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Text style={{ fontSize: 19, fontWeight: '800', letterSpacing: -0.2, color: colors.fg }}>What is BMI?</Text>
+              <Text style={{ fontSize: 19, fontWeight: '800', letterSpacing: -0.2, color: colors.fg }}>{t('What is BMI?')}</Text>
               <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" style={{ height: 32, width: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 999, backgroundColor: `${colors.fg}1a` }}><X size={16} color={colors.fg} /></Pressable>
             </View>
             <Text style={{ marginTop: 14, fontSize: 14, lineHeight: 22, color: `${colors.fg}b3` }}>
@@ -168,7 +171,7 @@ function BmiInfoSheet({ open, onClose, colors }: { open: boolean; onClose: () =>
               {rows.map((r) => (
                 <View key={r.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                   <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: r.c }} />
-                  <Text style={{ flex: 1, fontSize: 13.5, fontWeight: '600', color: colors.fg }}>{r.label}</Text>
+                  <Text style={{ flex: 1, fontSize: 13.5, fontWeight: '600', color: colors.fg }}>{t(r.label)}</Text>
                   <Text style={{ fontSize: 13, color: `${colors.fg}80` }}>{r.range}</Text>
                 </View>
               ))}

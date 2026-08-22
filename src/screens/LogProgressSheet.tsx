@@ -13,6 +13,7 @@
 import { useMemo } from 'react'
 import { useStore } from '../store/store'
 import { useNav } from '../nav'
+import { useT } from '../lib/useT'
 import { useColors, sectionColor } from '../theme'
 import { todayKey } from '../lib/date'
 import { fmtFluid } from '../lib/format'
@@ -24,6 +25,7 @@ export function LogProgressSheet({ onClose }: { open?: boolean; onClose: () => v
   const { state, dispatch } = useStore()
   const nav = useNav()
   const colors = useColors()
+  const tr = useT()
   const units = state.settings.units
 
   const goals = useMemo<Goal[]>(() => {
@@ -36,13 +38,13 @@ export function LogProgressSheet({ onClose }: { open?: boolean; onClose: () => v
     const isRestDay = !session || restByPeriodMode
     const workoutDone = isRestDay || workoutStartedForDay(state, todayKey) || (session?.completed ?? false)
     return [
-      { id: 'steps', kind: 'measure', icon: 'footprints', tile: sectionColor('movement', colors), label: 'Steps', done: habit.steps >= t.steps, value: habit.steps, target: t.steps, step: 500, fmt: (v) => Math.round(v).toLocaleString(), patch: (v) => dispatch({ type: 'PATCH_HABIT', dateKey: todayKey, patch: { steps: v } }) },
-      { id: 'sleep', kind: 'measure', icon: 'moon', tile: sectionColor('sleep', colors), label: 'Sleep', done: habit.sleepH >= t.sleepH, value: habit.sleepH, target: t.sleepH, step: 0.5, fmt: (v) => `${Math.round(v * 10) / 10} hrs`, patch: (v) => dispatch({ type: 'PATCH_HABIT', dateKey: todayKey, patch: { sleepH: v } }) },
-      { id: 'water', kind: 'measure', icon: 'droplet', tile: sectionColor('hydration', colors), label: 'Water', done: habit.waterL >= t.waterL, value: habit.waterL, target: t.waterL, step: 0.2, fmt: (v) => fmtFluid(v, units), patch: (v) => dispatch({ type: 'PATCH_HABIT', dateKey: todayKey, patch: { waterL: v } }) },
-      { id: 'nutrition', kind: 'auto', icon: 'leaf', tile: sectionColor('nutrition', colors), label: "Today's nutrition choices", done: checkedIn, sub: checkedIn ? 'Checked in · auto' : 'Not checked in yet', sheetValue: checkedIn ? 'Checked in' : 'Not checked in yet', cta: 'Log', onOpen: () => nav.goTab('nutrition') },
-      { id: 'workout', kind: 'auto', icon: 'dumbbell', tile: sectionColor('training', colors), label: 'Workout', done: workoutDone, sub: isRestDay ? 'Rest day · auto' : `${session?.name ?? 'Workout'} · ${workoutDone ? 'auto' : 'not started'}`, sheetValue: isRestDay ? 'Rest day' : workoutDone ? 'Completed' : 'Not yet', cta: 'Start', onOpen: () => (session ? nav.open('activeWorkout') : nav.goTab('workout')) },
+      { id: 'steps', kind: 'measure', icon: 'footprints', tile: sectionColor('movement', colors), label: tr('Steps'), done: habit.steps >= t.steps, value: habit.steps, target: t.steps, step: 500, fmt: (v) => Math.round(v).toLocaleString(), patch: (v) => dispatch({ type: 'PATCH_HABIT', dateKey: todayKey, patch: { steps: v } }) },
+      { id: 'sleep', kind: 'measure', icon: 'moon', tile: sectionColor('sleep', colors), label: tr('Sleep'), done: habit.sleepH >= t.sleepH, value: habit.sleepH, target: t.sleepH, step: 0.5, fmt: (v) => `${Math.round(v * 10) / 10} hrs`, patch: (v) => dispatch({ type: 'PATCH_HABIT', dateKey: todayKey, patch: { sleepH: v } }) },
+      { id: 'water', kind: 'measure', icon: 'droplet', tile: sectionColor('hydration', colors), label: tr('Water'), done: habit.waterL >= t.waterL, value: habit.waterL, target: t.waterL, step: 0.2, fmt: (v) => fmtFluid(v, units), patch: (v) => dispatch({ type: 'PATCH_HABIT', dateKey: todayKey, patch: { waterL: v } }) },
+      { id: 'nutrition', kind: 'auto', icon: 'leaf', tile: sectionColor('nutrition', colors), label: tr("Today's nutrition choices"), done: checkedIn, sub: checkedIn ? tr('Checked in · auto') : tr('Not checked in yet'), sheetValue: checkedIn ? tr('Checked in') : tr('Not checked in yet'), cta: tr('Log'), onOpen: () => nav.goTab('nutrition') },
+      { id: 'workout', kind: 'auto', icon: 'dumbbell', tile: sectionColor('training', colors), label: tr('Workout'), done: workoutDone, sub: isRestDay ? tr('Rest day · auto') : `${session?.name ?? tr('Workout')} · ${workoutDone ? tr('auto') : tr('not started')}`, sheetValue: isRestDay ? tr('Rest day') : workoutDone ? tr('Completed') : tr('Not yet'), cta: tr('Start'), onOpen: () => (session ? nav.open('activeWorkout') : nav.goTab('workout')) },
     ]
-  }, [state, colors, units, dispatch, nav])
+  }, [state, colors, units, dispatch, nav, tr])
 
   const doneCount = goals.filter((g) => g.done).length
   return <UpdateTodaySheet open onClose={onClose} goals={goals} doneCount={doneCount} total={goals.length} colors={colors} />

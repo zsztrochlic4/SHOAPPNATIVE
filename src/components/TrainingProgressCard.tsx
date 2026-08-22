@@ -6,6 +6,7 @@ import { dashboardTrackedIds, dashboardLiftPeriod, progressTrackedLifts } from '
 import { exById } from '../data/catalog'
 import { weightUnit } from '../lib/format'
 import { useColors } from '../theme'
+import { useT } from '../lib/useT'
 
 const RANGE_LABEL: Record<string, string> = {
   '7 days': '7 Days', '4 weeks': '4 Weeks', '3 months': '3 Months', '6 months': '6 Months',
@@ -22,6 +23,7 @@ const RANGE_LABEL: Record<string, string> = {
 export function TrainingProgressCard() {
   const { state } = useStore()
   const colors = useColors()
+  const t = useT()
   const units = state.settings.units
 
   const trackedIds = dashboardTrackedIds(state)
@@ -40,17 +42,17 @@ export function TrainingProgressCard() {
     if (names.length === 0) return null
     return (
       <>
-        <SectionHeader title="Training progress" />
-        <Text className="-mt-2 mb-3.5 text-[12.5px] text-secondary">Your tracked lifts · Last {RANGE_LABEL[liftPeriod]}</Text>
+        <SectionHeader title={t('Training progress')} />
+        <Text className="-mt-2 mb-3.5 text-[12.5px] text-secondary">{t('Your tracked lifts · Last {range}', { range: t(RANGE_LABEL[liftPeriod]) })}</Text>
         <View className="rounded-3xl border border-white/5 bg-ink-800 px-[18px] pb-4 pt-1">
           {names.map((name, i) => (
             <View key={i} className="flex-row items-center justify-between" style={{ paddingVertical: 12, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: `${colors.fg}12` }}>
               <Text numberOfLines={1} className="flex-1 text-[14.5px] font-bold text-white">{name}</Text>
-              <Text className="ml-2 text-[12px] font-semibold text-tertiary">No data yet</Text>
+              <Text className="ml-2 text-[12px] font-semibold text-tertiary">{t('No data yet')}</Text>
             </View>
           ))}
           <Text className="mt-3 text-[11.5px] leading-4 text-tertiary">
-            Log a workout with these lifts and your strength gains will rank here.
+            {t('Log a workout with these lifts and your strength gains will rank here.')}
           </Text>
         </View>
       </>
@@ -59,8 +61,8 @@ export function TrainingProgressCard() {
 
   return (
     <>
-      <SectionHeader title="Training progress" />
-      <Text className="-mt-2 mb-3.5 text-[12.5px] text-secondary">Sorted by gain · Last {RANGE_LABEL[liftPeriod]}</Text>
+      <SectionHeader title={t('Training progress')} />
+      <Text className="-mt-2 mb-3.5 text-[12.5px] text-secondary">{t('Sorted by gain · Last {range}', { range: t(RANGE_LABEL[liftPeriod]) })}</Text>
       <View className="rounded-3xl border border-white/5 bg-ink-800 px-[18px] pb-3.5 pt-1">
         {shown.map((l, i) => (
           <View key={l.id} style={{ paddingVertical: 13, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: `${colors.fg}12` }}>
@@ -77,7 +79,7 @@ export function TrainingProgressCard() {
         ))}
         {hasToggle && (
           <Pressable onPress={() => setExpanded((v) => !v)} className="mt-1.5 items-center border-t border-white/[0.07] pt-4 active:opacity-70">
-            <Text className="text-[13px] font-bold text-brand-400">{expanded ? 'Show less' : `Show ${lifts.length - 4} more`}</Text>
+            <Text className="text-[13px] font-bold text-brand-400">{expanded ? t('Show less') : t('Show {n} more', { n: lifts.length - 4 })}</Text>
           </Pressable>
         )}
       </View>

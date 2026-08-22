@@ -12,30 +12,32 @@ import { useToast } from '../components/Toast'
 import { useStore } from '../store/store'
 import { tick } from '../lib/haptics'
 import { Avatar } from '../components/Avatar'
+import { useT } from '../lib/useT'
 
 export function BlockedUsersSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { state, dispatch } = useStore()
   const toast = useToast()
+  const t = useT()
   const blocked = state.community.blockedUids ?? []
 
   const unblock = (uid: string) => {
     tick()
     dispatch({ type: 'UNBLOCK_USER', uid })
-    toast(`Unblocked @${uid}`)
+    toast(t('Unblocked @{name}', { name: uid }))
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title="Blocked users">
+    <Sheet open={open} onClose={onClose} title={t('Blocked users')}>
       {blocked.length === 0 ? (
         <EmptyState
           icon={<Ban size={32} color="#fff" />}
-          title="No one blocked"
-          body="People you block are hidden from your leaderboards and group feeds."
+          title={t('No one blocked')}
+          body={t('People you block are hidden from your leaderboards and group feeds.')}
         />
       ) : (
         <>
           <Text className="text-[13px] leading-snug text-secondary">
-            These people are hidden from your leaderboards and group feeds. Unblocking brings them back.
+            {t('These people are hidden from your leaderboards and group feeds. Unblocking brings them back.')}
           </Text>
           <View className="mt-3 gap-1.5">
             {blocked.map((uid) => (
@@ -52,7 +54,7 @@ export function BlockedUsersSheet({ open, onClose }: { open: boolean; onClose: (
                   accessibilityLabel={`Unblock @${uid}`}
                   className="rounded-full border border-white/15 bg-white/5 px-4 py-2 active:opacity-80"
                 >
-                  <Text className="text-[13px] font-bold text-secondary">Unblock</Text>
+                  <Text className="text-[13px] font-bold text-secondary">{t('Unblock')}</Text>
                 </PressableScale>
               </View>
             ))}

@@ -3,6 +3,7 @@ import { Animated, Easing, View, Text } from 'react-native'
 import Svg, { Path, G, Polygon, Circle, Defs, LinearGradient, Stop } from 'react-native-svg'
 import type { WeeklyIndex } from '../store/selectors'
 import { useColors } from '../theme'
+import { useT } from '../lib/useT'
 import { useCountUp } from '../lib/useCountUp'
 import { AccessibleChart } from './AccessibleChart'
 import { prefersReducedMotion } from '../lib/a11y'
@@ -15,6 +16,7 @@ import { prefersReducedMotion } from '../lib/a11y'
  */
 export function IndexGauge({ index }: { index: WeeklyIndex }) {
   const colors = useColors()
+  const t = useT()
   // Count the score up as the needle swings, so the number feels earned.
   const scoreText = useCountUp(index.score, { duration: 950 })
   const W = 220, H = 116
@@ -82,13 +84,13 @@ export function IndexGauge({ index }: { index: WeeklyIndex }) {
 
       {/* readable anchors under the arc */}
       <View className="mt-1.5 w-full max-w-[236px] flex-row items-center justify-between">
-        <Text className="text-[10px] font-bold uppercase tracking-wide text-secondary">Behind</Text>
-        <Text className="text-[10px] font-bold uppercase tracking-wide text-secondary">Ahead</Text>
+        <Text className="text-[10px] font-bold uppercase tracking-wide text-secondary">{t('Behind')}</Text>
+        <Text className="text-[10px] font-bold uppercase tracking-wide text-secondary">{t('Ahead')}</Text>
       </View>
 
       <Text className="mt-1.5 text-[18px] font-black tracking-tight" style={{ color }}>{index.label}</Text>
       <Text className="text-[12px] text-secondary">
-        <Text className="font-bold" style={{ color }}>{scoreText}</Text>/100 · last 14 days
+        <Text className="font-bold" style={{ color }}>{scoreText}</Text>{t('/100 · last 14 days')}
       </Text>
     </View>
   )
