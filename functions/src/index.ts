@@ -53,3 +53,6 @@ export { createGroup, joinGroupByPasscode, joinGroupByCode, leaveGroup, deleteGr
 export { reportContent, resolveContentReport } from './communityModeration'
 // Community ops/health metrics (daily aggregate + owner on-demand refresh).
 export { computeCommunityMetrics, refreshCommunityMetrics } from './communityMetrics'
+// Admin analytics dashboard (strengthhub-admin.web.app) — owner-only KPI +
+// user aggregates. Reads Firebase Auth + entitlements via the Admin SDK.
+export { adminAnalytics, adminUsers } from './adminAnalytics'
