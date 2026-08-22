@@ -11,6 +11,7 @@ import { ActivityIcon } from '../components/ActivityIcon'
 import { ProgressBar, SegmentedTabs, ScreenHeader, Chip } from '../components/ui'
 import { MuscleMapCard, RestDayCard } from '../components/MuscleMapCard'
 import { useStore } from '../store/store'
+import { useT } from '../lib/useT'
 import { useNav } from '../nav'
 import { ACTIVE_EXERCISES } from '../backend/data'
 import { BEGINNER_LESSONS } from '../data/catalog'
@@ -107,6 +108,7 @@ function PendingSyncChip() {
 
 function TodayTab() {
   const { state, dispatch } = useStore()
+  const tr = useT()
   const nav = useNav()
   const units = state.settings.units
   const session = todaySession(state)
@@ -146,7 +148,7 @@ function TodayTab() {
 
           {/* Today's Progress */}
           <View className="mt-6">
-            <Text className="section-title mb-2">Today's Progress</Text>
+            <Text className="section-title mb-2">{tr('wk.todaysProgress')}</Text>
             <View className="mb-[7px] flex-row items-center justify-between">
               <Text className="text-[12.5px] text-secondary">{prog.done}/{prog.total} exercises completed</Text>
               <Text className="text-[12.5px] font-semibold text-white">{prog.pct}%</Text>
@@ -156,7 +158,7 @@ function TodayTab() {
 
           {/* Exercises */}
           <View className="mt-[26px]">
-            <Text className="section-title mb-3">Exercises</Text>
+            <Text className="section-title mb-3">{tr('wk.exercises')}</Text>
             <View className="gap-2.5">
               {session.exercises.map((e) => {
                 const done = e.sets.length > 0 && e.sets.every((s) => s.done)
@@ -202,7 +204,7 @@ function TodayTab() {
         <View className="h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-accent-blue/[0.18]"><Clock size={20} color="#3B82F6" /></View>
         <View className="min-w-0 flex-1">
           <Text className="text-[14.5px] font-bold leading-tight text-white">12-Minute Bodyweight Exercises</Text>
-          <Text className="mt-0.5 text-[12px] text-secondary">Quick, no-equipment workouts when you're short on time</Text>
+          <Text className="mt-0.5 text-[12px] text-secondary">{tr('wk.quickDesc')}</Text>
         </View>
         <ChevronRight size={17} color="rgba(59,130,246,0.55)" />
       </Pressable>
@@ -214,17 +216,18 @@ function TodayTab() {
 /* Self-logged activities: anything the app didn't prescribe. */
 function OtherActivities() {
   const { state, dispatch } = useStore()
+  const tr = useT()
   const nav = useNav()
   const acts = activitiesForDay(state)
   return (
     <View className="mt-7">
       <View className="mb-3 flex-row items-start justify-between">
         <View>
-          <Text className="section-title">Other activities</Text>
-          <Text className="mt-0.5 text-[12px] text-secondary">Log anything else you did today</Text>
+          <Text className="section-title">{tr('wk.otherActivities')}</Text>
+          <Text className="mt-0.5 text-[12px] text-secondary">{tr('wk.logAnything')}</Text>
         </View>
         <Pressable onPress={() => nav.open('logActivity')} className="flex-row items-center gap-1 px-1 active:opacity-70">
-          <Text className="see-all">Log</Text>
+          <Text className="see-all">{tr('wk.log')}</Text>
           <Plus size={15} color={brand[400]} strokeWidth={2.6} />
         </Pressable>
       </View>
@@ -233,8 +236,8 @@ function OtherActivities() {
         <Pressable onPress={() => nav.open('logActivity')} className="w-full flex-row items-center gap-3 rounded-[20px] border border-dashed border-white/15 p-4 active:opacity-90">
           <View className="h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-brand-400/15"><Activity size={20} color={brand[400]} /></View>
           <View className="min-w-0 flex-1">
-            <Text className="text-[14.5px] font-bold leading-tight text-white">Log a workout, sport or activity</Text>
-            <Text className="mt-0.5 text-[12px] text-secondary">Swim, run, football, pickleball, anything counts</Text>
+            <Text className="text-[14.5px] font-bold leading-tight text-white">{tr('wk.logWorkoutSport')}</Text>
+            <Text className="mt-0.5 text-[12px] text-secondary">{tr('wk.swimRun')}</Text>
           </View>
           <ChevronRight size={17} color="rgba(255,255,255,0.3)" />
         </Pressable>
@@ -249,7 +252,7 @@ function OtherActivities() {
                   {a.weekly && (
                     <View className="flex-row shrink-0 items-center gap-1 rounded-full bg-brand-400/15 px-1.5 py-0.5">
                       <Repeat size={10} color={brand[300]} />
-                      <Text className="text-[10px] font-bold text-brand-300">Weekly</Text>
+                      <Text className="text-[10px] font-bold text-brand-300">{tr('wk.weekly')}</Text>
                     </View>
                   )}
                 </View>
@@ -272,6 +275,7 @@ function OtherActivities() {
 /* Build-your-own sessions + saved reusable workouts (#2). */
 function MyWorkouts() {
   const { state, dispatch } = useStore()
+  const tr = useT()
   const nav = useNav()
   const toast = useToast()
   const templates = state.templates ?? []
@@ -287,15 +291,15 @@ function MyWorkouts() {
   return (
     <View className="mt-7">
       <View className="mb-3">
-        <Text className="section-title">Your workouts</Text>
-        <Text className="mt-0.5 text-[12px] text-secondary">Build your own session, your exercises, your way</Text>
+        <Text className="section-title">{tr('wk.yourWorkouts')}</Text>
+        <Text className="mt-0.5 text-[12px] text-secondary">{tr('wk.buildYourOwn')}</Text>
       </View>
 
       <Pressable onPress={() => nav.open('createSession')} className="w-full flex-row items-center gap-3 rounded-[20px] border border-brand-400/25 bg-brand-400/[0.06] p-3.5 active:opacity-90">
         <View className="h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-brand-400/15"><Plus size={20} color={brand[400]} strokeWidth={2.4} /></View>
         <View className="min-w-0 flex-1">
-          <Text className="text-[14.5px] font-bold leading-tight text-white">New workout</Text>
-          <Text className="mt-0.5 text-[12px] text-secondary">Pick exercises, set sets & reps, then start</Text>
+          <Text className="text-[14.5px] font-bold leading-tight text-white">{tr('wk.newWorkout')}</Text>
+          <Text className="mt-0.5 text-[12px] text-secondary">{tr('wk.pickExercises')}</Text>
         </View>
         <ChevronRight size={17} color="rgba(255,255,255,0.3)" />
       </Pressable>
@@ -318,7 +322,7 @@ function MyWorkouts() {
                 </Pressable>
                 <Pressable onPress={() => startTemplate(t.id)} className="flex-row items-center gap-1 rounded-full bg-brand-400 px-3.5 py-1.5 active:opacity-90">
                   <Play size={12} color="#000" fill="#000" />
-                  <Text className="text-[13px] font-bold text-black">Start</Text>
+                  <Text className="text-[13px] font-bold text-black">{tr('wk.start')}</Text>
                 </Pressable>
                 <Pressable onPress={() => { dispatch({ type: 'REMOVE_TEMPLATE', id: t.id }); toast('Workout removed') }} hitSlop={6} className="h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/5 active:opacity-80">
                   <Trash2 size={15} color="rgba(255,255,255,0.45)" />
@@ -337,6 +341,7 @@ function MyWorkouts() {
 /* ------------------------------------------------------------------ */
 function ProgramTab() {
   const { state } = useStore()
+  const tr = useT()
   // Once a user has been through the safety-gated backend, their program comes from the
   // generator (or a holding state when the gate is closed). The legacy static split is only
   // the fallback for demo/seed sessions that never ran the backend.
@@ -347,12 +352,13 @@ function ProgramTab() {
 
 function LegacyProgram() {
   const { state } = useStore()
+  const tr = useT()
   const [openDay, setOpenDay] = useState<string | null>(state.program[0]?.day ?? null)
   return (
     <View className="gap-2.5">
       <View className="rounded-[20px] border border-brand-400/20 bg-brand-400/[0.06] p-4">
         <Text className="text-[14px] font-bold text-white">Your weekly split · {state.profile.daysPerWeek}-day program</Text>
-        <Text className="mt-1.5 text-[12.5px] leading-5 text-secondary">Built around your week. Weights adapt as you log each session.</Text>
+        <Text className="mt-1.5 text-[12.5px] leading-5 text-secondary">{tr('wk.builtAroundWeek')}</Text>
       </View>
       {state.program.map((d) => {
         const open = openDay === d.day && !d.rest && d.exerciseIds.length > 0
@@ -364,7 +370,7 @@ function LegacyProgram() {
                 <Text className="text-[14.5px] font-bold text-white">{d.name}</Text>
                 <Text className="mt-0.5 text-[12px] text-secondary">{d.focus}</Text>
               </View>
-              {d.rest ? <Chip color="gray">Rest</Chip> : <Chip color="green">{d.exerciseIds.length} ex</Chip>}
+              {d.rest ? <Chip color="gray">{tr('wk.rest')}</Chip> : <Chip color="green">{d.exerciseIds.length} ex</Chip>}
               {!d.rest && d.exerciseIds.length > 0 && (
                 <ChevronDown size={17} color="rgba(255,255,255,0.3)" style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
               )}
@@ -404,6 +410,7 @@ const exerciseKey = (item: ExerciseLibraryItem) => item.id
 function ExercisesTab({ bottomInset }: { bottomInset: number }) {
   const nav = useNav()
   const { state } = useStore()
+  const tr = useT()
   const [q, setQ] = useState('')
   const [muscle, setMuscle] = useState<string | null>(null)
 
@@ -457,16 +464,16 @@ function ExercisesTab({ bottomInset }: { bottomInset: number }) {
       {beginnerDone ? (
         <Pressable onPress={() => nav.open('beginner')} className="mb-3.5 flex-row items-center gap-2.5 rounded-[14px] bg-white/[0.03] px-3 py-2.5 active:opacity-90">
           <Check size={13} strokeWidth={3} color="rgba(126,217,87,0.8)" />
-          <Text className="flex-1 text-[12.5px] font-semibold text-secondary">Beginner guide finished</Text>
-          <Text className="text-[12px] font-semibold text-tertiary">Revisit</Text>
+          <Text className="flex-1 text-[12.5px] font-semibold text-secondary">{tr('wk.beginnerFinished')}</Text>
+          <Text className="text-[12px] font-semibold text-tertiary">{tr('wk.revisit')}</Text>
           <ChevronRight size={14} color="rgba(255,255,255,0.25)" />
         </Pressable>
       ) : (
         <Pressable onPress={() => nav.open('beginner')} className="mb-3.5 w-full flex-row items-center gap-3 rounded-[20px] border border-brand-400/20 bg-brand-400/[0.06] p-3.5 active:opacity-90">
           <View className="h-[38px] w-[38px] items-center justify-center rounded-[14px] bg-brand-400/15"><Leaf size={18} color={brand[400]} /></View>
           <View className="min-w-0 flex-1">
-            <Text className="text-[14px] font-bold leading-tight text-white">New here?</Text>
-            <Text className="mt-0.5 text-[12px] text-secondary">Start the beginner guide, no experience needed</Text>
+            <Text className="text-[14px] font-bold leading-tight text-white">{tr('wk.newHere')}</Text>
+            <Text className="mt-0.5 text-[12px] text-secondary">{tr('wk.startBeginner')}</Text>
           </View>
           <ChevronRight size={16} color="rgba(255,255,255,0.3)" />
         </Pressable>
@@ -528,10 +535,10 @@ function ExercisesTab({ bottomInset }: { bottomInset: number }) {
       ListEmptyComponent={(
         <View className="items-center px-5 py-9">
           <Search size={24} color="rgba(255,255,255,0.35)" />
-          <Text className="mt-3 text-center text-[14px] font-semibold text-white">No matching exercises</Text>
-          <Text className="mt-1 text-center text-[13px] leading-5 text-secondary">Try another muscle group or clear your search.</Text>
+          <Text className="mt-3 text-center text-[14px] font-semibold text-white">{tr('wk.noMatching')}</Text>
+          <Text className="mt-1 text-center text-[13px] leading-5 text-secondary">{tr('wk.tryAnother')}</Text>
           <Pressable onPress={clearFilters} className="mt-4 min-h-11 items-center justify-center rounded-full bg-brand-400 px-5 active:opacity-90">
-            <Text className="text-[13px] font-bold text-black">Clear filters</Text>
+            <Text className="text-[13px] font-bold text-black">{tr('wk.clearFilters')}</Text>
           </Pressable>
         </View>
       )}
@@ -622,6 +629,7 @@ const historyKey = (item: HistoryItem) => `${item.kind}:${item.id}`
 
 function HistoryTab({ bottomInset }: { bottomInset: number }) {
   const { state, dispatch } = useStore()
+  const tr = useT()
   const nav = useNav()
   const toast = useToast()
   const units = state.settings.units
@@ -686,10 +694,10 @@ function HistoryTab({ bottomInset }: { bottomInset: number }) {
       ListEmptyComponent={(
         <View className="items-center px-5 py-10">
           <Dumbbell size={28} color="rgba(126,217,87,0.55)" />
-          <Text className="mt-3 text-center text-[15px] font-bold text-white">No workouts logged yet</Text>
-          <Text className="mt-1 max-w-[260px] text-center text-[13px] leading-5 text-secondary">Your first one is the hardest. Start with a session or add an activity you have already completed.</Text>
+          <Text className="mt-3 text-center text-[15px] font-bold text-white">{tr('wk.noWorkoutsLogged')}</Text>
+          <Text className="mt-1 max-w-[260px] text-center text-[13px] leading-5 text-secondary">{tr('wk.firstHardest')}</Text>
           <Pressable onPress={() => nav.open('logActivity')} className="mt-4 min-h-11 items-center justify-center rounded-full bg-brand-400 px-5 active:opacity-90">
-            <Text className="text-[13px] font-bold text-black">Log an activity</Text>
+            <Text className="text-[13px] font-bold text-black">{tr('wk.logActivity')}</Text>
           </Pressable>
         </View>
       )}
@@ -706,7 +714,7 @@ function HistoryTab({ bottomInset }: { bottomInset: number }) {
                   <Text numberOfLines={1} className="text-[14.5px] font-bold text-white">{h.name}</Text>
                   {h.kind === 'activity' && h.weekly && (
                     <View className="rounded-full bg-brand-400/15 px-1.5 py-0.5">
-                      <Text className="text-[10px] font-bold text-brand-300">Weekly</Text>
+                      <Text className="text-[10px] font-bold text-brand-300">{tr('wk.weekly')}</Text>
                     </View>
                   )}
                 </View>
@@ -762,7 +770,7 @@ function HistoryTab({ bottomInset }: { bottomInset: number }) {
                   ) : (
                     <View className="flex-row items-center justify-between gap-3">
                       <View className="min-w-0 flex-1">
-                        <Text className="text-[13px] font-semibold text-white">Estimated burn</Text>
+                        <Text className="text-[13px] font-semibold text-white">{tr('wk.estimatedBurn')}</Text>
                         <Text className="mt-px text-[11.5px] capitalize text-secondary">{h.minutes} min at {h.intensity} effort</Text>
                       </View>
                       <Text className="text-[13px] font-bold text-brand-300">{h.calories} kcal</Text>
@@ -782,7 +790,7 @@ function HistoryTab({ bottomInset }: { bottomInset: number }) {
                       className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl bg-white/[0.06] py-2.5 active:opacity-80"
                     >
                       <Pencil size={13} color="rgba(255,255,255,0.7)" />
-                      <Text className="text-[12.5px] font-bold text-white/80">Edit sets</Text>
+                      <Text className="text-[12.5px] font-bold text-white/80">{tr('wk.editSets')}</Text>
                     </Pressable>
                   )}
                   <Pressable
