@@ -9,6 +9,7 @@ import { View, Text, TextInput, Pressable, ActivityIndicator } from 'react-nativ
 import { AtSign, Check, X, Trophy, Crown, Flame, Users, Eye } from 'lucide-react-native'
 import { useStore } from '../store/store'
 import { useColors, brand } from '../theme'
+import { useT } from '../lib/useT'
 import { useToast } from '../components/Toast'
 import { Sheet } from '../components/Sheet'
 import { PressableScale } from '../components/PressableScale'
@@ -84,6 +85,7 @@ function UsernameField({
   autoFocus?: boolean
 }) {
   const colors = useColors()
+  const t = useT()
   const borderColor =
     field.kind === 'available' ? `${brand[400]}aa`
     : field.kind === 'taken' || field.kind === 'invalid' || field.kind === 'error' ? `${colors.danger}aa`
@@ -105,7 +107,7 @@ function UsernameField({
           autoComplete="off"
           spellCheck={false}
           maxLength={USERNAME_MAX}
-          placeholder="username"
+          placeholder={t('username')}
           placeholderTextColor="rgba(255,255,255,0.3)"
           accessibilityLabel="Username"
           className="flex-1 text-[16px] font-semibold text-white"
@@ -124,12 +126,12 @@ function UsernameField({
         )}
       </View>
       <View className="mt-2 min-h-[18px] px-1">
-        {field.kind === 'checking' && <Text className="text-[12px] text-tertiary">Checking availability…</Text>}
-        {field.kind === 'available' && <Text className="text-[12px] font-semibold text-brand-300">Available</Text>}
+        {field.kind === 'checking' && <Text className="text-[12px] text-tertiary">{t('Checking availability…')}</Text>}
+        {field.kind === 'available' && <Text className="text-[12px] font-semibold text-brand-300">{t('Available')}</Text>}
         {(field.kind === 'taken' || field.kind === 'invalid' || field.kind === 'error') && (
           <Text className="text-[12px] font-semibold" style={{ color: colors.danger }}>{field.message}</Text>
         )}
-        {field.kind === 'idle' && <Text className="text-[12px] text-tertiary">Letters, numbers and underscores. This is how you appear on leaderboards.</Text>}
+        {field.kind === 'idle' && <Text className="text-[12px] text-tertiary">{t('Letters, numbers and underscores. This is how you appear on leaderboards.')}</Text>}
       </View>
     </View>
   )
@@ -144,6 +146,7 @@ function UsernameField({
 export function UsernameSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { state, dispatch } = useStore()
   const toast = useToast()
+  const t = useT()
   const current = state.community.username
   const isFirst = !current
   const [busy, setBusy] = useState(false)
@@ -163,7 +166,7 @@ export function UsernameSheet({ open, onClose }: { open: boolean; onClose: () =>
           await backend.claimUsernameRemote(field.canonical)
         } catch {
           setBusy(false)
-          toast('That username was just taken, try another')
+          toast(t('That username was just taken, try another'))
           return
         }
         setBusy(false)
@@ -171,24 +174,24 @@ export function UsernameSheet({ open, onClose }: { open: boolean; onClose: () =>
     }
     thud()
     dispatch({ type: 'SET_USERNAME', username: field.canonical })
-    toast(isFirst ? `Welcome, @${field.canonical}` : 'Username updated')
+    toast(isFirst ? t('Welcome, @{name}', { name: field.canonical }) : t('Username updated'))
     onClose()
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title={isFirst ? 'Claim your username' : 'Change username'}>
+    <Sheet open={open} onClose={onClose} title={isFirst ? t('Claim your username') : t('Change username')}>
       {isFirst ? (
         <View className="mb-5 items-center">
           <View className="h-14 w-14 items-center justify-center rounded-2xl" style={{ backgroundColor: `${brand[400]}1a` }}>
             <Trophy size={26} color={brand[400]} />
           </View>
           <Text className="mt-3 max-w-[300px] text-center text-[14px] leading-snug text-secondary">
-            Pick a unique name to compete on the leaderboard and join groups with friends. You can change it later.
+            {t('Pick a unique name to compete on the leaderboard and join groups with friends. You can change it later.')}
           </Text>
         </View>
       ) : (
         <Text className="mb-4 text-[13px] leading-snug text-secondary">
-          Your username is how friends find you and how you appear on every leaderboard.
+          {t('Your username is how friends find you and how you appear on every leaderboard.')}
         </Text>
       )}
       <UsernameField value={value} field={field} onChange={onChange} autoFocus />
@@ -200,7 +203,7 @@ export function UsernameSheet({ open, onClose }: { open: boolean; onClose: () =>
         accessibilityState={{ disabled: !canSave }}
         className={`mt-3 items-center rounded-2xl py-4 ${canSave ? 'bg-brand-400 active:opacity-90' : 'bg-white/10'}`}
       >
-        <Text className={`text-[15px] font-bold ${canSave ? 'text-black' : 'text-disabled'}`}>{busy ? 'Saving…' : isFirst ? 'Continue' : 'Save'}</Text>
+        <Text className={`text-[15px] font-bold ${canSave ? 'text-black' : 'text-disabled'}`}>{busy ? t('Saving…') : isFirst ? t('Continue') : t('Save')}</Text>
       </PressableScale>
     </Sheet>
   )
@@ -271,6 +274,7 @@ function FeaturePill({ icon, label, color, tint }: { icon: React.ReactNode; labe
 export function CommunitySetupGate({ onPreview, onClaimed }: { onPreview: () => void; onClaimed: (name: string) => void }) {
   const { dispatch } = useStore()
   const toast = useToast()
+  const t = useT()
   const [busy, setBusy] = useState(false)
   const { value, field, onChange } = useUsernameField('', null)
   const canContinue = field.kind === 'available' && !busy
@@ -286,7 +290,7 @@ export function CommunitySetupGate({ onPreview, onClaimed }: { onPreview: () => 
           await backend.claimUsernameRemote(name)
         } catch {
           setBusy(false)
-          toast('That username was just taken, try another')
+          toast(t('That username was just taken, try another'))
           return
         }
         setBusy(false)
@@ -302,17 +306,17 @@ export function CommunitySetupGate({ onPreview, onClaimed }: { onPreview: () => 
       <View className="mt-5"><Podium /></View>
       <View className="mt-3 flex-row justify-center">
         <Text className="rounded-full border border-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-tertiary">
-          Anyone can finish first
+          {t('Anyone can finish first')}
         </Text>
       </View>
-      <Text className="mt-4 text-center text-[22px] font-extrabold text-white">Claim your username</Text>
+      <Text className="mt-4 text-center text-[22px] font-extrabold text-white">{t('Claim your username')}</Text>
       <Text className="mt-2 text-center text-[14px] leading-relaxed text-secondary">
-        Join the streak leaderboard and compete with friends and the wider world. You can change your username later.
+        {t('Join the streak leaderboard and compete with friends and the wider world. You can change your username later.')}
       </Text>
       <View className="mt-4 flex-row justify-center gap-2">
-        <FeaturePill icon={<Trophy size={14} color="#C7CDD6" />} label="Leagues" color="#C7CDD6" tint="rgba(199,205,214,0.14)" />
-        <FeaturePill icon={<Flame size={14} color="#F5A524" fill="#F5A524" />} label="Streaks" color="#F5A524" tint="rgba(245,165,36,0.14)" />
-        <FeaturePill icon={<Users size={14} color="#7ED957" />} label="Groups" color="#7ED957" tint="rgba(126,217,87,0.14)" />
+        <FeaturePill icon={<Trophy size={14} color="#C7CDD6" />} label={t('Leagues')} color="#C7CDD6" tint="rgba(199,205,214,0.14)" />
+        <FeaturePill icon={<Flame size={14} color="#F5A524" fill="#F5A524" />} label={t('Streaks')} color="#F5A524" tint="rgba(245,165,36,0.14)" />
+        <FeaturePill icon={<Users size={14} color="#7ED957" />} label={t('Groups')} color="#7ED957" tint="rgba(126,217,87,0.14)" />
       </View>
       <View className="mt-4">
         <UsernameField value={value} field={field} onChange={onChange} autoFocus />
@@ -324,7 +328,7 @@ export function CommunitySetupGate({ onPreview, onClaimed }: { onPreview: () => 
           accessibilityState={{ disabled: !canContinue }}
           className={`mt-3.5 min-h-[52px] items-center justify-center rounded-2xl py-4 ${canContinue ? 'bg-brand-400 active:opacity-90' : 'bg-white/10'}`}
         >
-          <Text className={`text-[15px] font-bold ${canContinue ? 'text-black' : 'text-disabled'}`}>{busy ? 'Claiming…' : 'Continue'}</Text>
+          <Text className={`text-[15px] font-bold ${canContinue ? 'text-black' : 'text-disabled'}`}>{busy ? t('Claiming…') : t('Continue')}</Text>
         </PressableScale>
         <PressableScale
           onPress={onPreview}
@@ -333,7 +337,7 @@ export function CommunitySetupGate({ onPreview, onClaimed }: { onPreview: () => 
           className="mt-2.5 min-h-[52px] flex-row items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 py-4 active:opacity-90"
         >
           <Eye size={16} color="rgba(255,255,255,0.7)" />
-          <Text className="text-[14px] font-bold text-secondary">Preview Community</Text>
+          <Text className="text-[14px] font-bold text-secondary">{t('Preview Community')}</Text>
         </PressableScale>
       </View>
     </View>
@@ -353,6 +357,7 @@ const WELCOME_ROWS = [
  *  with a plain card View so nested Pressables don't swallow the close taps. */
 export function CommunityWelcomeModal({ open, onClose, name }: { open: boolean; onClose: () => void; name: string }) {
   const colors = useColors()
+  const t = useT()
   return (
     <AppModal visible={open} transparent animationType="fade" onRequestClose={onClose}>
       <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 16 }}>
@@ -364,31 +369,31 @@ export function CommunityWelcomeModal({ open, onClose, name }: { open: boolean; 
         />
         <View className="rounded-3xl border border-white/10 bg-ink-800 p-5" style={{ shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 40, shadowOffset: { width: 0, height: 24 } }}>
           <View className="mb-3.5 flex-row items-center justify-between">
-            <Text className="text-[18px] font-extrabold text-white">You're all set</Text>
+            <Text className="text-[18px] font-extrabold text-white">{t("You're all set")}</Text>
             <Pressable onPress={onClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close" className="h-7 w-7 items-center justify-center rounded-full bg-white/10">
               <X size={15} color={colors.fg} />
             </Pressable>
           </View>
           <Text className="mb-4 text-[13px] leading-relaxed text-secondary">
-            Welcome, <Text className="font-bold text-white">@{name}</Text>. Community is where you compete on staying consistent. Here's what you'll find.
+            {t('Welcome,')} <Text className="font-bold text-white">@{name}</Text>{t(". Community is where you compete on staying consistent. Here's what you'll find.")}
           </Text>
           <View className="gap-3.5">
             {WELCOME_ROWS.map((w) => (
               <View key={w.title} className="flex-row gap-3">
                 <View className="mt-1.5 h-2.5 w-2.5 rounded-full" style={{ backgroundColor: w.color }} />
                 <View className="flex-1">
-                  <Text className="text-[14px] font-bold text-white">{w.title}</Text>
-                  <Text className="mt-0.5 text-[12px] leading-relaxed text-secondary">{w.body}</Text>
+                  <Text className="text-[14px] font-bold text-white">{t(w.title)}</Text>
+                  <Text className="mt-0.5 text-[12px] leading-relaxed text-secondary">{t(w.body)}</Text>
                 </View>
               </View>
             ))}
           </View>
           <View className="mt-4 flex-row items-center gap-2 rounded-2xl bg-white/[0.04] px-3.5 py-3">
             <Settings2Placeholder />
-            <Text className="flex-1 text-[12px] leading-snug text-tertiary">Change your username any time from the settings icon in the top corner.</Text>
+            <Text className="flex-1 text-[12px] leading-snug text-tertiary">{t('Change your username any time from the settings icon in the top corner.')}</Text>
           </View>
           <PressableScale onPress={onClose} accessibilityRole="button" accessibilityLabel="Explore Community" className="mt-4 items-center justify-center rounded-2xl bg-brand-400/15 py-4 active:opacity-90">
-            <Text className="text-[15px] font-bold text-brand-300">Explore Community</Text>
+            <Text className="text-[15px] font-bold text-brand-300">{t('Explore Community')}</Text>
           </PressableScale>
         </View>
       </View>
