@@ -35,6 +35,22 @@ export function coachOutputLanguage(lang: Language): Language {
 type Dict = Record<string, string>
 
 const en: Dict = {
+  // ── safety screening (PAR-Q, clinical-review pending) ──
+  "Has a doctor ever said you have a heart condition, or that you should only exercise under medical supervision?": "Has a doctor ever said you have a heart condition, or that you should only exercise under medical supervision?",
+  "Do you feel chest pain during physical activity?": "Do you feel chest pain during physical activity?",
+  "In the past month, have you had chest pain when you were not physically active?": "In the past month, have you had chest pain when you were not physically active?",
+  "Do you lose balance because of dizziness, or have you ever lost consciousness?": "Do you lose balance because of dizziness, or have you ever lost consciousness?",
+  "Do you have a bone, joint or soft-tissue problem that physical activity could worsen?": "Do you have a bone, joint or soft-tissue problem that physical activity could worsen?",
+  "Are you currently pregnant, or have you given birth within the past six months?": "Are you currently pregnant, or have you given birth within the past six months?",
+  "Is there any other reason you should not do physical activity?": "Is there any other reason you should not do physical activity?",
+  "Is the area painful right now?": "Is the area painful right now?",
+  "Are you currently receiving treatment for it?": "Are you currently receiving treatment for it?",
+  "Have you been advised to restrict exercise or particular movements?": "Have you been advised to restrict exercise or particular movements?",
+  "Has the issue fully resolved, or is it still active?": "Has the issue fully resolved, or is it still active?",
+  "Please speak with a qualified health professional before continuing": "Please speak with a qualified health professional before continuing",
+  "Based on your answers, we can’t safely generate a training program for you yet. Please speak with a GP, physiotherapist or another appropriately qualified health professional.\n\nOnce you’ve been cleared to exercise, you can return and continue setting up your StrengthHub experience.": "Based on your answers, we can’t safely generate a training program for you yet. Please speak with a GP, physiotherapist or another appropriately qualified health professional.\n\nOnce you’ve been cleared to exercise, you can return and continue setting up your StrengthHub experience.",
+  "Please seek medical advice before training": "Please seek medical advice before training",
+  "You told us you’ve experienced chest pain while at rest. For your safety we can’t generate a training program. Please speak with a doctor or another qualified health professional as a priority.\n\nWe’ll keep your answers safe so you can return once you’ve been cleared.": "You told us you’ve experienced chest pain while at rest. For your safety we can’t generate a training program. Please speak with a doctor or another qualified health professional as a priority.\n\nWe’ll keep your answers safe so you can return once you’ve been cleared.",
   // ── app-wide (string-key, batch 3) ──
   "2 chicken breasts\n1 cup rice\nHandful of veg": "2 chicken breasts\n1 cup rice\nHandful of veg",
   "50 means on track": "50 means on track",
@@ -1195,6 +1211,22 @@ const en: Dict = {
 }
 
 const zh: Dict = {
+  // ── safety screening (PAR-Q, clinical-review pending) ──
+  "Has a doctor ever said you have a heart condition, or that you should only exercise under medical supervision?": "医生是否曾告诉你患有心脏疾病，或只能在医疗监督下运动？",
+  "Do you feel chest pain during physical activity?": "你在体力活动时是否感到胸痛？",
+  "In the past month, have you had chest pain when you were not physically active?": "在过去一个月里，你在没有进行体力活动时是否出现过胸痛？",
+  "Do you lose balance because of dizziness, or have you ever lost consciousness?": "你是否因头晕而失去平衡，或曾经失去意识？",
+  "Do you have a bone, joint or soft-tissue problem that physical activity could worsen?": "你是否有可能因体力活动而加重的骨骼、关节或软组织问题？",
+  "Are you currently pregnant, or have you given birth within the past six months?": "你目前是否怀孕，或在过去六个月内分娩？",
+  "Is there any other reason you should not do physical activity?": "是否还有其他原因让你不应进行体力活动？",
+  "Is the area painful right now?": "该部位现在是否疼痛？",
+  "Are you currently receiving treatment for it?": "你目前是否正在为此接受治疗？",
+  "Have you been advised to restrict exercise or particular movements?": "是否有人建议你限制运动或某些动作？",
+  "Has the issue fully resolved, or is it still active?": "该问题是否已完全解决，还是仍然存在？",
+  "Please speak with a qualified health professional before continuing": "请在继续之前咨询合格的健康专业人员",
+  "Based on your answers, we can’t safely generate a training program for you yet. Please speak with a GP, physiotherapist or another appropriately qualified health professional.\n\nOnce you’ve been cleared to exercise, you can return and continue setting up your StrengthHub experience.": "根据你的回答，我们暂时无法安全地为你生成训练计划。请咨询全科医生、物理治疗师或其他适当合格的健康专业人员。\n\n在你获得运动许可后，可以返回并继续设置你的 StrengthHub 体验。",
+  "Please seek medical advice before training": "请在训练前寻求医疗建议",
+  "You told us you’ve experienced chest pain while at rest. For your safety we can’t generate a training program. Please speak with a doctor or another qualified health professional as a priority.\n\nWe’ll keep your answers safe so you can return once you’ve been cleared.": "你告诉我们你在静息状态下曾出现胸痛。为了你的安全，我们无法生成训练计划。请优先咨询医生或其他合格的健康专业人员。\n\n我们会妥善保存你的回答，以便你在获得许可后返回。",
   // ── app-wide (string-key, batch 3) ──
   "2 chicken breasts\n1 cup rice\nHandful of veg": "2块鸡胸肉\n1杯米饭\n一把蔬菜",
   "50 means on track": "50 表示进度正常",
@@ -2352,6 +2384,22 @@ const zh: Dict = {
 }
 
 const hi: Dict = {
+  // ── safety screening (PAR-Q, clinical-review pending) ──
+  "Has a doctor ever said you have a heart condition, or that you should only exercise under medical supervision?": "क्या किसी डॉक्टर ने कभी कहा है कि आपको हृदय की कोई समस्या है, या आपको केवल चिकित्सकीय निगरानी में ही व्यायाम करना चाहिए?",
+  "Do you feel chest pain during physical activity?": "क्या शारीरिक गतिविधि के दौरान आपको सीने में दर्द महसूस होता है?",
+  "In the past month, have you had chest pain when you were not physically active?": "पिछले महीने में, जब आप शारीरिक रूप से सक्रिय नहीं थे तब क्या आपको सीने में दर्द हुआ?",
+  "Do you lose balance because of dizziness, or have you ever lost consciousness?": "क्या चक्कर आने के कारण आपका संतुलन बिगड़ता है, या क्या आप कभी बेहोश हुए हैं?",
+  "Do you have a bone, joint or soft-tissue problem that physical activity could worsen?": "क्या आपको हड्डी, जोड़ या सॉफ्ट-टिश्यू की कोई समस्या है जो शारीरिक गतिविधि से बिगड़ सकती है?",
+  "Are you currently pregnant, or have you given birth within the past six months?": "क्या आप वर्तमान में गर्भवती हैं, या पिछले छह महीनों में आपने बच्चे को जन्म दिया है?",
+  "Is there any other reason you should not do physical activity?": "क्या कोई और कारण है जिसकी वजह से आपको शारीरिक गतिविधि नहीं करनी चाहिए?",
+  "Is the area painful right now?": "क्या वह हिस्सा अभी दर्द कर रहा है?",
+  "Are you currently receiving treatment for it?": "क्या आप वर्तमान में इसका उपचार करा रहे हैं?",
+  "Have you been advised to restrict exercise or particular movements?": "क्या आपको व्यायाम या कुछ विशेष गतिविधियों को सीमित करने की सलाह दी गई है?",
+  "Has the issue fully resolved, or is it still active?": "क्या समस्या पूरी तरह ठीक हो गई है, या यह अभी भी बनी हुई है?",
+  "Please speak with a qualified health professional before continuing": "कृपया आगे बढ़ने से पहले किसी योग्य स्वास्थ्य पेशेवर से परामर्श करें",
+  "Based on your answers, we can’t safely generate a training program for you yet. Please speak with a GP, physiotherapist or another appropriately qualified health professional.\n\nOnce you’ve been cleared to exercise, you can return and continue setting up your StrengthHub experience.": "आपके उत्तरों के आधार पर, हम अभी सुरक्षित रूप से आपके लिए प्रशिक्षण कार्यक्रम नहीं बना सकते। कृपया किसी जीपी, फिजियोथेरेपिस्ट या अन्य उपयुक्त योग्य स्वास्थ्य पेशेवर से परामर्श करें।\n\nजब आपको व्यायाम की अनुमति मिल जाए, तो आप लौटकर अपना StrengthHub अनुभव सेट करना जारी रख सकते हैं।",
+  "Please seek medical advice before training": "कृपया प्रशिक्षण से पहले चिकित्सीय सलाह लें",
+  "You told us you’ve experienced chest pain while at rest. For your safety we can’t generate a training program. Please speak with a doctor or another qualified health professional as a priority.\n\nWe’ll keep your answers safe so you can return once you’ve been cleared.": "आपने हमें बताया कि आराम की स्थिति में आपको सीने में दर्द हुआ है। आपकी सुरक्षा के लिए हम प्रशिक्षण कार्यक्रम नहीं बना सकते। कृपया प्राथमिकता के रूप में किसी डॉक्टर या अन्य योग्य स्वास्थ्य पेशेवर से परामर्श करें।\n\nहम आपके उत्तर सुरक्षित रखेंगे ताकि अनुमति मिलने पर आप लौट सकें।",
   // ── app-wide (string-key, batch 3) ──
   "2 chicken breasts\n1 cup rice\nHandful of veg": "2 चिकन ब्रेस्ट\n1 कप चावल\nएक मुट्ठी सब्ज़ी",
   "50 means on track": "50 का मतलब सही राह पर",
@@ -3509,6 +3557,22 @@ const hi: Dict = {
 }
 
 const ar: Dict = {
+  // ── safety screening (PAR-Q, clinical-review pending) ──
+  "Has a doctor ever said you have a heart condition, or that you should only exercise under medical supervision?": "هل سبق أن أخبرك طبيب بأنك تعاني من مرض في القلب، أو بأنه ينبغي لك ممارسة الرياضة تحت إشراف طبي فقط؟",
+  "Do you feel chest pain during physical activity?": "هل تشعر بألم في الصدر أثناء النشاط البدني؟",
+  "In the past month, have you had chest pain when you were not physically active?": "في الشهر الماضي، هل شعرت بألم في الصدر بينما لم تكن تمارس نشاطًا بدنيًا؟",
+  "Do you lose balance because of dizziness, or have you ever lost consciousness?": "هل تفقد توازنك بسبب الدوخة، أو هل فقدت الوعي من قبل؟",
+  "Do you have a bone, joint or soft-tissue problem that physical activity could worsen?": "هل لديك مشكلة في العظام أو المفاصل أو الأنسجة الرخوة قد يزيدها النشاط البدني سوءًا؟",
+  "Are you currently pregnant, or have you given birth within the past six months?": "هل أنتِ حامل حاليًا، أو هل وضعتِ مولودًا خلال الأشهر الستة الماضية؟",
+  "Is there any other reason you should not do physical activity?": "هل هناك أي سبب آخر يمنعك من ممارسة النشاط البدني؟",
+  "Is the area painful right now?": "هل المنطقة مؤلمة الآن؟",
+  "Are you currently receiving treatment for it?": "هل تتلقى علاجًا لها حاليًا؟",
+  "Have you been advised to restrict exercise or particular movements?": "هل نُصحت بتقييد التمارين أو حركات معينة؟",
+  "Has the issue fully resolved, or is it still active?": "هل زالت المشكلة تمامًا، أم أنها لا تزال قائمة؟",
+  "Please speak with a qualified health professional before continuing": "يرجى التحدث إلى مختص صحي مؤهل قبل المتابعة",
+  "Based on your answers, we can’t safely generate a training program for you yet. Please speak with a GP, physiotherapist or another appropriately qualified health professional.\n\nOnce you’ve been cleared to exercise, you can return and continue setting up your StrengthHub experience.": "بناءً على إجاباتك، لا يمكننا بعد إنشاء برنامج تدريبي لك بأمان. يرجى التحدث إلى طبيب عام أو أخصائي علاج طبيعي أو مختص صحي مؤهل آخر.\n\nبمجرد الحصول على إذن بممارسة الرياضة، يمكنك العودة ومتابعة إعداد تجربتك في StrengthHub.",
+  "Please seek medical advice before training": "يرجى طلب المشورة الطبية قبل التمرين",
+  "You told us you’ve experienced chest pain while at rest. For your safety we can’t generate a training program. Please speak with a doctor or another qualified health professional as a priority.\n\nWe’ll keep your answers safe so you can return once you’ve been cleared.": "أخبرتنا بأنك شعرت بألم في الصدر أثناء الراحة. من أجل سلامتك لا يمكننا إنشاء برنامج تدريبي. يرجى التحدث إلى طبيب أو مختص صحي مؤهل آخر على سبيل الأولوية.\n\nسنحتفظ بإجاباتك بأمان حتى تتمكن من العودة بعد حصولك على الإذن.",
   // ── app-wide (string-key, batch 3) ──
   "2 chicken breasts\n1 cup rice\nHandful of veg": "قطعتا صدر دجاج\nكوب أرز\nحفنة من الخضار",
   "50 means on track": "50 يعني أنك على المسار الصحيح",
@@ -4666,6 +4730,22 @@ const ar: Dict = {
 }
 
 const vi: Dict = {
+  // ── safety screening (PAR-Q, clinical-review pending) ──
+  "Has a doctor ever said you have a heart condition, or that you should only exercise under medical supervision?": "Bác sĩ đã bao giờ nói bạn có bệnh tim, hoặc bạn chỉ nên tập thể dục dưới sự giám sát y tế chưa?",
+  "Do you feel chest pain during physical activity?": "Bạn có bị đau ngực khi vận động thể chất không?",
+  "In the past month, have you had chest pain when you were not physically active?": "Trong tháng qua, bạn có bị đau ngực khi không vận động thể chất không?",
+  "Do you lose balance because of dizziness, or have you ever lost consciousness?": "Bạn có bị mất thăng bằng do chóng mặt, hoặc đã từng bất tỉnh không?",
+  "Do you have a bone, joint or soft-tissue problem that physical activity could worsen?": "Bạn có vấn đề về xương, khớp hoặc mô mềm mà vận động thể chất có thể làm nặng thêm không?",
+  "Are you currently pregnant, or have you given birth within the past six months?": "Bạn hiện có đang mang thai, hoặc đã sinh con trong sáu tháng qua không?",
+  "Is there any other reason you should not do physical activity?": "Có lý do nào khác khiến bạn không nên vận động thể chất không?",
+  "Is the area painful right now?": "Vùng đó hiện có đau không?",
+  "Are you currently receiving treatment for it?": "Bạn hiện có đang điều trị cho vấn đề đó không?",
+  "Have you been advised to restrict exercise or particular movements?": "Bạn có được khuyên hạn chế tập luyện hoặc một số động tác nhất định không?",
+  "Has the issue fully resolved, or is it still active?": "Vấn đề đã khỏi hẳn hay vẫn còn?",
+  "Please speak with a qualified health professional before continuing": "Vui lòng trao đổi với chuyên gia y tế đủ trình độ trước khi tiếp tục",
+  "Based on your answers, we can’t safely generate a training program for you yet. Please speak with a GP, physiotherapist or another appropriately qualified health professional.\n\nOnce you’ve been cleared to exercise, you can return and continue setting up your StrengthHub experience.": "Dựa trên câu trả lời của bạn, chúng tôi chưa thể tạo chương trình tập một cách an toàn cho bạn. Vui lòng trao đổi với bác sĩ đa khoa, chuyên viên vật lý trị liệu hoặc chuyên gia y tế đủ trình độ khác.\n\nSau khi được cho phép tập luyện, bạn có thể quay lại và tiếp tục thiết lập trải nghiệm StrengthHub của mình.",
+  "Please seek medical advice before training": "Vui lòng tìm tư vấn y tế trước khi tập luyện",
+  "You told us you’ve experienced chest pain while at rest. For your safety we can’t generate a training program. Please speak with a doctor or another qualified health professional as a priority.\n\nWe’ll keep your answers safe so you can return once you’ve been cleared.": "Bạn đã cho chúng tôi biết bạn từng bị đau ngực khi đang nghỉ ngơi. Vì sự an toàn của bạn, chúng tôi không thể tạo chương trình tập. Vui lòng ưu tiên trao đổi với bác sĩ hoặc chuyên gia y tế đủ trình độ khác.\n\nChúng tôi sẽ lưu giữ câu trả lời của bạn an toàn để bạn có thể quay lại sau khi được cho phép.",
   // ── app-wide (string-key, batch 3) ──
   "2 chicken breasts\n1 cup rice\nHandful of veg": "2 ức gà\n1 chén cơm\nMột nắm rau",
   "50 means on track": "50 nghĩa là đúng tiến độ",

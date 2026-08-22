@@ -609,8 +609,11 @@ function ProgressHeader({ sectionIdx, sectionProgress, onBack, showBack = true }
 function QHeader({ title, sub, chip }: { title: string; sub?: string; chip?: ReactNode }) {
   const tok = useTok()
   // Translate by the English string itself as the key: a translated locale supplies the value,
-  // and anything without a translation (incl. the safety-screening questions, deliberately left
-  // English until native/clinical review) falls back to the English key unchanged.
+  // and anything without a translation falls back to the English key unchanged. The PAR-Q
+  // screening questions are now translated too (a non-English user who cannot read the English
+  // questions can't screen safely); those translations are flagged for clinical/native sign-off
+  // in the dictionary. What still stays English is the AI coach's OUTPUT language, gated
+  // separately by COACH_APPROVED_LOCALES for crisis-detection safety.
   const t = useT()
   return (
     <View style={{ marginBottom: 22 }}>
@@ -1156,7 +1159,7 @@ function StepView({ step, answers, set, header, onContinue, onAdvance, onRestart
         <View style={{ flex: 1 }}>
           {header}
           <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 24 }}>
-            <Reveal delay={80}><Text style={{ marginBottom: 30, fontSize: 24, fontWeight: '700', color: tok.rgb('--fg'), lineHeight: 31 }}>{q.text}</Text></Reveal>
+            <Reveal delay={80}><Text style={{ marginBottom: 30, fontSize: 24, fontWeight: '700', color: tok.rgb('--fg'), lineHeight: 31 }}>{t(q.text)}</Text></Reveal>
             <View style={{ gap: 11 }}>
               <Stagger start={180} step={60}>
                 {opts.map((o: any) => <OptionRow key={o.value} label={o.label} selected={val === o.value} onPress={() => pick(o.value)} />)}
@@ -1197,7 +1200,7 @@ function StepView({ step, answers, set, header, onContinue, onAdvance, onRestart
             {SAFETY_QUESTIONS.map((q, i) => (
               <Reveal key={q.id} delay={110 + i * 45}>
                 <View style={{ paddingVertical: 14, paddingHorizontal: 15, borderRadius: 16, backgroundColor: tok.rgb('--ink-800'), borderWidth: 1, borderColor: answers.safety[q.id] === 'yes' ? tok.rgb('--accent-orange', 0.4) : tok.rgb('--fg', 0.06) }}>
-                  <Text style={{ fontSize: 13.8, lineHeight: 19.3, fontWeight: '500', color: tok.rgb('--fg', 0.85) }}>{q.text}</Text>
+                  <Text style={{ fontSize: 13.8, lineHeight: 19.3, fontWeight: '500', color: tok.rgb('--fg', 0.85) }}>{t(q.text)}</Text>
                   <View style={{ flexDirection: 'row', gap: 8, marginTop: 11 }}>
                     {(['no', 'yes'] as const).map((v) => {
                       const on = answers.safety[q.id] === v
@@ -1633,8 +1636,8 @@ function SafetyOutcome({ answers, header, onSaveExit }: { answers: Answers; head
       {header}
       <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 26 }}>
         <Reveal delay={80}><View style={{ width: 70, height: 70, borderRadius: 22, backgroundColor: c.tone === 'danger' ? tok.rgb('--danger', 0.14) : tok.rgb('--accent-orange', 0.14), alignItems: 'center', justifyContent: 'center' }}><Icon name={c.icon} size={34} color={accent} /></View></Reveal>
-        <Reveal delay={260}><Text style={{ marginTop: 24, fontSize: 24, fontWeight: '800', letterSpacing: -0.5, color: tok.rgb('--fg'), lineHeight: 29 }}>{c.title}</Text></Reveal>
-        <Reveal delay={360}><Text style={{ marginTop: 14, fontSize: 15, lineHeight: 24, color: tok.rgb('--fg', 0.6) }}>{c.body}</Text></Reveal>
+        <Reveal delay={260}><Text style={{ marginTop: 24, fontSize: 24, fontWeight: '800', letterSpacing: -0.5, color: tok.rgb('--fg'), lineHeight: 29 }}>{t(c.title)}</Text></Reveal>
+        <Reveal delay={360}><Text style={{ marginTop: 14, fontSize: 15, lineHeight: 24, color: tok.rgb('--fg', 0.6) }}>{t(c.body)}</Text></Reveal>
         <Reveal delay={440}><View style={{ marginTop: 18, paddingVertical: 13, paddingHorizontal: 15, borderRadius: 14, backgroundColor: tok.rgb('--fg', 0.05) }}><Text style={{ fontSize: 13, lineHeight: 19.5, color: tok.rgb('--fg', 0.5) }}>{t('StrengthHub provides general fitness information, not a medical assessment. This isn’t a diagnosis.')}</Text></View></Reveal>
       </View>
       <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 26 }}>
