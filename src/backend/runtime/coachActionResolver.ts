@@ -17,7 +17,7 @@
 import type { UserDoc, ProgramDoc, WorkoutInstanceDoc, Weekday, AbsenceMode } from '../schema'
 import {
   activateProgram,
-  projectProgram,
+  changeGoalActivation,
   storedExerciseFromPrescription,
   prescribedExerciseFromPrescription,
   type StoredProgram,
@@ -27,7 +27,6 @@ import {
 import { contextForUser } from '../generator/generate'
 import { swapCandidates, requestSpecific, type SwapResult, type SwapReason } from '../generator/swaps'
 import { DELOAD } from '../generator/deload'
-import { changeGoal } from '../generator/goalChange'
 import { EXERCISE_BY_ID } from '../data/index'
 import { validateWorkoutActionPayload, SWAP_REASONS, type NudgeKindLit } from '../coach/workoutActions'
 import { validateProgramForUser, summarizeViolations, fitProgramToDuration, DURATION_TARGET_TOLERANCE } from './programInvariants'
@@ -294,18 +293,20 @@ export function resolveCoachAction(
       if (action.newGoal === state.backendUser.goal) {
         return { ok: false, reason: 'no_change', message: `You're already training for ${action.newGoal}.` }
       }
-      // Use the dedicated Goal Change engine (GC01–GC09): re-selects split, re-budgets volume,
-      // re-prescribes (re-clamped), preserves logged loads, and versions the program.
-      const result = changeGoal(state.backendUser, action.newGoal, state.programDoc?.version ?? 1)
-      if (!('ok' in result) || result.ok !== true) {
-        return { ok: false, reason: (result as { reason: string }).reason, message: 'That change needs a quick health re-check before I can apply it — open your Training profile to finish it.' }
+      // Unified Goal Change (GC01–GC09) via changeGoalActivation — the SAME entry point the
+      // Settings training-profile edit uses. It re-selects split, re-budgets, re-prescribes
+      // (re-clamped), preserves logged loads, versions the program, and applies the eased GC07
+      // transition week as the active plan (settling automatically a week out).
+      const todayKey = now.slice(0, 10)
+      const act = changeGoalActivation(state.backendUser, action.newGoal, state.programDoc?.version ?? 1, todayKey, now)
+      if (!act.status.ok || !act.program || !act.programDoc) {
+        return { ok: false, reason: act.status.reason ?? 'goal_change_failed', message: 'That change needs a quick health re-check before I can apply it — open your Training profile to finish it.' }
       }
       const nextUser: UserDoc = { ...state.backendUser, goal: action.newGoal }
-      const projected = projectProgram(nextUser.uid, now, result.program, result.version)
-      return guardProgram(nextUser, projected.program, {
+      return guardProgram(nextUser, act.program, {
         ok: true, apply: 'regen', nextUser,
-        program: projected.program, status: { ok: true, reason: null }, programDoc: projected.programDoc, instances: projected.instances,
-        message: `Switched your goal to ${action.newGoal} and rebuilt your plan around it — your logged loads carry over. Take the first week one notch easier so the change doesn't spike your intensity.`,
+        program: act.program, status: act.status, programDoc: act.programDoc, instances: act.instances,
+        message: `Switched your goal to ${action.newGoal} and rebuilt your plan around it — your logged loads carry over, and your first week runs one notch easier to ease the change in, then settles automatically. If anything about your health has changed since onboarding, tell me first so we re-check.`,
       })
     }
 

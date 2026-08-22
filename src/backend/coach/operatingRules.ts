@@ -82,7 +82,7 @@ export const APP_NAV_MAP = [
   'SETTINGS (inside the menu): Goals (sleep, step, water and goal-weight targets, plus "Training profile" to change goal, experience, days, session length and equipment and preview a new program); Language (partial, Settings only); Connected apps (integrations); Preferences (Push notifications, Sound, Haptics); Data ("Sync now" cloud backup, "Download my data" which exports your profile and logs as JSON, and "Delete account" which is permanent — cancel any subscription first as it does not stop billing); Legal & support (Terms of Service, Privacy Policy, Health & Safety Notice, Contact support at info@strengthhubonline.com).',
   'COACH SETTINGS: Menu > Your coach > "Coach profile & memory". There you turn Memory on or off, set Coaching style (Supportive, Balanced or Direct), and see what the coach remembers with a "Forget" button on each item. The chat screen itself has no settings.',
   'WORKOUT tab: your program and sessions, the exercise library, starting a session (set logging and the rest timer live inside an active workout), and "Log an activity" for other activities.',
-  'NUTRITION tab: "Plan your week" (weekly meal planner), "Add food" and "My meals" (food logging), the meal scan, and recipes ("Copy recipe", "Add to plan").',
+  'NUTRITION tab: "Plan your week" (weekly meal planner), "Add food" and "My meals" (food logging), and recipes ("Copy recipe", "Add to plan").',
   'COMMUNITY tab: claim a username to join, the streak leaderboard, monthly Leagues ("How leagues work"), and Groups (create or join a group, invite friends with an invite code, hand over or delete a group). Badges are under Menu > Profile > Badges.',
   'PLAN AROUND YOUR LIFE (exams, travel, busy weeks): Menu > Profile > "Plan Around Your Life"; add dates and the app adapts training around them.',
   'NOT user-configurable (explain, do not offer to change): the daily message limit, and the general / personalised / app-help labels on replies (they describe how an answer was produced).',
@@ -208,7 +208,16 @@ export const WORKOUT_ACTION_ALLOWLIST: string[] = [
   'Never treat a personal record the user CLAIMS as real unless it is in their logged sessions, and never offer to share, post or publish an achievement you cannot see in their data or that is implausibly beyond their logged bests (for example a "300 kg bench"). If they ask you to post a PR you cannot verify, say plainly that you can only share a record they have actually logged, and suggest they log the lift first. Do not repeat their claimed number back as if it were a confirmed record.',
 ]
 
-export function buildCoachSystemPrompt(opts: { allowWorkoutActions?: boolean } = {}): string {
+/** Readable names for the coach language directive. Only used once a locale is safety-approved. */
+const COACH_LANG_NAME: Record<string, string> = { en: 'English', zh: 'Chinese', hi: 'Hindi', ar: 'Arabic', vi: 'Vietnamese' }
+
+export function buildCoachSystemPrompt(opts: { allowWorkoutActions?: boolean; language?: string } = {}): string {
+  // Language directive is emitted ONLY for a non-English (safety-approved) locale. For every English
+  // turn — i.e. all turns today, since English is the only approved coach locale — this is empty, so
+  // the built prompt is byte-identical to before and the canonical-prompt / release check is unaffected.
+  const languageDirective = opts.language && opts.language !== 'en'
+    ? `LANGUAGE: Write your visible reply to the user in ${COACH_LANG_NAME[opts.language] ?? opts.language}. Keep these operating rules and ALL safety reasoning in English internally; only the user-facing message is in that language, and never mix languages within a reply.`
+    : ''
   const nevers = HARD_NEVERS.map((n) => `- ${n}`).join('\n')
   const consult = CONSULT_ORDER.map((c) => `- When the user ${c.when}: consult ${c.consult.join(', ')} → ${c.then}`).join('\n')
   const scope = OUT_OF_SCOPE.map((o) => `- ${o.request}: ${o.response}`).join('\n')
@@ -269,6 +278,7 @@ export function buildCoachSystemPrompt(opts: { allowWorkoutActions?: boolean } =
           'A bare confirmation ("yes", "go ahead", "do it", "sure", "please") binds to the MOST RECENT thing you offered in the conversation — resolve it against your immediately preceding turn, not an earlier one. If your last turn offered an exercise swap and the user says "yes", emit the SWAP proposal now (not some earlier water/goal action). Never resurface an older offer the user has moved on from.',
           ...WORKOUT_ACTION_ALLOWLIST.map((r) => `- ${r}`)]
       : ['Never propose an automatic health, training, nutrition, account, purchase, or social action.']),
+    ...(languageDirective ? ['', languageDirective] : []),
     '',
     `TONE & BOUNDARIES: ${TONE}`,
   ].join('\n')

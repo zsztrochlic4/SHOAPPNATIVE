@@ -33,6 +33,10 @@ export interface CoachServerInput {
   /** Validated device IANA timezone for THIS turn (audit R5-010) — lets the server name the
    *  correct local day immediately, before the debounced settings cloud-save catches up. */
   timezone?: string
+  /** The language the coach should REPLY in — already gated to a safety-approved locale by the
+   *  client (coachOutputLanguage), so this is 'en' until a locale passes its per-locale safety
+   *  review. The server only ever adds a language directive for a non-'en' value. */
+  language?: string
 }
 
 export interface CoachServerResult {

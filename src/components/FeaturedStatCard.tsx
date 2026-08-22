@@ -8,6 +8,7 @@ import {
 } from '../lib/metrics'
 import type { StatTimeframe } from '../store/types'
 import { useColors, type Palette } from '../theme'
+import { useT } from '../lib/useT'
 
 const RANGE_LABEL: Record<string, string> = {
   '7 days': '7 Days', '4 weeks': '4 Weeks', '3 months': '3 Months', '6 months': '6 Months',
@@ -36,6 +37,7 @@ function progColor(c: ProgressColor, colors: Palette): string {
 export function FeaturedStatCard() {
   const { state } = useStore()
   const colors = useColors()
+  const t = useT()
   const units = state.settings.units
   const metricId = dashboardFeaturedId(state)
 
@@ -78,7 +80,7 @@ export function FeaturedStatCard() {
           accessibilityLabel={`Change range, currently ${RANGE_LABEL[tf]}`}
           className="shrink-0 flex-row items-center rounded-[10px] border border-white/10 bg-ink-700 px-3 py-1.5 active:scale-95"
         >
-          <Text className="text-[12px] font-bold text-white/75">{RANGE_LABEL[tf]}</Text>
+          <Text className="text-[12px] font-bold text-white/75">{t(RANGE_LABEL[tf])}</Text>
         </Pressable>
       </View>
 
@@ -109,7 +111,7 @@ export function FeaturedStatCard() {
       {/* Mini 7-day bars (steps / water / sleep) */}
       {feat.mini7 && (
         <View className="mt-3 border-t border-white/[0.06] pt-3">
-          <Text className="mb-2 text-[11px] text-tertiary">Last 7 days</Text>
+          <Text className="mb-2 text-[11px] text-tertiary">{t('Last 7 days')}</Text>
           <View className="h-14 flex-row items-end gap-[7px]">
             {feat.mini7.map((b, i) => (
               <View key={i} className="h-full flex-1 flex-col items-center gap-1.5">

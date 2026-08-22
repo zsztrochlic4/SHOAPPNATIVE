@@ -17,13 +17,17 @@ import { RankBadge, StreakFlame } from './ui'
 import { ReportSheet, type ReportTarget } from './ReportSheet'
 import { BlockedUsersSheet } from './BlockedUsersSheet'
 import { PressableScale } from '../components/PressableScale'
+import { useT } from '../lib/useT'
 
 type Status = 'loading' | 'ready' | 'error'
 
 export function GlobalLeaderboard({ onClaimUsername }: { onClaimUsername: () => void }) {
   const { state } = useStore()
-  const me = useMemo(() => myLeaderStats(state), [state])
+  // myLeaderStats reads only these slices; narrowing the deps is intentional (avoids recomputing on every unrelated dispatch).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const me = useMemo(() => myLeaderStats(state), [state.habits, state.sessions, state.activities, state.community, state.profile])
   const colors = useColors()
+  const t = useT()
 
   const [status, setStatus] = useState<Status>('loading')
   const [rows, setRows] = useState<LeaderRow[]>([])
@@ -82,10 +86,10 @@ export function GlobalLeaderboard({ onClaimUsername }: { onClaimUsername: () => 
     return (
       <View className="mt-8 items-center rounded-2xl border border-dashed border-white/15 px-6 py-12">
         <RefreshCw size={26} color="rgba(255,255,255,0.4)" />
-        <Text className="mt-3 font-bold text-white">Couldn't load the leaderboard</Text>
-        <Text className="mt-1 max-w-[240px] text-center text-[13px] text-secondary">Check your connection and try again.</Text>
+        <Text className="mt-3 font-bold text-white">{t("Couldn't load the leaderboard")}</Text>
+        <Text className="mt-1 max-w-[240px] text-center text-[13px] text-secondary">{t('Check your connection and try again.')}</Text>
         <PressableScale onPress={load} accessibilityRole="button" accessibilityLabel="Retry loading leaderboard" className="btn-primary mt-4 px-5 py-2.5 active:opacity-90">
-          <Text className="text-sm font-semibold text-black">Try again</Text>
+          <Text className="text-sm font-semibold text-black">{t('Try again')}</Text>
         </PressableScale>
       </View>
     )
@@ -100,10 +104,10 @@ export function GlobalLeaderboard({ onClaimUsername }: { onClaimUsername: () => 
       {me.username ? <YourRankCard rank={youRank} total={total} me={me} /> : <ClaimBanner onPress={onClaimUsername} />}
 
       <View className="mb-3 mt-6 flex-row items-center justify-between">
-        <Text className="section-title">Streak leaderboard</Text>
+        <Text className="section-title">{t('Streak leaderboard')}</Text>
         <View className="flex-row items-center gap-1.5">
           <Flame size={13} color={colors.accentOrange} />
-          <Text className="text-[12px] font-semibold text-secondary">By current streak</Text>
+          <Text className="text-[12px] font-semibold text-secondary">{t('By current streak')}</Text>
         </View>
       </View>
 
@@ -128,18 +132,18 @@ export function GlobalLeaderboard({ onClaimUsername }: { onClaimUsername: () => 
           {loadingMore ? (
             <>
               <ActivityIndicator size="small" color="rgba(255,255,255,0.7)" />
-              <Text className="text-[14px] font-bold text-secondary">Loading…</Text>
+              <Text className="text-[14px] font-bold text-secondary">{t('Loading…')}</Text>
             </>
           ) : (
             <>
               <ChevronDown size={15} color="rgba(255,255,255,0.7)" />
-              <Text className="text-[14px] font-bold text-secondary">Load 20 more</Text>
+              <Text className="text-[14px] font-bold text-secondary">{t('Load 20 more')}</Text>
             </>
           )}
         </PressableScale>
       )}
       <Text className="mt-2.5 text-center text-[12px] text-tertiary">
-        Showing {Math.min(shown, visibleRows.length)} of {total.toLocaleString('en-US')}
+        {t('Showing {n} of {total}', { n: Math.min(shown, visibleRows.length), total: total.toLocaleString('en-US') })}
       </Text>
 
       {blocked.size > 0 && (
@@ -151,7 +155,7 @@ export function GlobalLeaderboard({ onClaimUsername }: { onClaimUsername: () => 
           className="mt-2 flex-row items-center justify-center gap-1.5 py-2 active:opacity-70"
         >
           <Ban size={12} color="rgba(255,255,255,0.45)" />
-          <Text className="text-[12px] font-semibold text-tertiary">Manage blocked ({blocked.size})</Text>
+          <Text className="text-[12px] font-semibold text-tertiary">{t('Manage blocked ({n})', { n: blocked.size })}</Text>
         </Pressable>
       )}
 
@@ -163,6 +167,7 @@ export function GlobalLeaderboard({ onClaimUsername }: { onClaimUsername: () => 
 
 function YourRankCard({ rank, total, me }: { rank: number | null; total: number; me: ReturnType<typeof myLeaderStats> }) {
   const rankText = useCountUp(rank ?? 0, { duration: 700 })
+  const t = useT()
   if (!rank || !me.username) {
     // No username yet is handled upstream (the setup gate); this is the belt-and-braces path.
     return null
@@ -178,18 +183,18 @@ function YourRankCard({ rank, total, me }: { rank: number | null; total: number;
           <Trophy size={26} color={brand[400]} />
         </View>
         <View className="flex-1">
-          <Text className="text-[12px] font-semibold uppercase tracking-wide text-brand-300">Your rank</Text>
+          <Text className="text-[12px] font-semibold uppercase tracking-wide text-brand-300">{t('Your rank')}</Text>
           <View className="flex-row items-end gap-1.5">
             <Text className="text-[30px] font-black leading-tight text-white">#{rankText}</Text>
-            <Text className="mb-1.5 text-[13px] font-semibold text-secondary">of {total.toLocaleString('en-US')}</Text>
+            <Text className="mb-1.5 text-[13px] font-semibold text-secondary">{t('of {total}', { total: total.toLocaleString('en-US') })}</Text>
           </View>
-          <Text className="text-[13px] text-secondary">@{me.username}{top ? ' · top 3!' : ''}</Text>
+          <Text className="text-[13px] text-secondary">@{me.username}{top ? t(' · top 3!') : ''}</Text>
         </View>
         <View className="items-end gap-1.5">
           <StreakFlame days={me.streakCurrent} size={18} />
           <View className="flex-row items-center gap-1">
             <TrendingUp size={12} color="rgba(255,255,255,0.4)" />
-            <Text className="text-[12px] font-semibold text-secondary">best {me.streakBest}</Text>
+            <Text className="text-[12px] font-semibold text-secondary">{t('best {n}', { n: me.streakBest })}</Text>
           </View>
         </View>
       </View>
@@ -200,6 +205,7 @@ function YourRankCard({ rank, total, me }: { rank: number | null; total: number;
 /** Shown above the board when the user hasn't claimed a username yet — they can
  *  still see everyone, but need an identity to appear and compete. */
 function ClaimBanner({ onPress }: { onPress: () => void }) {
+  const t = useT()
   return (
     <View
       className="flex-row items-center gap-3 rounded-2xl border p-4"
@@ -209,11 +215,11 @@ function ClaimBanner({ onPress }: { onPress: () => void }) {
         <Trophy size={22} color={brand[400]} />
       </View>
       <View className="flex-1">
-        <Text className="font-bold text-white">Join the leaderboard</Text>
-        <Text className="text-[12px] text-secondary">Claim a username to appear and compete on your streak.</Text>
+        <Text className="font-bold text-white">{t('Join the leaderboard')}</Text>
+        <Text className="text-[12px] text-secondary">{t('Claim a username to appear and compete on your streak.')}</Text>
       </View>
       <PressableScale onPress={onPress} accessibilityRole="button" accessibilityLabel="Claim a username" className="rounded-full bg-brand-400 px-3.5 py-2 active:opacity-90">
-        <Text className="text-[13px] font-bold text-black">Claim</Text>
+        <Text className="text-[13px] font-bold text-black">{t('Claim')}</Text>
       </PressableScale>
     </View>
   )
@@ -221,6 +227,7 @@ function ClaimBanner({ onPress }: { onPress: () => void }) {
 
 function LeaderRowView({ row, onReport }: { row: LeaderRow; onReport?: () => void }) {
   const you = !!row.isYou
+  const t = useT()
   return (
     <Pressable
       onLongPress={onReport}
@@ -240,9 +247,9 @@ function LeaderRowView({ row, onReport }: { row: LeaderRow; onReport?: () => voi
       <Avatar name={row.username} size={38} />
       <View className="min-w-0 flex-1">
         <Text numberOfLines={1} className={`font-bold leading-tight ${you ? 'text-brand-300' : 'text-white'}`}>
-          @{row.username}{you ? ' (You)' : ''}
+          @{row.username}{you ? t(' (You)') : ''}
         </Text>
-        <Text className="text-[12px] text-tertiary">Best streak {row.streakBest}</Text>
+        <Text className="text-[12px] text-tertiary">{t('Best streak {n}', { n: row.streakBest })}</Text>
       </View>
       <StreakFlame days={row.streakCurrent} size={16} />
     </Pressable>

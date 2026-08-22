@@ -3,8 +3,8 @@ import { View, Text, Pressable, TextInput, Image, ScrollView, Animated, Easing, 
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
 import {
-  Bell, Moon, Sun, GraduationCap, RotateCcw, Trash2, Camera, Trophy,
-  Flame, Search, ScanLine, Plus, Check, Share2, ChevronRight, User, Sparkles, Dumbbell,
+  Bell, Moon, Sun, GraduationCap, RotateCcw, Trash2, Trophy,
+  Flame, Search, Plus, Check, Share2, ChevronRight, User, Sparkles, Dumbbell,
   Droplet, Footprints, BedDouble, Leaf, Play, Award, BellRing,
   HeartPulse, Activity, Zap, Minus, X, LogOut, Volume2, Download,
 } from 'lucide-react-native'
@@ -30,7 +30,6 @@ import { writeBackendUser } from '../backend/repo/userRepo'
 import { canOfferDemoReset } from '../store/resetGuards'
 import { serializeUserExport, splitLocalState, buildExportFilename } from '../lib/dataExport'
 import { deliverExport } from '../lib/exportDeliver'
-import { pick, makeRng } from '../lib/rng'
 import { requestPushPermission, resolveNotifPrefs } from '../lib/notifications'
 import { openBillingPortal } from '../lib/billing'
 import { subscribeSyncStatus, type SyncStatus } from '../store/syncStatus'
@@ -51,6 +50,8 @@ import {
 import { ActivityIcon } from '../components/ActivityIcon'
 import { activePeriod, upcomingPeriods } from '../store/periods'
 import { translator, LANGUAGES, type Language } from '../lib/i18n'
+import { useT } from '../lib/useT'
+import { syncLayoutDirection } from '../lib/rtl'
 import { shareText } from '../lib/share'
 import type { MealName, Units, Theme, NotificationPrefs } from '../store/types'
 import { brand, accent } from '../theme'
@@ -63,6 +64,7 @@ export * from './extra'
 /* ============================ Notifications ============================ */
 export function NotificationsSheet({ open, onClose }: Props) {
   const { state, dispatch } = useStore()
+  const t = useT()
   const iconFor: Record<string, ReactNode> = {
     workout: <Dumbbell size={18} color={brand[400]} />,
     nutrition: <Leaf size={18} color={brand[400]} />,
@@ -72,9 +74,9 @@ export function NotificationsSheet({ open, onClose }: Props) {
     system: <Award size={18} color={brand[400]} />,
   }
   return (
-    <Sheet open={open} onClose={onClose} title="Notifications">
+    <Sheet open={open} onClose={onClose} title={t('Notifications')}>
       <Pressable onPress={() => dispatch({ type: 'MARK_ALL_READ' })} className="active:opacity-80">
-        <Text className="mb-3 text-sm font-semibold text-brand-400">Mark all as read</Text>
+        <Text className="mb-3 text-sm font-semibold text-brand-400">{t('Mark all as read')}</Text>
       </Pressable>
       <View className="gap-2.5">
         {state.notifications.map((n) => (
@@ -95,7 +97,7 @@ export function NotificationsSheet({ open, onClose }: Props) {
           </Pressable>
         ))}
         {state.notifications.length === 0 && (
-          <EmptyState icon={<Bell size={32} color="#fff" />} title="All caught up" body="New activity will show up here." />
+          <EmptyState icon={<Bell size={32} color="#fff" />} title={t('All caught up')} body={t('New activity will show up here.')} />
         )}
       </View>
     </Sheet>
@@ -113,6 +115,7 @@ export function GoalsSettings() {
   const { user } = useAuth()
   const uid = user?.uid
   const toast = useToast()
+  const t = useT()
   const units = state.settings.units
   const p = state.profile
 
@@ -162,29 +165,29 @@ export function GoalsSettings() {
     if (uid && backendPatch && state.backendUser) {
       void writeBackendUser(uid, { ...state.backendUser, ...backendPatch }).catch(() => { /* retried by CloudSync */ })
     }
-    toast('Goals updated')
+    toast(t('Goals updated'))
   }
 
   const inputCls = 'w-24 rounded-xl border border-white/8 bg-ink-900 px-3 py-2 text-right text-[15px] font-bold text-white'
   return (
     <View className="gap-3 rounded-2xl border border-white/5 bg-ink-800 p-4">
-      <GoalRow label="Goal weight" unit={weightUnit(units)}>
+      <GoalRow label={t('Goal weight')} unit={weightUnit(units)}>
         <TextInput value={goalW} onChangeText={(v) => setGoalW(v.replace(/[^\d.]/g, ''))} keyboardType="decimal-pad" placeholderTextColor="rgba(148,148,148,0.6)" className={inputCls} />
       </GoalRow>
-      <GoalRow label="Daily steps" unit="steps">
+      <GoalRow label={t('Daily steps')} unit={t('steps')}>
         <TextInput value={steps} onChangeText={(v) => setSteps(v.replace(/\D/g, ''))} keyboardType="number-pad" placeholderTextColor="rgba(148,148,148,0.6)" className={inputCls} />
       </GoalRow>
-      <GoalRow label="Sleep" unit="hours">
+      <GoalRow label={t('Sleep')} unit={t('hours')}>
         <TextInput value={sleep} onChangeText={(v) => setSleep(v.replace(/[^\d.]/g, ''))} keyboardType="decimal-pad" placeholderTextColor="rgba(148,148,148,0.6)" className={inputCls} />
       </GoalRow>
-      <GoalRow label="Water" unit={units === 'imperial' ? 'fl oz' : 'litres'}>
+      <GoalRow label={t('Water')} unit={units === 'imperial' ? 'fl oz' : t('litres')}>
         <TextInput value={water} onChangeText={(v) => setWater(v.replace(/[^\d.]/g, ''))} keyboardType="decimal-pad" placeholderTextColor="rgba(148,148,148,0.6)" className={inputCls} />
       </GoalRow>
-      <GoalRow label="Height" unit="cm">
+      <GoalRow label={t('Height')} unit="cm">
         <TextInput value={heightCm} onChangeText={(v) => setHeightCm(v.replace(/\D/g, '').slice(0, 3))} keyboardType="number-pad" placeholderTextColor="rgba(148,148,148,0.6)" className={inputCls} />
       </GoalRow>
       <View className="flex-row items-center justify-between py-1">
-        <Text className="text-[15px] text-white">Sex</Text>
+        <Text className="text-[15px] text-white">{t('Sex')}</Text>
         <View className="flex-row gap-1.5">
           {(['male', 'female', 'other'] as const).map((s) => (
             <Pressable key={s} onPress={() => setSex(s)} accessibilityRole="radio" accessibilityLabel={s} accessibilityState={{ selected: sex === s, checked: sex === s }} className={`rounded-lg border px-3 py-1.5 ${sex === s ? 'border-brand-400 bg-brand-400/10' : 'border-white/8 bg-ink-900'}`}>
@@ -194,7 +197,7 @@ export function GoalsSettings() {
         </View>
       </View>
       <Pressable onPress={saveGoals} className="btn-primary mt-1 w-full py-2.5 active:opacity-90">
-        <Text className="text-sm font-semibold text-black">Save goals</Text>
+        <Text className="text-sm font-semibold text-black">{t('Save goals')}</Text>
       </Pressable>
     </View>
   )
@@ -232,6 +235,7 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
   const reducedMotion = state.settings.reducedMotion ?? 'system'
   const lang = state.settings.language ?? 'en'
   const t = translator(lang)
+  const tr = useT()
   // Two-step inline confirm for the destructive wipe — works on web and native
   // (RN's Alert is a no-op on react-native-web, so a dialog would never show).
   const [confirmingClear, setConfirmingClear] = useState(false)
@@ -250,12 +254,12 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
     ? new Date(sub.currentPeriodEnd * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
     : null
   const subStatusLabel =
-    sub?.status === 'trialing' ? 'Free trial'
-    : sub?.status === 'active' ? 'Active'
-    : sub?.status === 'past_due' ? 'Payment issue'
-    : sub?.status === 'canceled' ? 'Cancelled'
-    : sub?.status === 'incomplete' ? 'Incomplete'
-    : 'None'
+    sub?.status === 'trialing' ? tr('Free trial')
+    : sub?.status === 'active' ? tr('Active')
+    : sub?.status === 'past_due' ? tr('Payment issue')
+    : sub?.status === 'canceled' ? tr('Cancelled')
+    : sub?.status === 'incomplete' ? tr('Incomplete')
+    : tr('None')
 
   async function onManageSubscription() {
     if (portalBusy) return
@@ -264,7 +268,7 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
       // Stripe's hosted Billing Portal: plan, payment method, invoices, cancel.
       await openBillingPortal()
     } catch {
-      toast('Could not open subscription management. Please try again, or email info@strengthhubonline.com.')
+      toast(tr('Could not open subscription management. Please try again, or email info@strengthhubonline.com.'))
     } finally {
       setPortalBusy(false)
     }
@@ -276,7 +280,7 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
     try {
       await deleteAccount()
       dispatch({ type: 'RESET_EMPTY' }) // clear local state; auth listener routes to login
-      toast('Your account has been deleted. If you had a subscription and did not cancel it, email info@strengthhubonline.com and we will cancel it.')
+      toast(tr('Your account has been deleted. If you had a subscription and did not cancel it, email info@strengthhubonline.com and we will cancel it.'))
       onDone?.()
     } catch (e: unknown) {
       // Truthful failure copy (audit SA-002). The callable is AUTH-FIRST and
@@ -289,14 +293,14 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
       const code = err?.code ?? ''
       const offline = code === 'functions/unavailable' || code === 'unavailable'
       if (err?.details?.accountDisabled) {
-        toast('Your account is being deleted and access has been revoked. Some data is still being removed — this will finish automatically.')
+        toast(tr('Your account is being deleted and access has been revoked. Some data is still being removed — this will finish automatically.'))
         // The session is dead; drop local state so we don't show a half-account.
         dispatch({ type: 'RESET_EMPTY' })
         onDone?.()
       } else {
         toast(offline
-          ? 'Could not reach our servers. Nothing was deleted — please try again once you are online.'
-          : 'Could not delete your account. Nothing was deleted — please try again.')
+          ? tr('Could not reach our servers. Nothing was deleted — please try again once you are online.')
+          : tr('Could not delete your account. Nothing was deleted — please try again.'))
         setConfirmingDelete(false)
       }
     } finally {
@@ -317,9 +321,9 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
           : splitLocalState(state as unknown as Record<string, unknown>)
       const json = serializeUserExport(payload)
       await deliverExport(buildExportFilename(), json)
-      toast('Your data export is ready')
+      toast(tr('Your data export is ready'))
     } catch {
-      toast('Could not prepare your export. Please try again.')
+      toast(tr('Could not prepare your export. Please try again.'))
     } finally {
       setExporting(false)
     }
@@ -366,12 +370,15 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
   function toggleHaptics() {
     const next = !hapticsEnabled
     dispatch({ type: 'SET_SETTINGS', patch: { hapticsEnabled: next } })
-    toast(next ? 'Haptics on' : 'Haptics off')
+    toast(next ? tr('Haptics on') : tr('Haptics off'))
   }
 
   function setLang(code: Language) {
     dispatch({ type: 'SET_SETTINGS', patch: { language: code } })
-    toast(translator(code)('toast.langSet'))
+    // Align RTL layout (gated; see lib/rtl). If the direction flips, RN only applies it on the next
+    // launch, so ask the user to restart. When RTL layout is gated off this is a no-op.
+    const { changed } = syncLayoutDirection(code)
+    toast(changed ? tr('Restart the app to apply right-to-left layout') : translator(code)('toast.langSet'))
   }
 
   return (
@@ -388,8 +395,8 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
         >
           <Dumbbell size={18} color={brand[400]} />
           <View className="flex-1">
-            <Text className="font-bold text-white">Training profile</Text>
-            <Text className="text-[12px] text-secondary">Goal, experience, days, session length, equipment — preview a new program before applying</Text>
+            <Text className="font-bold text-white">{tr('Training profile')}</Text>
+            <Text className="text-[12px] text-secondary">{tr('Goal, experience, days, session length, equipment — preview a new program before applying')}</Text>
           </View>
           <ChevronRight size={16} color="rgba(255,255,255,0.35)" />
         </Pressable>
@@ -425,17 +432,18 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
                   >
                     <View className="min-w-0 flex-1">
                       <Text numberOfLines={1} className="font-bold leading-tight text-white" style={l.rtl ? { writingDirection: 'rtl' } : undefined}>{l.native}</Text>
-                      <Text className="text-[11px] text-secondary">{l.english}{l.code !== 'en' ? ' · partial' : ''}</Text>
+                      <Text className="text-[11px] text-secondary">{l.english}</Text>
                     </View>
                     {active && <Check size={16} strokeWidth={3} color={brand[400]} />}
                   </Pressable>
                 )
               })}
             </View>
-            {/* Honesty over implication (audit F-030): today's translations
-                cover Settings only — say so instead of promising a translated app. */}
+            {/* Honesty over implication (audit F-030): state what is NOT translated.
+                The app UI is localised, but the safety screening and coach replies
+                stay English until a clinical/native review signs them off. */}
             <Text className="mt-2 px-1 text-[11px] leading-4 text-tertiary">
-              Translations are a preview and currently cover Settings only — the rest of the app remains in English for now.
+              {tr('The app is translated. Safety screening and coach replies stay in English until a qualified review signs them off.')}
             </Text>
           </>
         )}
@@ -460,35 +468,35 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
             className="w-full flex-row items-center gap-3 rounded-2xl border border-amber-400/20 bg-amber-400/[0.06] p-4 active:opacity-90"
           >
             <View className="flex-1">
-              <Text className="font-bold text-amber-200">Notifications are blocked by your device</Text>
-              <Text className="mt-0.5 text-[12px] leading-4 text-secondary">Allow them in device Settings, then turn the switch on here.</Text>
+              <Text className="font-bold text-amber-200">{tr('Notifications are blocked by your device')}</Text>
+              <Text className="mt-0.5 text-[12px] leading-4 text-secondary">{tr('Allow them in device Settings, then turn the switch on here.')}</Text>
             </View>
-            <Text className="text-[12.5px] font-extrabold text-amber-300">Open Settings</Text>
+            <Text className="text-[12.5px] font-extrabold text-amber-300">{tr('Open Settings')}</Text>
           </Pressable>
         )}
         {notificationsEnabled && <NotificationPrefsPanel t={t} />}
         <Row icon={<Volume2 size={18} color={brand[400]} />} title={t('settings.sound')} sub={t('settings.soundSub')}>
           <Toggle on={soundEnabled} onPress={toggleSound} label={t('settings.sound')} />
         </Row>
-        <Row icon={<Zap size={18} color={brand[400]} />} title="Haptics" sub="Vibration feedback on taps and actions">
+        <Row icon={<Zap size={18} color={brand[400]} />} title={tr('Haptics')} sub={tr('Vibration feedback on taps and actions')}>
           <Toggle on={hapticsEnabled} onPress={toggleHaptics} label="Haptics" />
         </Row>
       </Group>
 
       {/* Accessibility (audit SA-013/SA-017): an in-app reduced-motion override,
           independent of the OS setting. */}
-      <Group label="Accessibility">
+      <Group label={tr('Accessibility')}>
         <View className="rounded-2xl border border-white/5 bg-ink-800 p-4">
-          <Text className="mb-1 font-bold text-white">Motion</Text>
+          <Text className="mb-1 font-bold text-white">{tr('Motion')}</Text>
           <Text className="mb-3 text-[12px] leading-4 text-secondary">
-            Reduce animations and celebratory effects. "Auto" follows your device's Reduce Motion setting.
+            {tr('Reduce animations and celebratory effects. "Auto" follows your device\'s Reduce Motion setting.')}
           </Text>
           <Segmented<'system' | 'reduce' | 'full'>
             value={reducedMotion}
             options={[
-              { v: 'system', l: 'Auto' },
-              { v: 'reduce', l: 'Reduced' },
-              { v: 'full', l: 'Full' },
+              { v: 'system', l: tr('Auto') },
+              { v: 'reduce', l: tr('Reduced') },
+              { v: 'full', l: tr('Full') },
             ]}
             onChange={(v) => dispatch({ type: 'SET_SETTINGS', patch: { reducedMotion: v } })}
           />
@@ -496,16 +504,16 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
       </Group>
 
       {hasSubscription && (
-        <Group label="Subscription">
+        <Group label={tr('Subscription')}>
           <View className="rounded-2xl border border-white/5 bg-ink-800 p-4">
             <View className="flex-row items-center justify-between">
               <View className="min-w-0 flex-1">
-                <Text className="font-bold text-white">StrengthHub membership</Text>
+                <Text className="font-bold text-white">{tr('StrengthHub membership')}</Text>
                 <Text className="mt-0.5 text-[12px] text-secondary">
                   {subStatusLabel}
-                  {sub?.status === 'trialing' && sub.trialEnd ? ` · trial ends ${new Date(sub.trialEnd * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : ''}
-                  {sub?.status === 'active' && periodEndLabel ? ` · renews ${periodEndLabel}` : ''}
-                  {sub?.status === 'canceled' && periodEndLabel ? ` · access until ${periodEndLabel}` : ''}
+                  {sub?.status === 'trialing' && sub.trialEnd ? ` · ${tr('trial ends {date}', { date: new Date(sub.trialEnd * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) })}` : ''}
+                  {sub?.status === 'active' && periodEndLabel ? ` · ${tr('renews {date}', { date: periodEndLabel })}` : ''}
+                  {sub?.status === 'canceled' && periodEndLabel ? ` · ${tr('access until {date}', { date: periodEndLabel })}` : ''}
                 </Text>
               </View>
               <View className={`rounded-full px-2.5 py-1 ${sub?.status === 'past_due' ? 'bg-amber-400/15' : 'bg-brand-400/15'}`}>
@@ -519,10 +527,10 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
               accessibilityLabel="Manage or cancel your subscription"
               className={`btn-primary mt-3.5 w-full items-center py-2.5 active:opacity-90 ${portalBusy ? 'opacity-60' : ''}`}
             >
-              <Text className="text-sm font-semibold text-black">{portalBusy ? 'Opening…' : 'Manage or cancel subscription'}</Text>
+              <Text className="text-sm font-semibold text-black">{portalBusy ? tr('Opening…') : tr('Manage or cancel subscription')}</Text>
             </Pressable>
             <Text className="mt-2 text-[11px] leading-4 text-tertiary">
-              Opens Stripe's secure portal: change payment method, view invoices, or cancel any time. Cancelling keeps access until the period ends.
+              {tr('Opens Stripe\'s secure portal: change payment method, view invoices, or cancel any time. Cancelling keeps access until the period ends.')}
             </Text>
           </View>
         </Group>
@@ -536,7 +544,7 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
             demo/preview (no real account signed in). The store dispatch and
             CloudSync both enforce this structurally too. */}
         {canOfferDemoReset({ authEnabled, signedIn: !!user }) && (
-          <Pressable onPress={() => { dispatch({ type: 'RESET_DEMO' }); toast('Demo data restored'); onDone?.() }} accessibilityRole="button" accessibilityLabel={t('settings.resetDemo')} className="w-full flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-4 active:opacity-90">
+          <Pressable onPress={() => { dispatch({ type: 'RESET_DEMO' }); toast(tr('Demo data restored')); onDone?.() }} accessibilityRole="button" accessibilityLabel={t('settings.resetDemo')} className="w-full flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-4 active:opacity-90">
             <RotateCcw size={18} color={brand[400]} />
             <View className="flex-1">
               <Text className="font-bold text-white">{t('settings.resetDemo')}</Text>
@@ -557,8 +565,8 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
         >
           <Trash2 size={18} color="#f87171" />
           <View className="flex-1">
-            <Text className="font-bold text-red-300">{confirmingClear ? 'Tap again to wipe everything' : t('settings.clear')}</Text>
-            <Text className="text-[12px] text-secondary">{confirmingClear ? 'Erases your data and restarts onboarding' : t('settings.clearSub')}</Text>
+            <Text className="font-bold text-red-300">{confirmingClear ? tr('Tap again to wipe everything') : t('settings.clear')}</Text>
+            <Text className="text-[12px] text-secondary">{confirmingClear ? tr('Erases your data and restarts onboarding') : t('settings.clearSub')}</Text>
           </View>
         </Pressable>
         <Pressable
@@ -570,8 +578,8 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
         >
           <Download size={18} color="rgba(255,255,255,0.7)" />
           <View className="flex-1">
-            <Text className="font-bold text-white/85">{exporting ? 'Preparing…' : 'Download my data'}</Text>
-            <Text className="text-[12px] text-secondary">Export your profile and logs as a JSON file</Text>
+            <Text className="font-bold text-white/85">{exporting ? tr('Preparing…') : tr('Download my data')}</Text>
+            <Text className="text-[12px] text-secondary">{tr('Export your profile and logs as a JSON file')}</Text>
           </View>
         </Pressable>
         {authEnabled && (
@@ -582,18 +590,18 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
           >
             <Trash2 size={18} color="#f87171" />
             <View className="flex-1">
-              <Text className="font-bold text-red-300">{deleting ? 'Deleting…' : confirmingDelete ? 'Tap again to permanently delete' : 'Delete account'}</Text>
-              <Text className="text-[12px] text-secondary">{confirmingDelete ? 'Erases your account and all data — this cannot be undone. Cancel your subscription first — deleting your account does not stop billing. If you delete without cancelling, email info@strengthhubonline.com and we will cancel it for you.' : 'Permanently delete your account and data (cancel your subscription first — this does not stop billing)'}</Text>
+              <Text className="font-bold text-red-300">{deleting ? tr('Deleting…') : confirmingDelete ? tr('Tap again to permanently delete') : tr('Delete account')}</Text>
+              <Text className="text-[12px] text-secondary">{confirmingDelete ? tr('Erases your account and all data — this cannot be undone. Cancel your subscription first — deleting your account does not stop billing. If you delete without cancelling, email info@strengthhubonline.com and we will cancel it for you.') : tr('Permanently delete your account and data (cancel your subscription first — this does not stop billing)')}</Text>
             </View>
           </Pressable>
         )}
       </Group>
 
-      <Group label="Legal & support">
+      <Group label={tr('Legal & support')}>
         {([
-          { key: 'terms' as LegalDocKey, title: 'Terms of Service' },
-          { key: 'privacy' as LegalDocKey, title: 'Privacy Policy' },
-          { key: 'health-safety' as LegalDocKey, title: 'Health & Safety Notice' },
+          { key: 'terms' as LegalDocKey, title: tr('Terms of Service') },
+          { key: 'privacy' as LegalDocKey, title: tr('Privacy Policy') },
+          { key: 'health-safety' as LegalDocKey, title: tr('Health & Safety Notice') },
         ]).map((docItem) => (
           <Pressable
             key={docItem.key}
@@ -613,8 +621,8 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
           className="w-full flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-4 active:opacity-90"
         >
           <View className="flex-1">
-            <Text className="font-bold text-white">Contact support</Text>
-            <Text className="text-[12px] text-secondary">info@strengthhubonline.com — billing, data, safety or anything else</Text>
+            <Text className="font-bold text-white">{tr('Contact support')}</Text>
+            <Text className="text-[12px] text-secondary">{tr('info@strengthhubonline.com — billing, data, safety or anything else')}</Text>
           </View>
           <ChevronRight size={16} color="rgba(255,255,255,0.35)" />
         </Pressable>
@@ -650,21 +658,22 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
 function SyncStatusRow() {
   const [status, setStatus] = useState<SyncStatus>({ synced: false, pending: false, error: false, lastSavedAt: null })
   const [retrying, setRetrying] = useState(false)
+  const t = useT()
   useEffect(() => subscribeSyncStatus(setStatus), [])
   const label = status.error
-    ? 'Some changes are NOT backed up yet'
+    ? t('Some changes are NOT backed up yet')
     : status.pending
-      ? 'Backing up…'
+      ? t('Backing up…')
       : !status.synced
-        ? 'Connecting to your cloud backup…'
+        ? t('Connecting to your cloud backup…')
         : status.lastSavedAt
-          ? `Backed up ${new Date(status.lastSavedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
-          : 'Up to date'
+          ? t('Backed up {time}', { time: new Date(status.lastSavedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) })
+          : t('Up to date')
   const tone = status.error ? 'text-amber-200' : 'text-white/85'
   return (
     <View className={`w-full flex-row items-center gap-3 rounded-2xl border p-4 ${status.error ? 'border-amber-400/25 bg-amber-400/[0.06]' : 'border-white/5 bg-ink-800'}`}>
       <View className="flex-1">
-        <Text className={`font-bold ${tone}`}>Cloud backup</Text>
+        <Text className={`font-bold ${tone}`}>{t('Cloud backup')}</Text>
         <Text className="mt-0.5 text-[12px] text-secondary">{label}</Text>
       </View>
       <Pressable
@@ -677,7 +686,7 @@ function SyncStatusRow() {
         accessibilityLabel="Sync now"
         className="rounded-full bg-white/[0.08] px-3.5 py-2 active:opacity-80"
       >
-        <Text className="text-[12.5px] font-bold text-white/80">{retrying ? 'Syncing…' : 'Sync now'}</Text>
+        <Text className="text-[12.5px] font-bold text-white/80">{retrying ? t('Syncing…') : t('Sync now')}</Text>
       </Pressable>
     </View>
   )
@@ -691,6 +700,7 @@ export function DisplaySettings() {
   const { state, dispatch } = useStore()
   const { units, theme } = state.settings
   const t = translator(state.settings.language ?? 'en')
+  const tr = useT()
   return (
     <>
       <Group label={t('settings.units')}>
@@ -708,7 +718,7 @@ export function DisplaySettings() {
           options={[
             { v: 'dark', l: t('settings.dark'), icon: <Moon size={15} color={theme === 'dark' ? '#000' : 'rgba(255,255,255,0.6)'} /> },
             { v: 'light', l: t('settings.light'), icon: <Sun size={15} color={theme === 'light' ? '#000' : 'rgba(255,255,255,0.6)'} /> },
-            { v: 'system', l: 'Auto' },
+            { v: 'system', l: tr('Auto') },
           ]}
           onChange={(v) => dispatch({ type: 'SET_SETTINGS', patch: { theme: v } })}
         />
@@ -735,9 +745,10 @@ export function MenuDrawer({ open, onClose }: { open: boolean; onClose: () => vo
   const { enabled: authEnabled, signOut } = useAuth()
   const nav = useNav()
   const insets = useSafeAreaInsets()
+  const t = useT()
   const p = state.profile
   const unread = state.notifications.filter((n) => !n.read).length
-  const goalLabel: Record<string, string> = { 'build-muscle': 'Build Muscle', 'lose-fat': 'Lose Fat', 'gain-strength': 'Get Stronger', 'stay-healthy': 'Stay Healthy' }
+  const goalLabel: Record<string, string> = { 'build-muscle': t('Build Muscle'), 'lose-fat': t('Lose Fat'), 'gain-strength': t('Get Stronger'), 'stay-healthy': t('Stay Healthy') }
   const joined = fromKey(p.createdAtKey).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
   // Push the target as a detail: it slides in from the right over the menu, and
   // its back arrow returns here (see Sheet's menu-detail mode).
@@ -792,7 +803,7 @@ export function MenuDrawer({ open, onClose }: { open: boolean; onClose: () => vo
           <Pressable onPress={onClose} hitSlop={8} className="h-9 w-9 items-center justify-center rounded-full active:opacity-70">
             <X size={22} color="rgba(255,255,255,0.7)" />
           </Pressable>
-          <Text className="text-[17px] font-bold text-white">Menu</Text>
+          <Text className="text-[17px] font-bold text-white">{t('Menu')}</Text>
         </View>
 
         <ScrollView className="flex-1 px-4" style={IS_WEB ? { minHeight: 0 } : undefined} contentContainerStyle={{ paddingBottom: insets.bottom + 32 }} showsVerticalScrollIndicator={false}>
@@ -805,10 +816,10 @@ export function MenuDrawer({ open, onClose }: { open: boolean; onClose: () => vo
             <Avatar name={p.name} size={64} />
             <View className="min-w-0 flex-1">
               <Text numberOfLines={1} className="text-xl font-extrabold text-white">{p.name}</Text>
-              <Text numberOfLines={1} className="mt-0.5 text-[13px] text-secondary">{p.university} · Age {p.age}</Text>
+              <Text numberOfLines={1} className="mt-0.5 text-[13px] text-secondary">{p.university} · {t('Age {age}', { age: p.age })}</Text>
               <View className="mt-2 flex-row flex-wrap items-center gap-2">
                 <View className="rounded-full bg-brand-400/15 px-2.5 py-1"><Text className="text-[11px] font-bold text-brand-400">{goalLabel[p.goal]}</Text></View>
-                <Text className="text-[12px] text-tertiary">Member since {joined}</Text>
+                <Text className="text-[12px] text-tertiary">{t('Member since {date}', { date: joined })}</Text>
               </View>
             </View>
           </Pressable>
@@ -818,16 +829,16 @@ export function MenuDrawer({ open, onClose }: { open: boolean; onClose: () => vo
             <DisplaySettings />
           </View>
 
-          <MenuSection title="Coaching">
-            <MenuRow icon={<Sparkles size={17} color={brand[400]} />} title="Your coach" sub="Daily check-ins and milestones" onPress={go('coach')} first />
-            {p.newToGym && <MenuRow icon={<Leaf size={17} color={brand[400]} />} title="New to the gym" sub="Your first 90 days" onPress={go('beginner')} />}
+          <MenuSection title={t('Coaching')}>
+            <MenuRow icon={<Sparkles size={17} color={brand[400]} />} title={t('Your coach')} sub={t('Daily check-ins and milestones')} onPress={go('coach')} first />
+            {p.newToGym && <MenuRow icon={<Leaf size={17} color={brand[400]} />} title={t('New to the gym')} sub={t('Your first 90 days')} onPress={go('beginner')} />}
           </MenuSection>
 
-          <MenuSection title="Activity">
+          <MenuSection title={t('Activity')}>
             <MenuRow
               icon={<Bell size={17} color={brand[400]} />}
-              title="Notifications"
-              sub="Reminders, streaks & social"
+              title={t('Notifications')}
+              sub={t('Reminders, streaks & social')}
               onPress={go('notifications')}
               first
               badge={unread > 0 ? <View className="h-5 min-w-[20px] items-center justify-center rounded-full bg-brand-400 px-1.5"><Text className="text-[11px] font-bold text-black">{unread}</Text></View> : undefined}
@@ -847,7 +858,7 @@ export function MenuDrawer({ open, onClose }: { open: boolean; onClose: () => vo
               className="mt-5 flex-row items-center justify-center gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 p-3.5 active:opacity-80"
             >
               <LogOut size={18} color="#f87171" />
-              <Text className="font-semibold text-red-400">Log out</Text>
+              <Text className="font-semibold text-red-400">{t('Log out')}</Text>
             </Pressable>
           )}
         </ScrollView>
@@ -882,21 +893,22 @@ function MenuRow({ icon, title, sub, onPress, badge, first }: { icon: ReactNode;
 export function ProfileSheet({ open, onClose }: Props) {
   const { state } = useStore()
   const nav = useNav()
+  const t = useT()
   const units = state.settings.units
   const w = weightStats(state)
   const streak = streakStats(state)
   const totalWorkouts = state.sessions.filter((s) => s.completed).length
   const earned = state.badges.filter((b) => b.earned).length
-  const goalLabel: Record<string, string> = { 'build-muscle': 'Build Muscle', 'lose-fat': 'Lose Fat', 'gain-strength': 'Get Stronger', 'stay-healthy': 'Stay Healthy' }
+  const goalLabel: Record<string, string> = { 'build-muscle': t('Build Muscle'), 'lose-fat': t('Lose Fat'), 'gain-strength': t('Get Stronger'), 'stay-healthy': t('Stay Healthy') }
   const upcomingCount = upcomingPeriods(state).length
   const planSub = activePeriod(state)
-    ? 'Active now'
+    ? t('Active now')
     : upcomingCount > 0
       ? `${upcomingCount} period${upcomingCount > 1 ? 's' : ''} scheduled`
-      : 'Exams, travel or busy weeks'
+      : t('Exams, travel or busy weeks')
 
   return (
-    <Sheet open={open} onClose={onClose} title="Profile">
+    <Sheet open={open} onClose={onClose} title={t('Profile')}>
       <View className="flex-row items-center gap-4">
         <Avatar name={state.profile.name} size={64} />
         <View>
@@ -911,18 +923,18 @@ export function ProfileSheet({ open, onClose }: Props) {
       <Text className="mt-3 text-[13px] text-secondary">{state.profile.dorm} · {state.profile.cohort}</Text>
 
       <View className="mt-4 flex-row gap-3">
-        <Stat label="Workouts" value={String(totalWorkouts)} />
-        <Stat label="Day streak" value={`${streak.current}`} />
-        <Stat label="Weight" value={fmtWeight(w.current, units, 1)} />
+        <Stat label={t('Workouts')} value={String(totalWorkouts)} />
+        <Stat label={t('Day streak')} value={`${streak.current}`} />
+        <Stat label={t('Weight')} value={fmtWeight(w.current, units, 1)} />
       </View>
 
       <View className="mt-4 gap-2.5">
-        <LinkRow icon={<Sparkles size={18} color={brand[400]} />} title="Your coach" sub="Daily check ins and milestones" onPress={() => nav.open('coach')} />
-        <LinkRow icon={<Bell size={18} color={brand[400]} />} title="Notifications" sub="Reminders, streaks & social" onPress={() => nav.open('notifications')} />
-        <LinkRow icon={<Award size={18} color={brand[400]} />} title="Badges" sub={`${earned} earned`} onPress={() => nav.open('badges')} />
-        <LinkRow icon={<GraduationCap size={18} color={brand[400]} />} title="Plan Around Your Life" sub={planSub} onPress={() => nav.open('examMode')} />
-        {state.profile.newToGym && <LinkRow icon={<Leaf size={18} color={brand[400]} />} title="New to the gym" sub="Your first 90 days" onPress={() => nav.open('beginner')} />}
-        <LinkRow icon={<User size={18} color="rgba(255,255,255,0.7)" />} title="Settings" sub="Units, theme and data" onPress={() => nav.open('settings')} />
+        <LinkRow icon={<Sparkles size={18} color={brand[400]} />} title={t('Your coach')} sub={t('Daily check ins and milestones')} onPress={() => nav.open('coach')} />
+        <LinkRow icon={<Bell size={18} color={brand[400]} />} title={t('Notifications')} sub={t('Reminders, streaks & social')} onPress={() => nav.open('notifications')} />
+        <LinkRow icon={<Award size={18} color={brand[400]} />} title={t('Badges')} sub={t('{n} earned', { n: earned })} onPress={() => nav.open('badges')} />
+        <LinkRow icon={<GraduationCap size={18} color={brand[400]} />} title={t('Plan Around Your Life')} sub={planSub} onPress={() => nav.open('examMode')} />
+        {state.profile.newToGym && <LinkRow icon={<Leaf size={18} color={brand[400]} />} title={t('New to the gym')} sub={t('Your first 90 days')} onPress={() => nav.open('beginner')} />}
+        <LinkRow icon={<User size={18} color="rgba(255,255,255,0.7)" />} title={t('Settings')} sub={t('Units, theme and data')} onPress={() => nav.open('settings')} />
       </View>
     </Sheet>
   )
@@ -932,9 +944,9 @@ export function ProfileSheet({ open, onClose }: Props) {
 export function AddFoodSheet({ open, onClose, params }: Props) {
   const { state, dispatch } = useStore()
   const toast = useToast()
+  const t = useT()
   const [meal, setMeal] = useState<MealName>((params?.meal as MealName) || 'Snack')
   const [q, setQ] = useState('')
-  const [scanned, setScanned] = useState<string | null>(null)
 
   const results = useMemo(() => {
     return FOODS.filter((f) => f.name.toLowerCase().includes(q.toLowerCase()))
@@ -950,59 +962,42 @@ export function AddFoodSheet({ open, onClose, params }: Props) {
   function add(foodId: string) {
     const f = FOODS.find((x) => x.id === foodId)!
     dispatch({ type: 'ADD_MEAL', meal: { meal, name: f.name, qty: 1, kcal: f.kcal, p: f.p, c: f.c, f: f.f } })
-    toast(`Added to ${meal}`)
+    toast(t('Added to {meal}', { meal }))
     onClose()
   }
 
   function addUserMeal(m: UserMeal) {
     dispatch({ type: 'ADD_MEAL', meal: { meal, name: m.name, qty: 1, kcal: m.kcal, p: m.p, c: m.c, f: m.f } })
-    toast(`Added to ${meal}`)
+    toast(t('Added to {meal}', { meal }))
     onClose()
   }
 
-  function scan() {
-    // simulate a barcode scan resolving to a product
-    const f = pick(makeRng(Date.now() % 100000), FOODS.filter((x) => x.barcode))
-    setScanned(f.id)
-    setQ('')
-  }
-
   return (
-    <Sheet open={open} onClose={onClose} title="Add food">
+    <Sheet open={open} onClose={onClose} title={t('Add food')}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-1 mb-3" contentContainerStyle={{ gap: 8, paddingHorizontal: 4 }}>
         {(['Breakfast', 'Lunch', 'Snack', 'Dinner'] as MealName[]).map((m) => (
           <Pressable key={m} onPress={() => setMeal(m)} accessibilityRole="button" accessibilityLabel={m} accessibilityState={{ selected: meal === m }} className={`shrink-0 rounded-full px-4 py-1.5 active:opacity-90 ${meal === m ? 'bg-brand-400' : 'bg-ink-700'}`}>
-            <Text className={`text-sm font-semibold ${meal === m ? 'text-black' : 'text-secondary'}`}>{m}</Text>
+            <Text className={`text-sm font-semibold ${meal === m ? 'text-black' : 'text-secondary'}`}>{t(m)}</Text>
           </Pressable>
         ))}
       </ScrollView>
 
-      <View className="mb-3 flex-row gap-2">
+      <View className="mb-3">
         <View className="flex-1 flex-row items-center gap-2 rounded-xl border border-white/8 bg-ink-800 px-3">
           <Search size={18} color="rgba(255,255,255,0.4)" />
           <TextInput
             value={q}
-            onChangeText={(v) => { setQ(v); setScanned(null) }}
-            placeholder="Search foods…"
+            onChangeText={setQ}
+            placeholder={t('Search foods…')}
             placeholderTextColor="rgba(148,148,148,0.6)"
             className="flex-1 bg-transparent py-3 text-sm text-white"
           />
         </View>
-        <Pressable onPress={scan} accessibilityRole="button" accessibilityLabel="Scan a barcode" className="h-[46px] w-[46px] items-center justify-center rounded-xl bg-brand-400 active:opacity-90">
-          <ScanLine size={20} color="#000" />
-        </Pressable>
       </View>
-
-      {scanned && (
-        <View className="mb-3 rounded-2xl border border-brand-400/30 bg-brand-400/10 p-3">
-          <Text className="mb-1 text-[12px] font-semibold text-brand-400">✓ Barcode matched</Text>
-          <FoodRow id={scanned} onAdd={add} />
-        </View>
-      )}
 
       {myResults.length > 0 && (
         <View className="mb-4">
-          <Text className="mb-2 text-[12px] font-extrabold uppercase tracking-wide text-tertiary">My meals</Text>
+          <Text className="mb-2 text-[12px] font-extrabold uppercase tracking-wide text-tertiary">{t('My meals')}</Text>
           <View className="gap-2">
             {myResults.map((m) => (
               <MyMealRow key={m.id} m={m} onAdd={addUserMeal} />
@@ -1013,18 +1008,19 @@ export function AddFoodSheet({ open, onClose, params }: Props) {
 
       <View className="gap-2">
         {myResults.length > 0 && results.length > 0 && (
-          <Text className="mb-1 text-[12px] font-extrabold uppercase tracking-wide text-tertiary">Foods</Text>
+          <Text className="mb-1 text-[12px] font-extrabold uppercase tracking-wide text-tertiary">{t('Foods')}</Text>
         )}
         {results.map((f) => (
           <FoodRow key={f.id} id={f.id} onAdd={add} />
         ))}
-        {results.length === 0 && myResults.length === 0 && <Text className="py-6 text-center text-sm text-tertiary">No foods found.</Text>}
+        {results.length === 0 && myResults.length === 0 && <Text className="py-6 text-center text-sm text-tertiary">{t('No foods found.')}</Text>}
       </View>
     </Sheet>
   )
 }
 
 function MyMealRow({ m, onAdd }: { m: UserMeal; onAdd: (m: UserMeal) => void }) {
+  const t = useT()
   return (
     <Pressable onPress={() => onAdd(m)} className="w-full flex-row items-center gap-3 rounded-2xl border border-brand-400/25 bg-brand-400/[0.06] p-3 active:opacity-90">
       <View className="h-9 w-9 items-center justify-center rounded-xl bg-brand-400/15">
@@ -1032,7 +1028,7 @@ function MyMealRow({ m, onAdd }: { m: UserMeal; onAdd: (m: UserMeal) => void }) 
       </View>
       <View className="min-w-0 flex-1">
         <Text numberOfLines={1} className="font-bold leading-tight text-white">{m.name}</Text>
-        <Text className="text-[12px] text-secondary">Saved meal · {m.kcal} kcal · {m.p}P {m.c}C {m.f}F</Text>
+        <Text className="text-[12px] text-secondary">{t('Saved meal')} · {m.kcal} kcal · {m.p}P {m.c}C {m.f}F</Text>
       </View>
       <View className="h-7 w-7 items-center justify-center rounded-full bg-brand-400"><Plus size={16} strokeWidth={3} color="#000" /></View>
     </Pressable>
@@ -1056,6 +1052,7 @@ function FoodRow({ id, onAdd }: { id: string; onAdd: (id: string) => void }) {
 export function LogWeightSheet({ open, onClose }: Props) {
   const { state, dispatch } = useStore()
   const toast = useToast()
+  const t = useT()
   const units = state.settings.units
   const current = weightStats(state).current
   const [val, setVal] = useState(() => fmtWeightNum(current, units, 1))
@@ -1063,14 +1060,14 @@ export function LogWeightSheet({ open, onClose }: Props) {
   function save() {
     const kg = toKg(parseFloat(val) || current, units)
     dispatch({ type: 'LOG_WEIGHT', kg: Math.round(kg * 10) / 10 })
-    toast('Weight logged')
+    toast(t('Weight logged'))
     onClose()
   }
 
   const num = weightVal(current, units)
   return (
-    <Sheet open={open} onClose={onClose} title="Log weight">
-      <Text className="text-[13px] text-secondary">Today · {relativeLabel(todayKey)}</Text>
+    <Sheet open={open} onClose={onClose} title={t('Log weight')}>
+      <Text className="text-[13px] text-secondary">{t('Today')} · {relativeLabel(todayKey)}</Text>
       <View className="mt-6 flex-row items-end justify-center gap-2">
         <TextInput
           autoFocus
@@ -1089,7 +1086,7 @@ export function LogWeightSheet({ open, onClose }: Props) {
         ))}
       </View>
       <Pressable onPress={save} className="btn-primary mt-8 w-full active:opacity-90">
-        <Text className="font-semibold text-black">Save</Text>
+        <Text className="font-semibold text-black">{t('Save')}</Text>
       </Pressable>
     </Sheet>
   )
@@ -1098,6 +1095,7 @@ export function LogWeightSheet({ open, onClose }: Props) {
 export function QuickWorkoutsSheet({ open, onClose }: Props) {
   const dispatch = useDispatch()
   const nav = useNav()
+  const t = useT()
   // Seed shows instantly; a Firestore `workouts` overlay (if present) refreshes it.
   const quickWorkouts = useQuickWorkouts()
 
@@ -1145,8 +1143,8 @@ export function QuickWorkoutsSheet({ open, onClose }: Props) {
 
   return (
     <Sheet open={open} onClose={onClose} full>
-      <Text className="text-[25px] font-extrabold tracking-[-0.03em] leading-[1.15] text-white">12-Minute Bodyweight Exercises</Text>
-      <Text className="mt-2.5 text-[13.5px] leading-5 text-secondary">Quick, no-equipment workouts when you're short on time. Ordered easiest first.</Text>
+      <Text className="text-[25px] font-extrabold tracking-[-0.03em] leading-[1.15] text-white">{t('12-Minute Bodyweight Exercises')}</Text>
+      <Text className="mt-2.5 text-[13.5px] leading-5 text-secondary">{t('Quick, no-equipment workouts when you\'re short on time. Ordered easiest first.')}</Text>
       <View className="mt-4 gap-2.5">
         {quickWorkouts.map((q) => {
           const stations = q.rounds[0]?.stations ?? []
@@ -1160,11 +1158,11 @@ export function QuickWorkoutsSheet({ open, onClose }: Props) {
                   </View>
                   <Text className="text-[15px] font-bold leading-tight text-white">{q.name}</Text>
                   <Text className="mt-0.5 text-[12px] text-secondary">{q.focus}</Text>
-                  <Text className="mt-1 text-[11px] text-tertiary">{q.rounds.length} rounds · {stations.length} exercises</Text>
+                  <Text className="mt-1 text-[11px] text-tertiary">{t('{rounds} rounds · {exercises} exercises', { rounds: q.rounds.length, exercises: stations.length })}</Text>
                 </View>
                 <View className="shrink-0 items-end">
                   <Text className="text-[22px] font-extrabold leading-none text-accent-blue">{q.minutes}</Text>
-                  <Text className="mt-[3px] text-[9.5px] font-bold uppercase tracking-wider text-tertiary">minutes</Text>
+                  <Text className="mt-[3px] text-[9.5px] font-bold uppercase tracking-wider text-tertiary">{t('minutes')}</Text>
                 </View>
               </View>
               <View className="mt-3 flex-row flex-wrap gap-1.5">
@@ -1177,7 +1175,7 @@ export function QuickWorkoutsSheet({ open, onClose }: Props) {
               </View>
               <PressableScale onPress={() => startQuick(q)} haptic={false} scaleTo={0.97} containerStyle={{ marginTop: 12 }} className="flex-row items-center justify-center gap-1.5 rounded-full bg-accent-blue py-2.5">
                 <Play size={12} color="#fff" fill="#fff" />
-                <Text className="text-[13.5px] font-bold text-white">Start {q.minutes} min session</Text>
+                <Text className="text-[13.5px] font-bold text-white">{t('Start {n} min session', { n: q.minutes })}</Text>
               </PressableScale>
             </View>
           )
@@ -1190,9 +1188,10 @@ export function QuickWorkoutsSheet({ open, onClose }: Props) {
 /* ============================ Badges ============================ */
 export function BadgesSheet({ open, onClose }: Props) {
   const { state } = useStore()
+  const t = useT()
   const earned = state.badges.filter((b) => b.earned).length
   return (
-    <Sheet open={open} onClose={onClose} title={`Badges · ${earned}/${state.badges.length}`}>
+    <Sheet open={open} onClose={onClose} title={t('Badges · {earned}/{total}', { earned, total: state.badges.length })}>
       <View className="flex-row flex-wrap gap-3">
         {state.badges.map((b) => (
           <View key={b.id} className={`items-center rounded-2xl border p-3 ${b.earned ? 'border-brand-400/30 bg-brand-400/8' : 'border-white/5 bg-ink-800 opacity-50'}`} style={{ width: '30%' }}>

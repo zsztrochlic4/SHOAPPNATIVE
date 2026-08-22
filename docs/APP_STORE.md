@@ -60,7 +60,7 @@ App Store Connect / Google Play.
 
 ## Payments — App Store & Play Store billing (read first)
 
-The paywall (4-week free trial → **$2.99/week AUD**) currently opens **Stripe
+The paywall (4-week free trial → **$2.00/week AUD**) currently opens **Stripe
 Checkout** and unlocks in-app features via the `entitlements/{uid}` record. That
 is fine on the **web** build, but for the **iOS and Android apps**:
 

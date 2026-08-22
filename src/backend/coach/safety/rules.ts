@@ -1343,7 +1343,7 @@ const APP_HELP_TERMS = [
   'group', 'groups', 'invite code', 'invite friends', 'streak', 'badge', 'badges', 'username',
   'sharing',
   // in-app tools
-  'rest timer', 'log a set', 'meal planner', 'plan your week', 'barcode', 'meal scan', 'food log',
+  'rest timer', 'log a set', 'meal planner', 'plan your week', 'food log',
   'training profile', 'confirmation card', 'confirm card', 'onboarding', 'quick workout',
   'exercise library',
   // social / sharing surfaces
@@ -1399,9 +1399,6 @@ const APP_HELP_TERMS = [
   'common nickname', 'nickname', 'the exercise library', 'find an exercise',
   // quick workouts
   'quick circuit', 'easiest quick', 'the quick workout', 'quick workout is', 'shortest workout',
-  // barcode / scanning
-  'scanning a', 'scanning an', 'scan a barcode', 'barcode scan', 'camera permission', 'imported product',
-  'sticker over', 'scanning will not', 'scan will not', 'scanner',
   // coach memory
   'long-term memory', 'long term memory', 'turn memory off', 'not saved as', 'saved as a long',
   'keeping consent', 'keeping other', 'memory off while',

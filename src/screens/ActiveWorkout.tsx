@@ -12,6 +12,7 @@ import { tick, thud } from '../lib/haptics'
 import { beep, restTick, successChime } from '../lib/sound'
 import { TechniqueClip } from '../components/TechniqueClip'
 import { useStore } from '../store/store'
+import { useT } from '../lib/useT'
 import { todaySession, sessionProgress, streakStats, workoutsThisWeek } from '../store/selectors'
 import { examState, examTrim, nextSetRecommendation } from '../store/training'
 import { prForSession, type PR } from '../store/coach'
@@ -621,6 +622,7 @@ function Dots({ dots, size = 13 }: { dots: Dot[]; size?: number }) {
 
 /* ============================ List / overview ============================ */
 function ListScreen(props: any) {
+  const tr = useT()
   const {
     session, units, colors: c, exam, trim, statsV, allDone, activeIdx, resumed, goalText, goalOpen, onToggleGoal,
     timeStr, expanded, onToggleExpand, scrollRef, confirmEnd, onCta, onStartAt, onAdjWeight, onAdjReps, onToggleSet,
@@ -632,11 +634,12 @@ function ListScreen(props: any) {
     <ScreenIn>
       {/* Persistent progress header */}
       <View style={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: dim(0.06) }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+        {/* Close control sits top-RIGHT to match the app-wide dismiss pattern (X-right, pinned). */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
+          <Text style={{ fontSize: 12, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase', color: dim(0.4) }}>{tr('aw.activeWorkout')}</Text>
           <PressableScale onPress={onClose} scaleTo={0.9} accessibilityLabel="Close workout" className="items-center justify-center rounded-full" style={{ width: 34, height: 34, backgroundColor: dim(0.08) }}>
             <X size={17} strokeWidth={2.4} color={dim(0.8)} />
           </PressableScale>
-          <Text style={{ fontSize: 12, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase', color: dim(0.4) }}>Active Workout</Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
           <View style={{ flex: 1 }}>
@@ -654,9 +657,9 @@ function ListScreen(props: any) {
           <Text style={{ fontSize: 12.5, fontWeight: '700', color: c.brand400, minWidth: 44, textAlign: 'right' }}>{statsV.pct}%</Text>
         </View>
         <View style={{ marginTop: 10, flexDirection: 'row', gap: 16 }}>
-          <HeaderStat value={`${statsV.done} / ${statsV.total}`} label="sets" c={c} />
-          <HeaderStat value={timeStr} label="elapsed" c={c} />
-          <HeaderStat value={fmtVolume(statsV.vol, units)} label="volume" c={c} />
+          <HeaderStat value={`${statsV.done} / ${statsV.total}`} label={tr('sets')} c={c} />
+          <HeaderStat value={timeStr} label={tr('elapsed')} c={c} />
+          <HeaderStat value={fmtVolume(statsV.vol, units)} label={tr('volume')} c={c} />
         </View>
       </View>
 
@@ -665,7 +668,7 @@ function ListScreen(props: any) {
         {/* Primary CTA */}
         <PressableScale onPress={onCta} scaleTo={0.97} className="w-full flex-row items-center justify-center rounded-2xl" style={{ gap: 9, padding: 16, backgroundColor: c.brand400 }}>
           {allDone ? <Flag size={17} color="#0a0a0b" /> : <Play size={17} color="#0a0a0b" fill="#0a0a0b" />}
-          <Text style={{ fontSize: 15, fontWeight: '600', color: '#0a0a0b' }}>{allDone ? 'Finish & log workout' : resumed ? 'Resume workout' : 'Start workout'}</Text>
+          <Text style={{ fontSize: 15, fontWeight: '600', color: '#0a0a0b' }}>{allDone ? tr('Finish & log workout') : resumed ? tr('Resume workout') : tr('Start workout')}</Text>
         </PressableScale>
 
         {/* Exam-mode retention (safety feature, styled to the design language) */}
@@ -673,7 +676,7 @@ function ListScreen(props: any) {
           <View style={{ marginTop: 14, flexDirection: 'row', gap: 10, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(139,92,246,0.25)', backgroundColor: 'rgba(139,92,246,0.1)', padding: 13 }}>
             <Info size={17} color={c.accentPurple} style={{ marginTop: 1 }} />
             <Text style={{ flex: 1, fontSize: 12.5, lineHeight: 18, color: dim(0.72) }}>
-              Exam mode is on. Your {trim?.keptCount} key lifts are all you need today — the rest are optional.
+              {tr('Exam mode is on. Your {count} key lifts are all you need today — the rest are optional.', { count: trim?.keptCount })}
             </Text>
           </View>
         )}
@@ -682,7 +685,7 @@ function ListScreen(props: any) {
         <View style={{ marginTop: 14, borderWidth: 1, borderColor: dim(0.07), backgroundColor: dim(0.03), borderRadius: 16, overflow: 'hidden' }}>
           <Pressable onPress={onToggleGoal} className="active:opacity-80" style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, paddingHorizontal: 14 }}>
             <Target size={14} color={c.brand400} />
-            <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 1.6, textTransform: 'uppercase', color: c.brand400 }}>Today's goal</Text>
+            <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 1.6, textTransform: 'uppercase', color: c.brand400 }}>{tr('aw.todaysGoal')}</Text>
             <View style={{ marginLeft: 'auto', transform: [{ rotate: goalOpen ? '180deg' : '0deg' }] }}>
               <ChevronDown size={16} color={dim(0.4)} />
             </View>
@@ -717,7 +720,7 @@ function ListScreen(props: any) {
         <FinishButton c={c} pct={statsV.pct} remaining={statsV.remaining} allDone={allDone} confirmEnd={confirmEnd} onPress={onFinishTap} />
         {confirmEnd && (
           <Text style={{ marginTop: 9, textAlign: 'center', fontSize: 12.5, color: dim(0.5) }}>
-            {statsV.remaining} {statsV.remaining === 1 ? 'set still to go' : 'sets still to go'} · <Text onPress={onCancelEnd} style={{ color: c.brand400, fontWeight: '700' }}>Keep going</Text>
+            {statsV.remaining} {statsV.remaining === 1 ? tr('set still to go') : tr('sets still to go')} · <Text onPress={onCancelEnd} style={{ color: c.brand400, fontWeight: '700' }}>{tr('aw.keepGoing')}</Text>
           </Text>
         )}
       </ScrollView>
@@ -735,16 +738,17 @@ function HeaderStat({ value, label, c }: { value: string; label: string; c: any 
 }
 
 function FinishButton({ c, pct, remaining, allDone, confirmEnd, onPress }: { c: any; pct: number; remaining: number; allDone: boolean; confirmEnd: boolean; onPress: () => void }) {
+  const tr = useT()
   const bg = confirmEnd ? 'rgba(245,165,36,0.15)' : rgbaOf(c.brand400, 0.14)
   const border = confirmEnd ? 'rgba(245,165,36,0.5)' : rgbaOf(c.brand400, 0.3)
   const fg = confirmEnd ? c.accentOrange : c.brand400
-  const hint = confirmEnd ? '' : allDone ? '· all done' : `· ${remaining} ${remaining === 1 ? 'set left' : 'sets left'}`
+  const hint = confirmEnd ? '' : allDone ? `· ${tr('all done')}` : `· ${remaining} ${remaining === 1 ? tr('set left') : tr('sets left')}`
   return (
     <PressableScale onPress={onPress} haptic={false} scaleTo={0.98} className="w-full flex-row items-center justify-center overflow-hidden rounded-2xl" style={{ position: 'relative', marginTop: 20, padding: 14, backgroundColor: bg, borderWidth: 1, borderColor: border }}>
       {!confirmEnd && <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${pct}%`, backgroundColor: rgbaOf(c.brand400, 0.1) }} />}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
         <Flag size={16} color={fg} />
-        <Text style={{ fontSize: 14.5, fontWeight: '700', color: fg }}>{confirmEnd ? 'End workout early' : 'Finish workout'}</Text>
+        <Text style={{ fontSize: 14.5, fontWeight: '700', color: fg }}>{confirmEnd ? tr('End workout early') : tr('Finish workout')}</Text>
         {!!hint && <Text style={{ fontSize: 12, fontWeight: '600', color: rgbaOf(c.brand400, 0.6) }}>{hint}</Text>}
       </View>
     </PressableScale>
@@ -752,6 +756,7 @@ function FinishButton({ c, pct, remaining, allDone, confirmEnd, onPress }: { c: 
 }
 
 function ExerciseCard({ ex, idx, c, units, isActive, isOptional, expanded, onToggleExpand, onStart, onAdjWeight, onAdjReps, onToggleSet }: any) {
+  const tr = useT()
   const dim = (o: number) => `rgba(255,255,255,${o})`
   const doneCount = ex.sets.filter((x: any) => x.done).length
   const isDone = ex.sets.length > 0 && doneCount === ex.sets.length
@@ -801,18 +806,18 @@ function ExerciseCard({ ex, idx, c, units, isActive, isOptional, expanded, onTog
             <Text numberOfLines={1} style={{ flex: 1, fontSize: 16.5, fontWeight: '700', lineHeight: 19, color: c.fg }}>{ex.name}</Text>
             {isActive && (
               <View style={{ backgroundColor: rgbaOf(c.brand400, 0.16), paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 }}>
-                <Text style={{ fontSize: 10, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', color: c.brand300 }}>Now</Text>
+                <Text style={{ fontSize: 10, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', color: c.brand300 }}>{tr('aw.now')}</Text>
               </View>
             )}
             {!isActive && isOptional && (
               <View style={{ backgroundColor: dim(0.1), paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 }}>
-                <Text style={{ fontSize: 10, fontWeight: '600', color: dim(0.55) }}>Optional</Text>
+                <Text style={{ fontSize: 10, fontWeight: '600', color: dim(0.55) }}>{tr('aw.optional')}</Text>
               </View>
             )}
           </View>
           <Text style={{ marginTop: 3, fontSize: 12, fontWeight: '500', color: dim(0.45) }}>{metaLine}</Text>
           <Text style={{ marginTop: 5, fontSize: 12, lineHeight: 16.8 }}>
-            <Text style={{ color: dim(0.35) }}>Last: </Text>
+            <Text style={{ color: dim(0.35) }}>{tr('Last:')} </Text>
             <Text style={{ color: dim(0.7), fontWeight: '500' }}>{lastLine}</Text>
           </Text>
           <View style={{ marginTop: 9, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -823,11 +828,11 @@ function ExerciseCard({ ex, idx, c, units, isActive, isOptional, expanded, onTog
           <View style={{ marginTop: 11, flexDirection: 'row', gap: 8 }}>
             <PressableScale haptic={false} scaleTo={0.97} containerStyle={{ flex: 1 }} onPress={onToggleExpand} className="flex-row items-center justify-center rounded-xl" style={{ gap: 6, paddingVertical: 9, backgroundColor: dim(0.09) }}>
               <BookOpen size={14} color={dim(0.85)} />
-              <Text style={{ fontSize: 12, fontWeight: '700', color: dim(0.85) }}>Form</Text>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: dim(0.85) }}>{tr('aw.form')}</Text>
             </PressableScale>
             <PressableScale scaleTo={0.97} containerStyle={{ flex: 1 }} onPress={onStart} className="flex-row items-center justify-center rounded-xl" style={{ gap: 6, paddingVertical: 9, backgroundColor: isActive ? c.brand400 : dim(0.09) }}>
               <Play size={12} color={isActive ? '#000' : dim(0.85)} fill={isActive ? '#000' : dim(0.85)} />
-              <Text style={{ fontSize: 12, fontWeight: '700', color: isActive ? '#000' : dim(0.85) }}>{isDone ? 'Redo' : 'Start'}</Text>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: isActive ? '#000' : dim(0.85) }}>{isDone ? tr('Redo') : tr('Start')}</Text>
             </PressableScale>
           </View>
         </View>
@@ -843,6 +848,7 @@ function ExerciseCard({ ex, idx, c, units, isActive, isOptional, expanded, onTog
 /** Design `.form-reveal` — the expanded form + manual log, revealed with a
  *  fade + slide instead of the web clip-path (not expressible in RN). */
 function ExpandedForm({ ex, idx, c, units, detail, onAdjWeight, onAdjReps, onToggleSet }: any) {
+  const tr = useT()
   const dim = (o: number) => `rgba(255,255,255,${o})`
   const v = useRef(new Animated.Value(0)).current
   useEffect(() => {
@@ -851,7 +857,7 @@ function ExpandedForm({ ex, idx, c, units, detail, onAdjWeight, onAdjReps, onTog
   const u = weightUnit(units)
   return (
     <Animated.View style={{ borderTopWidth: 1, borderTopColor: dim(0.06), padding: 14, opacity: v, transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] }) }] }}>
-      <TechniqueClip exerciseId={ex.defId} poster={ex.image} label="Form clip · coming soon" accent={c.brand400} />
+      <TechniqueClip exerciseId={ex.defId} poster={ex.image} label={tr('Form clip · coming soon')} accent={c.brand400} />
       <Text style={{ marginTop: 12, fontSize: 13, lineHeight: 19.5, color: dim(0.72) }}>{detail.desc}</Text>
       <View style={{ marginTop: 12, gap: 9 }}>
         {detail.cues.map((cue: string, k: number) => (
@@ -864,16 +870,16 @@ function ExpandedForm({ ex, idx, c, units, detail, onAdjWeight, onAdjReps, onTog
         ))}
       </View>
       <View style={{ marginTop: 12, borderWidth: 1, borderColor: 'rgba(245,165,36,0.25)', backgroundColor: 'rgba(245,165,36,0.09)', borderRadius: 12, padding: 11 }}>
-        <Text style={{ fontSize: 12, lineHeight: 17.4, color: dim(0.7) }}><Text style={{ color: c.accentOrange, fontWeight: '700' }}>Avoid · </Text>{detail.commonMistake}</Text>
+        <Text style={{ fontSize: 12, lineHeight: 17.4, color: dim(0.7) }}><Text style={{ color: c.accentOrange, fontWeight: '700' }}>{tr('Avoid')} · </Text>{detail.commonMistake}</Text>
       </View>
 
-      <Text style={{ marginTop: 15, fontSize: 11, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase', color: dim(0.35) }}>{ex.measure === 'time' ? 'Rounds' : 'Log manually'}</Text>
+      <Text style={{ marginTop: 15, fontSize: 11, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase', color: dim(0.35) }}>{ex.measure === 'time' ? tr('Rounds') : tr('Log manually')}</Text>
       <View style={{ marginTop: 9, gap: 8 }}>
         {ex.sets.map((st: any, j: number) =>
           ex.measure === 'time' ? (
             <View key={j} style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
               <Text style={{ width: 16, fontSize: 12, fontWeight: '700', color: dim(0.4) }}>{j + 1}</Text>
-              <Text style={{ flex: 1, fontSize: 13, fontWeight: '600', color: dim(0.6) }}>Round {j + 1} · {ex.durationSec ?? 0}s{ex.perSide ? '/side' : ''}</Text>
+              <Text style={{ flex: 1, fontSize: 13, fontWeight: '600', color: dim(0.6) }}>{tr('Round {n}', { n: j + 1 })} · {ex.durationSec ?? 0}s{ex.perSide ? '/side' : ''}</Text>
               <PressableScale haptic={false} scaleTo={0.9} onPress={() => onToggleSet(idx, j)} accessibilityLabel={`Set ${j + 1}`} accessibilityState={{ checked: st.done }} className="items-center justify-center" style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: st.done ? c.brand400 : 'transparent', borderWidth: 2, borderColor: st.done ? c.brand400 : dim(0.2) }}>
                 {st.done && <Check size={15} strokeWidth={3.4} color="#0a0a0b" />}
               </PressableScale>
@@ -911,17 +917,18 @@ function Stepper({ c, value, unit, onDown, onUp }: { c: any; value: string; unit
 
 /* ============================ Work ============================ */
 function WorkScreen({ colors: c, ex, cursor, exTotal, rail, elapsedStr, sessionStr, recWeight, reps, remaining, timeMode, workRemaining, durationSec, perSide, detail, showHow, onOpenHow, onCloseHow, onDecReps, onIncReps, onBack, onLogSet }: any) {
+  const tr = useT()
   const dim = (o: number) => `rgba(255,255,255,${o})`
   const dots: Dot[] = ex.sets.map((st: any, j: number) => ({
     bg: st.done ? c.brand400 : j === cursor.setIdx ? 'transparent' : dim(0.12),
     border: st.done ? 'transparent' : j === cursor.setIdx ? c.brand400 : 'transparent',
   }))
-  const doneLabel = remaining <= 1 ? 'Done, finish set' : 'Done, start rest'
+  const doneLabel = remaining <= 1 ? tr('Done, finish set') : tr('Done, start rest')
   // Time-based circuit station: a big countdown that auto-advances at zero, with a
   // round label and (for per-side moves) a switch-sides cue at the half-way point.
-  const roundLabel = `Round ${cursor.setIdx + 1} of ${ex.sets.length} · Station ${cursor.exIdx + 1} of ${exTotal}`
+  const roundLabel = tr('Round {round} of {rounds} · Station {station} of {stations}', { round: cursor.setIdx + 1, rounds: ex.sets.length, station: cursor.exIdx + 1, stations: exTotal })
   const halfway = perSide && durationSec > 0 && workRemaining <= switchSidesAtSec(durationSec)
-  const workSub = perSide ? (halfway ? 'Switch sides now' : 'Switch sides halfway') : ex.targetReps ? `Aim for ${ex.targetReps}` : 'Hold to the buzzer'
+  const workSub = perSide ? (halfway ? tr('Switch sides now') : tr('Switch sides halfway')) : ex.targetReps ? tr('Aim for {reps}', { reps: ex.targetReps }) : tr('Hold to the buzzer')
 
   return (
     <ScreenIn>
@@ -929,7 +936,7 @@ function WorkScreen({ colors: c, ex, cursor, exTotal, rail, elapsedStr, sessionS
       <View style={{ paddingHorizontal: 18, paddingTop: 6, paddingBottom: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <PressableScale onPress={onBack} haptic={false} className="flex-row items-center rounded-full" style={{ gap: 7, paddingVertical: 8, paddingLeft: 11, paddingRight: 14, backgroundColor: dim(0.07) }}>
           <ListChecks size={15} color={dim(0.85)} />
-          <Text style={{ fontSize: 12.5, fontWeight: '700', color: dim(0.85) }}>All exercises</Text>
+          <Text style={{ fontSize: 12.5, fontWeight: '700', color: dim(0.85) }}>{tr('aw.allExercises')}</Text>
         </PressableScale>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Timer size={14} color={dim(0.45)} />
@@ -942,13 +949,13 @@ function WorkScreen({ colors: c, ex, cursor, exTotal, rail, elapsedStr, sessionS
       {/* context */}
       <View style={{ paddingHorizontal: 24, paddingTop: 16, alignItems: 'center' }}>
         <Text style={{ fontSize: 11, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', color: c.brand400, textAlign: 'center' }}>
-          {timeMode ? roundLabel : `Exercise ${cursor.exIdx + 1} of ${exTotal} · Set ${cursor.setIdx + 1} of ${ex.sets.length}`}
+          {timeMode ? roundLabel : tr('Exercise {ex} of {exTotal} · Set {set} of {sets}', { ex: cursor.exIdx + 1, exTotal, set: cursor.setIdx + 1, sets: ex.sets.length })}
         </Text>
         <Text style={{ marginTop: 5, fontSize: 25, fontWeight: '800', letterSpacing: -0.5, lineHeight: 27.5, color: c.fg, textAlign: 'center' }}>{ex.name}</Text>
         <View style={{ marginTop: 9 }}><Dots dots={dots} size={9} /></View>
         <PressableScale onPress={onOpenHow} haptic={false} className="flex-row items-center rounded-full" style={{ marginTop: 12, gap: 6, paddingVertical: 7, paddingHorizontal: 13, borderWidth: 1, borderColor: dim(0.12), backgroundColor: dim(0.05) }}>
           <HelpCircle size={14} color={dim(0.75)} />
-          <Text style={{ fontSize: 12, fontWeight: '700', color: dim(0.75) }}>Not sure how? Show me</Text>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: dim(0.75) }}>{tr('aw.notSureHow')}</Text>
         </PressableScale>
       </View>
 
@@ -959,9 +966,9 @@ function WorkScreen({ colors: c, ex, cursor, exTotal, rail, elapsedStr, sessionS
             <Circle cx="50" cy="50" r="46" fill="none" stroke={c.brand400} strokeWidth={2} strokeLinecap="round" strokeDasharray="3.4 3.6" />
           </Svg>
           <View style={{ alignItems: 'center' }}>
-            <Text style={{ fontSize: 13, fontWeight: '800', letterSpacing: 4, textTransform: 'uppercase', color: c.brand400 }}>Work</Text>
+            <Text style={{ fontSize: 13, fontWeight: '800', letterSpacing: 4, textTransform: 'uppercase', color: c.brand400 }}>{tr('aw.work')}</Text>
             <Text accessibilityLabel={timeMode ? `${workRemaining} seconds left` : undefined} style={{ marginTop: 6, fontSize: 62, fontWeight: '800', letterSpacing: -1, lineHeight: 62, color: timeMode && workRemaining <= 3 ? c.accentOrange : c.fg, fontVariant: ['tabular-nums'] }}>{timeMode ? mmss(workRemaining) : elapsedStr}</Text>
-            <Text style={{ marginTop: 8, fontSize: 13, fontWeight: '600', color: timeMode && halfway && perSide ? c.brand400 : dim(0.4) }}>{timeMode ? workSub : `Aim for ${ex.targetReps} reps`}</Text>
+            <Text style={{ marginTop: 8, fontSize: 13, fontWeight: '600', color: timeMode && halfway && perSide ? c.brand400 : dim(0.4) }}>{timeMode ? workSub : tr('Aim for {reps} reps', { reps: ex.targetReps })}</Text>
           </View>
         </View>
       </View>
@@ -970,10 +977,10 @@ function WorkScreen({ colors: c, ex, cursor, exTotal, rail, elapsedStr, sessionS
       {!timeMode && (
         <View style={{ paddingHorizontal: 20, alignItems: 'center' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: dim(0.06), borderWidth: 1, borderColor: dim(0.08), borderRadius: 999, paddingVertical: 7, paddingHorizontal: 14 }}>
-            <Text style={{ fontSize: 12.5, fontWeight: '600', color: dim(0.55) }}>Recommended</Text>
+            <Text style={{ fontSize: 12.5, fontWeight: '600', color: dim(0.55) }}>{tr('aw.recommended')}</Text>
             <Text style={{ fontSize: 12.5, fontWeight: '800', color: c.brand400 }}>{recWeight}</Text>
           </View>
-          <Text style={{ marginTop: 18, fontSize: 11, fontWeight: '700', letterSpacing: 2, textTransform: 'uppercase', color: dim(0.4) }}>Reps done</Text>
+          <Text style={{ marginTop: 18, fontSize: 11, fontWeight: '700', letterSpacing: 2, textTransform: 'uppercase', color: dim(0.4) }}>{tr('aw.repsDone')}</Text>
           <View style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 26 }}>
             <PressableScale onPress={onDecReps} scaleTo={0.9} accessibilityRole="button" accessibilityLabel="Decrease reps" className="items-center justify-center rounded-full" style={{ width: 52, height: 52, backgroundColor: dim(0.08) }}>
               <Minus size={22} color={c.fg} />
@@ -990,7 +997,7 @@ function WorkScreen({ colors: c, ex, cursor, exTotal, rail, elapsedStr, sessionS
       <View style={{ paddingHorizontal: 20, paddingTop: 18, paddingBottom: 26 }}>
         {timeMode ? (
           <PressableScale onPress={onLogSet} haptic={false} scaleTo={0.97} accessibilityRole="button" accessibilityLabel="Done early, skip to rest" className="w-full flex-row items-center justify-center rounded-full" style={{ gap: 8, paddingVertical: 15, borderWidth: 1, borderColor: dim(0.14), backgroundColor: dim(0.05) }}>
-            <Text style={{ fontSize: 14, fontWeight: '700', letterSpacing: 0.3, textTransform: 'uppercase', color: dim(0.8) }}>Done early · skip to rest</Text>
+            <Text style={{ fontSize: 14, fontWeight: '700', letterSpacing: 0.3, textTransform: 'uppercase', color: dim(0.8) }}>{tr('Done early · skip to rest')}</Text>
           </PressableScale>
         ) : (
           <PressableScale onPress={onLogSet} haptic={false} scaleTo={0.97} className="w-full flex-row items-center justify-center rounded-full" style={{ gap: 10, padding: 19, backgroundColor: c.brand400 }}>
@@ -1006,6 +1013,7 @@ function WorkScreen({ colors: c, ex, cursor, exTotal, rail, elapsedStr, sessionS
 }
 
 function HowToDialog({ c, ex, detail, onClose }: any) {
+  const tr = useT()
   const dim = (o: number) => `rgba(255,255,255,${o})`
   const v = useRef(new Animated.Value(0)).current
   useEffect(() => {
@@ -1016,13 +1024,13 @@ function HowToDialog({ c, ex, detail, onClose }: any) {
       <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       <Animated.View style={{ width: '100%', maxHeight: '100%', backgroundColor: c.ink800, borderWidth: 1, borderColor: dim(0.1), borderRadius: 24, overflow: 'hidden', transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.93, 1] }) }] }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, paddingBottom: 10 }}>
-          <Text style={{ fontSize: 15, fontWeight: '700', color: c.fg }}>How to · {ex.name}</Text>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: c.fg }}>{tr('How to')} · {ex.name}</Text>
           <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" className="items-center justify-center rounded-full active:opacity-80" style={{ width: 32, height: 32, backgroundColor: dim(0.1) }}><X size={17} strokeWidth={2.4} color={dim(0.7)} /></Pressable>
         </View>
         <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 18 }} showsVerticalScrollIndicator={false}>
-          <TechniqueClip exerciseId={ex.defId} poster={ex.image} label="Form clip · coming soon" accent={c.brand400} />
+          <TechniqueClip exerciseId={ex.defId} poster={ex.image} label={tr('Form clip · coming soon')} accent={c.brand400} />
           <Text style={{ marginTop: 14, fontSize: 14, lineHeight: 21, color: dim(0.78) }}>{detail.desc}</Text>
-          <Text style={{ marginTop: 18, marginBottom: 10, fontSize: 11.5, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', color: dim(0.4) }}>Step by step</Text>
+          <Text style={{ marginTop: 18, marginBottom: 10, fontSize: 11.5, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', color: dim(0.4) }}>{tr('aw.stepByStep')}</Text>
           <View style={{ gap: 11 }}>
             {detail.cues.map((cue: string, k: number) => (
               <View key={k} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 11 }}>
@@ -1034,10 +1042,10 @@ function HowToDialog({ c, ex, detail, onClose }: any) {
             ))}
           </View>
           <View style={{ marginTop: 16, borderWidth: 1, borderColor: 'rgba(245,165,36,0.25)', backgroundColor: 'rgba(245,165,36,0.09)', borderRadius: 14, padding: 13 }}>
-            <Text style={{ fontSize: 13, lineHeight: 18.85, color: dim(0.72) }}><Text style={{ color: c.accentOrange, fontWeight: '700' }}>Avoid · </Text>{detail.commonMistake}</Text>
+            <Text style={{ fontSize: 13, lineHeight: 18.85, color: dim(0.72) }}><Text style={{ color: c.accentOrange, fontWeight: '700' }}>{tr('Avoid')} · </Text>{detail.commonMistake}</Text>
           </View>
           <PressableScale onPress={onClose} className="w-full items-center rounded-2xl" style={{ marginTop: 18, padding: 15, backgroundColor: c.brand400 }}>
-            <Text style={{ fontSize: 15, fontWeight: '700', color: '#000' }}>Got it</Text>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: '#000' }}>{tr('aw.gotIt')}</Text>
           </PressableScale>
         </ScrollView>
       </Animated.View>
@@ -1047,6 +1055,7 @@ function HowToDialog({ c, ex, detail, onClose }: any) {
 
 /* ============================ Rest ============================ */
 function RestScreen({ colors: c, blue, units, remaining, total, rail, nextEx, nextCursor, nextSet, onBack, onSkip, onAdd, onSub }: any) {
+  const tr = useT()
   const dim = (o: number) => `rgba(255,255,255,${o})`
   const frac = total > 0 ? Math.max(0, Math.min(1, remaining / total)) : 0
   const color = restColor(frac, blue ? c.brand400 : undefined)
@@ -1079,11 +1088,11 @@ function RestScreen({ colors: c, blue, units, remaining, total, rail, nextEx, ne
       <View style={{ paddingHorizontal: 18, paddingTop: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <PressableScale onPress={onBack} haptic={false} className="flex-row items-center rounded-full" style={{ gap: 4, paddingVertical: 8, paddingLeft: 9, paddingRight: 13, backgroundColor: dim(0.07) }}>
           <ChevronLeft size={16} color={dim(0.85)} />
-          <Text style={{ fontSize: 12.5, fontWeight: '700', color: dim(0.85) }}>List</Text>
+          <Text style={{ fontSize: 12.5, fontWeight: '700', color: dim(0.85) }}>{tr('aw.list')}</Text>
         </PressableScale>
-        <Text style={{ fontSize: 11, fontWeight: '800', letterSpacing: 2.8, textTransform: 'uppercase', color }}>Rest</Text>
+        <Text style={{ fontSize: 11, fontWeight: '800', letterSpacing: 2.8, textTransform: 'uppercase', color }}>{tr('aw.rest')}</Text>
         <PressableScale onPress={onSkip} haptic={false} className="rounded-full" style={{ paddingVertical: 8, paddingHorizontal: 15, backgroundColor: dim(0.07) }}>
-          <Text style={{ fontSize: 12.5, fontWeight: '700', color: dim(0.85) }}>Skip</Text>
+          <Text style={{ fontSize: 12.5, fontWeight: '700', color: dim(0.85) }}>{tr('aw.skip')}</Text>
         </PressableScale>
       </View>
       <View style={{ marginTop: 10 }}><Rail rail={rail} /></View>
@@ -1101,7 +1110,7 @@ function RestScreen({ colors: c, blue, units, remaining, total, rail, nextEx, ne
                 <Text style={{ fontSize: 13, fontWeight: '600', color: dim(0.4) }}>{endTime}</Text>
               </View>
               <Text style={{ marginTop: 8, fontSize: 70, fontWeight: '800', letterSpacing: -1.4, lineHeight: 70, color, fontVariant: ['tabular-nums'] }}>{mmss(remaining)}</Text>
-              <Text style={{ marginTop: 6, fontSize: 11.5, fontWeight: '700', letterSpacing: 1.6, textTransform: 'uppercase', color: dim(0.35) }}>until next set</Text>
+              <Text style={{ marginTop: 6, fontSize: 11.5, fontWeight: '700', letterSpacing: 1.6, textTransform: 'uppercase', color: dim(0.35) }}>{tr('aw.untilNextSet')}</Text>
             </View>
           </Animated.View>
         </PressableScale>
@@ -1115,7 +1124,7 @@ function RestScreen({ colors: c, blue, units, remaining, total, rail, nextEx, ne
           </View>
           <View>
             <Text style={{ fontSize: 10.5, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', color: dim(0.4) }}>
-              {nextEx.measure === 'time' ? `Up next · Round ${nextCursor.setIdx + 1} of ${nextEx.sets.length}` : `Up next · Set ${nextCursor.setIdx + 1} of ${nextEx.sets.length}`}
+              {nextEx.measure === 'time' ? tr('Up next · Round {n} of {t}', { n: nextCursor.setIdx + 1, t: nextEx.sets.length }) : tr('Up next · Set {n} of {t}', { n: nextCursor.setIdx + 1, t: nextEx.sets.length })}
             </Text>
             <Text style={{ fontSize: 15, fontWeight: '700', lineHeight: 17.25, color: c.fg }}>{nextEx.name}</Text>
             <Text style={{ fontSize: 12.5, fontWeight: '700', color: c.brand400 }}>
@@ -1140,7 +1149,7 @@ function RestScreen({ colors: c, blue, units, remaining, total, rail, nextEx, ne
             <Text style={{ fontSize: 14, fontWeight: '700', color: c.fg }}>+15s</Text>
           </PressableScale>
         </View>
-        <Text style={{ marginTop: 12, textAlign: 'center', fontSize: 12, fontWeight: '600', color: dim(0.35) }}>Tap the centre to start now</Text>
+        <Text style={{ marginTop: 12, textAlign: 'center', fontSize: 12, fontWeight: '600', color: dim(0.35) }}>{tr('aw.tapCentreStart')}</Text>
       </View>
     </ScreenIn>
   )
@@ -1148,6 +1157,7 @@ function RestScreen({ colors: c, blue, units, remaining, total, rail, nextEx, ne
 
 /* ============================ Go ============================ */
 function GoScreen({ colors: c, units, nextEx, nextCursor, nextSet, onStart }: any) {
+  const tr = useT()
   const v = useRef(new Animated.Value(0)).current
   useEffect(() => {
     Animated.timing(v, { toValue: 1, duration: 400, easing: Easing.out(Easing.cubic), useNativeDriver: USE_NATIVE }).start()
@@ -1157,14 +1167,14 @@ function GoScreen({ colors: c, units, nextEx, nextCursor, nextSet, onStart }: an
   return (
     <Animated.View style={{ flex: 1, opacity: v, transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] }) }] }}>
       <Pressable onPress={() => { thud(); onStart() }} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.brand400 }}>
-        <Text style={{ fontSize: 92, fontWeight: '800', letterSpacing: -3, lineHeight: 83, color: ink }}>GO</Text>
+        <Text style={{ fontSize: 92, fontWeight: '800', letterSpacing: -3, lineHeight: 83, color: ink }}>{tr('GO')}</Text>
         <Text style={{ marginTop: 14, fontSize: 24, fontWeight: '800', color: ink }}>
           {nextEx.measure === 'time'
             ? `${nextEx.durationSec ?? 0}s${nextEx.perSide ? ' · switch sides' : ''}`
             : `${fmtWeightNum(nextSet.weightKg, units, units === 'imperial' ? 0 : 1)} ${u} × ${nextSet.reps}`}
         </Text>
-        <Text style={{ marginTop: 4, fontSize: 13, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase', color: 'rgba(10,10,11,0.62)' }}>{nextEx.name} · {nextEx.measure === 'time' ? `Round ${nextCursor.setIdx + 1}` : `Set ${nextCursor.setIdx + 1}`}</Text>
-        <Text style={{ position: 'absolute', bottom: 56, fontSize: 13, fontWeight: '700', color: 'rgba(10,10,11,0.5)' }}>Tap to begin</Text>
+        <Text style={{ marginTop: 4, fontSize: 13, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase', color: 'rgba(10,10,11,0.62)' }}>{nextEx.name} · {nextEx.measure === 'time' ? tr('Round {n}', { n: nextCursor.setIdx + 1 }) : tr('Set {n}', { n: nextCursor.setIdx + 1 })}</Text>
+        <Text style={{ position: 'absolute', bottom: 56, fontSize: 13, fontWeight: '700', color: 'rgba(10,10,11,0.5)' }}>{tr('aw.tapToBegin')}</Text>
       </Pressable>
     </Animated.View>
   )
@@ -1183,6 +1193,7 @@ const RAYS: { deg: number; accent: 'brand' | 'yellow' }[] = [
 ]
 
 function FinishSheet({ colors: c, units, name, firstName, streakN, weekDone, weekTarget, stats, pr, saveAtRisk, onDone }: any) {
+  const tr = useT()
   const dim = (o: number) => `rgba(255,255,255,${o})`
   const insets = useSafeAreaInsets()
 
@@ -1224,8 +1235,8 @@ function FinishSheet({ colors: c, units, name, firstName, streakN, weekDone, wee
   // Entrance scale composes with the "hit" bounce (1 → 1.12 → 1).
   const discScale = { transform: [{ scale: disc.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }) }, { scale: pop.interpolate({ inputRange: [0, 1], outputRange: [1, 1.12] }) }] }
 
-  const streakPart = streakN > 0 ? `Day ${streakN} of your streak` : 'Streak building'
-  const weekPart = weekTarget > 0 ? `${weekDone} of ${weekTarget} workouts this week` : `${weekDone} ${weekDone === 1 ? 'workout' : 'workouts'} this week`
+  const streakPart = streakN > 0 ? tr('Day {n} of your streak', { n: streakN }) : tr('Streak building')
+  const weekPart = weekTarget > 0 ? tr('{done} of {target} workouts this week', { done: weekDone, target: weekTarget }) : `${weekDone} ${weekDone === 1 ? tr('workout') : tr('workouts')} ${tr('this week')}`
   const volFull = stats ? fmtVolume(stats.volume, units) : '0 kg'
   const spaceIdx = volFull.lastIndexOf(' ')
   const volNum = spaceIdx > 0 ? volFull.slice(0, spaceIdx) : volFull
@@ -1270,8 +1281,8 @@ function FinishSheet({ colors: c, units, name, firstName, streakN, weekDone, wee
           </View>
 
           <Animated.View style={[{ alignItems: 'center' }, riseStyle]}>
-            <Text style={{ marginTop: 12, fontSize: 11, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase', color: c.brand400 }}>{name} complete</Text>
-            <Text style={{ marginTop: 4, fontSize: 24, fontWeight: '800', letterSpacing: -0.6, lineHeight: 26, color: c.fg, textAlign: 'center' }}>Nice work, {firstName}</Text>
+            <Text style={{ marginTop: 12, fontSize: 11, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase', color: c.brand400 }}>{name} {tr('complete')}</Text>
+            <Text style={{ marginTop: 4, fontSize: 24, fontWeight: '800', letterSpacing: -0.6, lineHeight: 26, color: c.fg, textAlign: 'center' }}>{tr('Nice work, {name}', { name: firstName })}</Text>
             <Text style={{ marginTop: 5, fontSize: 13.5, fontWeight: '500', color: dim(0.7), textAlign: 'center' }}>{streakPart} · {weekPart}</Text>
           </Animated.View>
         </View>
@@ -1282,18 +1293,18 @@ function FinishSheet({ colors: c, units, name, firstName, streakN, weekDone, wee
               <Star size={15} color={c.accentYellow} fill={c.accentYellow} />
             </View>
             <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, fontWeight: '600', color: dim(0.9) }}>
-              <Text style={{ fontWeight: '800', color: c.accentYellow }}>New PR</Text> · {pr.name} — {fmtWeight(pr.weightKg, units, units === 'imperial' ? 0 : 1)} × {pr.reps}
+              <Text style={{ fontWeight: '800', color: c.accentYellow }}>{tr('aw.newPR')}</Text> · {pr.name} — {fmtWeight(pr.weightKg, units, units === 'imperial' ? 0 : 1)} × {pr.reps}
             </Text>
           </Animated.View>
         )}
 
         {/* Stats grouped into a single card, echoing the dashboard's stat surfaces. */}
         <Animated.View style={[{ flexDirection: 'row', marginTop: 9, paddingVertical: 11, borderRadius: 16, backgroundColor: dim(0.04), borderWidth: 1, borderColor: dim(0.05) }, riseStyle]}>
-          <FinishStat value={stats ? mmss(stats.time) : '0:00'} label="Time" c={c} />
+          <FinishStat value={stats ? mmss(stats.time) : '0:00'} label={tr('Time')} c={c} />
           <View style={{ flex: 1, borderLeftWidth: 1, borderRightWidth: 1, borderColor: dim(0.07) }}>
-            <FinishStat value={volNum} unit={volUnit} label="Volume" c={c} />
+            <FinishStat value={volNum} unit={volUnit} label={tr('Volume')} c={c} />
           </View>
-          <FinishStat value={stats ? String(stats.sets) : '0'} label="Sets" c={c} />
+          <FinishStat value={stats ? String(stats.sets) : '0'} label={tr('Sets')} c={c} />
         </Animated.View>
 
         {/* Honest save state (audit SA-004): if the completion could not be
@@ -1301,13 +1312,13 @@ function FinishSheet({ colors: c, units, name, firstName, streakN, weekDone, wee
         {saveAtRisk && (
           <Animated.View style={[{ marginTop: 12, paddingVertical: 9, paddingHorizontal: 12, borderRadius: 14, backgroundColor: rgbaOf(c.accentYellow, 0.1), borderWidth: 1, borderColor: rgbaOf(c.accentYellow, 0.28) }, riseStyle]}>
             <Text style={{ fontSize: 12.5, fontWeight: '600', lineHeight: 17, color: dim(0.85), textAlign: 'center' }}>
-              Saved on this device, but we couldn't sync it yet. It'll upload automatically once you're back online.
+              {tr("Saved on this device, but we couldn't sync it yet. It'll upload automatically once you're back online.")}
             </Text>
           </Animated.View>
         )}
 
         <PressableScale onPress={onDone} accessibilityRole="button" accessibilityLabel="Continue" className="items-center rounded-full" style={{ marginTop: 20, height: 48, justifyContent: 'center', backgroundColor: c.brand400 }}>
-          <Text style={{ fontSize: 15, fontWeight: '800', color: c.ink900 }}>Continue</Text>
+          <Text style={{ fontSize: 15, fontWeight: '800', color: c.ink900 }}>{tr('aw.continue')}</Text>
         </PressableScale>
       </Animated.View>
     </View>

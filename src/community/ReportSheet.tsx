@@ -14,6 +14,7 @@ import { useColors, brand } from '../theme'
 import { useStore } from '../store/store'
 import { tick, thud } from '../lib/haptics'
 import { reportContent, REPORT_REASONS, type ReportReason } from './service'
+import { useT } from '../lib/useT'
 
 export interface ReportTarget {
   type: 'user' | 'group'
@@ -30,6 +31,7 @@ function usernameOf(target: ReportTarget | null): string | null {
 
 export function ReportSheet({ open, target, onClose }: { open: boolean; target: ReportTarget | null; onClose: () => void }) {
   const colors = useColors()
+  const t = useT()
   const toast = useToast()
   const { dispatch } = useStore()
   const [reason, setReason] = useState<ReportReason>('offensive_name')
@@ -59,28 +61,28 @@ export function ReportSheet({ open, target, onClose }: { open: boolean; target: 
         thud()
         if (blockName && block) {
           dispatch({ type: 'BLOCK_USER', uid: blockName })
-          toast(`Reported and blocked @${blockName}`)
+          toast(t('Reported and blocked @{name}', { name: blockName }))
         } else {
-          toast('Thanks, our team will review this')
+          toast(t('Thanks, our team will review this'))
         }
         setNote('')
         setReason('offensive_name')
         onClose()
       } else {
-        toast("Couldn't send that. Try again.")
+        toast(t("Couldn't send that. Try again."))
       }
     } catch {
-      toast("Couldn't send that. Try again.")
+      toast(t("Couldn't send that. Try again."))
     } finally {
       setSubmitting(false)
     }
   }
 
-  const what = target?.type === 'group' ? 'group' : 'user'
+  const what = target?.type === 'group' ? t('group') : t('user')
   return (
-    <Sheet open={open} onClose={onClose} title={`Report ${what}`}>
+    <Sheet open={open} onClose={onClose} title={t('Report {what}', { what })}>
       <Text className="text-[13px] leading-snug text-secondary">
-        Reporting {target ? <Text className="font-semibold text-white" style={{ color: colors.fg }}>{target.label}</Text> : `this ${what}`}. Our team reviews reports privately; the person isn't told who reported them.
+        Reporting {target ? <Text className="font-semibold text-white" style={{ color: colors.fg }}>{target.label}</Text> : t('this {what}', { what })}. {t("Our team reviews reports privately; the person isn't told who reported them.")}
       </Text>
 
       <View className="mt-3 flex-row flex-wrap gap-2">
@@ -107,7 +109,7 @@ export function ReportSheet({ open, target, onClose }: { open: boolean; target: 
           onChangeText={setNote}
           multiline
           maxLength={500}
-          placeholder="Add any detail (optional)"
+          placeholder={t('Add any detail (optional)')}
           placeholderTextColor="rgba(255,255,255,0.3)"
           accessibilityLabel="Report detail"
           textAlignVertical="top"
@@ -132,8 +134,8 @@ export function ReportSheet({ open, target, onClose }: { open: boolean; target: 
             {block ? <Check size={14} color="#000" /> : null}
           </View>
           <View className="flex-1">
-            <Text className="text-[13px] font-semibold text-white" style={{ color: colors.fg }}>Also block @{blockName}</Text>
-            <Text className="text-[12px] leading-snug text-tertiary">Hides them from your leaderboards and group feeds.</Text>
+            <Text className="text-[13px] font-semibold text-white" style={{ color: colors.fg }}>{t('Also block @{name}', { name: blockName })}</Text>
+            <Text className="text-[12px] leading-snug text-tertiary">{t('Hides them from your leaderboards and group feeds.')}</Text>
           </View>
         </Pressable>
       )}
@@ -147,7 +149,7 @@ export function ReportSheet({ open, target, onClose }: { open: boolean; target: 
         className="btn-primary mt-3 flex-row items-center justify-center gap-2 py-3 active:opacity-90"
         style={submitting ? { opacity: 0.7 } : undefined}
       >
-        {submitting ? <ActivityIndicator size="small" color="#000" /> : <Text className="text-[15px] font-bold text-black">Submit report</Text>}
+        {submitting ? <ActivityIndicator size="small" color="#000" /> : <Text className="text-[15px] font-bold text-black">{t('Submit report')}</Text>}
       </PressableScale>
     </Sheet>
   )

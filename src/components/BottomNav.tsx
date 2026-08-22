@@ -4,7 +4,9 @@ import Svg, { Path, Rect, Circle, G } from 'react-native-svg'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { TabKey } from '../App'
 import { useColors } from '../theme'
+import { useT } from '../lib/useT'
 import { withAlpha } from '../lib/color'
+import { coachAvailable } from '../backend/coach/coachGate'
 
 /** The items-row height (above the home-indicator region + safe-area inset). Exported so the Coach
  *  tab can reserve the right amount of space for its composer to sit directly above the nav. */
@@ -69,14 +71,17 @@ function NavIcon({ name, size, color }: { name: IconKey; size: number; color: st
 
 type Item = { key: TabKey; label: string; center?: boolean }
 
-// Design "B": five tabs, Coach the raised centre control.
-const items: Item[] = [
+// Design "B": five tabs, Coach the raised centre control. The Coach tab is only shown while the
+// coach is actually available; when it is gated off we drop the tab entirely (rather than leaving a
+// prominent centre button that dead-ends on a "coming soon" screen).
+const allItems: Item[] = [
   { key: 'dashboard', label: 'Dashboard' },
   { key: 'workout', label: 'Workout' },
   { key: 'coach', label: 'Coach', center: true },
   { key: 'nutrition', label: 'Nutrition' },
   { key: 'community', label: 'Community' },
 ]
+const items: Item[] = coachAvailable() ? allItems : allItems.filter((i) => i.key !== 'coach')
 
 export function BottomNav({
   active,
@@ -90,6 +95,7 @@ export function BottomNav({
 }) {
   const insets = useSafeAreaInsets()
   const c = useColors()
+  const t = useT()
   const inactive = withAlpha(c.fg, 0.62)
 
   // Standard app transition timing; the bar drops away + fades when hidden, springs back cleanly.
@@ -136,7 +142,7 @@ export function BottomNav({
                 {/* Icon-slot spacer keeps the "Coach" label on the same baseline as the other labels. */}
                 <View style={{ height: 24 }} />
                 <Text className="text-[10.5px] font-bold" style={{ color: isActive ? c.brand400 : inactive }}>
-                  {label}
+                  {t(label)}
                 </Text>
                 {/* The orb, absolutely centred and pulled up so it hangs over the bar's top edge. */}
                 <View style={{ position: 'absolute', top: -13, left: 0, right: 0, alignItems: 'center' }}>
@@ -181,7 +187,7 @@ export function BottomNav({
               </View>
               <NavIcon name={key as IconKey} size={24} color={isActive ? c.brand400 : inactive} />
               <Text className="text-[10.5px] font-bold" style={{ color: isActive ? c.brand400 : inactive }}>
-                {label}
+                {t(label)}
               </Text>
             </NavTab>
           )

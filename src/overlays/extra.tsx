@@ -15,6 +15,7 @@ import { posterOverrideUrl } from '../lib/media'
 import { useDispatch, useStore } from '../store/store'
 import { useToast } from '../components/Toast'
 import { useNav } from '../nav'
+import { useT } from '../lib/useT'
 import { BEGINNER_LESSONS, exerciseDetail, REP_TARGETS, BASE_WEIGHTS, SET_TARGETS, ACTIVITY_PRESETS, activityPreset, INTENSITY_MULT, EXERCISES, exById } from '../data/catalog'
 import { useExerciseInfo } from '../data/exerciseInfo'
 import { fmtWeight } from '../lib/format'
@@ -30,7 +31,7 @@ import { todaySession, leaderboardSorted, youRank } from '../store/selectors'
 import { relativeLabel, todayKey, deviceTimezone } from '../lib/date'
 import { CHART_METRICS, DASHBOARD_FEATURED, MAX_DASHBOARD_STATS, PROGRESS_LIFT_PERIODS, STAT_METRICS, STAT_TIMEFRAMES, dashboardFeaturedId, dashboardLiftPeriod, dashboardStatIds, dashboardTimeframe, dashboardTrackedIds, progressMetricId } from '../lib/metrics'
 import type { ProgressLiftPeriod } from '../store/types'
-import { brand, useColors, accentFor, type AccentKey } from '../theme'
+import { brand, useColors, accentFor, SECTION_ACCENT, type AccentKey } from '../theme'
 import { AppModal, IS_WEB, WEB_SCREEN } from '../components/WebFrame'
 import { CoachScreen } from '../coach/CoachScreen'
 import type { ReactNode } from 'react'
@@ -50,6 +51,7 @@ const coachIcon: Record<CoachKind, ReactNode> = {
 export function CoachSheet({ open, onClose }: Props) {
   const { state } = useStore()
   const nav = useNav()
+  const t = useT()
   const thread = coachThreadView(state)
   // Coach profile & memory (formerly the brain icon in the chat header) now lives here, under
   // Menu → Your coach — the chat itself carries no settings.
@@ -57,7 +59,7 @@ export function CoachSheet({ open, onClose }: Props) {
 
   if (!coachOperational() && !COACH_PREVIEW) {
     return (
-      <Sheet open={open} onClose={onClose} title="Your coach">
+      <Sheet open={open} onClose={onClose} title={t('Your coach')}>
         <CoachComingSoon />
       </Sheet>
     )
@@ -65,27 +67,27 @@ export function CoachSheet({ open, onClose }: Props) {
 
   if (showSettings) {
     return (
-      <Sheet open={open} onClose={onClose} title="Coach profile" full bare>
+      <Sheet open={open} onClose={onClose} title={t('Coach profile')} full bare>
         <CoachMemoryView onClose={() => setShowSettings(false)} />
       </Sheet>
     )
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title="Your coach">
+    <Sheet open={open} onClose={onClose} title={t('Your coach')}>
       <View className="mb-4 flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-3.5">
         <View className="h-11 w-11 items-center justify-center rounded-full bg-brand-400"><Sparkles size={20} color="#000" /></View>
         <View>
           <Text className="font-bold leading-tight text-white">{coachDisplayName(state.profile.coachName)}</Text>
-          <Text className="text-[12px] text-secondary">Reads your logs. Checks in, not chats.</Text>
+          <Text className="text-[12px] text-secondary">{t('Reads your logs. Checks in, not chats.')}</Text>
         </View>
       </View>
 
       <Pressable onPress={() => setShowSettings(true)} accessibilityRole="button" accessibilityLabel="Coach profile and memory" className="mb-4 flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-3.5 active:opacity-90">
         <View className="h-11 w-11 items-center justify-center rounded-full bg-white/5"><Brain size={19} color={brand[400]} strokeWidth={2} /></View>
         <View className="flex-1">
-          <Text className="font-bold leading-tight text-white">Coach profile &amp; memory</Text>
-          <Text className="text-[12px] text-secondary">What the coach remembers, and its style</Text>
+          <Text className="font-bold leading-tight text-white">{t('Coach profile & memory')}</Text>
+          <Text className="text-[12px] text-secondary">{t('What the coach remembers, and its style')}</Text>
         </View>
         <ChevronRight size={18} color="rgba(255,255,255,0.3)" />
       </Pressable>
@@ -96,7 +98,7 @@ export function CoachSheet({ open, onClose }: Props) {
             <View className="mb-1 flex-row items-center gap-2">
               <View className="h-6 w-6 items-center justify-center rounded-full bg-white/5">{coachIcon[m.kind]}</View>
               <Text className="font-bold leading-tight text-white">{m.title}</Text>
-              <Text className="ml-auto text-[11px] text-tertiary">{i === 0 ? 'Today' : relativeLabel(m.dateKey)}</Text>
+              <Text className="ml-auto text-[11px] text-tertiary">{i === 0 ? t('Today') : relativeLabel(m.dateKey)}</Text>
             </View>
             <Text className="text-[14px] leading-snug text-white/70">{m.body}</Text>
             {m.cta && (
@@ -119,36 +121,37 @@ export function CoachSheet({ open, onClose }: Props) {
 export function BeginnerSheet({ open, onClose }: Props) {
   const { state, dispatch } = useStore()
   const toast = useToast()
+  const t = useT()
   const done = state.beginnerProgress
   const total = BEGINNER_LESSONS.length
   const firstUnread = BEGINNER_LESSONS.find((l) => !done.includes(l.id))
   const [openId, setOpenId] = useState<string | null>(firstUnread?.id ?? BEGINNER_LESSONS[0]?.id ?? null)
 
   const left = total - done.length
-  const headline = left === 0 ? 'You have read them all' : 'Your first 90 days'
+  const headline = left === 0 ? t('You have read them all') : t('Your first 90 days')
   const note = left === 0
-    ? 'Come back to any of these whenever you want a refresher.'
+    ? t('Come back to any of these whenever you want a refresher.')
     : left === total
-      ? `${total} short reads. Start wherever you like.`
-      : `${left} left · about a minute each`
+      ? t('{n} short reads. Start wherever you like.', { n: total })
+      : t('{n} left · about a minute each', { n: left })
 
   return (
     <Sheet open={open} onClose={onClose} full>
-      <Text className="text-[25px] font-extrabold tracking-[-0.03em] leading-[1.15] text-white">New to the gym</Text>
-      <Text className="mt-2.5 text-[13.5px] leading-5 text-secondary">A calm, step by step path into your first 90 days. Nothing here assumes you know anything yet.</Text>
+      <Text className="text-[25px] font-extrabold tracking-[-0.03em] leading-[1.15] text-white">{t('New to the gym')}</Text>
+      <Text className="mt-2.5 text-[13.5px] leading-5 text-secondary">{t('A calm, step by step path into your first 90 days. Nothing here assumes you know anything yet.')}</Text>
 
       <View className="mt-4 rounded-[20px] border border-white/[0.06] bg-ink-800 p-4">
         <View className="flex-row items-center justify-between gap-3">
           <Text className="text-[13px] font-bold text-white">{headline}</Text>
-          <Text className="text-[12px] font-bold text-brand-400">{done.length}/{total} read</Text>
+          <Text className="text-[12px] font-bold text-brand-400">{t('{done}/{total} read', { done: done.length, total })}</Text>
         </View>
         <View className="mt-[11px]"><ProgressBar value={(done.length / total) * 100} /></View>
         <Text className="mt-[9px] text-[11.5px] text-secondary">{note}</Text>
       </View>
 
       <View className="mb-3 mt-[22px] flex-row items-center justify-between px-0.5">
-        <Text className="text-[11px] font-bold uppercase tracking-wider text-tertiary">The basics</Text>
-        <Text className="text-[11.5px] text-tertiary">Read in any order</Text>
+        <Text className="text-[11px] font-bold uppercase tracking-wider text-tertiary">{t('The basics')}</Text>
+        <Text className="text-[11.5px] text-tertiary">{t('Read in any order')}</Text>
       </View>
 
       <View className="gap-2.5">
@@ -169,7 +172,7 @@ export function BeginnerSheet({ open, onClose }: Props) {
                     <Text className={`text-[14.5px] font-bold leading-tight ${isDone ? 'text-secondary' : 'text-white'}`}>{l.title}</Text>
                     {isNext && (
                       <View className="rounded-full bg-brand-400/[0.16] px-2 py-0.5">
-                        <Text className="text-[9.5px] font-bold uppercase tracking-wide text-brand-300">Start here</Text>
+                        <Text className="text-[9.5px] font-bold uppercase tracking-wide text-brand-300">{t('Start here')}</Text>
                       </View>
                     )}
                   </View>
@@ -184,14 +187,14 @@ export function BeginnerSheet({ open, onClose }: Props) {
                     {l.body.map((para, j) => <Text key={j} className="text-[13.5px] leading-[1.6] text-white/70">{para}</Text>)}
                   </View>
                   {!isDone ? (
-                    <Pressable onPress={() => { dispatch({ type: 'COMPLETE_LESSON', id: l.id }); const next = BEGINNER_LESSONS.find((x) => x.id !== l.id && !done.includes(x.id)); setOpenId(next?.id ?? null); toast(next ? 'Read. Next one is open below.' : 'That is the whole guide. Nice work.') }} className="mt-[15px] flex-row items-center justify-center gap-1.5 rounded-full bg-brand-400 py-2.5 active:opacity-90">
+                    <Pressable onPress={() => { dispatch({ type: 'COMPLETE_LESSON', id: l.id }); const next = BEGINNER_LESSONS.find((x) => x.id !== l.id && !done.includes(x.id)); setOpenId(next?.id ?? null); toast(next ? t('Read. Next one is open below.') : t('That is the whole guide. Nice work.')) }} className="mt-[15px] flex-row items-center justify-center gap-1.5 rounded-full bg-brand-400 py-2.5 active:opacity-90">
                       <Check size={13} strokeWidth={3.2} color="#000" />
-                      <Text className="text-[13.5px] font-bold text-black">Mark as read</Text>
+                      <Text className="text-[13.5px] font-bold text-black">{t('Mark as read')}</Text>
                     </Pressable>
                   ) : (
                     <View className="mt-3.5 flex-row items-center gap-1.5">
                       <Check size={13} strokeWidth={3} color={brand[400]} />
-                      <Text className="text-[12.5px] font-semibold text-brand-400">Read</Text>
+                      <Text className="text-[12.5px] font-semibold text-brand-400">{t('Read')}</Text>
                     </View>
                   )}
                 </View>
@@ -201,7 +204,7 @@ export function BeginnerSheet({ open, onClose }: Props) {
         })}
       </View>
 
-      <Text className="mt-5 px-3 text-center text-[12px] leading-[1.55] text-tertiary">Nobody is watching you as closely as you think. Take these one at a time.</Text>
+      <Text className="mt-5 px-3 text-center text-[12px] leading-[1.55] text-tertiary">{t('Nobody is watching you as closely as you think. Take these one at a time.')}</Text>
     </Sheet>
   )
 }
@@ -209,6 +212,7 @@ export function BeginnerSheet({ open, onClose }: Props) {
 /* ===================== Exercise technique ========================= */
 export function ExerciseDetailSheet({ open, onClose, params }: Props) {
   const { state } = useStore()
+  const t = useT()
   const units = state.settings.units
   const defId = (params?.defId as string) ?? 'bench'
   const library = !!params?.library
@@ -226,12 +230,12 @@ export function ExerciseDetailSheet({ open, onClose, params }: Props) {
 
   const sets = sessionEx?.targetSets ?? SET_TARGETS[defId] ?? 3
   const reps = sessionEx?.targetReps ?? target
-  const level = detail.beginnerFriendly ? 'Beginner' : 'Advanced'
+  const level = detail.beginnerFriendly ? t('Beginner') : t('Advanced')
 
   if (!view) return null
   return (
     <Sheet open={open} onClose={onClose} title={view.name}>
-      <TechniqueClip exerciseId={defId} poster={posterOverrideUrl(defId) ?? view.image} label="Form clip coming soon" />
+      <TechniqueClip exerciseId={defId} poster={posterOverrideUrl(defId) ?? view.image} label={t('Form clip coming soon')} />
 
       <View className="mt-3 flex-row flex-wrap items-center gap-2">
         <Chip color="gray">{view.muscle}</Chip>
@@ -244,17 +248,17 @@ export function ExerciseDetailSheet({ open, onClose, params }: Props) {
       {!library && (
         <View className="mt-4 flex-row gap-2.5">
           <View className="flex-1 rounded-2xl bg-white/[0.04] px-3.5 py-3">
-            <Text className="text-[10.5px] font-bold uppercase tracking-wider text-tertiary">Target</Text>
-            <Text className="mt-1 text-[14.5px] font-bold text-white">{sets} × {reps} reps</Text>
+            <Text className="text-[10.5px] font-bold uppercase tracking-wider text-tertiary">{t('Target')}</Text>
+            <Text className="mt-1 text-[14.5px] font-bold text-white">{t('{sets} × {reps} reps', { sets, reps })}</Text>
           </View>
           <View className="flex-1 rounded-2xl bg-white/[0.04] px-3.5 py-3">
-            <Text className="text-[10.5px] font-bold uppercase tracking-wider text-tertiary">Working weight</Text>
+            <Text className="text-[10.5px] font-bold uppercase tracking-wider text-tertiary">{t('Working weight')}</Text>
             <Text className="mt-1 text-[14.5px] font-bold text-white">{fmtWeight(fallback, units, units === 'imperial' ? 0 : 1)}</Text>
           </View>
         </View>
       )}
 
-      <Text className="mb-2.5 mt-5 text-[13px] font-bold text-white">How to do it</Text>
+      <Text className="mb-2.5 mt-5 text-[13px] font-bold text-white">{t('How to do it')}</Text>
       <View className="gap-2.5">
         {detail.cues.map((c, i) => (
           <View key={i} className="flex-row items-start gap-3">
@@ -265,12 +269,12 @@ export function ExerciseDetailSheet({ open, onClose, params }: Props) {
       </View>
 
       <View className="mt-[18px] rounded-2xl border border-accent-orange/20 bg-accent-orange/[0.07] p-3">
-        <Text className="text-[11px] font-bold uppercase tracking-wider text-accent-orange">Common mistake</Text>
+        <Text className="text-[11px] font-bold uppercase tracking-wider text-accent-orange">{t('Common mistake')}</Text>
         <Text className="mt-[5px] text-[13px] leading-[1.5] text-white/70">{detail.commonMistake}</Text>
       </View>
 
       <View className="mt-2.5 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-3">
-        <Text className="text-[11px] font-bold uppercase tracking-wider text-tertiary">If the station is taken</Text>
+        <Text className="text-[11px] font-bold uppercase tracking-wider text-tertiary">{t('If the station is taken')}</Text>
         <Text className="mt-[5px] text-[13px] leading-[1.5] text-white/70">{detail.ifTaken}</Text>
       </View>
 
@@ -278,7 +282,7 @@ export function ExerciseDetailSheet({ open, onClose, params }: Props) {
         <View className="mt-2.5 flex-row gap-2.5 rounded-2xl border border-brand-400/20 bg-brand-400/5 p-3.5">
           <Sparkles size={18} color={brand[400]} style={{ flexShrink: 0 }} />
           <View className="flex-1">
-            <Text className="text-[13px] font-bold text-brand-400">Coach's call next time</Text>
+            <Text className="text-[13px] font-bold text-brand-400">{t('Coach\'s call next time')}</Text>
             <Text className="text-[13px] leading-snug text-white/70">{rec.reason}</Text>
           </View>
         </View>
@@ -291,29 +295,30 @@ export function ExerciseDetailSheet({ open, onClose, params }: Props) {
 export function PRCelebrationSheet({ open, onClose, params }: Props) {
   const dispatch = useDispatch()
   const toast = useToast()
+  const t = useT()
   const lift = (params?.lift as string) ?? 'a lift'
   const weight = (params?.weight as string) ?? ''
   const reps = (params?.reps as number) ?? 0
 
   function share() {
     dispatch({ type: 'ADD_POST', text: `New ${lift} best, ${weight} for ${reps}. Proof that turning up works.` })
-    toast('Shared to your campus feed')
+    toast(t('Shared to your campus feed'))
     onClose()
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title="Personal best">
+    <Sheet open={open} onClose={onClose} title={t('Personal best')}>
       <View className="items-center py-4">
         <View className="h-20 w-20 items-center justify-center rounded-3xl bg-brand-400">
           <Trophy size={38} color="#000" />
         </View>
-        <Text className="mt-5 text-[13px] font-semibold uppercase tracking-wide text-brand-400">New personal best</Text>
+        <Text className="mt-5 text-[13px] font-semibold uppercase tracking-wide text-brand-400">{t('New personal best')}</Text>
         <Text className="mt-1 text-3xl font-extrabold tracking-tight text-white">{lift}</Text>
-        <Text className="mt-1 text-lg font-bold text-white/80">{weight} for {reps} reps</Text>
-        <Text className="mt-3 max-w-[260px] text-center text-[14px] leading-snug text-secondary">That is the strongest you have logged on this lift. Quietly huge. Your cohort would love to see it.</Text>
+        <Text className="mt-1 text-lg font-bold text-white/80">{t('{weight} for {reps} reps', { weight, reps })}</Text>
+        <Text className="mt-3 max-w-[260px] text-center text-[14px] leading-snug text-secondary">{t('That is the strongest you have logged on this lift. Quietly huge. Your cohort would love to see it.')}</Text>
       </View>
-      <Pressable onPress={share} className="btn-primary w-full flex-row items-center justify-center gap-1.5 active:opacity-90"><Share2 size={16} color="#000" /><Text className="font-semibold text-black">Share with your cohort</Text></Pressable>
-      <Pressable onPress={onClose} className="mt-2 w-full items-center rounded-full bg-ink-700 py-3 active:opacity-90"><Text className="text-sm font-semibold text-white/70">Keep it to myself</Text></Pressable>
+      <Pressable onPress={share} className="btn-primary w-full flex-row items-center justify-center gap-1.5 active:opacity-90"><Share2 size={16} color="#000" /><Text className="font-semibold text-black">{t('Share with your cohort')}</Text></Pressable>
+      <Pressable onPress={onClose} className="mt-2 w-full items-center rounded-full bg-ink-700 py-3 active:opacity-90"><Text className="text-sm font-semibold text-white/70">{t('Keep it to myself')}</Text></Pressable>
     </Sheet>
   )
 }
@@ -324,8 +329,9 @@ export function PRCelebrationSheet({ open, onClose, params }: Props) {
 // the SAME shared body + engine (CoachScreen / useCoachChat) as a full-screen sheet — no second copy
 // of the safety-critical send path.
 export function CoachChatSheet({ open, onClose }: Props) {
+  const t = useT()
   return (
-    <Sheet open={open} onClose={onClose} title="Coach" full bare>
+    <Sheet open={open} onClose={onClose} title={t('Coach')} full bare>
       <CoachScreen chrome="sheet" active={open} onClose={onClose} />
     </Sheet>
   )
@@ -335,6 +341,7 @@ export function CoachChatSheet({ open, onClose }: Props) {
 export function LogActivitySheet({ open, onClose }: Props) {
   const dispatch = useDispatch()
   const toast = useToast()
+  const t = useT()
   const [key, setKey] = useState('run')
   const [customName, setCustomName] = useState('')
   const [minutes, setMinutes] = useState('30')
@@ -348,16 +355,16 @@ export function LogActivitySheet({ open, onClose }: Props) {
   const kcal = Math.round(mins * preset.kcalPerMin * INTENSITY_MULT[intensity])
 
   function save() {
-    if (mins <= 0) { toast('Add a duration first'); return }
+    if (mins <= 0) { toast(t('Add a duration first')); return }
     dispatch({ type: 'ADD_ACTIVITY', activity: { type: key, name, icon: isCustom ? 'other' : key, minutes: mins, intensity, calories: kcal, weekly } })
-    toast(`${name} logged`)
+    toast(t('{name} logged', { name }))
     setKey('run'); setCustomName(''); setMinutes('30'); setIntensity('moderate'); setWeekly(false)
     onClose()
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title="Log an activity">
-      <Text className="mb-1 text-[12.5px] text-secondary">Anything the app didn't prescribe still counts.</Text>
+    <Sheet open={open} onClose={onClose} title={t('Log an activity')}>
+      <Text className="mb-1 text-[12.5px] text-secondary">{t('Anything the app didn\'t prescribe still counts.')}</Text>
 
       <View className="mt-3 flex-row flex-wrap gap-2">
         {ACTIVITY_PRESETS.map((a) => {
@@ -381,13 +388,13 @@ export function LogActivitySheet({ open, onClose }: Props) {
           autoFocus
           value={customName}
           onChangeText={setCustomName}
-          placeholder="Name your activity (e.g. Padel, Surfing, Netball)"
+          placeholder={t('Name your activity (e.g. Padel, Surfing, Netball)')}
           placeholderTextColor="rgba(255,255,255,0.35)"
           className="mt-3 w-full rounded-xl border border-white/8 bg-ink-800 px-4 py-3 text-white"
         />
       )}
 
-      <Text className="mb-2.5 mt-[22px] text-[11px] font-bold uppercase tracking-wider text-tertiary">Duration</Text>
+      <Text className="mb-2.5 mt-[22px] text-[11px] font-bold uppercase tracking-wider text-tertiary">{t('Duration')}</Text>
       <View className="flex-row items-center gap-2">
         {['15', '30', '45', '60'].map((m) => {
           const on = minutes === m
@@ -399,40 +406,40 @@ export function LogActivitySheet({ open, onClose }: Props) {
           <TextInput
             keyboardType="numeric"
             value={minutes}
-            onChangeText={(t) => setMinutes(t.replace(/\D/g, '').slice(0, 3))}
+            onChangeText={(v) => setMinutes(v.replace(/\D/g, '').slice(0, 3))}
             className="w-[52px] rounded-full border border-white/10 bg-white/[0.03] px-1 py-2.5 text-center text-[13px] font-bold text-white"
           />
           <Text className="text-[12px] text-secondary">min</Text>
         </View>
       </View>
 
-      <Text className="mb-2.5 mt-[22px] text-[11px] font-bold uppercase tracking-wider text-tertiary">Intensity</Text>
+      <Text className="mb-2.5 mt-[22px] text-[11px] font-bold uppercase tracking-wider text-tertiary">{t('Intensity')}</Text>
       <View className="flex-row gap-2">
         {(['easy', 'moderate', 'hard'] as const).map((i) => {
           const on = intensity === i
           return (
-            <Pressable key={i} onPress={() => setIntensity(i)} className={`flex-1 items-center rounded-2xl border py-[11px] active:opacity-90 ${on ? 'border-brand-400/45 bg-brand-400/[0.16]' : 'border-white/[0.08] bg-white/[0.04]'}`}><Text className={`text-[13px] font-semibold capitalize ${on ? 'text-brand-300' : 'text-secondary'}`}>{i}</Text></Pressable>
+            <Pressable key={i} onPress={() => setIntensity(i)} className={`flex-1 items-center rounded-2xl border py-[11px] active:opacity-90 ${on ? 'border-brand-400/45 bg-brand-400/[0.16]' : 'border-white/[0.08] bg-white/[0.04]'}`}><Text className={`text-[13px] font-semibold capitalize ${on ? 'text-brand-300' : 'text-secondary'}`}>{t(i)}</Text></Pressable>
           )
         })}
       </View>
 
       <View className="mt-[18px] flex-row items-center justify-between rounded-2xl border border-brand-400/[0.18] bg-brand-400/[0.06] px-4 py-3">
-        <Text className="text-[13px] text-secondary">Estimated burn</Text>
+        <Text className="text-[13px] text-secondary">{t('Estimated burn')}</Text>
         <Text className="text-[17px] font-extrabold text-brand-400">≈ {kcal} kcal</Text>
       </View>
 
       {/* Weekly activity: only these count toward "workouts this week" */}
       <View className="mt-2.5 flex-row items-center justify-between rounded-2xl bg-white/[0.04] px-4 py-3">
         <View className="min-w-0 flex-1">
-          <Text className="text-[13.5px] font-bold text-white">Repeat weekly</Text>
-          <Text className="mt-0.5 text-[11.5px] text-secondary">Shows up every week automatically</Text>
+          <Text className="text-[13.5px] font-bold text-white">{t('Repeat weekly')}</Text>
+          <Text className="mt-0.5 text-[11.5px] text-secondary">{t('Shows up every week automatically')}</Text>
         </View>
         <Pressable onPress={() => setWeekly((v) => !v)} className={`h-7 w-12 shrink-0 justify-center rounded-full px-[3px] active:opacity-90 ${weekly ? 'bg-brand-400' : 'bg-white/15'}`}>
           <View className="h-[22px] w-[22px] rounded-full bg-white" style={{ transform: [{ translateX: weekly ? 20 : 0 }] }} />
         </Pressable>
       </View>
 
-      <Pressable onPress={save} className="btn-primary mt-5 w-full active:opacity-90"><Text className="font-semibold text-black">Log {name.toLowerCase()} · {mins} min</Text></Pressable>
+      <Pressable onPress={save} className="btn-primary mt-5 w-full active:opacity-90"><Text className="font-semibold text-black">{t('Log {name} · {mins} min', { name: name.toLowerCase(), mins })}</Text></Pressable>
     </Sheet>
   )
 }
@@ -466,8 +473,8 @@ function StatSwitch({ on, colors, big = false }: { on: boolean; colors: ReturnTy
 /** The Progress tab's "Top stat" presets — one drives the featured chart. */
 const TOP_STATS: { id: string; label: string; icon: string; accent: AccentKey }[] = [
   { id: 'weight', label: 'Body weight', icon: 'scale', accent: 'blue' },
-  { id: 'nutrition', label: 'Eating quality', icon: 'leaf', accent: 'orange' },
-  { id: 'water', label: 'Water', icon: 'droplet', accent: 'blue' },
+  { id: 'nutrition', label: 'Eating quality', icon: 'leaf', accent: SECTION_ACCENT.nutrition },
+  { id: 'water', label: 'Water', icon: 'droplet', accent: SECTION_ACCENT.hydration },
 ]
 
 /**
@@ -481,6 +488,7 @@ export function CustomizeSheet({ open, onClose, params }: Props) {
   const colors = useColors()
   const insets = useSafeAreaInsets()
   const win = useWindowDimensions()
+  const t = useT()
   const screenH = IS_WEB ? WEB_SCREEN.height : win.height
 
   const isProgress = params?.context === 'progress'
@@ -579,22 +587,22 @@ export function CustomizeSheet({ open, onClose, params }: Props) {
         >
           <View style={{ width: 38, height: 5, borderRadius: 3, backgroundColor: `${colors.fg}33`, alignSelf: 'center', marginTop: 0, marginBottom: 16 }} />
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text style={{ fontSize: isProgress ? 22 : 19, fontWeight: '800', letterSpacing: -0.22, color: colors.fg }}>Customise</Text>
+            <Text style={{ fontSize: isProgress ? 22 : 19, fontWeight: '800', letterSpacing: -0.22, color: colors.fg }}>{t('Customise')}</Text>
             <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Done">
-              <Text style={{ fontSize: isProgress ? 16 : 15, fontWeight: '700', color: colors.brand400 }}>Done</Text>
+              <Text style={{ fontSize: isProgress ? 16 : 15, fontWeight: '700', color: colors.brand400 }}>{t('Done')}</Text>
             </Pressable>
           </View>
           <Text style={{ marginTop: isProgress ? 4 : 3, fontSize: isProgress ? 13 : 12.5, color: `${colors.fg}80` }}>
-            {isProgress ? 'Choose the time window, then pick one stat to feature.' : 'Choose the time window, then pick up to four stats.'}
+            {isProgress ? t('Choose the time window, then pick one stat to feature.') : t('Choose the time window, then pick up to four stats.')}
           </Text>
 
           {/* Time window */}
           <View style={{ flexDirection: 'row', gap: 4, marginTop: isProgress ? 18 : 16, padding: 4, borderRadius: 13, backgroundColor: colors.ink700 }}>
-            {STAT_TIMEFRAMES.map((t) => {
-              const on = timeframe === t
+            {STAT_TIMEFRAMES.map((v) => {
+              const on = timeframe === v
               return (
-                <Pressable key={t} onPress={() => dispatch({ type: 'SET_SETTINGS', patch: { dashboardTimeframe: t } })} style={tabStyle(on)}>
-                  <Text style={{ fontSize: isProgress ? 13.5 : 13, fontWeight: '700', color: on ? '#0a0a0b' : `${colors.fg}8c` }}>{t}</Text>
+                <Pressable key={v} onPress={() => dispatch({ type: 'SET_SETTINGS', patch: { dashboardTimeframe: v } })} style={tabStyle(on)}>
+                  <Text style={{ fontSize: isProgress ? 13.5 : 13, fontWeight: '700', color: on ? '#0a0a0b' : `${colors.fg}8c` }}>{v}</Text>
                 </Pressable>
               )
             })}
@@ -609,7 +617,7 @@ export function CustomizeSheet({ open, onClose, params }: Props) {
             {isProgress ? (
               <>
                 {/* Top stat — a single featured metric drives the chart. */}
-                <Text style={{ marginTop: 22, marginBottom: 4, fontSize: 12, fontWeight: '700', letterSpacing: 0.72, textTransform: 'uppercase', color: `${colors.fg}73` }}>Top stat</Text>
+                <Text style={{ marginTop: 22, marginBottom: 4, fontSize: 12, fontWeight: '700', letterSpacing: 0.72, textTransform: 'uppercase', color: `${colors.fg}73` }}>{t('Top stat')}</Text>
                 {TOP_STATS.map((m) => {
                   const on = metric === m.id
                   const accent = accentFor(m.accent, colors)
@@ -618,7 +626,7 @@ export function CustomizeSheet({ open, onClose, params }: Props) {
                       <View style={{ width: 38, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: `${accent}26` }}>
                         <Icon name={m.icon} size={17} color={accent} />
                       </View>
-                      <Text style={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: '700', color: colors.fg }}>{m.label}</Text>
+                      <Text style={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: '700', color: colors.fg }}>{t(m.label)}</Text>
                       <StatSwitch on={on} colors={colors} big />
                     </Pressable>
                   )
@@ -627,8 +635,8 @@ export function CustomizeSheet({ open, onClose, params }: Props) {
                 <View style={{ height: 1, backgroundColor: `${colors.fg}0f`, marginTop: 22 }} />
 
                 {/* Feature an exercise — search the library and pin one. */}
-                <Text style={{ marginTop: 22, fontSize: 12, fontWeight: '700', letterSpacing: 0.72, textTransform: 'uppercase', color: `${colors.fg}73` }}>Feature an exercise</Text>
-                <Text style={{ marginTop: 5, fontSize: 13, color: `${colors.fg}80` }}>Search the exercise library and feature one on your top progress chart.</Text>
+                <Text style={{ marginTop: 22, fontSize: 12, fontWeight: '700', letterSpacing: 0.72, textTransform: 'uppercase', color: `${colors.fg}73` }}>{t('Feature an exercise')}</Text>
+                <Text style={{ marginTop: 5, fontSize: 13, color: `${colors.fg}80` }}>{t('Search the exercise library and feature one on your top progress chart.')}</Text>
 
                 {pinnedEx && (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 13, marginTop: 14, paddingVertical: 13, paddingHorizontal: 14, borderRadius: 16, backgroundColor: `${colors.brand400}1f`, borderWidth: 1, borderColor: `${colors.brand400}73` }}>
@@ -637,7 +645,7 @@ export function CustomizeSheet({ open, onClose, params }: Props) {
                     </View>
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <Text numberOfLines={1} style={{ fontSize: 15, fontWeight: '700', color: colors.fg }}>{pinnedEx.name}</Text>
-                      <Text style={{ marginTop: 1, fontSize: 12, fontWeight: '600', color: colors.brand300 }}>Featured on your progress chart</Text>
+                      <Text style={{ marginTop: 1, fontSize: 12, fontWeight: '600', color: colors.brand300 }}>{t('Featured on your progress chart')}</Text>
                     </View>
                     <Pressable onPress={() => pickMetric('weight')} hitSlop={6} accessibilityLabel="Unpin" style={{ width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.ink700 }}>
                       <X size={15} color={`${colors.fg}99`} />
@@ -650,7 +658,7 @@ export function CustomizeSheet({ open, onClose, params }: Props) {
                   <TextInput
                     value={query}
                     onChangeText={setQuery}
-                    placeholder="Search exercises"
+                    placeholder={t('Search exercises')}
                     placeholderTextColor={`${colors.fg}59`}
                     style={{ flex: 1, minWidth: 0, fontSize: 15, color: colors.fg, paddingVertical: 0 }}
                   />
@@ -676,14 +684,14 @@ export function CustomizeSheet({ open, onClose, params }: Props) {
                 )}
 
                 {q.length > 0 && results.length === 0 && (
-                  <Text style={{ marginTop: 12, textAlign: 'center', fontSize: 13, color: `${colors.fg}73`, padding: 8 }}>No exercises match your search.</Text>
+                  <Text style={{ marginTop: 12, textAlign: 'center', fontSize: 13, color: `${colors.fg}73`, padding: 8 }}>{t('No exercises match your search.')}</Text>
                 )}
               </>
             ) : (
               <>
                 {/* Featured stat — the big composition card under "Progress overview". */}
-                <Text style={{ marginTop: 20, marginBottom: 4, fontSize: 12, fontWeight: '700', letterSpacing: 0.72, textTransform: 'uppercase', color: `${colors.fg}73` }}>Featured stat</Text>
-                <Text style={{ marginBottom: 12, fontSize: 13, color: `${colors.fg}80` }}>The large card under Progress overview.</Text>
+                <Text style={{ marginTop: 20, marginBottom: 4, fontSize: 12, fontWeight: '700', letterSpacing: 0.72, textTransform: 'uppercase', color: `${colors.fg}73` }}>{t('Featured stat')}</Text>
+                <Text style={{ marginBottom: 12, fontSize: 13, color: `${colors.fg}80` }}>{t('The large card under Progress overview.')}</Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 9 }}>
                   {DASHBOARD_FEATURED.map((m) => {
                     const on = featured === m.id
@@ -733,7 +741,7 @@ export function CustomizeSheet({ open, onClose, params }: Props) {
                             </View>
                           )}
                         </View>
-                        <Text style={{ fontWeight: '700', fontSize: 14.5, color: colors.fg }}>None</Text>
+                        <Text style={{ fontWeight: '700', fontSize: 14.5, color: colors.fg }}>{t('None')}</Text>
                       </Pressable>
                     )
                   })()}
@@ -743,9 +751,9 @@ export function CustomizeSheet({ open, onClose, params }: Props) {
 
                 {/* Your stats */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 22, marginBottom: 2 }}>
-                  <Text style={{ fontSize: 12, fontWeight: '700', letterSpacing: 0.72, textTransform: 'uppercase', color: `${colors.fg}73` }}>Your stats</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', letterSpacing: 0.72, textTransform: 'uppercase', color: `${colors.fg}73` }}>{t('Your stats')}</Text>
                   <View style={{ paddingHorizontal: 10, paddingVertical: 2, borderRadius: 999, backgroundColor: atMax ? `${colors.brand400}26` : `${colors.fg}14` }}>
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: atMax ? colors.brand300 : `${colors.fg}80` }}>{stats.length} of {MAX_DASHBOARD_STATS}</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: atMax ? colors.brand300 : `${colors.fg}80` }}>{t('{n} of {max}', { n: stats.length, max: MAX_DASHBOARD_STATS })}</Text>
                   </View>
                 </View>
 
@@ -773,11 +781,11 @@ export function CustomizeSheet({ open, onClose, params }: Props) {
 
                 {/* Training progress — configures the dashboard's ranked-lifts card,
                     independently of the Progress screen's own tracked lifts. */}
-                <Text style={{ marginTop: 22, marginBottom: 4, fontSize: 12, fontWeight: '700', letterSpacing: 0.72, textTransform: 'uppercase', color: `${colors.fg}73` }}>Training progress</Text>
-                <Text style={{ marginBottom: 16, fontSize: 13, color: `${colors.fg}80` }}>The ranked lifts card under Progress overview.</Text>
+                <Text style={{ marginTop: 22, marginBottom: 4, fontSize: 12, fontWeight: '700', letterSpacing: 0.72, textTransform: 'uppercase', color: `${colors.fg}73` }}>{t('Training progress')}</Text>
+                <Text style={{ marginBottom: 16, fontSize: 13, color: `${colors.fg}80` }}>{t('The ranked lifts card under Progress overview.')}</Text>
 
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 0.55, textTransform: 'uppercase', color: `${colors.fg}66` }}>Tracked lifts</Text>
+                  <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 0.55, textTransform: 'uppercase', color: `${colors.fg}66` }}>{t('Tracked lifts')}</Text>
                   <View style={{ paddingHorizontal: 9, paddingVertical: 2, borderRadius: 999, backgroundColor: trackedIds.length ? `${colors.brand400}26` : `${colors.fg}14` }}>
                     <Text style={{ fontSize: 12, fontWeight: '700', color: trackedIds.length ? colors.brand300 : `${colors.fg}80` }}>{trackedIds.length}</Text>
                   </View>
@@ -785,21 +793,21 @@ export function CustomizeSheet({ open, onClose, params }: Props) {
 
                 {trackedRows.length === 0 ? (
                   <View style={{ alignItems: 'center', paddingVertical: 22, paddingHorizontal: 16, borderRadius: 16, borderWidth: 1, borderColor: `${colors.fg}1a`, borderStyle: 'dashed', backgroundColor: `${colors.fg}06` }}>
-                    <Text style={{ fontSize: 13.5, fontWeight: '700', color: `${colors.fg}99` }}>No lifts tracked</Text>
-                    <Text style={{ marginTop: 3, fontSize: 12.5, color: `${colors.fg}66`, textAlign: 'center' }}>The card is hidden. Search below to add one.</Text>
+                    <Text style={{ fontSize: 13.5, fontWeight: '700', color: `${colors.fg}99` }}>{t('No lifts tracked')}</Text>
+                    <Text style={{ marginTop: 3, fontSize: 12.5, color: `${colors.fg}66`, textAlign: 'center' }}>{t('The card is hidden. Search below to add one.')}</Text>
                   </View>
                 ) : (
                   <View style={{ gap: 8 }}>
-                    {trackedRows.map((t) => (
-                      <View key={t.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12, paddingVertical: 11, borderRadius: 14, backgroundColor: colors.ink700, borderWidth: 1, borderColor: `${colors.fg}10` }}>
+                    {trackedRows.map((v) => (
+                      <View key={v.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12, paddingVertical: 11, borderRadius: 14, backgroundColor: colors.ink700, borderWidth: 1, borderColor: `${colors.fg}10` }}>
                         <View style={{ width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: `${colors.brand400}1f` }}>
                           <Icon name="dumbbell" size={17} color={colors.brand400} />
                         </View>
                         <View style={{ flex: 1, minWidth: 0 }}>
-                          <Text numberOfLines={1} style={{ fontSize: 14.5, fontWeight: '700', color: colors.fg }}>{t.name}</Text>
-                          {!!t.muscle && <Text style={{ fontSize: 11.5, color: `${colors.fg}73`, marginTop: 1 }}>{t.muscle}</Text>}
+                          <Text numberOfLines={1} style={{ fontSize: 14.5, fontWeight: '700', color: colors.fg }}>{v.name}</Text>
+                          {!!v.muscle && <Text style={{ fontSize: 11.5, color: `${colors.fg}73`, marginTop: 1 }}>{v.muscle}</Text>}
                         </View>
-                        <Pressable onPress={() => toggleTracked(t.id)} hitSlop={10} accessibilityRole="button" accessibilityLabel={`Remove ${t.name}`} style={{ width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: `${colors.fg}12` }}>
+                        <Pressable onPress={() => toggleTracked(v.id)} hitSlop={10} accessibilityRole="button" accessibilityLabel={`Remove ${v.name}`} style={{ width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: `${colors.fg}12` }}>
                           <X size={14} color={`${colors.fg}8c`} strokeWidth={2.4} />
                         </Pressable>
                       </View>
@@ -807,11 +815,11 @@ export function CustomizeSheet({ open, onClose, params }: Props) {
                   </View>
                 )}
 
-                <Text style={{ marginTop: 20, marginBottom: 9, fontSize: 11, fontWeight: '700', letterSpacing: 0.55, textTransform: 'uppercase', color: `${colors.fg}66` }}>Trend range</Text>
+                <Text style={{ marginTop: 20, marginBottom: 9, fontSize: 11, fontWeight: '700', letterSpacing: 0.55, textTransform: 'uppercase', color: `${colors.fg}66` }}>{t('Trend range')}</Text>
                 <View style={{ flexDirection: 'row', gap: 4, backgroundColor: colors.ink700, padding: 4, borderRadius: 13 }}>
                   {PROGRESS_LIFT_PERIODS.map((pp) => {
                     const on = liftPeriod === pp
-                    const label = pp === '4 weeks' ? '4 Weeks' : pp === '3 months' ? '3 Months' : '6 Months'
+                    const label = pp === '4 weeks' ? t('4 Weeks') : pp === '3 months' ? t('3 Months') : t('6 Months')
                     return (
                       <Pressable key={pp} onPress={() => setLiftPeriod(pp)} accessibilityRole="button" accessibilityState={{ selected: on }} style={tabStyle(on)}>
                         <Text style={{ fontSize: 13, fontWeight: '700', color: on ? '#0a0a0b' : `${colors.fg}8c` }}>{label}</Text>
@@ -820,10 +828,10 @@ export function CustomizeSheet({ open, onClose, params }: Props) {
                   })}
                 </View>
 
-                <Text style={{ marginTop: 20, marginBottom: 9, fontSize: 11, fontWeight: '700', letterSpacing: 0.55, textTransform: 'uppercase', color: `${colors.fg}66` }}>Add a lift</Text>
+                <Text style={{ marginTop: 20, marginBottom: 9, fontSize: 11, fontWeight: '700', letterSpacing: 0.55, textTransform: 'uppercase', color: `${colors.fg}66` }}>{t('Add a lift')}</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 14, backgroundColor: colors.ink700, borderWidth: 1, borderColor: `${colors.fg}14` }}>
                   <Search size={18} color={`${colors.fg}66`} />
-                  <TextInput value={liftQuery} onChangeText={setLiftQuery} placeholder="Search exercises" placeholderTextColor={`${colors.fg}59`} style={{ flex: 1, minWidth: 0, fontSize: 15, color: colors.fg, paddingVertical: 0 }} />
+                  <TextInput value={liftQuery} onChangeText={setLiftQuery} placeholder={t('Search exercises')} placeholderTextColor={`${colors.fg}59`} style={{ flex: 1, minWidth: 0, fontSize: 15, color: colors.fg, paddingVertical: 0 }} />
                   {liftQuery.length > 0 && <Pressable onPress={() => setLiftQuery('')} hitSlop={8} accessibilityRole="button" accessibilityLabel="Clear search"><X size={15} color={`${colors.fg}73`} /></Pressable>}
                 </View>
                 {lq.length > 0 && (
@@ -847,7 +855,7 @@ export function CustomizeSheet({ open, onClose, params }: Props) {
                         </Pressable>
                       )
                     })}
-                    {liftResults.length === 0 && <Text style={{ textAlign: 'center', fontSize: 13, color: `${colors.fg}73`, padding: 14 }}>No exercises match your search.</Text>}
+                    {liftResults.length === 0 && <Text style={{ textAlign: 'center', fontSize: 13, color: `${colors.fg}73`, padding: 14 }}>{t('No exercises match your search.')}</Text>}
                   </View>
                 )}
               </>
@@ -867,6 +875,7 @@ export function CreateSessionSheet({ open, onClose, params }: Props) {
   const { state, dispatch } = useStore()
   const nav = useNav()
   const toast = useToast()
+  const t = useT()
   const [name, setName] = useState('')
   const [items, setItems] = useState<TemplateExercise[]>([])
   const [catalogOpen, setCatalogOpen] = useState(true)
@@ -877,7 +886,7 @@ export function CreateSessionSheet({ open, onClose, params }: Props) {
   // Fresh each open; prefill when started/edited from a saved template.
   useEffect(() => {
     if (!open) return
-    const tpl = editId ? (state.templates ?? []).find((t) => t.id === editId) : undefined
+    const tpl = editId ? (state.templates ?? []).find((v) => v.id === editId) : undefined
     setName(tpl?.name ?? '')
     setItems(tpl ? tpl.exercises.map((e) => ({ ...e })) : [])
     setCatalogOpen(!tpl); setQ(''); setRepsOpen(null)
@@ -912,38 +921,38 @@ export function CreateSessionSheet({ open, onClose, params }: Props) {
   const estMinutes = Math.max(15, items.length * 8)
 
   function start() {
-    if (items.length === 0) { toast('Add at least one exercise'); return }
+    if (items.length === 0) { toast(t('Add at least one exercise')); return }
     const session = buildCustomSession(name, items, todayKey)
     dispatch({ type: 'SAVE_SESSION', session })
     nav.open('activeWorkout', { sessionId: session.id })
   }
 
   function saveForLater() {
-    if (items.length === 0) { toast('Add at least one exercise'); return }
+    if (items.length === 0) { toast(t('Add at least one exercise')); return }
     const n = name.trim() || 'My Workout'
     if (editId) dispatch({ type: 'REMOVE_TEMPLATE', id: editId })
     dispatch({ type: 'SAVE_TEMPLATE', template: { id: `tpl-${Date.now()}`, name: n, createdAtKey: todayKey, exercises: items } })
-    toast(editId ? `${n} updated` : 'Saved to your workouts')
+    toast(editId ? t('{name} updated', { name: n }) : t('Saved to your workouts'))
     onClose()
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title={editId ? 'Edit workout' : 'New workout'} full>
-      <Text className="mb-2 text-[11px] font-bold uppercase tracking-wider text-tertiary">Workout name</Text>
+    <Sheet open={open} onClose={onClose} title={editId ? t('Edit workout') : t('New workout')} full>
+      <Text className="mb-2 text-[11px] font-bold uppercase tracking-wider text-tertiary">{t('Workout name')}</Text>
       <TextInput
         value={name}
         onChangeText={setName}
-        placeholder="e.g. Friday Arms"
+        placeholder={t('e.g. Friday Arms')}
         placeholderTextColor="rgba(255,255,255,0.35)"
         className="w-full rounded-2xl border border-white/10 bg-white/[0.03] px-3.5 py-3 text-[14px] text-white"
       />
 
-      <Text className="mb-2 mt-[22px] text-[11px] font-bold uppercase tracking-wider text-tertiary">Exercises</Text>
+      <Text className="mb-2 mt-[22px] text-[11px] font-bold uppercase tracking-wider text-tertiary">{t('Exercises')}</Text>
 
       {/* Catalog toggle */}
       <Pressable onPress={() => setCatalogOpen((v) => !v)} className="flex-row items-center gap-3 rounded-2xl border border-brand-400/25 bg-brand-400/[0.06] px-3.5 py-3 active:opacity-90">
         <Dumbbell size={18} color={brand[400]} />
-        <Text className="flex-1 text-[14px] font-bold text-white">All exercises · {ACTIVE_EXERCISES.length}</Text>
+        <Text className="flex-1 text-[14px] font-bold text-white">{t('All exercises')} · {ACTIVE_EXERCISES.length}</Text>
         <ChevronDown size={17} color={brand[400]} style={{ transform: [{ rotate: catalogOpen ? '180deg' : '0deg' }] }} />
       </Pressable>
 
@@ -954,7 +963,7 @@ export function CreateSessionSheet({ open, onClose, params }: Props) {
             <TextInput
               value={q}
               onChangeText={setQ}
-              placeholder="Search all exercises…"
+              placeholder={t('Search all exercises…')}
               placeholderTextColor="rgba(255,255,255,0.35)"
               className="w-full rounded-[14px] border border-white/[0.08] bg-ink-800 py-2.5 pl-9 pr-3 text-[13px] text-white"
             />
@@ -975,7 +984,7 @@ export function CreateSessionSheet({ open, onClose, params }: Props) {
                 </Pressable>
               )
             })}
-            {catalog.length === 0 && <Text className="py-5 text-center text-[13px] text-tertiary">No exercises found.</Text>}
+            {catalog.length === 0 && <Text className="py-5 text-center text-[13px] text-tertiary">{t('No exercises found.')}</Text>}
           </View>
         </View>
       )}
@@ -983,8 +992,8 @@ export function CreateSessionSheet({ open, onClose, params }: Props) {
       {/* Picks */}
       {items.length === 0 ? (
         <View className="mt-3.5 items-center rounded-[18px] border border-dashed border-white/15 px-6 py-[22px]">
-          <Text className="text-[13.5px] font-semibold text-secondary">No exercises yet</Text>
-          <Text className="mt-[3px] text-center text-[12px] text-tertiary">Pick a few from the list above to build your session</Text>
+          <Text className="text-[13.5px] font-semibold text-secondary">{t('No exercises yet')}</Text>
+          <Text className="mt-[3px] text-center text-[12px] text-tertiary">{t('Pick a few from the list above to build your session')}</Text>
         </View>
       ) : (
         <View className="mt-3.5 gap-2.5">
@@ -1006,7 +1015,7 @@ export function CreateSessionSheet({ open, onClose, params }: Props) {
                 <View className="mt-3 flex-row items-start gap-2.5">
                   {/* Sets */}
                   <View className="flex-1">
-                    <Text className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wide text-tertiary">Sets</Text>
+                    <Text className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wide text-tertiary">{t('Sets')}</Text>
                     <View className="flex-row items-center gap-2">
                       <Pressable onPress={() => patchItem(it.defId, { targetSets: Math.max(1, it.targetSets - 1) })} className="h-[34px] w-[34px] items-center justify-center rounded-xl bg-white/[0.06] active:opacity-80"><Minus size={15} color="rgba(255,255,255,0.7)" /></Pressable>
                       <Text className="flex-1 text-center text-[15px] font-bold text-white">{it.targetSets}</Text>
@@ -1015,9 +1024,9 @@ export function CreateSessionSheet({ open, onClose, params }: Props) {
                   </View>
                   {/* Target reps */}
                   <View className="flex-1">
-                    <Text className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wide text-tertiary">Target reps</Text>
+                    <Text className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wide text-tertiary">{t('Target reps')}</Text>
                     <Pressable onPress={() => setRepsOpen(repsMenu ? null : it.defId)} className="h-[34px] flex-row items-center justify-between rounded-xl border border-white/[0.08] bg-ink-700 px-2.5 active:opacity-80">
-                      <Text className="text-[13.5px] font-semibold text-white">{it.targetReps} reps</Text>
+                      <Text className="text-[13.5px] font-semibold text-white">{t('{reps} reps', { reps: it.targetReps })}</Text>
                       <ChevronDown size={15} color="rgba(255,255,255,0.5)" style={{ transform: [{ rotate: repsMenu ? '180deg' : '0deg' }] }} />
                     </Pressable>
                   </View>
@@ -1029,7 +1038,7 @@ export function CreateSessionSheet({ open, onClose, params }: Props) {
                       const on = it.targetReps === r
                       return (
                         <Pressable key={r} onPress={() => { patchItem(it.defId, { targetReps: r }); setRepsOpen(null) }} className={`rounded-full px-3 py-1.5 active:opacity-90 ${on ? 'bg-brand-400' : 'bg-white/[0.06]'}`}>
-                          <Text className={`text-[12px] font-bold ${on ? 'text-black' : 'text-white/65'}`}>{r} reps</Text>
+                          <Text className={`text-[12px] font-bold ${on ? 'text-black' : 'text-white/65'}`}>{t('{reps} reps', { reps: r })}</Text>
                         </Pressable>
                       )
                     })}
@@ -1047,10 +1056,10 @@ export function CreateSessionSheet({ open, onClose, params }: Props) {
 
           <Pressable onPress={start} className="mt-3.5 flex-row items-center justify-center gap-1.5 rounded-full bg-brand-400 py-3.5 active:opacity-90">
             <Play size={14} color="#000" fill="#000" />
-            <Text className="text-[15px] font-bold text-black">Start workout</Text>
+            <Text className="text-[15px] font-bold text-black">{t('Start workout')}</Text>
           </Pressable>
           <Pressable onPress={saveForLater} className="mt-2.5 items-center rounded-full bg-white/[0.06] py-3 active:opacity-90">
-            <Text className="text-[14px] font-semibold text-white/75">{editId ? 'Save changes' : 'Save for later'}</Text>
+            <Text className="text-[14px] font-semibold text-white/75">{editId ? t('Save changes') : t('Save for later')}</Text>
           </Pressable>
         </View>
       )}

@@ -1,7 +1,7 @@
 import { vars } from 'nativewind'
 import { useColorScheme } from 'react-native'
 import { useStoreSelector } from './store/store'
-import type { AccentKey } from './store/periods'
+import { SECTION_ACCENT, type AccentKey, type Section } from './store/periods'
 
 /**
  * Theme is driven by CSS variables applied via `vars()` on the root view —
@@ -172,6 +172,23 @@ export function accentFor(key: AccentKey, c: Palette): string {
   if (key === 'orange') return c.accentOrange
   if (key === 'yellow') return c.accentYellow
   return c.fg
+}
+
+/**
+ * Semantic per-section colour coding. The canonical map lives in store/periods.ts
+ * (a React-free module) so the coach layer and lib/metrics can share it; here we
+ * re-export it and add `sectionColor()` to resolve a section against a live palette.
+ * Every surface — dashboard stat cards, "update today" tiles, the stats customise
+ * sheet, and the coach action-card dot — must resolve its section colour through
+ * this map rather than picking an accent ad-hoc, so the five sections read
+ * identically everywhere.
+ */
+export { SECTION_ACCENT }
+export type { Section }
+
+/** Resolve a section's canonical accent colour against a live palette. */
+export function sectionColor(section: Section, c: Palette): string {
+  return accentFor(SECTION_ACCENT[section], c)
 }
 
 export type Palette = (typeof palette)[ThemeName]

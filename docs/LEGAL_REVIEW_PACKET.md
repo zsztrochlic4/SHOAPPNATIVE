@@ -28,7 +28,7 @@ completed by a real, named legal professional.
   goals, injuries), workout logs, meal photos (sent to a Gemini model for analysis),
   optional integrations, push tokens. **No calorie/macro intake targets are set** (a
   deliberate product rule — nutrition guidance is qualitative).
-- **Payments:** Stripe (subscription: 4-week trial → AUD $2.99/week).
+- **Payments:** Stripe (subscription: 4-week trial → AUD $2.00/week).
 - **Third parties/subprocessors:** Google Firebase/Google Cloud, Google Gemini (meal
   analysis), Stripe (billing), Expo (build/OTA), push provider.
 - **Deletion:** in-app account deletion with a server-side durability sweeper

@@ -56,7 +56,7 @@ export const APP_ROUTES: readonly AppRoute[] = [
   { id: 'quick', label: 'Quick workouts', route: 'Workout › quick workout', serves: ['quick workout', '15 minute workout', 'short workout', 'quick bodyweight'] },
   { id: 'logActivity', label: 'Log an activity', route: 'Workout › Log an activity', serves: ['log an activity', 'log activity', 'log a run', 'other activity', 'log a sport'] },
   { id: 'nutrition.planner', label: 'Plan your week', route: 'Nutrition › Plan your week', serves: ['meal planner', 'plan your week', 'plan my meals', 'weekly meal plan', 'assign a meal'] },
-  { id: 'addFood', label: 'Add food', route: 'Nutrition › Add food', serves: ['add a food', 'add food', 'log a meal', 'log food', 'meal scan', 'barcode', 'food to breakfast', 'add breakfast'] },
+  { id: 'addFood', label: 'Add food', route: 'Nutrition › Add food', serves: ['add a food', 'add food', 'log a meal', 'log food', 'food to breakfast', 'add breakfast'] },
   { id: 'nutrition.savedMeals', label: 'Save meal', route: 'Nutrition › My meals › Save meal (or Save changes to edit)', serves: ['save a meal', 'save meals i cook', 'saved meal', 'edit a recipe', 'edit a meal', 'meal i eat regularly'] },
   { id: 'community.username', label: 'Set username', route: 'Community › Set username', serves: ['set a username', 'claim a username', 'choose a username', 'change my username'] },
   { id: 'community.leagues', label: 'Leagues', route: 'Community › Leagues (How leagues work)', serves: ['leagues', 'how leagues work', 'monthly league', 'league scoring'] },

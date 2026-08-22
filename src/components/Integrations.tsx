@@ -5,6 +5,7 @@ import { useStore } from '../store/store'
 import { useToast } from './Toast'
 import { platformProviders, providerAvailable, syncAll, lastSyncLabel, type Provider, type ProviderId } from '../lib/integrations'
 import { brand, accent } from '../theme'
+import { useT } from '../lib/useT'
 
 const ICONS: Record<ProviderId, ReactNode> = {
   appleHealth: <HeartPulse size={18} color="#f87171" />,
@@ -38,6 +39,7 @@ export function IntegrationsAutoSync() {
 export function IntegrationsSection() {
   const { state, dispatch } = useStore()
   const toast = useToast()
+  const t = useT()
   const [syncing, setSyncing] = useState(false)
   const integ = state.integrations ?? {}
   const anyConnected = Object.values(integ).some((i) => i.connected)
@@ -56,12 +58,12 @@ export function IntegrationsSection() {
     const st = integ[p.id]
     if (st?.connected) {
       dispatch({ type: 'SET_INTEGRATION', id: p.id, patch: { connected: false } })
-      toast(`${p.name} disconnected`)
+      toast(t('{name} disconnected', { name: p.name }))
       return
     }
     // Nothing is connectable yet (native builds pending) — explain why.
     const avail = providerAvailable(p)
-    toast(avail.why ?? `${p.name} is not available yet`)
+    toast(avail.why ?? t('{name} is not available yet', { name: p.name }))
   }
 
   return (
@@ -70,6 +72,10 @@ export function IntegrationsSection() {
         const st = integ[p.id]
         const on = !!st?.connected
         const sync = lastSyncLabel(st)
+        // Whether this provider can actually be connected right now. Until the native builds ship
+        // this is false everywhere, so instead of a live-looking "Connect" button that only toasts a
+        // refusal, we show a muted, non-interactive "Soon" chip that sets the right expectation.
+        const canConnect = on || providerAvailable(p).ok
         return (
           <View key={p.id} className="flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-4">
             <View className="h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/5">{ICONS[p.id]}</View>
@@ -77,12 +83,20 @@ export function IntegrationsSection() {
               <Text className="font-bold leading-tight text-white">{p.name}</Text>
               <Text className="text-[12px] text-secondary">{on && sync ? sync : p.sub}</Text>
             </View>
-            <Pressable
-              onPress={() => onPress(p)}
-              className={`rounded-full px-3.5 py-1.5 active:opacity-90 ${on ? 'bg-ink-700' : 'bg-brand-400'}`}
-            >
-              <Text className={`text-sm font-bold ${on ? 'text-brand-400' : 'text-black'}`}>{on ? 'Connected' : 'Connect'}</Text>
-            </Pressable>
+            {canConnect ? (
+              <Pressable
+                onPress={() => onPress(p)}
+                accessibilityRole="button"
+                accessibilityLabel={on ? `Disconnect ${p.name}` : `Connect ${p.name}`}
+                className={`rounded-full px-3.5 py-1.5 active:opacity-90 ${on ? 'bg-ink-700' : 'bg-brand-400'}`}
+              >
+                <Text className={`text-sm font-bold ${on ? 'text-brand-400' : 'text-black'}`}>{on ? t('Connected') : t('Connect')}</Text>
+              </Pressable>
+            ) : (
+              <View accessibilityLabel={`${p.name} coming with the app`} className="rounded-full border border-white/10 px-3.5 py-1.5">
+                <Text className="text-sm font-bold text-tertiary">{t('Soon')}</Text>
+              </View>
+            )}
           </View>
         )
       })}
@@ -94,11 +108,11 @@ export function IntegrationsSection() {
           className={`mt-1 w-full flex-row items-center justify-center gap-2 rounded-2xl border border-brand-400/25 bg-brand-400/10 py-3 active:opacity-90 ${syncing ? 'opacity-60' : ''}`}
         >
           {syncing ? <ActivityIndicator size="small" color={brand[400]} /> : <RefreshCw size={15} color={brand[400]} />}
-          <Text className="text-sm font-semibold text-brand-400">{syncing ? 'Syncing…' : 'Sync now'}</Text>
+          <Text className="text-sm font-semibold text-brand-400">{syncing ? t('Syncing…') : t('Sync now')}</Text>
         </Pressable>
       )}
       <Text className="mt-0.5 px-1 text-[11px] leading-snug text-tertiary">
-        Apple Health and Health Connect sync automatically once the native app ships — your workouts, steps and sleep land in Workout history and feed your habit tracking.
+        {t('Apple Health and Health Connect sync automatically once the native app ships — your workouts, steps and sleep land in Workout history and feed your habit tracking.')}
       </Text>
     </View>
   )

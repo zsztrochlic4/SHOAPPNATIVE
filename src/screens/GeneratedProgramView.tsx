@@ -3,6 +3,7 @@ import { View, Text, Pressable, Linking } from 'react-native'
 import { ShieldCheck, HeartPulse, Info, Clock3, ChevronDown, Mail, Zap } from 'lucide-react-native'
 import { Chip } from '../components/ui'
 import { useNav } from '../nav'
+import { useT } from '../lib/useT'
 import { brand } from '../theme'
 import type { StoredProgram, ProgramStatus } from '../backend/runtime/activate'
 
@@ -75,6 +76,7 @@ const TONE_STYLE: Record<Tone, { ring: string; bg: string; color: string }> = {
 
 export function ProgramHolding({ status }: { status: ProgramStatus }) {
   const nav = useNav()
+  const t = useT()
   const { title, body, tone, support, quick } = holdingCopy(status.reason)
   const st = TONE_STYLE[tone]
   const IconCmp = tone === 'brand' ? ShieldCheck : tone === 'danger' ? HeartPulse : Info
@@ -93,7 +95,7 @@ export function ProgramHolding({ status }: { status: ProgramStatus }) {
           className="btn-primary mt-6 flex-row items-center gap-2 px-5 py-3 active:opacity-90"
         >
           <Zap size={15} color="#000" />
-          <Text className="text-[13.5px] font-bold text-black">Start a quick workout</Text>
+          <Text className="text-[13.5px] font-bold text-black">{t('Start a quick workout')}</Text>
         </Pressable>
       )}
       {support && (
@@ -107,7 +109,7 @@ export function ProgramHolding({ status }: { status: ProgramStatus }) {
           className="mt-6 flex-row items-center gap-2 rounded-full border border-white/12 bg-white/5 px-4 py-2.5 active:opacity-80"
         >
           <Mail size={14} color="rgba(255,255,255,0.7)" />
-          <Text className="text-[13px] font-semibold text-white/80">Contact us</Text>
+          <Text className="text-[13px] font-semibold text-white/80">{t('Contact us')}</Text>
         </Pressable>
       )}
     </View>
@@ -132,10 +134,11 @@ export function GeneratedProgramView({ program }: { program: StoredProgram }) {
   const training = days.length
   // Accordion: one day open at a time (first by default), matching the design.
   const [openDay, setOpenDay] = useState<string | null>(days[0]?.weekday ?? null)
+  const tr = useT()
   return (
     <View className="gap-2.5">
       <View className="rounded-[20px] border border-brand-400/20 bg-brand-400/[0.06] p-4">
-        <Text className="text-[14px] font-bold text-white">{program.splitName} · {training}-day program</Text>
+        <Text className="text-[14px] font-bold text-white">{program.splitName} · {tr('{n}-day program', { n: training })}</Text>
         <Text className="mt-1.5 text-[12.5px] leading-5 text-secondary">{program.recommendationNote}</Text>
       </View>
 
@@ -150,7 +153,7 @@ export function GeneratedProgramView({ program }: { program: StoredProgram }) {
                 <Text className="text-[14.5px] font-bold text-white">{d.dayType}</Text>
                 <Text numberOfLines={1} className="mt-0.5 text-[12px] text-secondary">{exercises.map((e) => e.muscleGroup).filter((m, i, a) => a.indexOf(m) === i).slice(0, 3).join(' · ')}</Text>
               </View>
-              <Chip color="green">{exercises.length} ex</Chip>
+              <Chip color="green">{tr('{n} ex', { n: exercises.length })}</Chip>
               <ChevronDown size={17} color="rgba(255,255,255,0.3)" style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
             </Pressable>
             {open && (
@@ -169,7 +172,7 @@ export function GeneratedProgramView({ program }: { program: StoredProgram }) {
                           <Text className="text-[12px] text-secondary">RIR {e.rirMin}</Text>
                           {e.injuryAdjusted && (
                             <View className="rounded-md bg-amber-400/15 px-1.5 py-0.5">
-                              <Text className="text-[10px] font-semibold text-amber-300">injury-adjusted</Text>
+                              <Text className="text-[10px] font-semibold text-amber-300">{tr('injury-adjusted')}</Text>
                             </View>
                           )}
                         </View>
@@ -185,7 +188,7 @@ export function GeneratedProgramView({ program }: { program: StoredProgram }) {
 
       {/* Weekly volume — chips of sets logged vs target per muscle. */}
       <View className="rounded-[20px] border border-white/5 bg-ink-800 p-4">
-        <Text className="mb-2.5 text-[13px] font-bold text-white">Weekly sets by muscle</Text>
+        <Text className="mb-2.5 text-[13px] font-bold text-white">{tr('Weekly sets by muscle')}</Text>
         <View className="flex-row flex-wrap gap-2">
           {Object.entries(program.weeklySetsByMuscle ?? {}).map(([m, n]) => {
             const t = program.volumeTargets?.[m]
@@ -213,8 +216,8 @@ export function GeneratedProgramView({ program }: { program: StoredProgram }) {
       <View className="flex-row items-center gap-2 rounded-2xl border border-white/5 bg-white/[0.02] px-4 py-3">
         <Clock3 size={15} color="rgba(255,255,255,0.4)" />
         <Text className="flex-1 text-[12px] leading-5 text-secondary">
-          {program.startingLoadNote} Head to the Today tab to log each session set by set — your
-          weights adapt automatically as you progress.
+          {program.startingLoadNote}{' '}
+          {tr('Head to the Today tab to log each session set by set — your weights adapt automatically as you progress.')}
         </Text>
       </View>
     </View>

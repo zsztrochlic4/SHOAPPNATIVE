@@ -43,6 +43,7 @@ import type {
 } from './types'
 import type { UserDoc, WorkoutInstanceDoc, ProgramDoc } from '../backend/schema'
 import type { StoredProgram, ProgramStatus } from '../backend/runtime/activate'
+import { settleTransitionIfDue } from '../backend/runtime/activate'
 import { sessionFromInstance, fullWeekday } from './programSession'
 import { sessionForDay } from './selectors'
 import { plannedPeriods, toPlannedAbsence } from './periods'
@@ -203,6 +204,25 @@ function withPeriods(state: AppState, periods: PlannedPeriod[]): AppState {
     backendUser: state.backendUser
       ? { ...state.backendUser, planned_absences: sorted.map(toPlannedAbsence) }
       : state.backendUser,
+  }
+}
+
+/**
+ * GC07 settle-on-open. If a goal change left the active program on its eased transition week and
+ * that week is now over (today ≥ the stored settle date), regenerate the program at full target
+ * intensity and clear the marker — deterministically, once — so the transition never lingers.
+ * A no-op (returns the same state) unless a due transition is present.
+ */
+function settleGoalTransition(state: AppState): AppState {
+  if (!state.backendUser || !state.programDoc?.transition) return state
+  const settled = settleTransitionIfDue(state.backendUser, state.programDoc, todayKey)
+  if (!settled || !settled.program) return state
+  return {
+    ...state,
+    generatedProgram: settled.program,
+    programStatus: settled.status,
+    programDoc: settled.programDoc,
+    workoutInstances: settled.instances,
   }
 }
 
@@ -1063,7 +1083,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           if (migration.ok) {
             persistKeyRef.current = key
             persistenceBlockedRef.current = false
-            dispatch({ type: 'HYDRATE', state: migration.state })
+            dispatch({ type: 'HYDRATE', state: settleGoalTransition(migration.state) })
           } else {
             // Preserve an invalid/future payload for recovery; never overwrite
             // it with seed data from an older build.

@@ -23,6 +23,7 @@ import { PressableScale } from '../components/PressableScale'
 import { useToast } from '../components/Toast'
 import { ProgressBar } from '../components/ui'
 import { useStore } from '../store/store'
+import { useT } from '../lib/useT'
 import { accentFor, useColors } from '../theme'
 import { todayKey, fromKey, toKey } from '../lib/date'
 import {
@@ -87,6 +88,7 @@ export function PlanAroundLifeSheet({ open, onClose }: { open: boolean; onClose:
   // Messages that land as this panel closes have to come from the app-level
   // toast — the local one would unmount with the panel before it was read.
   const appToast = useToast()
+  const t = useT()
 
   const [screen, setScreen] = useState<Screen>('hub')
   const [draft, setDraft] = useState<Draft>(newPeriodDraft)
@@ -182,10 +184,10 @@ export function PlanAroundLifeSheet({ open, onClose }: { open: boolean; onClose:
     // and blanking the draft now would flash an empty "Not set" card. The open
     // effect clears it before the flow is ever seen again.
     if (startsNow) {
-      appToast('Plan Around Your Life is on')
+      appToast(t('Plan Around Your Life is on'))
       return onClose()
     }
-    flash(editingId ? 'Changes saved' : 'Period saved')
+    flash(editingId ? t('Changes saved') : t('Period saved'))
     setEditingId(null); setDraft(newPeriodDraft()); setScreen('hub')
   }
 
@@ -195,40 +197,37 @@ export function PlanAroundLifeSheet({ open, onClose }: { open: boolean; onClose:
   const askCancel = (p: PlannedPeriod) => {
     setDetailOpen(false)
     setDialog({
-      title: 'Cancel this period?',
-      body: 'Your training won’t change for these dates. You can always add it again later.',
-      cancelLabel: 'Keep it', confirmLabel: 'Cancel period', danger: true,
-      onConfirm: () => { dispatch({ type: 'CANCEL_PERIOD', id: p.id }); setDialog(null); flash('Period cancelled') },
+      title: t('Cancel this period?'),
+      body: t('Your training won’t change for these dates. You can always add it again later.'),
+      cancelLabel: t('Keep it'), confirmLabel: t('Cancel period'), danger: true,
+      onConfirm: () => { dispatch({ type: 'CANCEL_PERIOD', id: p.id }); setDialog(null); flash(t('Period cancelled')) },
     })
   }
 
   const askEndEarly = (p: PlannedPeriod) => {
     setDetailOpen(false)
     setDialog({
-      title: 'End Plan Around Your Life early?',
-      body: 'We’ll switch you back to your normal program right away.',
-      cancelLabel: 'Stay in it', confirmLabel: 'End now', danger: true,
-      onConfirm: () => { dispatch({ type: 'CANCEL_PERIOD', id: p.id }); setDialog(null); appToast('Normal training restored'); onClose() },
+      title: t('End Plan Around Your Life early?'),
+      body: t('We’ll switch you back to your normal program right away.'),
+      cancelLabel: t('Stay in it'), confirmLabel: t('End now'), danger: true,
+      onConfirm: () => { dispatch({ type: 'CANCEL_PERIOD', id: p.id }); setDialog(null); appToast(t('Normal training restored')); onClose() },
     })
   }
 
   /* ------------------------------ footer ------------------------------ */
   const footer: { label: string; onPress: () => void; disabled?: boolean; icon?: boolean } | null =
-    screen === 'hub' ? { label: 'Add period', onPress: startAdd, icon: true }
-    : screen === 'dates' ? { label: 'Continue', onPress: () => setScreen('mode'), disabled: !datesOk }
-    : screen === 'mode' ? { label: 'Continue', onPress: () => setScreen(hasFollowup ? 'followup' : 'review'), disabled: !draft.mode }
-    : screen === 'followup' ? { label: 'Continue', onPress: () => setScreen('review'), disabled: !followupValid(draft) }
-    : { label: editingId ? 'Save changes' : 'Schedule This Plan', onPress: confirm }
+    screen === 'hub' ? { label: t('Add period'), onPress: startAdd, icon: true }
+    : screen === 'dates' ? { label: t('Continue'), onPress: () => setScreen('mode'), disabled: !datesOk }
+    : screen === 'mode' ? { label: t('Continue'), onPress: () => setScreen(hasFollowup ? 'followup' : 'review'), disabled: !draft.mode }
+    : screen === 'followup' ? { label: t('Continue'), onPress: () => setScreen('review'), disabled: !followupValid(draft) }
+    : { label: editingId ? t('Save changes') : t('Schedule This Plan'), onPress: confirm }
 
   return (
     <Sheet open={open} onClose={onClose} bare>
       <View style={{ flex: 1, paddingTop: insets.top }}>
-        <ScrollView
-          ref={scroller}
-          contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 6, paddingBottom: 132 + insets.bottom }}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
+        {/* Pinned dismiss/back control — kept ABOVE the ScrollView so it never scrolls away
+            (Back within the flow, Close on the hub). */}
+        <View style={{ paddingHorizontal: 24, paddingTop: 6, paddingBottom: 2 }}>
           <Pressable
             onPress={back}
             hitSlop={8}
@@ -237,7 +236,13 @@ export function PlanAroundLifeSheet({ open, onClose }: { open: boolean; onClose:
           >
             <ChevronLeft size={22} color={`${colors.fg}cc`} />
           </Pressable>
-
+        </View>
+        <ScrollView
+          ref={scroller}
+          contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 6, paddingBottom: 132 + insets.bottom }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
           {screen !== 'hub' && (
             <View style={{ marginTop: 16 }}>
               <ProgressBar value={Math.round((stepNum / stepTotal) * 100)} color={colors.brand400} height={4} />
@@ -340,38 +345,39 @@ function HubScreen({ colors, active, upcoming, onOpenPeriod, onEndEarly }: {
   onEndEarly: (p: PlannedPeriod) => void
 }) {
   const activeMeta = modeMeta(active?.mode)
+  const t = useT()
   return (
     <>
-      <Text style={{ marginTop: 14, fontSize: 28, fontWeight: '800', letterSpacing: -0.56, color: colors.fg }}>Plan Around Your Life</Text>
+      <Text style={{ marginTop: 14, fontSize: 28, fontWeight: '800', letterSpacing: -0.56, color: colors.fg }}>{t('Plan Around Your Life')}</Text>
       <Text style={{ marginTop: 7, fontSize: 14, lineHeight: 21, color: `${colors.fg}99` }}>
-        Add exams, travel or other busy periods and we'll adapt your training without losing your progress.
+        {t("Add exams, travel or other busy periods and we'll adapt your training without losing your progress.")}
       </Text>
 
       {active && (
         <View style={{ marginTop: 20, borderRadius: 20, padding: 17, backgroundColor: `${colors.brand500}33`, borderWidth: 1, borderColor: `${colors.brand400}61` }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
             <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.brand400 }} />
-            <Text style={{ fontSize: 13, fontWeight: '700', letterSpacing: 0.26, color: colors.brand300 }}>ACTIVE NOW</Text>
+            <Text style={{ fontSize: 13, fontWeight: '700', letterSpacing: 0.26, color: colors.brand300 }}>{t('ACTIVE NOW')}</Text>
           </View>
           <Text style={{ marginTop: 12, fontSize: 18, fontWeight: '700', color: colors.fg }}>{periodTitle(active)}</Text>
           <Text style={{ marginTop: 2, fontSize: 13, color: `${colors.fg}99` }}>{periodRangeText(active.start, active.end)}</Text>
           <View style={{ marginTop: 9 }}><ModeChip meta={activeMeta} colors={colors} /></View>
           <Text style={{ marginTop: 12, fontSize: 13.5, color: `${colors.fg}cc` }}>{activeMeta?.effect}</Text>
           <Text style={{ marginTop: 5, fontSize: 13.5, color: `${colors.fg}99` }}>
-            Normal training returns <Text style={{ fontWeight: '700', color: colors.fg }}>{fmtPeriodDate(nextDayKey(active.end))}</Text>
+            {t('Normal training returns')} <Text style={{ fontWeight: '700', color: colors.fg }}>{fmtPeriodDate(nextDayKey(active.end))}</Text>
           </Text>
           <Pressable
             onPress={() => onEndEarly(active)}
             style={{ marginTop: 15, borderRadius: 13, borderWidth: 1, borderColor: `${colors.fg}29`, paddingVertical: 12, alignItems: 'center' }}
           >
-            <Text style={{ fontSize: 14, fontWeight: '700', color: colors.fg }}>End Plan Around Your Life early</Text>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: colors.fg }}>{t('End Plan Around Your Life early')}</Text>
           </Pressable>
         </View>
       )}
 
       {upcoming.length > 0 ? (
         <>
-          <Text style={{ marginTop: 26, marginBottom: 11, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.84, color: `${colors.fg}73` }}>Upcoming</Text>
+          <Text style={{ marginTop: 26, marginBottom: 11, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.84, color: `${colors.fg}73` }}>{t('Upcoming')}</Text>
           <View style={{ gap: 10 }}>
             {upcoming.map((p) => {
               const meta = modeMeta(p.mode)
@@ -387,7 +393,7 @@ function HubScreen({ colors, active, upcoming, onOpenPeriod, onEndEarly }: {
                       <Text style={{ marginTop: 2, fontSize: 13, color: `${colors.fg}8c` }}>{periodRangeText(p.start, p.end)}</Text>
                       <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 9 }}>
                         <ModeChip meta={meta} colors={colors} />
-                        <Text style={{ fontSize: 12, color: `${colors.fg}73` }}>starts {daysLabel(daysUntil(p.start))}</Text>
+                        <Text style={{ fontSize: 12, color: `${colors.fg}73` }}>{t('starts {label}', { label: daysLabel(daysUntil(p.start)) })}</Text>
                       </View>
                     </View>
                     <ChevronRight size={20} color={`${colors.fg}59`} />
@@ -399,13 +405,13 @@ function HubScreen({ colors, active, upcoming, onOpenPeriod, onEndEarly }: {
         </>
       ) : (
         <View style={{ marginTop: 26, borderRadius: 18, paddingVertical: 30, paddingHorizontal: 16, alignItems: 'center', backgroundColor: colors.ink800, borderWidth: 1, borderStyle: 'dashed', borderColor: `${colors.fg}1f` }}>
-          <Text style={{ fontSize: 14, fontWeight: '600', color: `${colors.fg}80` }}>No periods yet</Text>
-          <Text style={{ marginTop: 4, fontSize: 13, color: `${colors.fg}80` }}>Add one whenever a busy period is coming up.</Text>
+          <Text style={{ fontSize: 14, fontWeight: '600', color: `${colors.fg}80` }}>{t('No periods yet')}</Text>
+          <Text style={{ marginTop: 4, fontSize: 13, color: `${colors.fg}80` }}>{t('Add one whenever a busy period is coming up.')}</Text>
         </View>
       )}
 
       <Text style={{ marginTop: 16, fontSize: 12, lineHeight: 18, textAlign: 'center', color: `${colors.fg}59` }}>
-        Add several periods, and edit or cancel any of them before they start.
+        {t('Add several periods, and edit or cancel any of them before they start.')}
       </Text>
     </>
   )
@@ -423,9 +429,10 @@ function DatesScreen({ colors, draft, patch, picking, setPicking, issue, valid, 
   valid: boolean
   taken: { start: string; end: string }[]
 }) {
+  const t = useT()
   const days = periodLength(draft.start, draft.end)
-  const summary = valid ? `${days} day period · normal training resumes ${fmtPeriodDate(nextDayKey(draft.end))}` : null
-  const caution = valid && days > 120 ? `That is a long period (${days} days). Double check the dates are right.` : null
+  const summary = valid ? t('{n} day period · normal training resumes {date}', { n: days, date: fmtPeriodDate(nextDayKey(draft.end)) }) : null
+  const caution = valid && days > 120 ? t('That is a long period ({n} days). Double check the dates are right.', { n: days }) : null
 
   // Tapping a day fills whichever field is armed, then arms the other one — so
   // the common case (pick start, pick end) is two taps with no mode switching.
@@ -446,15 +453,15 @@ function DatesScreen({ colors, draft, patch, picking, setPicking, issue, valid, 
 
   return (
     <>
-      <Text style={{ marginTop: 6, fontSize: 24, fontWeight: '800', letterSpacing: -0.48, color: colors.fg }}>When will you be busy?</Text>
+      <Text style={{ marginTop: 6, fontSize: 24, fontWeight: '800', letterSpacing: -0.48, color: colors.fg }}>{t('When will you be busy?')}</Text>
       <Text style={{ marginTop: 7, fontSize: 14, lineHeight: 21, color: `${colors.fg}99` }}>
-        Set the full period, whether it is exams, travel or something else.
+        {t('Set the full period, whether it is exams, travel or something else.')}
       </Text>
 
       <View style={{ marginTop: 22, gap: 14 }}>
         <View style={{ flexDirection: 'row', gap: 10 }}>
-          <DateField label="Start date" value={draft.start} armed={picking === 'start'} colors={colors} onPress={() => setPicking('start')} />
-          <DateField label="End date" value={draft.end} armed={picking === 'end'} colors={colors} onPress={() => setPicking('end')} />
+          <DateField label={t('Start date')} value={draft.start} armed={picking === 'start'} colors={colors} onPress={() => setPicking('start')} />
+          <DateField label={t('End date')} value={draft.end} armed={picking === 'end'} colors={colors} onPress={() => setPicking('end')} />
         </View>
 
         <RangeCalendar start={draft.start} end={draft.end} taken={taken} colors={colors} onPick={onPickDay} />
@@ -473,12 +480,12 @@ function DatesScreen({ colors, draft, patch, picking, setPicking, issue, valid, 
 
         <View style={{ marginTop: 4 }}>
           <Text style={{ marginBottom: 7, fontSize: 13, fontWeight: '700', color: `${colors.fg}99` }}>
-            What should we call this period? <Text style={{ fontWeight: '500', color: `${colors.fg}59` }}>(optional)</Text>
+            {t('What should we call this period?')} <Text style={{ fontWeight: '500', color: `${colors.fg}59` }}>{t('(optional)')}</Text>
           </Text>
           <TextInput
             value={draft.note ?? ''}
             onChangeText={(v) => patch({ note: v })}
-            placeholder="e.g. Final exams, Away interstate, Holiday"
+            placeholder={t('e.g. Final exams, Away interstate, Holiday')}
             placeholderTextColor={`${colors.fg}4d`}
             style={{ borderRadius: 14, paddingVertical: 14, paddingHorizontal: 16, backgroundColor: colors.ink700, borderWidth: 1, borderColor: `${colors.fg}14`, color: colors.fg, fontSize: 16 }}
           />
@@ -489,6 +496,7 @@ function DatesScreen({ colors, draft, patch, picking, setPicking, issue, valid, 
 }
 
 function DateField({ label, value, armed, colors, onPress }: { label: string; value: string; armed: boolean; colors: ThemeColors; onPress: () => void }) {
+  const t = useT()
   return (
     <View style={{ flex: 1 }}>
       <Text style={{ marginBottom: 7, fontSize: 13, fontWeight: '700', color: `${colors.fg}99` }}>{label}</Text>
@@ -501,7 +509,7 @@ function DateField({ label, value, armed, colors, onPress }: { label: string; va
         }}
       >
         <Text numberOfLines={1} style={{ fontSize: 15, fontWeight: value ? '700' : '400', color: value ? colors.fg : `${colors.fg}4d` }}>
-          {value ? fmtPeriodDate(value) : 'Select'}
+          {value ? fmtPeriodDate(value) : t('Select')}
         </Text>
       </Pressable>
     </View>
@@ -589,11 +597,12 @@ function RangeCalendar({ start, end, taken, colors, onPick }: { start: string; e
 /* ================================ mode ================================ */
 
 function ModeScreen({ colors, selected, onSelect }: { colors: ThemeColors; selected: PeriodMode | null; onSelect: (id: PeriodMode) => void }) {
+  const t = useT()
   return (
     <>
-      <Text style={{ marginTop: 6, fontSize: 24, fontWeight: '800', letterSpacing: -0.48, color: colors.fg }}>How should we train you?</Text>
+      <Text style={{ marginTop: 6, fontSize: 24, fontWeight: '800', letterSpacing: -0.48, color: colors.fg }}>{t('How should we train you?')}</Text>
       <Text style={{ marginTop: 7, fontSize: 14, lineHeight: 21, color: `${colors.fg}99` }}>
-        Pick one approach for this period, and we'll build the schedule around it.
+        {t("Pick one approach for this period, and we'll build the schedule around it.")}
       </Text>
       <View style={{ marginTop: 20, gap: 10 }}>
         {PERIOD_MODES.map((m) => {
@@ -653,12 +662,13 @@ function FollowupScreen({ colors, draft, patch, normalDays }: {
   patch: (p: Partial<Draft>) => void
   normalDays: string[]
 }) {
+  const t = useT()
   const mode = draft.mode
-  const title = mode === 'maintenance' ? 'Which days can you still train?' : mode === 'fewer' ? 'How often can you train?' : 'What kind of movement?'
+  const title = mode === 'maintenance' ? t('Which days can you still train?') : mode === 'fewer' ? t('How often can you train?') : t('What kind of movement?')
   const sub =
-    mode === 'maintenance' ? "We'll place your two maintenance sessions on the days that suit you."
-    : mode === 'fewer' ? 'Tell us your availability so we schedule the right sessions.'
-    : "Pick what you'd like to be nudged to do each day."
+    mode === 'maintenance' ? t("We'll place your two maintenance sessions on the days that suit you.")
+    : mode === 'fewer' ? t('Tell us your availability so we schedule the right sessions.')
+    : t("Pick what you'd like to be nudged to do each day.")
 
   const toggleMaint = (day: string) => {
     const has = draft.maintDays.includes(day)
@@ -685,7 +695,7 @@ function FollowupScreen({ colors, draft, patch, normalDays }: {
 
       {mode === 'maintenance' && (
         <>
-          <Text style={{ marginTop: 22, marginBottom: 10, fontSize: 12, fontWeight: '600', color: `${colors.fg}73` }}>Choose up to 2 days</Text>
+          <Text style={{ marginTop: 22, marginBottom: 10, fontSize: 12, fontWeight: '600', color: `${colors.fg}73` }}>{t('Choose up to 2 days')}</Text>
           <DayChips
             colors={colors}
             selected={draft.maintDays}
@@ -693,14 +703,14 @@ function FollowupScreen({ colors, draft, patch, normalDays }: {
             onToggle={toggleMaint}
           />
           <Text style={{ marginTop: 11, fontSize: 12, lineHeight: 17, color: `${colors.fg}66` }}>
-            {draft.maintDays.length ? `Selected: ${draft.maintDays.join(' & ')}` : `Your usual days (${normalDays.join(', ')}) are a good start.`}
+            {draft.maintDays.length ? t('Selected: {days}', { days: draft.maintDays.join(' & ') }) : t('Your usual days ({days}) are a good start.', { days: normalDays.join(', ') })}
           </Text>
         </>
       )}
 
       {mode === 'fewer' && (
         <>
-          <Text style={{ marginTop: 22, marginBottom: 10, fontSize: 13, fontWeight: '700', color: `${colors.fg}a6` }}>How often can you train?</Text>
+          <Text style={{ marginTop: 22, marginBottom: 10, fontSize: 13, fontWeight: '700', color: `${colors.fg}a6` }}>{t('How often can you train?')}</Text>
           <View style={{ flexDirection: 'row', gap: 10 }}>
             {([1, 2] as const).map((n) => {
               const on = draft.fewerCount === n
@@ -714,13 +724,13 @@ function FollowupScreen({ colors, draft, patch, normalDays }: {
                     borderWidth: 1, borderColor: on ? `${colors.brand400}99` : `${colors.fg}0f`,
                   }}
                 >
-                  <Text style={{ fontSize: 15, fontWeight: '700', color: on ? colors.brand300 : `${colors.fg}cc` }}>{n === 1 ? 'Once' : 'Twice'} per week</Text>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: on ? colors.brand300 : `${colors.fg}cc` }}>{t(n === 1 ? 'Once per week' : 'Twice per week')}</Text>
                 </Pressable>
               )
             })}
           </View>
           <Text style={{ marginTop: 20, marginBottom: 10, fontSize: 13, fontWeight: '700', color: `${colors.fg}a6` }}>
-            {draft.fewerCount === 1 ? 'Which day works best?' : 'Which two days work best?'}
+            {draft.fewerCount === 1 ? t('Which day works best?') : t('Which two days work best?')}
           </Text>
           <DayChips
             colors={colors}
@@ -729,7 +739,7 @@ function FollowupScreen({ colors, draft, patch, normalDays }: {
             onToggle={toggleFewer}
           />
           <Text style={{ marginTop: 11, fontSize: 12, lineHeight: 17, color: `${colors.fg}66` }}>
-            {draft.fewerDays.length ? `Selected: ${draft.fewerDays.join(' & ')}` : `Choose the day${draft.fewerCount > 1 ? 's' : ''} you can train.`}
+            {draft.fewerDays.length ? t('Selected: {days}', { days: draft.fewerDays.join(' & ') }) : t(draft.fewerCount > 1 ? 'Choose the days you can train.' : 'Choose the day you can train.')}
           </Text>
         </>
       )}
@@ -748,8 +758,8 @@ function FollowupScreen({ colors, draft, patch, normalDays }: {
                   }}
                 >
                   <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={{ fontSize: 16, fontWeight: '700', color: colors.fg }}>{o.title}</Text>
-                    <Text style={{ marginTop: 2, fontSize: 13, color: `${colors.fg}80` }}>{o.sub}</Text>
+                    <Text style={{ fontSize: 16, fontWeight: '700', color: colors.fg }}>{t(o.title)}</Text>
+                    <Text style={{ marginTop: 2, fontSize: 13, color: `${colors.fg}80` }}>{t(o.sub)}</Text>
                   </View>
                   <Radio on={on} color={colors.brand400} colors={colors} />
                 </View>
@@ -801,6 +811,7 @@ function ReviewScreen({ colors, draft, onEditDates, onEditMode }: {
   onEditDates: () => void
   onEditMode: () => void
 }) {
+  const t = useT()
   const meta = modeMeta(draft.mode)
   const days = periodLength(draft.start, draft.end)
   const returnLabel = fmtPeriodDate(nextDayKey(draft.end))
@@ -809,19 +820,19 @@ function ReviewScreen({ colors, draft, onEditDates, onEditMode }: {
 
   return (
     <>
-      <Text style={{ marginTop: 6, fontSize: 24, fontWeight: '800', letterSpacing: -0.48, color: colors.fg }}>Here's the plan</Text>
+      <Text style={{ marginTop: 6, fontSize: 24, fontWeight: '800', letterSpacing: -0.48, color: colors.fg }}>{t("Here's the plan")}</Text>
       <Text style={{ marginTop: 7, fontSize: 14, lineHeight: 21, color: `${colors.fg}99` }}>
-        Nothing changes until you confirm. Here's exactly what we'll do.
+        {t("Nothing changes until you confirm. Here's exactly what we'll do.")}
       </Text>
 
       <View style={{ marginTop: 20, borderRadius: 20, overflow: 'hidden', backgroundColor: colors.ink800, borderWidth: 1, borderColor: `${colors.fg}0f` }}>
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, paddingVertical: 15, paddingHorizontal: 16 }}>
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={{ fontSize: 12, fontWeight: '600', color: `${colors.fg}73` }}>Busy period</Text>
+            <Text style={{ fontSize: 12, fontWeight: '600', color: `${colors.fg}73` }}>{t('Busy period')}</Text>
             <Text style={{ marginTop: 3, fontSize: 15, fontWeight: '700', color: colors.fg }}>{periodRangeText(draft.start, draft.end)}</Text>
-            <Text style={{ marginTop: 2, fontSize: 12.5, color: `${colors.fg}80` }}>{days} days</Text>
+            <Text style={{ marginTop: 2, fontSize: 12.5, color: `${colors.fg}80` }}>{t('{n} days', { n: days })}</Text>
           </View>
-          <Pressable onPress={onEditDates} hitSlop={8}><Text style={{ fontSize: 13, fontWeight: '700', color: colors.brand400 }}>Edit</Text></Pressable>
+          <Pressable onPress={onEditDates} hitSlop={8}><Text style={{ fontSize: 13, fontWeight: '700', color: colors.brand400 }}>{t('Edit')}</Text></Pressable>
         </View>
         {divider}
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, paddingVertical: 15, paddingHorizontal: 16 }}>
@@ -830,15 +841,15 @@ function ReviewScreen({ colors, draft, onEditDates, onEditMode }: {
               <ModeIcon meta={meta} size={20} colors={colors} />
             </View>
             <View>
-              <Text style={{ fontSize: 12, fontWeight: '600', color: `${colors.fg}73` }}>Mode</Text>
+              <Text style={{ fontSize: 12, fontWeight: '600', color: `${colors.fg}73` }}>{t('Mode')}</Text>
               <Text style={{ marginTop: 3, fontSize: 15, fontWeight: '700', color: colors.fg }}>{meta?.title}</Text>
             </View>
           </View>
-          <Pressable onPress={onEditMode} hitSlop={8}><Text style={{ fontSize: 13, fontWeight: '700', color: colors.brand400 }}>Edit</Text></Pressable>
+          <Pressable onPress={onEditMode} hitSlop={8}><Text style={{ fontSize: 13, fontWeight: '700', color: colors.brand400 }}>{t('Edit')}</Text></Pressable>
         </View>
         {divider}
         <View style={{ paddingVertical: 15, paddingHorizontal: 16 }}>
-          <Text style={{ marginBottom: 9, fontSize: 12, fontWeight: '600', color: `${colors.fg}73` }}>What happens to your training</Text>
+          <Text style={{ marginBottom: 9, fontSize: 12, fontWeight: '600', color: `${colors.fg}73` }}>{t('What happens to your training')}</Text>
           <View style={{ gap: 8 }}>
             {whatHappens(draft).map((w) => (
               <View key={w} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 9 }}>
@@ -850,14 +861,14 @@ function ReviewScreen({ colors, draft, onEditDates, onEditMode }: {
         </View>
         {divider}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingVertical: 15, paddingHorizontal: 16 }}>
-          <Text style={{ fontSize: 13, color: `${colors.fg}99` }}>Normal training returns</Text>
+          <Text style={{ fontSize: 13, color: `${colors.fg}99` }}>{t('Normal training returns')}</Text>
           <Text style={{ fontSize: 15, fontWeight: '700', color: colors.brand300 }}>{returnLabel}</Text>
         </View>
         {!!note && (
           <>
             {divider}
             <View style={{ paddingVertical: 15, paddingHorizontal: 16 }}>
-              <Text style={{ fontSize: 12, fontWeight: '600', color: `${colors.fg}73` }}>Note</Text>
+              <Text style={{ fontSize: 12, fontWeight: '600', color: `${colors.fg}73` }}>{t('Note')}</Text>
               <Text style={{ marginTop: 4, fontSize: 14, color: colors.fg }}>{note}</Text>
             </View>
           </>
@@ -867,7 +878,7 @@ function ReviewScreen({ colors, draft, onEditDates, onEditMode }: {
       <View style={{ marginTop: 14, flexDirection: 'row', alignItems: 'flex-start', gap: 11, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 15, backgroundColor: `${colors.accentPurple}1a` }}>
         <GraduationCap size={22} color={colors.accentPurple} strokeWidth={1.9} />
         <Text style={{ flex: 1, fontSize: 13, lineHeight: 19.5, color: `${colors.fg}b8` }}>
-          We'll switch you back to your normal program automatically on {returnLabel}. Sessions you miss during this time won't count against you.
+          {t("We'll switch you back to your normal program automatically on {date}. Sessions you miss during this time won't count against you.", { date: returnLabel })}
         </Text>
       </View>
     </>
@@ -895,6 +906,7 @@ function PeriodDetailSheet({ open, period, isActive, colors, onClose, onEdit, on
   onCancel: (p: PlannedPeriod) => void
   onEndEarly: (p: PlannedPeriod) => void
 }) {
+  const t = useT()
   const insets = useSafeAreaInsets()
   const [render, setRender] = useState(open)
   const [panelH, setPanelH] = useState(420)
@@ -953,13 +965,13 @@ function PeriodDetailSheet({ open, period, isActive, colors, onClose, onEdit, on
           </View>
 
           <View style={{ marginTop: 18, borderRadius: 16, paddingHorizontal: 16, paddingVertical: 2, backgroundColor: colors.ink700 }}>
-            <DetailRow colors={colors} label="Mode" value={meta?.title ?? '—'} />
+            <DetailRow colors={colors} label={t('Mode')} value={meta?.title ?? '—'} />
             {divider}
-            <DetailRow colors={colors} label="What happens" value={meta?.effect ?? '—'} />
+            <DetailRow colors={colors} label={t('What happens')} value={meta?.effect ?? '—'} />
             {divider}
-            <DetailRow colors={colors} label="Status" value={isActive ? 'Active now' : `Starts ${daysLabel(daysUntil(shownPeriod.start))}`} />
+            <DetailRow colors={colors} label={t('Status')} value={isActive ? t('Active now') : t('Starts {label}', { label: daysLabel(daysUntil(shownPeriod.start)) })} />
             {divider}
-            <DetailRow colors={colors} label="Training returns" value={fmtPeriodDate(nextDayKey(shownPeriod.end))} tint={colors.brand300} />
+            <DetailRow colors={colors} label={t('Training returns')} value={fmtPeriodDate(nextDayKey(shownPeriod.end))} tint={colors.brand300} />
           </View>
 
           {isActive ? (
@@ -967,17 +979,17 @@ function PeriodDetailSheet({ open, period, isActive, colors, onClose, onEdit, on
               onPress={() => onEndEarly(shownPeriod)}
               style={{ marginTop: 16, alignItems: 'center', paddingVertical: 14, borderRadius: 14, borderWidth: 1, borderColor: `${colors.danger}73` }}
             >
-              <Text style={{ fontSize: 15, fontWeight: '700', color: colors.danger }}>End Plan Around Your Life early</Text>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: colors.danger }}>{t('End Plan Around Your Life early')}</Text>
             </Pressable>
           ) : (
             <>
               <PressableScale onPress={() => onEdit(shownPeriod)} scaleTo={0.98}>
                 <View style={{ marginTop: 16, alignItems: 'center', paddingVertical: 14, borderRadius: 14, backgroundColor: colors.brand400 }}>
-                  <Text style={{ fontSize: 15, fontWeight: '800', color: '#0a0a0b' }}>Edit period</Text>
+                  <Text style={{ fontSize: 15, fontWeight: '800', color: '#0a0a0b' }}>{t('Edit period')}</Text>
                 </View>
               </PressableScale>
               <Pressable onPress={() => onCancel(shownPeriod)} style={{ marginTop: 12, alignItems: 'center', paddingVertical: 10 }}>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: colors.danger }}>Cancel this period</Text>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: colors.danger }}>{t('Cancel this period')}</Text>
               </Pressable>
             </>
           )}

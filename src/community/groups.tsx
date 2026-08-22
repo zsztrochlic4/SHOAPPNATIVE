@@ -16,6 +16,7 @@ import {
 import { useStore } from '../store/store'
 import { myLeaderStats, type MyLeaderStats } from '../store/selectors'
 import { todayKey } from '../lib/date'
+import { useT } from '../lib/useT'
 import { useColors, brand } from '../theme'
 import { useToast } from '../components/Toast'
 import { Sheet, EmptyState } from '../components/Sheet'
@@ -153,9 +154,12 @@ type ActiveSheet =
 
 export function GroupsTab({ onClaimUsername }: { onClaimUsername: () => void }) {
   const { state, dispatch } = useStore()
-  const me = useMemo(() => myLeaderStats(state), [state])
+  // myLeaderStats reads only these slices; narrowing the deps is intentional (avoids recomputing on every unrelated dispatch).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const me = useMemo(() => myLeaderStats(state), [state.habits, state.sessions, state.activities, state.community, state.profile])
   const groups = state.community.groups
   const [sheet, setSheet] = useState<ActiveSheet>(null)
+  const t = useT()
 
   // Backend on: hydrate the local group cache from the server (firebase loaded on
   // demand). Off: the seeded/local groups are the source of truth (unchanged).
@@ -187,7 +191,7 @@ export function GroupsTab({ onClaimUsername }: { onClaimUsername: () => void }) 
           className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl bg-brand-400 py-3.5 active:opacity-90"
         >
           <Plus size={18} color="#000" />
-          <Text className="text-[14px] font-bold text-black">Create group</Text>
+          <Text className="text-[14px] font-bold text-black">{t('Create group')}</Text>
         </PressableScale>
         <PressableScale
           containerStyle={{ flex: 1 }}
@@ -197,7 +201,7 @@ export function GroupsTab({ onClaimUsername }: { onClaimUsername: () => void }) 
           className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 py-3.5 active:opacity-90"
         >
           <KeyRound size={18} color={brand[400]} />
-          <Text className="text-[14px] font-bold text-white">Join group</Text>
+          <Text className="text-[14px] font-bold text-white">{t('Join group')}</Text>
         </PressableScale>
       </View>
 
@@ -205,8 +209,8 @@ export function GroupsTab({ onClaimUsername }: { onClaimUsername: () => void }) 
         <View className="mt-4">
           <EmptyState
             icon={<Users size={32} color="#fff" />}
-            title="No groups yet"
-            body="Create a group and share the code with friends, or join one you've been invited to."
+            title={t('No groups yet')}
+            body={t("Create a group and share the code with friends, or join one you've been invited to.")}
           />
         </View>
       ) : (
@@ -238,6 +242,7 @@ function GroupCard({ group, me, onOpen }: { group: CommunityGroup; me: MyLeaderS
   const yourRank = ranked.findIndex((m) => m.isYou) + 1
   const owner = group.ownerUsername === me.username
   const { icon, color } = groupAppearance(group)
+  const t = useT()
   return (
     <PressableScale
       onPress={onOpen}
@@ -253,7 +258,7 @@ function GroupCard({ group, me, onOpen }: { group: CommunityGroup; me: MyLeaderS
           <Text numberOfLines={1} className="font-bold leading-tight text-white">{group.name}</Text>
           {owner && <Crown size={13} color="#F5C518" />}
         </View>
-        <Text className="text-[12px] text-secondary">{ranked.length} member{ranked.length === 1 ? '' : 's'} · you're #{yourRank}</Text>
+        <Text className="text-[12px] text-secondary">{ranked.length} {t(ranked.length === 1 ? 'member' : 'members')} · {t("you're #{rank}", { rank: yourRank })}</Text>
       </View>
       <ChevronRight size={18} color="rgba(255,255,255,0.3)" />
     </PressableScale>
@@ -266,7 +271,10 @@ function CreateGroupSheet({ open, onClose, onCreated }: { open: boolean; onClose
   const { state, dispatch } = useStore()
   const toast = useToast()
   const colors = useColors()
-  const me = useMemo(() => myLeaderStats(state), [state])
+  const t = useT()
+  // myLeaderStats reads only these slices; narrowing the deps is intentional (avoids recomputing on every unrelated dispatch).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const me = useMemo(() => myLeaderStats(state), [state.habits, state.sessions, state.activities, state.community, state.profile])
   const [name, setName] = useState('')
   const [pick, setPick] = useState(0)
   const [visibility, setVisibility] = useState<'private' | 'public'>('private')
@@ -291,12 +299,12 @@ function CreateGroupSheet({ open, onClose, onCreated }: { open: boolean; onClose
         setBusy(false)
         thud()
         dispatch({ type: 'CREATE_GROUP', group })
-        toast('Group created, share the code')
+        toast(t('Group created, share the code'))
         onClose()
         onCreated(groupId)
       } catch {
         setBusy(false)
-        setError("Couldn't create the group. Try again.")
+        setError(t("Couldn't create the group. Try again."))
       }
       return
     }
@@ -305,7 +313,7 @@ function CreateGroupSheet({ open, onClose, onCreated }: { open: boolean; onClose
     if (!res.ok) { setError(res.message); return }
     thud()
     dispatch({ type: 'CREATE_GROUP', group: res.group })
-    toast('Group created, share the code')
+    toast(t('Group created, share the code'))
     onClose()
     onCreated(res.group.id)
   }
@@ -313,18 +321,18 @@ function CreateGroupSheet({ open, onClose, onCreated }: { open: boolean; onClose
   const canSubmit = name.trim().length >= 2 && !busy
 
   return (
-    <Sheet open={open} onClose={onClose} title="Create a group">
+    <Sheet open={open} onClose={onClose} title={t('Create a group')}>
       <Text className="mb-4 text-[13px] leading-snug text-secondary">
-        Start a private group and get a join code to share. You'll be the owner.
+        {t("Start a private group and get a join code to share. You'll be the owner.")}
       </Text>
-      <Text className="mb-1.5 text-[12px] font-semibold uppercase tracking-wide text-tertiary">Group name</Text>
+      <Text className="mb-1.5 text-[12px] font-semibold uppercase tracking-wide text-tertiary">{t('Group name')}</Text>
       <View className="flex-row items-center rounded-2xl border bg-ink-700 px-3.5" style={{ borderColor: error ? `${colors.danger}aa` : 'rgba(255,255,255,0.12)', height: 54 }}>
         <TextInput
           value={name}
-          onChangeText={(t) => { setName(t.slice(0, 30)); setError(null) }}
+          onChangeText={(v) => { setName(v.slice(0, 30)); setError(null) }}
           autoFocus
           maxLength={30}
-          placeholder="e.g. West Hall Crew"
+          placeholder={t('e.g. West Hall Crew')}
           placeholderTextColor="rgba(255,255,255,0.3)"
           accessibilityLabel="Group name"
           className="flex-1 text-[16px] font-semibold text-white"
@@ -334,10 +342,10 @@ function CreateGroupSheet({ open, onClose, onCreated }: { open: boolean; onClose
       <View className="mt-2 min-h-[18px] px-1">
         {error
           ? <Text className="text-[12px] font-semibold" style={{ color: colors.danger }}>{error}</Text>
-          : <Text className="text-[12px] text-tertiary">{name.trim().length}/30 · pick something your friends will recognise.</Text>}
+          : <Text className="text-[12px] text-tertiary">{t('{count}/30 · pick something your friends will recognise.', { count: name.trim().length })}</Text>}
       </View>
 
-      <Text className="mb-2 mt-4 text-[12px] font-semibold uppercase tracking-wide text-tertiary">Icon</Text>
+      <Text className="mb-2 mt-4 text-[12px] font-semibold uppercase tracking-wide text-tertiary">{t('Icon')}</Text>
       <View className="flex-row flex-wrap gap-2.5">
         {GROUP_ICONS.map((g, i) => {
           const active = i === pick
@@ -357,7 +365,7 @@ function CreateGroupSheet({ open, onClose, onCreated }: { open: boolean; onClose
         })}
       </View>
 
-      <Text className="mb-2 mt-4 text-[12px] font-semibold uppercase tracking-wide text-tertiary">Visibility</Text>
+      <Text className="mb-2 mt-4 text-[12px] font-semibold uppercase tracking-wide text-tertiary">{t('Visibility')}</Text>
       <View className="flex-row gap-2.5">
         {([
           { value: 'private' as const, label: 'Private', hint: 'Join by code only' },
@@ -373,8 +381,8 @@ function CreateGroupSheet({ open, onClose, onCreated }: { open: boolean; onClose
               accessibilityState={{ selected: active }}
               className={`flex-1 rounded-2xl border-2 px-3.5 py-3 active:opacity-90 ${active ? 'border-brand-400 bg-brand-400/10' : 'border-white/10 bg-ink-700'}`}
             >
-              <Text className={`text-[14px] font-bold ${active ? 'text-brand-300' : 'text-white'}`}>{opt.label}</Text>
-              <Text className="mt-0.5 text-[12px] text-tertiary">{opt.hint}</Text>
+              <Text className={`text-[14px] font-bold ${active ? 'text-brand-300' : 'text-white'}`}>{t(opt.label)}</Text>
+              <Text className="mt-0.5 text-[12px] text-tertiary">{t(opt.hint)}</Text>
             </Pressable>
           )
         })}
@@ -389,7 +397,7 @@ function CreateGroupSheet({ open, onClose, onCreated }: { open: boolean; onClose
         className={`mt-3 flex-row items-center justify-center gap-2 rounded-2xl py-4 ${canSubmit ? 'bg-brand-400 active:opacity-90' : 'bg-white/10'}`}
       >
         {busy && <ActivityIndicator size="small" color="#000" />}
-        <Text className={`text-[15px] font-bold ${canSubmit ? 'text-black' : 'text-disabled'}`}>{busy ? 'Creating…' : 'Create group'}</Text>
+        <Text className={`text-[15px] font-bold ${canSubmit ? 'text-black' : 'text-disabled'}`}>{busy ? t('Creating…') : t('Create group')}</Text>
       </PressableScale>
     </Sheet>
   )
@@ -401,7 +409,10 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
   const { state, dispatch } = useStore()
   const toast = useToast()
   const colors = useColors()
-  const me = useMemo(() => myLeaderStats(state), [state])
+  const tr = useT()
+  // myLeaderStats reads only these slices; narrowing the deps is intentional (avoids recomputing on every unrelated dispatch).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const me = useMemo(() => myLeaderStats(state), [state.habits, state.sessions, state.activities, state.community, state.profile])
   const joinedIds = state.community.groups.map((g) => g.id)
 
   const [query, setQuery] = useState('')
@@ -434,23 +445,23 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
         setDirectBusy(false)
         if (full) dispatch({ type: 'JOIN_GROUP_BY_CODE', group: full })
         thud()
-        toast(`Joined ${name}`)
+        toast(tr('Joined {name}', { name }))
         onClose()
       } catch {
         setDirectBusy(false)
-        setDirectError("That code doesn't match any group.")
+        setDirectError(tr("That code doesn't match any group."))
       }
       return
     }
     // Simulation: resolve the code against the discoverable directory's passcodes.
     const match = DISCOVERABLE_GROUPS.find((g) => g.passcode.toUpperCase() === c)
-    if (!match) { setDirectBusy(false); setDirectError("That code doesn't match any group."); return }
+    if (!match) { setDirectBusy(false); setDirectError(tr("That code doesn't match any group.")); return }
     const res = await joinGroup(match, c, me, todayKey, state.community.groups.map((g) => g.id))
     setDirectBusy(false)
     if (!res.ok) { if (res.reason === 'duplicate') { toast(res.message); onClose(); return } setDirectError(res.message); return }
     dispatch({ type: 'JOIN_GROUP_BY_CODE', group: res.group })
     thud()
-    toast(`Joined ${res.group.name}`)
+    toast(tr('Joined {name}', { name: res.group.name }))
     onClose()
   }
 
@@ -490,11 +501,11 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
         setBusy(false)
         if (full) dispatch({ type: 'JOIN_GROUP_BY_CODE', group: full })
         thud()
-        toast(`Joined ${name}`)
+        toast(tr('Joined {name}', { name }))
         onClose()
       } catch {
         setBusy(false)
-        setError("That code doesn't match. Double-check with the group owner.")
+        setError(tr("That code doesn't match. Double-check with the group owner."))
       }
       return
     }
@@ -507,16 +518,16 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
     }
     dispatch({ type: 'JOIN_GROUP_BY_CODE', group: res.group })
     thud()
-    toast(`Joined ${res.group.name}`)
+    toast(tr('Joined {name}', { name: res.group.name }))
     onClose()
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title="Join a group">
+    <Sheet open={open} onClose={onClose} title={tr('Join a group')}>
       {selected ? (
         <View>
           <Pressable onPress={() => { setSelected(null); setCode(''); setError(null) }} accessibilityRole="button" accessibilityLabel="Back to search" className="mb-3 self-start active:opacity-70">
-            <Text className="text-[13px] font-semibold text-brand-300">‹ Back to search</Text>
+            <Text className="text-[13px] font-semibold text-brand-300">{tr('‹ Back to search')}</Text>
           </Pressable>
           <View className="flex-row items-center gap-3 rounded-2xl border border-white/5 bg-ink-800 p-3.5">
             <View className="h-12 w-12 items-center justify-center rounded-2xl" style={{ backgroundColor: `${brand[400]}1a` }}>
@@ -524,11 +535,11 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
             </View>
             <View className="flex-1">
               <Text className="font-bold text-white">{selected.name}</Text>
-              <Text className="text-[12px] text-secondary">{selected.memberCount} members · private</Text>
+              <Text className="text-[12px] text-secondary">{selected.memberCount} {tr('members · private')}</Text>
             </View>
           </View>
 
-          <Text className="mb-1.5 mt-5 text-[12px] font-semibold uppercase tracking-wide text-tertiary">Passcode</Text>
+          <Text className="mb-1.5 mt-5 text-[12px] font-semibold uppercase tracking-wide text-tertiary">{tr('Passcode')}</Text>
           <View className="flex-row items-center gap-2 rounded-2xl border bg-ink-700 px-3.5" style={{ borderColor: error ? `${colors.danger}aa` : 'rgba(255,255,255,0.12)', height: 54 }}>
             <KeyRound size={18} color="rgba(255,255,255,0.4)" />
             <TextInput
@@ -538,7 +549,7 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
               autoCapitalize="characters"
               autoCorrect={false}
               maxLength={8}
-              placeholder="6 character code"
+              placeholder={tr('6 character code')}
               placeholderTextColor="rgba(255,255,255,0.3)"
               accessibilityLabel="Group passcode"
               className="flex-1 text-[16px] font-bold tracking-[3px] text-white"
@@ -548,7 +559,7 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
           <View className="mt-2 min-h-[18px] px-1">
             {error
               ? <Text className="text-[12px] font-semibold" style={{ color: colors.danger }}>{error}</Text>
-              : <Text className="text-[12px] text-tertiary">Groups are private. Ask the owner for the code to join.</Text>}
+              : <Text className="text-[12px] text-tertiary">{tr('Groups are private. Ask the owner for the code to join.')}</Text>}
           </View>
           <PressableScale
             onPress={submitJoin}
@@ -559,7 +570,7 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
             className={`mt-3 flex-row items-center justify-center gap-2 rounded-2xl py-4 ${!busy && code.trim().length >= 4 ? 'bg-brand-400 active:opacity-90' : 'bg-white/10'}`}
           >
             {busy && <ActivityIndicator size="small" color="#000" />}
-            <Text className={`text-[15px] font-bold ${!busy && code.trim().length >= 4 ? 'text-black' : 'text-disabled'}`}>{busy ? 'Joining…' : 'Join group'}</Text>
+            <Text className={`text-[15px] font-bold ${!busy && code.trim().length >= 4 ? 'text-black' : 'text-disabled'}`}>{busy ? tr('Joining…') : tr('Join group')}</Text>
           </PressableScale>
         </View>
       ) : (
@@ -571,7 +582,7 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
               onChangeText={setQuery}
               autoCapitalize="none"
               autoCorrect={false}
-              placeholder="Search groups by name"
+              placeholder={tr('Search groups by name')}
               placeholderTextColor="rgba(255,255,255,0.3)"
               accessibilityLabel="Search groups by name"
               className="flex-1 text-[15px] text-white"
@@ -580,7 +591,7 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
           </View>
 
           {/* Private groups aren't listed — join one directly with its code. */}
-          <Text className="mb-1.5 mt-4 text-[12px] font-semibold uppercase tracking-wide text-tertiary">Have a code?</Text>
+          <Text className="mb-1.5 mt-4 text-[12px] font-semibold uppercase tracking-wide text-tertiary">{tr('Have a code?')}</Text>
           <View className="flex-row items-center gap-2">
             <View className="flex-1 flex-row items-center gap-2 rounded-2xl border bg-ink-700 px-3.5" style={{ borderColor: directError ? `${colors.danger}aa` : 'rgba(255,255,255,0.12)', height: 50 }}>
               <KeyRound size={18} color="rgba(255,255,255,0.4)" />
@@ -590,7 +601,7 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
                 autoCapitalize="characters"
                 autoCorrect={false}
                 maxLength={8}
-                placeholder="Enter code"
+                placeholder={tr('Enter code')}
                 placeholderTextColor="rgba(255,255,255,0.3)"
                 accessibilityLabel="Group join code"
                 className="flex-1 text-[15px] font-bold tracking-[3px] text-white"
@@ -606,7 +617,7 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
               className={`items-center justify-center rounded-2xl px-4 ${!directBusy && directCode.trim().length >= 4 ? 'bg-brand-400 active:opacity-90' : 'bg-white/10'}`}
               style={{ height: 50 }}
             >
-              {directBusy ? <ActivityIndicator size="small" color="#000" /> : <Text className={`text-[14px] font-bold ${directCode.trim().length >= 4 ? 'text-black' : 'text-disabled'}`}>Join</Text>}
+              {directBusy ? <ActivityIndicator size="small" color="#000" /> : <Text className={`text-[14px] font-bold ${directCode.trim().length >= 4 ? 'text-black' : 'text-disabled'}`}>{tr('Join')}</Text>}
             </PressableScale>
           </View>
           {directError && <Text className="mt-1.5 px-1 text-[12px] font-semibold" style={{ color: colors.danger }}>{directError}</Text>}
@@ -622,9 +633,9 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
             ) : results.length === 0 ? (
               <View className="items-center rounded-2xl border border-dashed border-white/15 px-6 py-10">
                 <Search size={24} color="rgba(255,255,255,0.35)" />
-                <Text className="mt-2 font-bold text-white">No groups found</Text>
+                <Text className="mt-2 font-bold text-white">{tr('No groups found')}</Text>
                 <Text className="mt-1 max-w-[240px] text-center text-[13px] text-secondary">
-                  {query.trim() ? 'No groups match that name. Ask a friend for their group’s invite code.' : 'No public groups to show right now.'}
+                  {query.trim() ? tr('No groups match that name. Ask a friend for their group’s invite code.') : tr('No public groups to show right now.')}
                 </Text>
               </View>
             ) : (
@@ -641,7 +652,7 @@ function JoinGroupSheet({ open, onClose }: { open: boolean; onClose: () => void 
                   </View>
                   <View className="flex-1">
                     <Text className="font-bold text-white">{g.name}</Text>
-                    <Text className="text-[12px] text-secondary">{g.memberCount} members · code required</Text>
+                    <Text className="text-[12px] text-secondary">{g.memberCount} {tr('members · code required')}</Text>
                   </View>
                   <ChevronRight size={18} color="rgba(255,255,255,0.3)" />
                 </PressableScale>
@@ -660,7 +671,10 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
   const { state, dispatch } = useStore()
   const toast = useToast()
   const colors = useColors()
-  const me = useMemo(() => myLeaderStats(state), [state])
+  const t = useT()
+  // myLeaderStats reads only these slices; narrowing the deps is intentional (avoids recomputing on every unrelated dispatch).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const me = useMemo(() => myLeaderStats(state), [state.habits, state.sessions, state.activities, state.community, state.profile])
   const group = state.community.groups.find((g) => g.id === groupId) ?? null
   // Preview: no claimed identity — hide owner/leave controls, offer to join.
   const preview = !me.username
@@ -700,14 +714,14 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
       setCopied(true)
       if (copyTimer.current) clearTimeout(copyTimer.current)
       copyTimer.current = setTimeout(() => setCopied(false), 1600)
-    } catch { toast("Couldn't copy") }
+    } catch { toast(t("Couldn't copy")) }
   }
   const leave = async () => {
     if (!group) return
     thud()
     if (COMMUNITY_BACKEND) { try { const b = await import('./groupsBackend'); await b.leaveGroupRemote(group.id) } catch { /* optimistic */ } }
     dispatch({ type: 'LEAVE_GROUP', id: group.id })
-    toast(`Left ${group.name}`)
+    toast(t('Left {name}', { name: group.name }))
     onClose()
   }
   const remove = async () => {
@@ -715,7 +729,7 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
     thud()
     if (COMMUNITY_BACKEND) { try { const b = await import('./groupsBackend'); await b.deleteGroupRemote(group.id) } catch { /* optimistic */ } }
     dispatch({ type: 'DELETE_GROUP', id: group.id })
-    toast('Group deleted')
+    toast(t('Group deleted'))
     onClose()
   }
   // Transfer ownership to another member (owner stays in the group). A server
@@ -726,7 +740,7 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
     thud()
     dispatch({ type: 'TRANSFER_GROUP_OWNER', id: group.id, newOwnerUsername: username })
     setExpandedId(null)
-    toast(`@${username} is now the owner`)
+    toast(t('@{username} is now the owner', { username }))
   }
   // Owner hands the group to a successor and leaves in one step.
   const makeOwnerAndLeave = (username: string) => {
@@ -734,7 +748,7 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
     thud()
     dispatch({ type: 'TRANSFER_GROUP_OWNER', id: group.id, newOwnerUsername: username })
     dispatch({ type: 'LEAVE_GROUP', id: group.id })
-    toast(`Handed ${group.name} to @${username}`)
+    toast(t('Handed {name} to @{username}', { name: group.name, username }))
     onClose()
   }
   const cancelAction = () => { setConfirmLeave(false); setConfirmDelete(false); setTransferMode(false) }
@@ -768,7 +782,7 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
 
   return (
     <>
-    <Sheet open={open} onClose={onClose} title={group?.name ?? 'Group'}>
+    <Sheet open={open} onClose={onClose} title={group?.name ?? t('Group')}>
       {!group ? (
         <EmptyDetail />
       ) : (
@@ -778,15 +792,15 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
             {owner ? (
               <View className="flex-row items-center gap-1.5 rounded-full bg-[#F5C518]/15 px-2.5 py-1">
                 <Crown size={12} color="#F5C518" />
-                <Text className="text-[11px] font-bold text-[#F5C518]">You own this group</Text>
+                <Text className="text-[11px] font-bold text-[#F5C518]">{t('You own this group')}</Text>
               </View>
             ) : (
               <View className="flex-row items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1">
                 <ShieldCheck size={12} color="rgba(255,255,255,0.6)" />
-                <Text className="text-[11px] font-bold text-secondary">@{group.ownerUsername}'s group</Text>
+                <Text className="text-[11px] font-bold text-secondary">@{group.ownerUsername}{t("'s group")}</Text>
               </View>
             )}
-            <Text className="text-[12px] text-secondary">{ranked.length} member{ranked.length === 1 ? '' : 's'}</Text>
+            <Text className="text-[12px] text-secondary">{ranked.length} {t(ranked.length === 1 ? 'member' : 'members')}</Text>
           </View>
 
           {/* group pulse */}
@@ -796,12 +810,12 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
           <View className="mt-2 rounded-xl bg-white/[0.03] px-3 py-2.5">
             <Pressable onPress={() => setVolInfoOpen((v) => !v)} accessibilityRole="button" accessibilityLabel="What the numbers mean" accessibilityState={{ expanded: volInfoOpen }} className="flex-row items-center gap-2">
               <Info size={14} color="rgba(255,255,255,0.4)" />
-              <Text className="flex-1 text-[11px] font-bold text-secondary">What the numbers mean</Text>
+              <Text className="flex-1 text-[11px] font-bold text-secondary">{t('What the numbers mean')}</Text>
               <ChevronDown size={15} color="rgba(255,255,255,0.4)" style={{ transform: [{ rotate: volInfoOpen ? '180deg' : '0deg' }] }} />
             </Pressable>
             {volInfoOpen && (
               <Text className="mt-2 pl-[22px] text-[11px] leading-relaxed text-tertiary">
-                <Text className="font-bold text-secondary">Volume</Text> is the total weight lifted across all workouts (sets × reps × weight). <Text className="font-bold text-secondary">Odometer</Text> is your weekly consistency score out of 100.
+                <Text className="font-bold text-secondary">{t('Volume')}</Text>{t(' is the total weight lifted across all workouts (sets × reps × weight). ')}<Text className="font-bold text-secondary">{t('Odometer')}</Text>{t(' is your weekly consistency score out of 100.')}
               </Text>
             )}
           </View>
@@ -820,13 +834,13 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
           ) : (
             <View className="mt-3 flex-row items-center gap-2.5 rounded-2xl border border-white/6 bg-white/[0.02] p-3.5">
               <Target size={16} color="rgba(255,255,255,0.4)" />
-              <Text className="text-[13px] leading-snug text-tertiary">No weekly team goal yet. The group owner can set one.</Text>
+              <Text className="text-[13px] leading-snug text-tertiary">{t('No weekly team goal yet. The group owner can set one.')}</Text>
             </View>
           )}
 
           {/* invite code */}
           <View className="mt-4 rounded-2xl border border-white/8 bg-ink-800 p-3.5">
-            <Text className="text-[11px] font-semibold uppercase tracking-wide text-tertiary">Invite code</Text>
+            <Text className="text-[11px] font-semibold uppercase tracking-wide text-tertiary">{t('Invite code')}</Text>
             <View className="mt-1.5 flex-row items-center justify-between">
               <Text className="text-[22px] font-black tracking-[4px] text-white">{group.passcode}</Text>
               <PressableScale
@@ -837,7 +851,7 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
                 className="h-9 flex-row items-center gap-1.5 rounded-full bg-brand-400 px-3.5 active:opacity-90"
               >
                 {copied ? <Check size={15} color="#000" strokeWidth={2.6} /> : <Copy size={15} color="#000" />}
-                <Text className="text-[13px] font-bold text-black">{copied ? 'Copied' : 'Copy'}</Text>
+                <Text className="text-[13px] font-bold text-black">{copied ? t('Copied') : t('Copy')}</Text>
               </PressableScale>
             </View>
           </View>
@@ -845,7 +859,7 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
           {/* ranking metric toggle */}
           <View className="mt-5 flex-row items-center gap-1.5">
             <Gauge size={14} color={brand[400]} />
-            <Text className="text-[12px] font-semibold uppercase tracking-wide text-tertiary">Rank by</Text>
+            <Text className="text-[12px] font-semibold uppercase tracking-wide text-tertiary">{t('Rank by')}</Text>
           </View>
           <View className="mt-2 flex-row gap-2 rounded-2xl bg-ink-700 p-1">
             {METRICS.map((m) => {
@@ -859,7 +873,7 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
                   accessibilityState={{ selected: active }}
                   className={`flex-1 items-center rounded-xl py-2 ${active ? 'bg-brand-400' : ''} active:opacity-80`}
                 >
-                  <Text className={`text-[13px] font-bold ${active ? 'text-black' : 'text-secondary'}`}>{m.label}</Text>
+                  <Text className={`text-[13px] font-bold ${active ? 'text-black' : 'text-secondary'}`}>{t(m.label)}</Text>
                 </Pressable>
               )
             })}
@@ -887,7 +901,7 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
             <>
               <View className="mb-2 mt-6 flex-row items-center gap-1.5">
                 <Activity size={14} color={brand[400]} />
-                <Text className="text-[12px] font-semibold uppercase tracking-wide text-tertiary">Recent activity</Text>
+                <Text className="text-[12px] font-semibold uppercase tracking-wide text-tertiary">{t('Recent activity')}</Text>
               </View>
               <View className="gap-2">
                 {activity.map((a) => (
@@ -915,10 +929,10 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
                   className="flex-row items-center justify-center gap-2 rounded-2xl bg-brand-400 py-4 active:opacity-90"
                 >
                   <AtSign size={16} color="#000" />
-                  <Text className="text-[14px] font-bold text-black">Claim a username to join</Text>
+                  <Text className="text-[14px] font-bold text-black">{t('Claim a username to join')}</Text>
                 </PressableScale>
                 <Text className="mt-2 text-center text-[12px] text-tertiary">
-                  You're previewing Community. Claim a name to join groups and appear on leaderboards.
+                  {t("You're previewing Community. Claim a name to join groups and appear on leaderboards.")}
                 </Text>
               </View>
             ) : (
@@ -947,7 +961,7 @@ function GroupDetailSheet({ open, groupId, onClose, onClaimUsername }: { open: b
                 className="mt-3 flex-row items-center justify-center gap-1.5 py-2 active:opacity-70"
               >
                 <Flag size={12} color="rgba(255,255,255,0.45)" />
-                <Text className="text-[12px] font-semibold text-tertiary">Report this group</Text>
+                <Text className="text-[12px] font-semibold text-tertiary">{t('Report this group')}</Text>
               </Pressable>
             )}
           </View>
@@ -979,9 +993,10 @@ function OwnershipFooter({ owner, others, danger, confirmLeave, confirmDelete, t
   onDelete: () => void
   onHandOver: (username: string) => void
 }) {
+  const t = useT()
   const CancelBtn = (
     <Pressable onPress={onCancel} accessibilityRole="button" accessibilityLabel="Cancel" className="items-center py-2.5 active:opacity-70">
-      <Text className="text-[13px] font-bold text-tertiary">Cancel</Text>
+      <Text className="text-[13px] font-bold text-tertiary">{t('Cancel')}</Text>
     </Pressable>
   )
   const DeleteConfirm = ({ note }: { note: string }) => (
@@ -989,7 +1004,7 @@ function OwnershipFooter({ owner, others, danger, confirmLeave, confirmDelete, t
       <Text className="px-2 pb-0.5 text-center text-[12px] leading-snug text-secondary">{note}</Text>
       <PressableScale onPress={onDelete} accessibilityRole="button" accessibilityLabel="Delete group permanently" className="flex-row items-center justify-center gap-2 rounded-2xl border py-3.5 active:opacity-90" style={{ borderColor: `${danger}80`, backgroundColor: `${danger}29` }}>
         <Trash2 size={16} color={danger} />
-        <Text className="text-[14px] font-extrabold" style={{ color: danger }}>Delete group permanently</Text>
+        <Text className="text-[14px] font-extrabold" style={{ color: danger }}>{t('Delete group permanently')}</Text>
       </PressableScale>
       {CancelBtn}
     </View>
@@ -1001,14 +1016,14 @@ function OwnershipFooter({ owner, others, danger, confirmLeave, confirmDelete, t
       <View className="gap-2">
         <PressableScale onPress={onLeave} accessibilityRole="button" accessibilityLabel="Confirm leave group" className="flex-row items-center justify-center gap-2 rounded-2xl border py-3.5 active:opacity-90" style={{ borderColor: `${danger}80`, backgroundColor: `${danger}29` }}>
           <LogOut size={16} color={danger} />
-          <Text className="text-[14px] font-extrabold" style={{ color: danger }}>Are you sure you want to leave group?</Text>
+          <Text className="text-[14px] font-extrabold" style={{ color: danger }}>{t('Are you sure you want to leave group?')}</Text>
         </PressableScale>
         {CancelBtn}
       </View>
     ) : (
       <PressableScale onPress={onAskLeave} accessibilityRole="button" accessibilityLabel="Leave group" className="flex-row items-center justify-center gap-2 rounded-2xl border border-white/10 py-3.5 active:opacity-80">
         <LogOut size={16} color="rgba(255,255,255,0.7)" />
-        <Text className="text-[14px] font-bold text-secondary">Leave group</Text>
+        <Text className="text-[14px] font-bold text-secondary">{t('Leave group')}</Text>
       </PressableScale>
     )
   }
@@ -1016,11 +1031,11 @@ function OwnershipFooter({ owner, others, danger, confirmLeave, confirmDelete, t
   // Owner, sole member → leaving deletes
   if (others.length === 0) {
     return confirmDelete ? (
-      <DeleteConfirm note="You're the only member, so leaving deletes this group for good." />
+      <DeleteConfirm note={t("You're the only member, so leaving deletes this group for good.")} />
     ) : (
       <PressableScale onPress={onAskDelete} accessibilityRole="button" accessibilityLabel="Delete group" className="flex-row items-center justify-center gap-2 rounded-2xl border border-white/10 py-3.5 active:opacity-80">
         <Trash2 size={16} color={danger} />
-        <Text className="text-[14px] font-bold" style={{ color: danger }}>Delete group</Text>
+        <Text className="text-[14px] font-bold" style={{ color: danger }}>{t('Delete group')}</Text>
       </PressableScale>
     )
   }
@@ -1029,19 +1044,19 @@ function OwnershipFooter({ owner, others, danger, confirmLeave, confirmDelete, t
   if (transferMode) {
     return (
       <View>
-        <Text className="text-[13px] font-bold text-white">Choose who takes over</Text>
-        <Text className="mt-0.5 text-[12px] leading-snug text-tertiary">A group always needs an owner. Pick a member to hand the group to, and you'll leave once they take over.</Text>
+        <Text className="text-[13px] font-bold text-white">{t('Choose who takes over')}</Text>
+        <Text className="mt-0.5 text-[12px] leading-snug text-tertiary">{t("A group always needs an owner. Pick a member to hand the group to, and you'll leave once they take over.")}</Text>
         <View className="mt-3 gap-2">
           {others.map((m) => (
             <PressableScale key={m.id} onPress={() => onHandOver(m.username)} accessibilityRole="button" accessibilityLabel={`Hand over to ${m.username}`} className="flex-row items-center gap-3 rounded-2xl border p-3 active:opacity-90" style={{ borderColor: 'rgba(245,197,24,0.25)', backgroundColor: 'rgba(245,197,24,0.06)' }}>
               <Avatar name={m.username} size={36} />
               <View className="min-w-0 flex-1">
                 <Text numberOfLines={1} className="font-bold text-white">@{m.username}</Text>
-                <Text className="text-[12px] text-tertiary">{m.streak}-day streak · {m.odometer}/100</Text>
+                <Text className="text-[12px] text-tertiary">{t('{streak}-day streak · {odometer}/100', { streak: m.streak, odometer: m.odometer })}</Text>
               </View>
               <View className="flex-row items-center gap-1.5 rounded-full px-2.5 py-1" style={{ backgroundColor: 'rgba(245,197,24,0.15)' }}>
                 <Crown size={12} color="#F5C518" />
-                <Text className="text-[11px] font-bold text-[#F5C518]">Hand over</Text>
+                <Text className="text-[11px] font-bold text-[#F5C518]">{t('Hand over')}</Text>
               </View>
             </PressableScale>
           ))}
@@ -1050,16 +1065,16 @@ function OwnershipFooter({ owner, others, danger, confirmLeave, confirmDelete, t
       </View>
     )
   }
-  if (confirmDelete) return <DeleteConfirm note="This deletes the group for all members. This can't be undone." />
+  if (confirmDelete) return <DeleteConfirm note={t("This deletes the group for all members. This can't be undone.")} />
   return (
     <View className="flex-row gap-2.5">
       <PressableScale containerStyle={{ flex: 1 }} onPress={onAskLeave} accessibilityRole="button" accessibilityLabel="Leave group" className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl border border-white/10 py-3.5 active:opacity-80">
         <LogOut size={16} color="rgba(255,255,255,0.7)" />
-        <Text className="text-[14px] font-bold text-secondary">Leave group</Text>
+        <Text className="text-[14px] font-bold text-secondary">{t('Leave group')}</Text>
       </PressableScale>
       <PressableScale containerStyle={{ flex: 1 }} onPress={onAskDelete} accessibilityRole="button" accessibilityLabel="Delete group" className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl border py-3.5 active:opacity-80" style={{ borderColor: `${danger}40` }}>
         <Trash2 size={16} color={danger} />
-        <Text className="text-[14px] font-bold" style={{ color: danger }}>Delete</Text>
+        <Text className="text-[14px] font-bold" style={{ color: danger }}>{t('Delete')}</Text>
       </PressableScale>
     </View>
   )
@@ -1068,11 +1083,12 @@ function OwnershipFooter({ owner, others, danger, confirmLeave, confirmDelete, t
 /* ------------------------------- pulse header ------------------------------ */
 
 function PulseHeader({ pulse }: { pulse: ReturnType<typeof groupPulse> }) {
+  const t = useT()
   return (
     <View className="mt-4 flex-row gap-2">
-      <PulseTile label="7-day volume" value={formatKgCompact(pulse.volume7)} sub="kg" />
-      <PulseTile label="Avg odometer" value={`${pulse.avgOdometer}`} sub="/100" />
-      <PulseTile label="Top streak" value={`${pulse.topStreak}`} sub="days" />
+      <PulseTile label={t('7-day volume')} value={formatKgCompact(pulse.volume7)} sub="kg" />
+      <PulseTile label={t('Avg odometer')} value={`${pulse.avgOdometer}`} sub="/100" />
+      <PulseTile label={t('Top streak')} value={`${pulse.topStreak}`} sub={t('days')} />
     </View>
   )
 }
@@ -1100,6 +1116,7 @@ function TeamGoalCard({ done, goal, owner, color, onEdit }: {
   color: string
   onEdit: () => void
 }) {
+  const t = useT()
   const pct = goal > 0 ? Math.min(100, Math.round((done / goal) * 100)) : 0
   const reached = done >= goal
   const remaining = Math.max(0, goal - done)
@@ -1107,21 +1124,21 @@ function TeamGoalCard({ done, goal, owner, color, onEdit }: {
     <View className="mt-3 rounded-2xl border border-white/8 bg-ink-800 p-4">
       <View className="flex-row items-center gap-2">
         <Target size={16} color={color} />
-        <Text className="flex-1 text-[13px] font-bold text-white">Weekly team goal</Text>
+        <Text className="flex-1 text-[13px] font-bold text-white">{t('Weekly team goal')}</Text>
         {owner && (
           <Pressable onPress={onEdit} accessibilityRole="button" accessibilityLabel="Edit team goal" hitSlop={6} className="flex-row items-center gap-1 active:opacity-70">
             <Pencil size={13} color="rgba(255,255,255,0.5)" />
-            <Text className="text-[12px] font-semibold text-secondary">Edit</Text>
+            <Text className="text-[12px] font-semibold text-secondary">{t('Edit')}</Text>
           </Pressable>
         )}
       </View>
       <View className="mt-2 flex-row items-baseline gap-1.5">
         <Text className="text-[24px] font-black text-white">{done}</Text>
-        <Text className="text-[14px] font-semibold text-secondary">/ {goal} sessions this week</Text>
+        <Text className="text-[14px] font-semibold text-secondary">{t('/ {goal} sessions this week', { goal })}</Text>
       </View>
       <ProgressBar value={pct} color={color} className="mt-2.5" height={9} />
       <Text className="mt-2 text-[12px] font-semibold" style={{ color: reached ? color : 'rgba(255,255,255,0.5)' }}>
-        {reached ? 'Goal smashed! Nice work, team!' : `${remaining} more to hit the goal`}
+        {reached ? t('Goal smashed! Nice work, team!') : t('{remaining} more to hit the goal', { remaining })}
       </Text>
     </View>
   )
@@ -1136,14 +1153,15 @@ function TeamGoalSetter({ draft, color, onDec, onInc, onSave }: {
   onInc: () => void
   onSave: () => void
 }) {
+  const t = useT()
   return (
     <View className="mt-3 rounded-2xl border border-dashed border-white/16 bg-ink-800 p-4">
       <View className="flex-row items-center gap-2">
         <Target size={16} color={color} />
-        <Text className="flex-1 text-[13px] font-bold text-white">Set a weekly team goal</Text>
+        <Text className="flex-1 text-[13px] font-bold text-white">{t('Set a weekly team goal')}</Text>
       </View>
       <Text className="mt-1 text-[12px] leading-snug text-tertiary">
-        Choose how many workouts the group aims to log together each week. There's no goal until you set one.
+        {t("Choose how many workouts the group aims to log together each week. There's no goal until you set one.")}
       </Text>
       <View className="mt-3.5 flex-row items-center gap-3.5">
         <PressableScale onPress={onDec} accessibilityRole="button" accessibilityLabel="Lower goal" className="h-10 w-10 items-center justify-center rounded-xl border border-white/12 bg-white/[0.04] active:opacity-70">
@@ -1151,14 +1169,14 @@ function TeamGoalSetter({ draft, color, onDec, onInc, onSave }: {
         </PressableScale>
         <View className="flex-1 items-center">
           <Text className="text-[30px] font-black text-white">{draft}</Text>
-          <Text className="text-[11px] font-semibold uppercase tracking-wide text-tertiary">sessions / week</Text>
+          <Text className="text-[11px] font-semibold uppercase tracking-wide text-tertiary">{t('sessions / week')}</Text>
         </View>
         <PressableScale onPress={onInc} accessibilityRole="button" accessibilityLabel="Raise goal" className="h-10 w-10 items-center justify-center rounded-xl border border-white/12 bg-white/[0.04] active:opacity-70">
           <Plus size={18} color="#fff" />
         </PressableScale>
       </View>
       <PressableScale onPress={onSave} accessibilityRole="button" accessibilityLabel="Set goal" className="mt-3.5 items-center justify-center rounded-2xl bg-brand-400 py-3.5 active:opacity-90">
-        <Text className="text-[14px] font-bold text-black">Set goal</Text>
+        <Text className="text-[14px] font-bold text-black">{t('Set goal')}</Text>
       </PressableScale>
     </View>
   )
@@ -1177,6 +1195,7 @@ function MemberRow({ member, rank, metric, expanded, onToggle, canMakeOwner, onM
   onReport?: () => void
 }) {
   const colors = useColors()
+  const t = useT()
   const you = !!member.isYou
   return (
     <View
@@ -1197,11 +1216,11 @@ function MemberRow({ member, rank, metric, expanded, onToggle, canMakeOwner, onM
         <Avatar name={member.username} size={36} />
         <View className="min-w-0 flex-1">
           <View className="flex-row items-center gap-1.5">
-            <Text numberOfLines={1} className={`font-bold leading-tight ${you ? 'text-brand-300' : 'text-white'}`}>@{member.username}{you ? ' (You)' : ''}</Text>
+            <Text numberOfLines={1} className={`font-bold leading-tight ${you ? 'text-brand-300' : 'text-white'}`}>@{member.username}{you ? ` ${t('(You)')}` : ''}</Text>
             {rank === 1 && (
               <View className="flex-row items-center gap-1 rounded-full bg-[#F5C518]/15 px-1.5 py-0.5">
                 <Crown size={10} color="#F5C518" />
-                <Text className="text-[9px] font-bold tracking-wide text-[#F5C518]">LEADER</Text>
+                <Text className="text-[9px] font-bold tracking-wide text-[#F5C518]">{t('LEADER')}</Text>
               </View>
             )}
           </View>
@@ -1216,6 +1235,7 @@ function MemberRow({ member, rank, metric, expanded, onToggle, canMakeOwner, onM
 }
 
 function MemberStats({ member, rank, colors, canMakeOwner, onMakeOwner, onReport }: { member: GroupMember; rank: number; colors: ReturnType<typeof useColors>; canMakeOwner: boolean; onMakeOwner: () => void; onReport?: () => void }) {
+  const tr = useT()
   const best = member.bestStreak ?? member.streak
   const tiles: { label: string; value: string; sub?: string; color?: string }[] = [
     { label: 'Odometer', value: `${member.odometer}`, sub: '/100', color: odometerColor(member.odometer, colors) },
@@ -1231,7 +1251,7 @@ function MemberStats({ member, rank, colors, canMakeOwner, onMakeOwner, onReport
         {tiles.map((t) => (
           <View key={t.label} style={{ width: '33.333%', padding: 4 }}>
             <View className="rounded-xl bg-white/[0.04] px-2.5 py-2">
-              <Text numberOfLines={1} className="text-[9px] font-semibold uppercase tracking-wide text-tertiary">{t.label}</Text>
+              <Text numberOfLines={1} className="text-[9px] font-semibold uppercase tracking-wide text-tertiary">{tr(t.label)}</Text>
               <View className="mt-0.5 flex-row items-baseline gap-1">
                 <Text className="text-[16px] font-black" style={{ color: t.color ?? '#fff' }}>{t.value}</Text>
                 {t.sub ? <Text className="text-[10px] text-tertiary">{t.sub}</Text> : null}
@@ -1249,7 +1269,7 @@ function MemberStats({ member, rank, colors, canMakeOwner, onMakeOwner, onReport
               style={{ borderColor: 'rgba(245,197,24,0.3)', backgroundColor: 'rgba(245,197,24,0.1)' }}
             >
               <Crown size={14} color="#F5C518" />
-              <Text className="text-[13px] font-bold text-[#F5C518]">Make group owner</Text>
+              <Text className="text-[13px] font-bold text-[#F5C518]">{tr('Make group owner')}</Text>
             </PressableScale>
           </View>
         )}
@@ -1263,7 +1283,7 @@ function MemberStats({ member, rank, colors, canMakeOwner, onMakeOwner, onReport
               className="flex-row items-center justify-center gap-2 rounded-xl border border-white/10 py-3 active:opacity-80"
             >
               <Flag size={13} color="rgba(255,255,255,0.5)" />
-              <Text className="text-[13px] font-semibold text-tertiary">Report member</Text>
+              <Text className="text-[13px] font-semibold text-tertiary">{tr('Report member')}</Text>
             </PressableScale>
           </View>
         )}
@@ -1386,11 +1406,12 @@ function ActivityRow({ item, reactions, pickerOpen, onTogglePicker, onReact }: {
 }
 
 function EmptyDetail() {
+  const t = useT()
   return (
     <View className="items-center py-12">
       <Users size={28} color="rgba(255,255,255,0.35)" />
-      <Text className="mt-3 font-bold text-white">Group unavailable</Text>
-      <Text className="mt-1 text-[13px] text-secondary">It may have been deleted.</Text>
+      <Text className="mt-3 font-bold text-white">{t('Group unavailable')}</Text>
+      <Text className="mt-1 text-[13px] text-secondary">{t('It may have been deleted.')}</Text>
     </View>
   )
 }

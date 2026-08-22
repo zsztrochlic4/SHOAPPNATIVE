@@ -15,6 +15,18 @@
 
 export type PlanId = 'weekly' | 'annual'
 
+/**
+ * THE single billing-offer source of truth for display copy. Paywall, Terms and every store
+ * listing must read the price from here (or match it byte-for-byte) so the app can never advertise
+ * one price while the store/Terms show another. Currency is AUD. Keep this in lock-step with the
+ * Stripe price + the store product ids below.
+ */
+export const BILLING_OFFER = {
+  currency: 'AUD',
+  weekly: { amountPerWeek: 2, perWeekLabel: '$2/week', trialWeeks: 4 },
+  annual: { amountTotal: 90, weeks: 52, totalLabel: '$90' },
+} as const
+
 /** The plan pre-selected when the paywall opens. */
 export const DEFAULT_PLAN: PlanId = 'weekly'
 
