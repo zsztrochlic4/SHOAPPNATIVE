@@ -1209,7 +1209,35 @@ function matchesFitnessIntentPattern(n: Norm): boolean {
     'workout', 'work out', 'today', 'gym', 'squeeze in', 'fit in', 'give me', 'most important', 'things to do',
     'prioritise', 'prioritize', 'priority', 'something quick')
   if (timeContext && sessionBearing) return true
+  // a check-in on how training / the week went — a coach conversation opener, not off-topic.
+  if (has(n, 'how did my week go', 'how was my week', 'how did the week go', 'how did my training go',
+    'how did i do', 'how am i doing', 'how is my training going', 'how has my week been', 'how did i go this week')) return true
   return false
+}
+
+/**
+ * A SHORT, STRUCTURED reply that answers the coach's own question mid-conversation — a bare weekday or
+ * list of weekdays ("Wednesday", "Monday Tuesday Thursday Saturday"), a value+unit ("80kg", "40 minutes",
+ * "5 days"), or a "make it / set it to / I meant <value>" correction. These carry NO free-text content,
+ * so they can never be a euphemistic crisis (the refer-by-default backstop's real job), yet in isolation
+ * they fall through every fitness recognizer and get bounced as off_topic, breaking multi-turn action and
+ * schedule flows (found in live conversation testing: the coach asks "which days?", the user answers
+ * "Wednesday", and the coach refuses its own question's answer). Recognised as on-topic so the reply is
+ * coached. Bounded to short messages; anything longer keeps the normal scope gate. Runs only on an
+ * already-`allow` turn (like every isOnTopicFitness caller), so it never widens the safety surface.
+ */
+function isStructuredShortReply(n: Norm): boolean {
+  const words = n.p.trim().split(/\s+/).filter(Boolean)
+  if (words.length === 0 || words.length > 9) return false
+  const WD = 'monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun'
+  // bare weekday(s), optionally led by "on/lets do/make it/and/the", comma/space/"and" separated.
+  const weekdayAnswer = new RegExp(`^((on|lets do|let s do|make it|change it to|set it to|and|the|do)\\s+)*(${WD})([ ,]+(and\\s+)?(${WD}))*$`).test(n.p.trim())
+  // a numeric value + a training/goal unit (weight, time, days, sets, reps, sleep, water, steps).
+  const valueUnit = hasRe(n, /\b\d{1,5}\s?(kg|kgs|kilo|kilos|kilogram|kilograms|lb|lbs|pound|pounds|min|mins|minute|minutes|day|days|set|sets|rep|reps|hour|hours|hr|hrs|litre|litres|liter|liters|l|step|steps)\b/)
+  // a "make it / set it / change it to / I meant / go with / lets do <value>" correction.
+  const setValue = has(n, 'make it', 'set it to', 'change it to', 'i meant', 'i actually meant', 'go with', 'lets do', 'let s do', 'change to', 'set to') &&
+    (hasRe(n, /\d/) || weekdayAnswer)
+  return weekdayAnswer || valueUnit || setValue
 }
 
 /**
@@ -1269,6 +1297,7 @@ export function isOnTopicFitness(text: string): boolean {
   const n = normalize(text)
   if (has(n, ...FITNESS_TERMS)) return true
   if (matchesFitnessIntentPattern(n)) return true
+  if (isStructuredShortReply(n)) return true
   if (isNutritionQuestion(n)) return true
   // Training-format nouns that are unambiguously fitness but were missing from the term list (a "circuit
   // still feels too difficult" is a training question). Kept out of FITNESS_TERMS deliberately (that list
