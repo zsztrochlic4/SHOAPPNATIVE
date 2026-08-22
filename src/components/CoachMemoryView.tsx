@@ -15,16 +15,18 @@ import {
 } from '../lib/coachWorkspace'
 import { thud } from '../lib/haptics'
 import { useDispatch, useStore } from '../store/store'
+import { useT } from '../lib/useT'
 import { useColors } from '../theme'
 
 type Props = { onClose: () => void; onConsentChanged?: (consented: boolean) => void }
 
 function MemoryTopBar({ onClose }: { onClose: () => void }) {
   const colors = useColors()
+  const t = useT()
   return (
     <View className="h-[54px] flex-row items-center border-b border-white/5 px-3">
       <Pressable onPress={onClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Back to coach" style={({ pressed }) => ({ opacity: pressed ? 0.55 : 1 })} className="h-11 w-11 items-center justify-center rounded-full"><ChevronLeft size={22} color={colors.fg} /></Pressable>
-      <Text className="ml-1 text-[16px] font-bold text-white">Coach profile</Text>
+      <Text className="ml-1 text-[16px] font-bold text-white">{t('Coach profile')}</Text>
     </View>
   )
 }
@@ -77,6 +79,7 @@ function MemorySkeleton() {
 function CoachNameCard() {
   const { state } = useStore()
   const dispatch = useDispatch()
+  const t = useT()
   const saved = (state.profile.coachName ?? '').trim()
   const [draft, setDraft] = useState(saved)
   useEffect(() => { setDraft((state.profile.coachName ?? '').trim()) }, [state.profile.coachName])
@@ -88,15 +91,15 @@ function CoachNameCard() {
   }, [draft, saved, dispatch])
   return (
     <View className="mx-[18px] mt-4 rounded-2xl border border-white/5 bg-ink-800 p-4">
-      <Text className="font-bold text-white">Coach name</Text>
-      <Text className="mt-0.5 text-[12px] leading-4 text-secondary">Give your coach a name — it shows across the app. Leave blank to just call it “Coach”.</Text>
+      <Text className="font-bold text-white">{t('Coach name')}</Text>
+      <Text className="mt-0.5 text-[12px] leading-4 text-secondary">{t('Give your coach a name — it shows across the app. Leave blank to just call it “Coach”.')}</Text>
       <TextInput
         value={draft}
         onChangeText={setDraft}
         onBlur={commit}
         onSubmitEditing={commit}
         returnKeyType="done"
-        placeholder="Coach"
+        placeholder={t('Coach')}
         placeholderTextColor="rgba(255,255,255,0.35)"
         maxLength={30}
         accessibilityLabel="Coach name"
@@ -108,6 +111,7 @@ function CoachNameCard() {
 
 export function CoachMemoryView({ onClose, onConsentChanged }: Props) {
   const colors = useColors()
+  const t = useT()
   const net = useNetInfo()
   const dispatch = useDispatch()
   const [workspace, setWorkspace] = useState<CoachWorkspaceSummary | null>(null)
@@ -233,7 +237,7 @@ export function CoachMemoryView({ onClose, onConsentChanged }: Props) {
       {net.isConnected === false && (
         <View className="mx-[18px] mt-3 flex-row items-center gap-2 rounded-xl bg-accent-orange/10 px-3 py-2">
           <WifiOff size={15} color={colors.accentOrange} />
-          <Text className="flex-1 text-[12px] text-white/65">Offline · showing your last saved coach profile</Text>
+          <Text className="flex-1 text-[12px] text-white/65">{t('Offline · showing your last saved coach profile')}</Text>
         </View>
       )}
       <CoachNameCard />
@@ -241,46 +245,46 @@ export function CoachMemoryView({ onClose, onConsentChanged }: Props) {
         <View className="flex-row items-center gap-3">
           <View className="h-10 w-10 items-center justify-center rounded-full bg-brand-400/10"><Database size={19} color={colors.brand400} /></View>
           <View className="flex-1">
-            <Text className="font-bold text-white">Long-term coach memory</Text>
-            <Text className="mt-0.5 text-[12px] leading-4 text-secondary">Save useful facts across sessions and devices.</Text>
+            <Text className="font-bold text-white">{t('Long-term coach memory')}</Text>
+            <Text className="mt-0.5 text-[12px] leading-4 text-secondary">{t('Save useful facts across sessions and devices.')}</Text>
           </View>
           <Switch value={workspace?.memoryEnabled === true} onValueChange={changeMemory} disabled={saving || net.isConnected === false} trackColor={{ true: colors.brand500, false: colors.ink600 }} thumbColor={colors.fg} />
         </View>
       </View>
       <View className="mx-[18px] mt-3 rounded-2xl border border-white/5 bg-ink-800 p-4">
         <View className="flex-row items-center gap-3">
-          <View className="flex-1"><Text className="font-bold text-white">Proactive check-ins</Text><Text className="mt-0.5 text-[12px] leading-4 text-secondary">Allow relevant, non-urgent coach prompts.</Text></View>
+          <View className="flex-1"><Text className="font-bold text-white">{t('Proactive check-ins')}</Text><Text className="mt-0.5 text-[12px] leading-4 text-secondary">{t('Allow relevant, non-urgent coach prompts.')}</Text></View>
           <Switch value={workspace?.proactiveEnabled === true} onValueChange={changeProactive} disabled={saving || net.isConnected === false} trackColor={{ true: colors.brand500, false: colors.ink600 }} thumbColor={colors.fg} />
         </View>
-        <Text className="mb-2 mt-5 text-[11px] font-bold uppercase tracking-wide text-tertiary">Coaching style</Text>
+        <Text className="mb-2 mt-5 text-[11px] font-bold uppercase tracking-wide text-tertiary">{t('Coaching style')}</Text>
         <View className="flex-row gap-2">
           {(['supportive', 'balanced', 'direct'] as const).map((style) => {
             const selected = workspace?.coachingStyle === style
             return (
               <Pressable key={style} disabled={saving || net.isConnected === false} onPress={() => void changeStyle(style)} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })} className={`min-h-11 flex-1 items-center justify-center rounded-xl border ${selected ? 'border-brand-400 bg-brand-400/10' : 'border-white/5 bg-white/[0.03]'}`}>
-                <Text className={`text-[12px] font-bold capitalize ${selected ? 'text-brand-400' : 'text-secondary'}`}>{style}</Text>
+                <Text className={`text-[12px] font-bold capitalize ${selected ? 'text-brand-400' : 'text-secondary'}`}>{t(style)}</Text>
               </Pressable>
             )
           })}
         </View>
       </View>
       <View className="mx-[18px] mb-3 mt-4 flex-row items-center">
-        <Text className="flex-1 text-[12px] font-bold uppercase tracking-wide text-secondary">What your coach knows</Text>
+        <Text className="flex-1 text-[12px] font-bold uppercase tracking-wide text-secondary">{t('What your coach knows')}</Text>
         {!!workspace?.memories.length && (
           <Pressable onPress={clearAll} hitSlop={8} style={({ pressed }) => ({ opacity: pressed ? 0.55 : 1 })} className="min-h-11 justify-center px-2">
-            <Text className="text-[12px] font-bold text-danger">{confirmClear ? 'Tap again to clear' : 'Clear all'}</Text>
+            <Text className="text-[12px] font-bold text-danger">{confirmClear ? t('Tap again to clear') : t('Clear all')}</Text>
           </Pressable>
         )}
       </View>
       <Pressable disabled={saving || net.isConnected === false} onPress={() => void disableCoach()} accessibilityRole="button" accessibilityLabel="Turn off coach and delete all coach data" style={({ pressed }) => ({ opacity: saving || net.isConnected === false ? 0.4 : pressed ? 0.6 : 1 })} className="mx-[18px] mb-2 min-h-11 items-center justify-center rounded-xl border border-danger/20 bg-danger/[0.06] px-4 py-2.5">
-        <Text className="text-[12px] font-bold text-danger">{confirmDisable ? 'Tap again to turn off coach and delete its data' : 'Turn off coach & delete coach data'}</Text>
+        <Text className="text-[12px] font-bold text-danger">{confirmDisable ? t('Tap again to turn off coach and delete its data') : t('Turn off coach & delete coach data')}</Text>
       </Pressable>
       {/* Exact deletion scope — no vague claims (audit F-015). */}
       <Text className="mx-[18px] mb-4 text-[10.5px] leading-4 text-tertiary">
         Deletes: consent, memories, coach safety state, and your coach conversation (cloud + this device). Kept: anonymised deletion audit and, until your subscription data is deleted with your account, billing records.
       </Text>
     </View>
-  ), [changeMemory, changeProactive, changeStyle, clearAll, colors, confirmClear, confirmDisable, disableCoach, net.isConnected, saving, workspace])
+  ), [changeMemory, changeProactive, changeStyle, clearAll, colors, confirmClear, confirmDisable, disableCoach, net.isConnected, saving, t, workspace])
 
   const renderMemory = useCallback(({ item }: { item: CoachMemory }) => <MemoryRow item={item} onDelete={removeMemory} />, [removeMemory])
 
@@ -292,7 +296,7 @@ export function CoachMemoryView({ onClose, onConsentChanged }: Props) {
         <MemoryTopBar onClose={onClose} />
         <View className="px-[18px] pt-4"><View className="rounded-3xl border border-brand-400/20 bg-ink-800 p-5">
           <View className="h-12 w-12 items-center justify-center rounded-full bg-brand-400/10"><ShieldCheck size={24} color={colors.brand400} /></View>
-          <Text className="mt-4 text-xl font-bold text-white">Let your coach understand you</Text>
+          <Text className="mt-4 text-xl font-bold text-white">{t('Let your coach understand you')}</Text>
           <Text className="mt-2 text-[14px] leading-5 text-white/65">Relevant profile, training, recovery and nutrition context, and your recent coach messages, will be processed by Google Gemini to answer you. Coach records are stored in Firebase. Operational safety state is stored separately.</Text>
           <Pressable
             disabled={saving || net.isConnected === false}
@@ -300,7 +304,7 @@ export function CoachMemoryView({ onClose, onConsentChanged }: Props) {
             style={({ pressed }) => ({ opacity: saving || net.isConnected === false ? 0.45 : pressed ? 0.78 : 1, transform: [{ scale: pressed ? 0.985 : 1 }] })}
             className="mt-5 min-h-[52px] items-center justify-center rounded-2xl bg-brand-400 px-5"
           >
-            <Text className="font-bold text-ink-900">{saving ? 'Saving…' : 'Continue with coach'}</Text>
+            <Text className="font-bold text-ink-900">{saving ? t('Saving…') : t('Continue with coach')}</Text>
           </Pressable>
           <Text className="mt-3 text-center text-[11px] leading-4 text-tertiary">This consent is required for personalised AI coaching. Long-term memory is on by default. You can inspect, pause or delete it anytime in coach settings.</Text>
         </View></View>
@@ -314,9 +318,9 @@ export function CoachMemoryView({ onClose, onConsentChanged }: Props) {
         <MemoryTopBar onClose={onClose} />
         <View className="flex-1 items-center justify-center px-8">
         <RefreshCw size={28} color={colors.brand400} />
-        <Text className="mt-4 text-lg font-bold text-white">Couldn’t load your coach profile</Text>
-        <Text className="mt-2 text-center text-[14px] leading-5 text-secondary">Check your connection and try again.</Text>
-        <Pressable onPress={load} style={({ pressed }) => ({ opacity: pressed ? 0.65 : 1 })} className="mt-5 min-h-[48px] justify-center rounded-2xl bg-brand-400 px-6"><Text className="font-bold text-ink-900">Try again</Text></Pressable>
+        <Text className="mt-4 text-lg font-bold text-white">{t('Couldn’t load your coach profile')}</Text>
+        <Text className="mt-2 text-center text-[14px] leading-5 text-secondary">{t('Check your connection and try again.')}</Text>
+        <Pressable onPress={load} style={({ pressed }) => ({ opacity: pressed ? 0.65 : 1 })} className="mt-5 min-h-[48px] justify-center rounded-2xl bg-brand-400 px-6"><Text className="font-bold text-ink-900">{t('Try again')}</Text></Pressable>
         </View>
       </View>
     )
@@ -325,13 +329,13 @@ export function CoachMemoryView({ onClose, onConsentChanged }: Props) {
   return (
     <View className="flex-1 bg-ink-900">
       <MemoryTopBar onClose={onClose} />
-      {error && <View className="mx-[18px] mt-3 flex-row items-center rounded-xl bg-danger/10 px-3 py-2"><Text className="flex-1 text-[12px] text-white/65">That change didn’t save. Your previous setting is still active.</Text><Pressable onPress={() => setError(false)} hitSlop={8}><Text className="font-bold text-white/70">Dismiss</Text></Pressable></View>}
+      {error && <View className="mx-[18px] mt-3 flex-row items-center rounded-xl bg-danger/10 px-3 py-2"><Text className="flex-1 text-[12px] text-white/65">{t('That change didn’t save. Your previous setting is still active.')}</Text><Pressable onPress={() => setError(false)} hitSlop={8}><Text className="font-bold text-white/70">{t('Dismiss')}</Text></Pressable></View>}
       <FlatList
         data={workspace?.memories ?? []}
         keyExtractor={(item) => item.id}
         renderItem={renderMemory}
         ListHeaderComponent={header}
-        ListEmptyComponent={<View className="mx-[18px] items-center rounded-2xl border border-dashed border-white/10 p-7"><Brain size={26} color={colors.brand400} /><Text className="mt-3 font-bold text-white/80">Nothing saved yet</Text><Text className="mt-1 text-center text-[13px] leading-5 text-secondary">As you chat, useful facts you explicitly share can appear here.</Text></View>}
+        ListEmptyComponent={<View className="mx-[18px] items-center rounded-2xl border border-dashed border-white/10 p-7"><Brain size={26} color={colors.brand400} /><Text className="mt-3 font-bold text-white/80">{t('Nothing saved yet')}</Text><Text className="mt-1 text-center text-[13px] leading-5 text-secondary">{t('As you chat, useful facts you explicitly share can appear here.')}</Text></View>}
         contentContainerStyle={{ paddingBottom: 36 }}
         showsVerticalScrollIndicator={false}
       />

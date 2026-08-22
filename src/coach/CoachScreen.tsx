@@ -29,6 +29,7 @@ import { useStore } from '../store/store'
 import { useNav } from '../nav'
 import { useColors } from '../theme'
 import { withAlpha } from '../lib/color'
+import { useT } from '../lib/useT'
 import { tick } from '../lib/haptics'
 import { IS_WEB } from '../components/WebFrame'
 import { coachWelcome, CHAT_SUGGESTIONS } from '../lib/coachChat'
@@ -56,6 +57,7 @@ export function CoachScreen({
   const nav = useNav()
   const insets = useSafeAreaInsets()
   const c = useColors()
+  const t = useT()
   const chat = useCoachChat({ active })
   const {
     colors, coachName, messages, hasHistory, hasText,
@@ -114,7 +116,7 @@ export function CoachScreen({
     if (atBottom.current) requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }))
   }, [messages.length, typing])
 
-  const submit = (t?: string) => { tick(); void send(t) }
+  const submit = (v?: string) => { tick(); void send(v) }
 
   // ---- gates: coming-soon → welcome → consent → conversation --------------------------------
   if (!coachOperational() && !COACH_SCRIPTED) {
@@ -225,19 +227,19 @@ export function CoachScreen({
 
         {typing && (
           <PressableScale haptic={false} onPress={cancelPending} accessibilityRole="button" accessibilityLabel="Cancel waiting for the coach" containerStyle={{ alignSelf: 'center', marginTop: 6 }} style={{ paddingVertical: 7, paddingHorizontal: 16, borderRadius: 999, backgroundColor: withAlpha(colors.fg, 0.08) }}>
-            <Text style={{ fontSize: 12.5, fontWeight: '700', color: withAlpha(colors.fg, 0.65) }}>Cancel</Text>
+            <Text style={{ fontSize: 12.5, fontWeight: '700', color: withAlpha(colors.fg, 0.65) }}>{t('Cancel')}</Text>
           </PressableScale>
         )}
         {!typing && retryMsg && (
           <PressableScale haptic={false} onPress={() => void send(retryMsg, { resend: true })} accessibilityRole="button" accessibilityLabel="Retry your last message" containerStyle={{ alignSelf: 'center', marginTop: 6 }} style={{ paddingVertical: 7, paddingHorizontal: 16, borderRadius: 999, backgroundColor: withAlpha(colors.brand400, 0.14), borderWidth: 1, borderColor: withAlpha(colors.brand400, 0.4) }}>
-            <Text style={{ fontSize: 12.5, fontWeight: '700', color: colors.brand400 }}>Retry last message</Text>
+            <Text style={{ fontSize: 12.5, fontWeight: '700', color: colors.brand400 }}>{t('Retry last message')}</Text>
           </PressableScale>
         )}
 
         {replyingTo && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 14, marginTop: 6, paddingVertical: 8, paddingLeft: 12, paddingRight: 8, backgroundColor: withAlpha(colors.fg, 0.04), borderRadius: 12, borderLeftWidth: 3, borderLeftColor: colors.brand400 }}>
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={{ fontSize: 11, fontWeight: '800', color: colors.brand400, marginBottom: 1 }}>Replying to {replyingTo.role === 'user' ? 'you' : coachName}</Text>
+              <Text style={{ fontSize: 11, fontWeight: '800', color: colors.brand400, marginBottom: 1 }}>{t('Replying to {who}', { who: replyingTo.role === 'user' ? t('you') : coachName })}</Text>
               <Text numberOfLines={1} style={{ fontSize: 12, color: withAlpha(colors.fg, 0.55) }}>{replyingTo.text}</Text>
             </View>
             <PressableScale haptic={false} onPress={() => setReplyingTo(null)} accessibilityRole="button" accessibilityLabel="Cancel reply" style={{ width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: withAlpha(colors.fg, 0.06) }}>
@@ -255,7 +257,7 @@ export function CoachScreen({
               onFocus={() => setFocused(true)}
               onBlur={() => setFocused(false)}
               multiline
-              placeholder="Message your coach…"
+              placeholder={t('Message your coach…')}
               placeholderTextColor={withAlpha(colors.fg, 0.4)}
               onSubmitEditing={() => submit()}
               style={{ flex: 1, maxHeight: 112, paddingVertical: 8, fontSize: 14.5, color: colors.fg }}
@@ -284,10 +286,11 @@ export function CoachScreen({
 /** One quiet end-of-chat rating. Tapping records the feedback and the row dismisses itself for the rest
  *  of the session. A "not helpful" tap is what the review pass turns into a new coach eval case. */
 function FeedbackRow({ colors, onRate }: { colors: ReturnType<typeof useColors>; onRate: (helpful: boolean) => void }) {
+  const t = useT()
   const pill = { width: 40, height: 34, borderRadius: 12, alignItems: 'center' as const, justifyContent: 'center' as const, backgroundColor: withAlpha(colors.fg, 0.06), borderWidth: 1, borderColor: withAlpha(colors.fg, 0.08) }
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, paddingTop: 12, paddingBottom: 4 }}>
-      <Text style={{ fontSize: 12.5, fontWeight: '600', color: withAlpha(colors.fg, 0.5) }}>Was this helpful?</Text>
+      <Text style={{ fontSize: 12.5, fontWeight: '600', color: withAlpha(colors.fg, 0.5) }}>{t('Was this helpful?')}</Text>
       <PressableScale onPress={() => { tick(); onRate(true) }} accessibilityRole="button" accessibilityLabel="This chat was helpful" style={pill}>
         <ThumbsUp size={16} color={withAlpha(colors.fg, 0.7)} strokeWidth={2.2} />
       </PressableScale>
@@ -315,6 +318,7 @@ function Shell({
   insetsTop: number
   children: React.ReactNode
 }) {
+  const t = useT()
   return (
     <View style={{ flex: 1, backgroundColor: colors.ink900, paddingTop: chrome === 'sheet' ? insetsTop : 0 }}>
       <View style={{ position: 'relative', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: withAlpha(colors.fg, 0.06) }}>
@@ -336,7 +340,7 @@ function Shell({
           </View>
           <View style={{ alignItems: 'flex-start' }}>
             <Text style={{ fontSize: 14.5, fontWeight: '800', letterSpacing: -0.2, color: colors.fg }}>{coachName}</Text>
-            <Text style={{ fontSize: 11.5, color: withAlpha(colors.fg, 0.5) }}>Your AI fitness coach</Text>
+            <Text style={{ fontSize: 11.5, color: withAlpha(colors.fg, 0.5) }}>{t('Your AI fitness coach')}</Text>
           </View>
         </View>
       </View>

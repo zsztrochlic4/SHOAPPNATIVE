@@ -13,6 +13,7 @@ import { View, Text, Animated, Easing, PanResponder } from 'react-native'
 import { MessageCircle, Reply } from 'lucide-react-native'
 import type { Palette } from '../theme'
 import { withAlpha } from '../lib/color'
+import { useT } from '../lib/useT'
 import { thud } from '../lib/haptics'
 import { IS_WEB } from '../components/WebFrame'
 import { useReducedMotion, motionDuration } from '../lib/a11y'
@@ -78,6 +79,7 @@ export function CoachMessageRow({
   onCancelShare?: () => void
 }) {
   const user = m.role === 'user'
+  const t = useT()
   const reduceMotion = useReducedMotion()
   const replyX = useRef(new Animated.Value(0)).current
   const iconOpacity = useRef(new Animated.Value(0)).current
@@ -151,7 +153,7 @@ export function CoachMessageRow({
           {/* Quoted message this one replies to. */}
           {m.replyTo && (
             <View style={{ maxWidth: '100%', backgroundColor: withAlpha(colors.fg, 0.06), borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 4 }}>
-              <Text style={{ fontSize: 10.5, fontWeight: '700', color: withAlpha(colors.fg, 0.5), marginBottom: 1 }}>{m.replyTo.role === 'user' ? 'You' : coachName}</Text>
+              <Text style={{ fontSize: 10.5, fontWeight: '700', color: withAlpha(colors.fg, 0.5), marginBottom: 1 }}>{m.replyTo.role === 'user' ? t('You') : coachName}</Text>
               <Text numberOfLines={2} style={{ fontSize: 12, lineHeight: 16, color: withAlpha(colors.fg, 0.55) }}>{m.replyTo.text}</Text>
             </View>
           )}
@@ -199,6 +201,7 @@ export function CoachMessageRow({
 
 /** Three bouncing dots while the coach "types". Honours reduce-motion (static fallback). */
 export function TypingDots({ colors }: { colors: Palette }) {
+  const t = useT()
   const dots = useRef([new Animated.Value(0), new Animated.Value(0), new Animated.Value(0)]).current
   const reduceMotion = useReducedMotion()
   useEffect(() => {
@@ -227,7 +230,7 @@ export function TypingDots({ colors }: { colors: Palette }) {
         </View>
       </View>
       {/* A quiet "thinking" caption so the considered pause reads as intentional, not slow. */}
-      <Text style={{ marginLeft: 44, fontSize: 11.5, fontWeight: '600', color: withAlpha(colors.fg, 0.38) }}>Coach is thinking…</Text>
+      <Text style={{ marginLeft: 44, fontSize: 11.5, fontWeight: '600', color: withAlpha(colors.fg, 0.38) }}>{t('Coach is thinking…')}</Text>
     </View>
   )
 }

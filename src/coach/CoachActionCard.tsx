@@ -17,6 +17,7 @@ import { View, Text, Pressable } from 'react-native'
 import { ArrowRight } from 'lucide-react-native'
 import type { Palette } from '../theme'
 import { withAlpha } from '../lib/color'
+import { useT } from '../lib/useT'
 import { thud } from '../lib/haptics'
 import { respondToCoachProposal } from '../lib/coachWorkspace'
 import type { CoachActionProposal } from '../backend/coach/contracts'
@@ -58,6 +59,7 @@ export function CoachActionCard({
   const [proposalStatus, setProposalStatus] = useState(proposal.status ?? null)
   const [resolving, setResolving] = useState(false)
   const [resolveError, setResolveError] = useState(false)
+  const t = useT()
 
   const cat: CoachCategory = proposalCategory(proposal)
   const c = categoryColor(cat, colors)
@@ -136,7 +138,7 @@ export function CoachActionCard({
               accessibilityState={{ disabled: resolving, busy: resolving }}
               style={({ pressed }) => ({ minHeight: 44, flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: colors.brand400, opacity: resolving ? 0.5 : pressed ? 0.8 : 1, transform: [{ scale: pressed ? 0.97 : 1 }] })}
             >
-              <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#07110b' }}>{resolving ? 'Saving…' : 'Confirm'}</Text>
+              <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#07110b' }}>{resolving ? t('Saving…') : t('Confirm')}</Text>
             </Pressable>
             <Pressable
               disabled={resolving}
@@ -147,24 +149,24 @@ export function CoachActionCard({
               accessibilityState={{ disabled: resolving }}
               style={({ pressed }) => ({ minHeight: 44, flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: withAlpha(colors.fg, 0.07), opacity: pressed ? 0.65 : 1 })}
             >
-              <Text style={{ fontSize: 12.5, fontWeight: '800', color: colors.fg }}>Cancel</Text>
+              <Text style={{ fontSize: 12.5, fontWeight: '800', color: colors.fg }}>{t('Cancel')}</Text>
             </Pressable>
           </View>
           {resolveError && (
             <Text style={{ marginTop: 6, fontSize: 11, color: colors.danger }} accessibilityRole="text">
-              Couldn’t reach the server — your choice is still here, tap again to retry.
+              {t('Couldn’t reach the server — your choice is still here, tap again to retry.')}
             </Text>
           )}
         </>
       ) : proposalStatus === 'confirmed' && applying ? (
         <View style={{ marginTop: 9 }} accessibilityRole="text" accessibilityLabel="Applying your change">
-          <Text style={{ fontSize: 11.5, fontWeight: '700', color: withAlpha(colors.fg, 0.55) }}>Applying…</Text>
+          <Text style={{ fontSize: 11.5, fontWeight: '700', color: withAlpha(colors.fg, 0.55) }}>{t('Applying…')}</Text>
         </View>
       ) : proposalStatus === 'confirmed' && applyFailed && onRetryApply ? (
         <View style={{ marginTop: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Text style={{ fontSize: 11.5, fontWeight: '700', color: colors.danger }}>Couldn’t save</Text>
+          <Text style={{ fontSize: 11.5, fontWeight: '700', color: colors.danger }}>{t('Couldn’t save')}</Text>
           <Pressable onPress={onRetryApply} hitSlop={8} accessibilityRole="button" accessibilityLabel="Retry applying the change" style={({ pressed }) => ({ minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 11, backgroundColor: withAlpha(colors.brand400, pressed ? 0.16 : 0.1) })}>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.brand400 }}>Retry</Text>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.brand400 }}>{t('Retry')}</Text>
           </Pressable>
         </View>
       ) : proposalStatus === 'confirmed' && shareText && onPublishShare ? (
@@ -174,22 +176,22 @@ export function CoachActionCard({
           </View>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <Pressable onPress={onPublishShare} accessibilityRole="button" accessibilityLabel="Publish PR to feed" style={({ pressed }) => ({ minHeight: 44, flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: colors.brand400, opacity: pressed ? 0.8 : 1 })}>
-              <Text style={{ fontSize: 12, fontWeight: '800', color: '#07110b' }}>Publish to feed</Text>
+              <Text style={{ fontSize: 12, fontWeight: '800', color: '#07110b' }}>{t('Publish to feed')}</Text>
             </Pressable>
             <Pressable onPress={onCancelShare} accessibilityRole="button" accessibilityLabel="Don't publish" style={({ pressed }) => ({ minHeight: 44, flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: withAlpha(colors.fg, 0.07), opacity: pressed ? 0.65 : 1 })}>
-              <Text style={{ fontSize: 12, fontWeight: '800', color: withAlpha(colors.fg, 0.7) }}>Not now</Text>
+              <Text style={{ fontSize: 12, fontWeight: '800', color: withAlpha(colors.fg, 0.7) }}>{t('Not now')}</Text>
             </Pressable>
           </View>
         </View>
       ) : proposalStatus === 'confirmed' && swapOptions && onChooseSwap ? (
         <View style={{ marginTop: 9, gap: 8 }}>
-          <Text style={{ fontSize: 11, fontWeight: '700', color: withAlpha(colors.fg, 0.45) }}>Pick a replacement</Text>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: withAlpha(colors.fg, 0.45) }}>{t('Pick a replacement')}</Text>
           {swapOptions.map((option) => (
             <Pressable key={option.id} onPress={() => onChooseSwap(option)} accessibilityRole="button" accessibilityLabel={`Replace with ${option.name}${option.recommended ? ', recommended' : ''}${option.muscleGroup ? `, ${option.muscleGroup}` : ''}`} style={({ pressed }) => ({ minHeight: 44, borderRadius: 11, borderWidth: option.recommended ? 1.5 : 1, borderColor: withAlpha(colors.brand400, option.recommended ? 0.7 : 0.35), paddingVertical: 9, paddingHorizontal: 12, backgroundColor: withAlpha(colors.brand400, pressed ? 0.16 : option.recommended ? 0.12 : 0.08) })}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Text style={{ fontSize: 12.5, fontWeight: '700', color: colors.fg }}>{option.name}</Text>
                 {option.recommended && (
-                  <Text style={{ fontSize: 9.5, fontWeight: '800', letterSpacing: 0.3, color: colors.brand400, backgroundColor: withAlpha(colors.brand400, 0.16), paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, overflow: 'hidden' }}>RECOMMENDED</Text>
+                  <Text style={{ fontSize: 9.5, fontWeight: '800', letterSpacing: 0.3, color: colors.brand400, backgroundColor: withAlpha(colors.brand400, 0.16), paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, overflow: 'hidden' }}>{t('RECOMMENDED')}</Text>
                 )}
               </View>
               {!!option.muscleGroup && <Text style={{ marginTop: 1, fontSize: 11, color: withAlpha(colors.fg, 0.5) }}>{option.muscleGroup}</Text>}
@@ -198,14 +200,14 @@ export function CoachActionCard({
         </View>
       ) : proposalStatus === 'confirmed' && undoActive && onUndo ? (
         <View style={{ marginTop: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Text style={{ fontSize: 11.5, fontWeight: '700', color: colors.brand400 }} accessibilityRole="text" accessibilityLabel="Change applied">Applied</Text>
+          <Text style={{ fontSize: 11.5, fontWeight: '700', color: colors.brand400 }} accessibilityRole="text" accessibilityLabel="Change applied">{t('Applied')}</Text>
           <Pressable onPress={onUndo} hitSlop={8} accessibilityRole="button" accessibilityLabel="Undo this change" style={({ pressed }) => ({ minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 11, backgroundColor: withAlpha(colors.fg, 0.07), opacity: pressed ? 0.65 : 1 })}>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: withAlpha(colors.fg, 0.7) }}>Undo</Text>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: withAlpha(colors.fg, 0.7) }}>{t('Undo')}</Text>
           </Pressable>
         </View>
       ) : (
         <Text style={{ marginTop: 8, fontSize: 11.5, fontWeight: '700', color: proposalStatus === 'confirmed' ? colors.brand400 : withAlpha(colors.fg, 0.4) }}>
-          {proposalStatus === 'confirmed' ? 'Confirmed' : proposalStatus === 'rejected' ? 'Cancelled' : 'Proposal expired'}
+          {proposalStatus === 'confirmed' ? t('Confirmed') : proposalStatus === 'rejected' ? t('Cancelled') : t('Proposal expired')}
         </Text>
       )}
     </View>
