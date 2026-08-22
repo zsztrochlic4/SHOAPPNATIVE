@@ -35,6 +35,7 @@ export function coachOutputLanguage(lang: Language): Language {
 type Dict = Record<string, string>
 
 const en: Dict = {
+  "The app is translated. Safety screening and coach replies stay in English until a qualified review signs them off.": "The app is translated. Safety screening and coach replies stay in English until a qualified review signs them off.",
   // ── app-wide (string-key, batch 2) ──
   " (You)": " (You)",
   " is the total weight lifted across all workouts (sets × reps × weight). ": " is the total weight lifted across all workouts (sets × reps × weight). ",
@@ -1040,6 +1041,7 @@ const en: Dict = {
 }
 
 const zh: Dict = {
+  "The app is translated. Safety screening and coach replies stay in English until a qualified review signs them off.": "应用已翻译。安全筛查和教练回复在通过合格审核之前仍保持英文。",
   // ── app-wide (string-key, batch 2) ──
   " (You)": " (你)",
   " is the total weight lifted across all workouts (sets × reps × weight). ": " 是所有训练中举起的训练总量（组数 × 次数 × 重量）。 ",
@@ -2042,6 +2044,7 @@ const zh: Dict = {
 }
 
 const hi: Dict = {
+  "The app is translated. Safety screening and coach replies stay in English until a qualified review signs them off.": "ऐप का अनुवाद हो चुका है। सुरक्षा स्क्रीनिंग और कोच के उत्तर योग्य समीक्षा द्वारा स्वीकृत होने तक अंग्रेज़ी में रहते हैं।",
   // ── app-wide (string-key, batch 2) ──
   " (You)": " (आप)",
   " is the total weight lifted across all workouts (sets × reps × weight). ": " सभी वर्कआउट में उठाया गया कुल वॉल्यूम है (सेट × रेप्स × वज़न)। ",
@@ -3044,6 +3047,7 @@ const hi: Dict = {
 }
 
 const ar: Dict = {
+  "The app is translated. Safety screening and coach replies stay in English until a qualified review signs them off.": "تمت ترجمة التطبيق. يبقى فحص السلامة وردود المدرب بالإنجليزية حتى تعتمدها مراجعة مختصة.",
   // ── app-wide (string-key, batch 2) ──
   " (You)": " (أنت)",
   " is the total weight lifted across all workouts (sets × reps × weight). ": " هو إجمالي حجم التدريب المرفوع عبر جميع التمارين (المجموعات × التكرارات × الوزن). ",
@@ -4046,6 +4050,7 @@ const ar: Dict = {
 }
 
 const vi: Dict = {
+  "The app is translated. Safety screening and coach replies stay in English until a qualified review signs them off.": "Ứng dụng đã được dịch. Phần sàng lọc an toàn và câu trả lời của huấn luyện viên vẫn bằng tiếng Anh cho đến khi được chuyên môn phê duyệt.",
   // ── app-wide (string-key, batch 2) ──
   " (You)": " (Bạn)",
   " is the total weight lifted across all workouts (sets × reps × weight). ": " là tổng khối lượng nâng trong tất cả buổi tập (hiệp × lần × mức tạ). ",

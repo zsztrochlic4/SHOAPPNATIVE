@@ -432,17 +432,18 @@ export function SettingsBody({ visible, onDone }: { visible: boolean; onDone?: (
                   >
                     <View className="min-w-0 flex-1">
                       <Text numberOfLines={1} className="font-bold leading-tight text-white" style={l.rtl ? { writingDirection: 'rtl' } : undefined}>{l.native}</Text>
-                      <Text className="text-[11px] text-secondary">{l.english}{l.code !== 'en' ? ' · partial' : ''}</Text>
+                      <Text className="text-[11px] text-secondary">{l.english}</Text>
                     </View>
                     {active && <Check size={16} strokeWidth={3} color={brand[400]} />}
                   </Pressable>
                 )
               })}
             </View>
-            {/* Honesty over implication (audit F-030): today's translations
-                cover Settings only — say so instead of promising a translated app. */}
+            {/* Honesty over implication (audit F-030): state what is NOT translated.
+                The app UI is localised, but the safety screening and coach replies
+                stay English until a clinical/native review signs them off. */}
             <Text className="mt-2 px-1 text-[11px] leading-4 text-tertiary">
-              {tr('Translations are a preview and currently cover Settings only — the rest of the app remains in English for now.')}
+              {tr('The app is translated. Safety screening and coach replies stay in English until a qualified review signs them off.')}
             </Text>
           </>
         )}
