@@ -4,6 +4,7 @@ import { GestureDetector } from 'react-native-gesture-handler'
 import Animated, { useAnimatedStyle, interpolate, Extrapolation } from 'react-native-reanimated'
 import { Menu, MessageCircle } from 'lucide-react-native'
 import { useColors } from '../theme'
+import { useT } from '../lib/useT'
 import { useHorizontalSwipe, SWIPE_COMMIT_RATIO } from '../lib/useHorizontalSwipe'
 import { IS_WEB, WEB_SCREEN } from './WebFrame'
 
@@ -31,6 +32,7 @@ export function SwipeNav({
   coachLabel?: string
 }) {
   const colors = useColors()
+  const t = useT()
   const [width, setWidth] = useState(IS_WEB ? WEB_SCREEN.width : 0)
   const { gesture, dragX } = useHorizontalSwipe({
     width: width || 402,
@@ -65,7 +67,7 @@ export function SwipeNav({
           style={[styles.pill, { left: 14, backgroundColor: colors.ink700 }, leftStyle]}
         >
           <Menu size={18} color={colors.brand400} />
-          <Text style={[styles.pillText, { color: colors.fg }]}>Menu</Text>
+          <Text style={[styles.pillText, { color: colors.fg }]}>{t('Menu')}</Text>
         </Animated.View>
         {onOpenCoach && (
           <Animated.View
