@@ -40,6 +40,7 @@ import Nutrition from './screens/Nutrition'
 import Progress from './screens/Progress'
 import Community from './screens/Community'
 import Onboarding from './screens/Onboarding'
+import { WelcomeTour } from './screens/WelcomeTour'
 import ActiveWorkout from './screens/ActiveWorkout'
 import { LogProgressSheet } from './screens/LogProgressSheet'
 import { CoachScreen } from './coach/CoachScreen'
@@ -82,6 +83,7 @@ const selectSoundEnabled = (state: AppState) => state.settings.soundEnabled ?? t
 const selectHapticsEnabled = (state: AppState) => state.settings.hapticsEnabled ?? true
 const selectReducedMotion = (state: AppState) => state.settings.reducedMotion ?? 'system'
 const selectOnboarded = (state: AppState) => state.profile.onboarded
+const selectWelcomeTourSeen = (state: AppState) => state.settings.welcomeTourSeen === true
 
 /**
  * Fades + slides each screen up by 10px when the active tab changes, mirroring
@@ -113,8 +115,10 @@ function ScreenFade({ tabKey, children }: { tabKey: string; children: React.Reac
 }
 
 function Shell() {
+  const { dispatch } = useStore()
   const { hydrated, persistenceError } = useStoreMeta()
   const onboarded = useStoreSelector(selectOnboarded)
+  const welcomeTourSeen = useStoreSelector(selectWelcomeTourSeen)
   const insets = useSafeAreaInsets()
   const [tab, setTab] = useState<TabKey>('dashboard')
   const [visitedTabs, setVisitedTabs] = useState<Set<TabKey>>(() => new Set(['dashboard']))
@@ -298,6 +302,13 @@ function Shell() {
       <ActiveWorkout open={overlay === 'activeWorkout'} onClose={nav.close} onComplete={() => nav.goTab('dashboard')} params={params} />
       <MenuDrawer open={menuOpen} onClose={nav.closeMenu} />
       {overlayContent}
+
+      {/* First-run Welcome tour — the four cards a paid user sees the very first time they land in
+          the app, floating over the dimmed dashboard. Rendered last so it sits above the nav and
+          every sheet; shows once per account (persisted in settings). See screens/WelcomeTour. */}
+      {onboarded && !welcomeTourSeen && (
+        <WelcomeTour onFinish={() => dispatch({ type: 'SET_SETTINGS', patch: { welcomeTourSeen: true } })} />
+      )}
     </NavProvider>
   )
 }

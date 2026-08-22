@@ -39,7 +39,7 @@ import type {
 // v13: + AppState.community (competition hub — persistent username + friend groups).
 // The current user's leaderboard row is always live (selectors.myLeaderStats); other
 // members are simulated locally until the Firestore backend lands.
-export const SCHEMA_VERSION = 13
+export const SCHEMA_VERSION = 14
 const DAYS = 40 // 0..38 completed history, 39 = today (in progress)
 
 /* round to nearest 2.5 (plate increments) */
