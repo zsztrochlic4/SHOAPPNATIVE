@@ -35,6 +35,14 @@ export function coachOutputLanguage(lang: Language): Language {
 type Dict = Record<string, string>
 
 const en: Dict = {
+  "Create your account": "Create your account",
+  "Name": "Name",
+  "Create account": "Create account",
+  "Sign in": "Sign in",
+  "New here? ": "New here? ",
+  "Create one": "Create one",
+  "Enter your email above first, then tap “Forgot password?”.": "Enter your email above first, then tap “Forgot password?”.",
+  "Password reset email sent. Check your inbox (and your spam folder).": "Password reset email sent. Check your inbox (and your spam folder).",
   "The app is translated. Safety screening and coach replies stay in English until a qualified review signs them off.": "The app is translated. Safety screening and coach replies stay in English until a qualified review signs them off.",
   // ── app-wide (string-key, batch 2) ──
   " (You)": " (You)",
@@ -1041,6 +1049,14 @@ const en: Dict = {
 }
 
 const zh: Dict = {
+  "Create your account": "创建你的账户",
+  "Name": "姓名",
+  "Create account": "创建账户",
+  "Sign in": "登录",
+  "New here? ": "初次使用？ ",
+  "Create one": "创建一个",
+  "Enter your email above first, then tap “Forgot password?”.": "请先在上方输入你的邮箱，然后点击“忘记密码？”。",
+  "Password reset email sent. Check your inbox (and your spam folder).": "密码重置邮件已发送。请查看收件箱（以及垃圾邮件文件夹）。",
   "The app is translated. Safety screening and coach replies stay in English until a qualified review signs them off.": "应用已翻译。安全筛查和教练回复在通过合格审核之前仍保持英文。",
   // ── app-wide (string-key, batch 2) ──
   " (You)": " (你)",
@@ -2044,6 +2060,14 @@ const zh: Dict = {
 }
 
 const hi: Dict = {
+  "Create your account": "अपना खाता बनाएँ",
+  "Name": "नाम",
+  "Create account": "खाता बनाएँ",
+  "Sign in": "साइन इन",
+  "New here? ": "यहाँ नए हैं? ",
+  "Create one": "एक बनाएँ",
+  "Enter your email above first, then tap “Forgot password?”.": "पहले ऊपर अपना ईमेल दर्ज करें, फिर “पासवर्ड भूल गए?” पर टैप करें।",
+  "Password reset email sent. Check your inbox (and your spam folder).": "पासवर्ड रीसेट ईमेल भेज दिया गया। अपना इनबॉक्स (और स्पैम फ़ोल्डर) देखें।",
   "The app is translated. Safety screening and coach replies stay in English until a qualified review signs them off.": "ऐप का अनुवाद हो चुका है। सुरक्षा स्क्रीनिंग और कोच के उत्तर योग्य समीक्षा द्वारा स्वीकृत होने तक अंग्रेज़ी में रहते हैं।",
   // ── app-wide (string-key, batch 2) ──
   " (You)": " (आप)",
@@ -3047,6 +3071,14 @@ const hi: Dict = {
 }
 
 const ar: Dict = {
+  "Create your account": "أنشئ حسابك",
+  "Name": "الاسم",
+  "Create account": "إنشاء حساب",
+  "Sign in": "تسجيل الدخول",
+  "New here? ": "جديد هنا؟ ",
+  "Create one": "أنشئ واحدًا",
+  "Enter your email above first, then tap “Forgot password?”.": "أدخل بريدك الإلكتروني بالأعلى أولًا، ثم اضغط على «هل نسيت كلمة المرور؟».",
+  "Password reset email sent. Check your inbox (and your spam folder).": "تم إرسال بريد إعادة تعيين كلمة المرور. تحقّق من صندوق الوارد (ومجلد البريد العشوائي).",
   "The app is translated. Safety screening and coach replies stay in English until a qualified review signs them off.": "تمت ترجمة التطبيق. يبقى فحص السلامة وردود المدرب بالإنجليزية حتى تعتمدها مراجعة مختصة.",
   // ── app-wide (string-key, batch 2) ──
   " (You)": " (أنت)",
@@ -4050,6 +4082,14 @@ const ar: Dict = {
 }
 
 const vi: Dict = {
+  "Create your account": "Tạo tài khoản của bạn",
+  "Name": "Tên",
+  "Create account": "Tạo tài khoản",
+  "Sign in": "Đăng nhập",
+  "New here? ": "Mới đến? ",
+  "Create one": "Tạo một tài khoản",
+  "Enter your email above first, then tap “Forgot password?”.": "Nhập email của bạn ở trên trước, rồi chạm “Quên mật khẩu?”.",
+  "Password reset email sent. Check your inbox (and your spam folder).": "Đã gửi email đặt lại mật khẩu. Kiểm tra hộp thư đến (và thư mục spam).",
   "The app is translated. Safety screening and coach replies stay in English until a qualified review signs them off.": "Ứng dụng đã được dịch. Phần sàng lọc an toàn và câu trả lời của huấn luyện viên vẫn bằng tiếng Anh cho đến khi được chuyên môn phê duyệt.",
   // ── app-wide (string-key, batch 2) ──
   " (You)": " (Bạn)",

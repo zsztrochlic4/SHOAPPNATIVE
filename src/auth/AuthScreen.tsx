@@ -6,9 +6,11 @@ import { PressableScale } from '../components/PressableScale'
 import { useAuth } from './AuthProvider'
 import { friendlyError } from './authErrors'
 import { brand } from '../theme'
+import { useT } from '../lib/useT'
 
 export function AuthScreen({ initialMode = 'signin', onBack }: { initialMode?: 'signin' | 'signup'; onBack?: () => void }) {
   const insets = useSafeAreaInsets()
+  const t = useT()
   const { signIn, signUp, signInWithGoogle, resetPassword } = useAuth()
   const [mode, setMode] = useState<'signin' | 'signup'>(initialMode)
   const [name, setName] = useState('')
@@ -22,13 +24,13 @@ export function AuthScreen({ initialMode = 'signin', onBack }: { initialMode?: '
     setError(null)
     setNotice(null)
     if (!email.trim()) {
-      setError('Enter your email above first, then tap “Forgot password?”.')
+      setError(t('Enter your email above first, then tap “Forgot password?”.'))
       return
     }
     setBusy(true)
     try {
       await resetPassword(email)
-      setNotice('Password reset email sent. Check your inbox (and your spam folder).')
+      setNotice(t('Password reset email sent. Check your inbox (and your spam folder).'))
     } catch (e: unknown) {
       const code = (e as { code?: string })?.code ?? ''
       setError(friendlyError(code) || (e as Error)?.message || 'Couldn’t send the reset email.')
@@ -83,24 +85,24 @@ export function AuthScreen({ initialMode = 'signin', onBack }: { initialMode?: '
         <View className="mb-8 items-center">
           <LogoMark size={52} />
           <Text className="mt-4 text-2xl font-extrabold tracking-tight text-white">StrengthHub Online</Text>
-          <Text className="mt-1 text-[14px] text-secondary">{isSignup ? 'Create your account' : 'Welcome back'}</Text>
+          <Text className="mt-1 text-[14px] text-secondary">{isSignup ? t('Create your account') : t('Welcome back')}</Text>
         </View>
 
         {isSignup && (
-          <Field label="Name" value={name} onChangeText={setName} placeholder="Alex Morgan" autoCapitalize="words" />
+          <Field label={t('Name')} value={name} onChangeText={setName} placeholder="Alex Morgan" autoCapitalize="words" />
         )}
         <Field
-          label="Email" value={email} onChangeText={setEmail} placeholder="you@university.edu"
+          label={t('Email')} value={email} onChangeText={setEmail} placeholder="you@university.edu"
           keyboardType="email-address" autoCapitalize="none" autoComplete="email"
         />
         <Field
-          label="Password" value={password} onChangeText={setPassword} placeholder="••••••••"
+          label={t('Password')} value={password} onChangeText={setPassword} placeholder="••••••••"
           secureTextEntry autoCapitalize="none"
         />
 
         {!isSignup && (
           <Pressable onPress={forgot} disabled={busy} hitSlop={6} className="mt-2 self-end active:opacity-70">
-            <Text className="text-[13px] font-semibold" style={{ color: brand[400] }}>Forgot password?</Text>
+            <Text className="text-[13px] font-semibold" style={{ color: brand[400] }}>{t('Forgot password?')}</Text>
           </Pressable>
         )}
 
@@ -122,7 +124,7 @@ export function AuthScreen({ initialMode = 'signin', onBack }: { initialMode?: '
           className={`btn-primary mt-5 w-full ${busy ? 'opacity-60' : ''}`}
         >
           {busy ? <ActivityIndicator color="#000" /> : (
-            <Text className="font-semibold text-black">{isSignup ? 'Create account' : 'Sign in'}</Text>
+            <Text className="font-semibold text-black">{isSignup ? t('Create account') : t('Sign in')}</Text>
           )}
         </PressableScale>
 
@@ -130,7 +132,7 @@ export function AuthScreen({ initialMode = 'signin', onBack }: { initialMode?: '
           <>
             <View className="my-5 flex-row items-center gap-3">
               <View className="h-px flex-1 bg-white/10" />
-              <Text className="text-[12px] text-tertiary">or</Text>
+              <Text className="text-[12px] text-tertiary">{t('or')}</Text>
               <View className="h-px flex-1 bg-white/10" />
             </View>
 
@@ -141,15 +143,15 @@ export function AuthScreen({ initialMode = 'signin', onBack }: { initialMode?: '
               accessibilityLabel="Continue with Google"
               className={`w-full flex-row items-center justify-center gap-2 rounded-full border border-white/15 bg-ink-800 py-3 ${busy ? 'opacity-60' : ''}`}
             >
-              <Text className="font-semibold text-white">Continue with Google</Text>
+              <Text className="font-semibold text-white">{t('Continue with Google')}</Text>
             </PressableScale>
           </>
         )}
 
         <Pressable onPress={() => { setMode(isSignup ? 'signin' : 'signup'); setError(null); setNotice(null) }} className="mt-6 active:opacity-70">
           <Text className="text-center text-[14px] text-secondary">
-            {isSignup ? 'Already have an account? ' : 'New here? '}
-            <Text className="font-bold" style={{ color: brand[400] }}>{isSignup ? 'Sign in' : 'Create one'}</Text>
+            {isSignup ? t('Already have an account? ') : t('New here? ')}
+            <Text className="font-bold" style={{ color: brand[400] }}>{isSignup ? t('Sign in') : t('Create one')}</Text>
           </Text>
         </Pressable>
       </ScrollView>
