@@ -1676,7 +1676,7 @@ function Under18({ onBack }: { onBack: () => void }) {
         <Reveal delay={340}><Text style={{ marginTop: 12, fontSize: 14, lineHeight: 21.7, color: tok.rgb('--fg', 0.45) }}>{t('In the meantime, staying active with sport and everyday movement is a great foundation.')}</Text></Reveal>
       </View>
       <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 26 }}>
-        <Pressable onPress={onBack} style={{ height: 54, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: tok.rgb('--fg', 0.1) }}><Text style={{ fontSize: 16, fontWeight: '700', color: tok.rgb('--fg') }}>{t('Back')}</Text></Pressable>
+        <Pressable onPress={onBack} style={{ height: 54, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: tok.rgb('--fg', 0.1) }}><Text style={{ fontSize: 16, fontWeight: '700', color: tok.rgb('--fg') }}>{t('Go back')}</Text></Pressable>
       </View>
     </View>
   )
