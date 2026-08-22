@@ -37,6 +37,28 @@ type Dict = Record<string, string>
 const en: Dict = {
   // dashboard
   // paywall
+  // activeWorkout
+  "aw.activeWorkout": "Active Workout",
+  "aw.todaysGoal": "Today's goal",
+  "aw.keepGoing": "Keep going",
+  "aw.now": "Now",
+  "aw.optional": "Optional",
+  "aw.form": "Form",
+  "aw.allExercises": "All exercises",
+  "aw.notSureHow": "Not sure how? Show me",
+  "aw.work": "Work",
+  "aw.recommended": "Recommended",
+  "aw.repsDone": "Reps done",
+  "aw.stepByStep": "Step by step",
+  "aw.gotIt": "Got it",
+  "aw.list": "List",
+  "aw.rest": "Rest",
+  "aw.skip": "Skip",
+  "aw.untilNextSet": "until next set",
+  "aw.tapCentreStart": "Tap the centre to start now",
+  "aw.tapToBegin": "Tap to begin",
+  "aw.newPR": "New PR",
+  "aw.continue": "Continue",
   // community
   "cm.title": "Community",
   "cm.setUsername": "Set username",
@@ -253,6 +275,28 @@ const en: Dict = {
 const zh: Dict = {
   // dashboard
   // paywall
+  // activeWorkout
+  "aw.activeWorkout": "进行中的训练",
+  "aw.todaysGoal": "今日目标",
+  "aw.keepGoing": "继续加油",
+  "aw.now": "进行中",
+  "aw.optional": "可选",
+  "aw.form": "动作要领",
+  "aw.allExercises": "全部动作",
+  "aw.notSureHow": "不确定怎么做？给我演示",
+  "aw.work": "做组",
+  "aw.recommended": "推荐",
+  "aw.repsDone": "完成次数",
+  "aw.stepByStep": "逐步指导",
+  "aw.gotIt": "明白了",
+  "aw.list": "列表",
+  "aw.rest": "休息",
+  "aw.skip": "跳过",
+  "aw.untilNextSet": "直到下一组",
+  "aw.tapCentreStart": "点击中心立即开始",
+  "aw.tapToBegin": "点击开始",
+  "aw.newPR": "新纪录",
+  "aw.continue": "继续",
   // community
   "cm.title": "社区",
   "cm.setUsername": "设置用户名",
@@ -466,6 +510,28 @@ const zh: Dict = {
 const hi: Dict = {
   // dashboard
   // paywall
+  // activeWorkout
+  "aw.activeWorkout": "चालू वर्कआउट",
+  "aw.todaysGoal": "आज का लक्ष्य",
+  "aw.keepGoing": "लगे रहें",
+  "aw.now": "अभी",
+  "aw.optional": "वैकल्पिक",
+  "aw.form": "फ़ॉर्म",
+  "aw.allExercises": "सभी एक्सरसाइज़",
+  "aw.notSureHow": "पता नहीं कैसे? मुझे दिखाएं",
+  "aw.work": "वर्क",
+  "aw.recommended": "अनुशंसित",
+  "aw.repsDone": "किए गए रेप",
+  "aw.stepByStep": "कदम दर कदम",
+  "aw.gotIt": "समझ गया",
+  "aw.list": "सूची",
+  "aw.rest": "आराम",
+  "aw.skip": "छोड़ें",
+  "aw.untilNextSet": "अगले सेट तक",
+  "aw.tapCentreStart": "अभी शुरू करने के लिए बीच में टैप करें",
+  "aw.tapToBegin": "शुरू करने के लिए टैप करें",
+  "aw.newPR": "नया PR",
+  "aw.continue": "जारी रखें",
   // community
   "cm.title": "कम्युनिटी",
   "cm.setUsername": "यूज़रनेम सेट करें",
@@ -679,6 +745,28 @@ const hi: Dict = {
 const ar: Dict = {
   // dashboard
   // paywall
+  // activeWorkout
+  "aw.activeWorkout": "التمرين النشط",
+  "aw.todaysGoal": "هدف اليوم",
+  "aw.keepGoing": "واصل",
+  "aw.now": "الآن",
+  "aw.optional": "اختياري",
+  "aw.form": "الأداء",
+  "aw.allExercises": "كل التمارين",
+  "aw.notSureHow": "لست متأكدًا كيف؟ أرِني",
+  "aw.work": "العمل",
+  "aw.recommended": "موصى به",
+  "aw.repsDone": "التكرارات المنجزة",
+  "aw.stepByStep": "خطوة بخطوة",
+  "aw.gotIt": "فهمت",
+  "aw.list": "القائمة",
+  "aw.rest": "راحة",
+  "aw.skip": "تخطّي",
+  "aw.untilNextSet": "حتى المجموعة التالية",
+  "aw.tapCentreStart": "انقر المنتصف للبدء الآن",
+  "aw.tapToBegin": "انقر للبدء",
+  "aw.newPR": "رقم قياسي جديد",
+  "aw.continue": "متابعة",
   // community
   "cm.title": "المجتمع",
   "cm.setUsername": "تعيين اسم المستخدم",
@@ -892,6 +980,28 @@ const ar: Dict = {
 const vi: Dict = {
   // dashboard
   // paywall
+  // activeWorkout
+  "aw.activeWorkout": "Buổi tập đang diễn ra",
+  "aw.todaysGoal": "Mục tiêu hôm nay",
+  "aw.keepGoing": "Cố lên",
+  "aw.now": "Bây giờ",
+  "aw.optional": "Tùy chọn",
+  "aw.form": "Kỹ thuật",
+  "aw.allExercises": "Tất cả bài tập",
+  "aw.notSureHow": "Không rõ cách làm? Hướng dẫn tôi",
+  "aw.work": "Tập",
+  "aw.recommended": "Đề xuất",
+  "aw.repsDone": "Số rep đã làm",
+  "aw.stepByStep": "Từng bước",
+  "aw.gotIt": "Đã hiểu",
+  "aw.list": "Danh sách",
+  "aw.rest": "Nghỉ",
+  "aw.skip": "Bỏ qua",
+  "aw.untilNextSet": "đến set tiếp theo",
+  "aw.tapCentreStart": "Chạm vào giữa để bắt đầu ngay",
+  "aw.tapToBegin": "Chạm để bắt đầu",
+  "aw.newPR": "Kỷ lục mới",
+  "aw.continue": "Tiếp tục",
   // community
   "cm.title": "Cộng đồng",
   "cm.setUsername": "Đặt tên người dùng",
